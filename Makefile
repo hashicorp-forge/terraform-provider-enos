@@ -5,15 +5,17 @@ NAME=enos
 BINARY=terraform-provider-enos
 VERSION=0.1
 OS_ARCH=darwin_amd64
+GLOBAL_BUILD_TAGS=-tags osusergo,netgo
+GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
 
 default: install
 
 build:
-	go build -o ${BINARY}
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ${BINARY}
 
 release:
-	GOOS=darwin GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_darwin_amd64
-	GOOS=linux GOARCH=amd64 go build -o ./bin/${BINARY}_${VERSION}_linux_amd64
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_darwin_amd64
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_linux_amd64
 
 install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
