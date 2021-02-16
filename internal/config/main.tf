@@ -2,12 +2,12 @@ terraform {
   required_providers {
     enos = {
       version = "~> 0.1"
-      source   = "hashicorp.com/qti/enos"
+      source  = "hashicorp.com/qti/enos"
     }
   }
 }
 
-provider "enos" { }
+provider "enos" {}
 
 output "transport_user" {
   value = data.enos_transport.default.ssh.user
