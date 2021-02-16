@@ -1,0 +1,54 @@
+name: Validate
+
+on:
+  push:
+#     branches-ignore:
+#       - main
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    container: docker.mirror.hashicorp.services/library/golang:1.15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Test code
+        run: make test
+
+  acceptance:
+    runs-on: ubuntu-latest
+    container: docker.mirror.hashicorp.services/library/golang:1.15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Acceptance Tests
+        run: make testacc
+
+  terraform:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.mirror.hashicorp.services/hashicorp/terraform:0.14.6
+      options: "--entrypoint=\"\""
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Test Terraform
+        run: |
+          cd internal/config
+          terraform fmt -check
+          #TODO: figure out how to access hashicorp.com/qti/enos after build.
+          # terraform init -backend=false
+          # terraform validate
+
+  #TODO: Fix codeql and opt in?
+  # codeql:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Initialize CodeQL
+  #       uses: github/codeql-action/init@v1
+  #       with:
+  #         languages: go
+  #     - run: |
+  #         make release
+  #     - name: Perform CodeQL Analysis
+  #       uses: github/codeql-action/analyze@v1
