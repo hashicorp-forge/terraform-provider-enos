@@ -2,10 +2,23 @@ name: Validate
 
 on:
   push:
-#     branches-ignore:
-#       - main
 
 jobs:
+  build-and-terraform:
+    runs-on: ubuntu-latest
+    # container: docker.mirror.hashicorp.services/library/golang:1.15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build code
+        run: make tftest # runs build + install make targets
+      # - name: Upload artifacts to actions workflow
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: ${{ github.event.repository.name }}-artifacts
+      #     path: |
+      #       ./bin/
+
   unit:
     runs-on: ubuntu-latest
     container: docker.mirror.hashicorp.services/library/golang:1.15
@@ -24,11 +37,9 @@ jobs:
       - name: Acceptance Tests
         run: make testacc
 
-  terraform:
+  go-lint:
     runs-on: ubuntu-latest
-    container:
-      image: docker.mirror.hashicorp.services/hashicorp/terraform:0.14.6
-      options: "--entrypoint=\"\""
+    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -39,8 +50,10 @@ jobs:
           #TODO: figure out how to access hashicorp.com/qti/enos after build.
           # terraform init -backend=false
           # terraform validate
+      - name: Go Lint
+        run: golangci-lint run
 
-  #TODO: Fix codeql and opt in?
+  # TODO: Fix codeql and opt in?
   # codeql:
   #   runs-on: ubuntu-latest
   #   steps:
