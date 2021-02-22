@@ -1,5 +1,4 @@
 ![Validation](https://github.com/hashicorp/enos-provider/.github/workflows/validate.yml/badge.svg)
-![Build](https://github.com/hashicorp/enos-provider/.github/workflows/build.yml/badge.svg)
 
 # enos-provider
 A terraform provider for quality infrastructure
