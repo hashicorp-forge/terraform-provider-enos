@@ -15,7 +15,6 @@ bin/*
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Config
-internal/config/.terraform/*
-internal/config/.terraform*
-internal/config/terraform*
+# Example terraform state
+examples/.terraform/*
+examples/*/*terraform*

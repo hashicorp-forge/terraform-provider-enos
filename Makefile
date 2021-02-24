@@ -11,7 +11,7 @@ GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
 default: install
 
 build:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ${BINARY}
+	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ${BINARY}
 
 release:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_darwin_amd64
@@ -22,8 +22,8 @@ install: build
 	mv ${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 
 test:
-	go test -i $(TEST) || exit 1
-	echo $(TEST) | xargs -t -n4 go test $(TESTARGS) -timeout=30s -parallel=4
+	go test -vi $(TEST) || exit 1
+	echo $(TEST) | xargs -t -n4 go test -v $(TESTARGS) -timeout=30s -parallel=4
 
 testacc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m

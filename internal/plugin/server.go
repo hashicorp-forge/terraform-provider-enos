@@ -12,8 +12,10 @@ func Server() tfprotov5.ProviderServer {
 	return server.New(
 		server.RegisterProvider(NewProvider()),
 		server.RegisterDataRouter(datarouter.New(
-			datarouter.RegisterDataSource(&transport{}),
+			datarouter.RegisterDataSource(newTransport()),
 		)),
-		server.RegisterResourceRouter(resourcerouter.New()),
+		server.RegisterResourceRouter(resourcerouter.New(
+			resourcerouter.RegisterResource(newFile()),
+		)),
 	)
 }
