@@ -143,13 +143,13 @@ func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
 // always match the schema that is passed in as user configuration.
 func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
 	defaultValues := map[string]tftypes.Value{
-		"user":             stringValue(em.SSH.User),
-		"host":             stringValue(em.SSH.Host),
-		"private_key":      stringValue(em.SSH.PrivateKey),
-		"private_key_path": stringValue(em.SSH.PrivateKeyPath),
+		"user":             tfMarshalStringValue(em.SSH.User),
+		"host":             tfMarshalStringValue(em.SSH.Host),
+		"private_key":      tfMarshalStringValue(em.SSH.PrivateKey),
+		"private_key_path": tfMarshalStringValue(em.SSH.PrivateKeyPath),
 
-		"passphrase":      stringValue(em.SSH.Passphrase),
-		"passphrase_path": stringValue(em.SSH.PassphrasePath),
+		"passphrase":      tfMarshalStringValue(em.SSH.Passphrase),
+		"passphrase_path": tfMarshalStringValue(em.SSH.PassphrasePath),
 	}
 
 	// The SSH Values are set if the struct is built dynamically from user
@@ -257,4 +257,25 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 	}
 
 	return ssh.New(sshOpts...)
+}
+
+// transportReplacedAttributePaths returns a slice of changed attribute paths that
+// require the resource to be replaced.
+func transportReplacedAttributePaths(priorState, proposedState *embeddedTransportV1) []*tftypes.AttributePath {
+	attrs := []*tftypes.AttributePath{}
+
+	// We could be super conservative here and replace if _any_ transport option
+	// changes, however, I think host is the only surefire option that warrants
+	// replacement.
+	if priorState.SSH.Host != proposedState.SSH.Host {
+		attrs = append(attrs, &tftypes.AttributePath{
+			Steps: []tftypes.AttributePathStep{
+				tftypes.AttributeName("transport"),
+				tftypes.AttributeName("ssh"),
+				tftypes.AttributeName("host"),
+			},
+		})
+	}
+
+	return attrs
 }

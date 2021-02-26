@@ -70,14 +70,7 @@ func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov
 	return marshal(currentState)
 }
 
-func mapAttributeTo(vals map[string]tftypes.Value, key string, to interface{}) error {
-	if vals[key].IsKnown() && !vals[key].IsNull() {
-		return vals[key].As(to)
-	}
-
-	return nil
-}
-
+// mapAttributesTo is a helper to ease mapping basic string, bool, and number tftypes.Types to corresponding go values. The val input should be a top-level marshaled tftypes.Object. The props is a property map that dictates which val field to map to the which go value. The value of the prop map should be a pointer to valid value. 
 func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[string]tftypes.Value, error) {
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
@@ -86,7 +79,11 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 	}
 
 	for key, to := range props {
-		err := mapAttributeTo(vals, key, to)
+		if !vals[key].IsKnown() || vals[key].IsNull() {
+			continue
+		}
+
+		err = vals[key].As(to)
 		if err != nil {
 			return vals, err
 		}
@@ -95,10 +92,78 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 	return vals, nil
 }
 
-func stringValue(val string) tftypes.Value {
+func tfUnmarshalStringSlice(val tftypes.Value) ([]string, error) {
+	strings := []string{}
+	vals := []tftypes.Value{}
+	err := val.As(&vals)
+	if err != nil {
+		return strings, err
+	}
+
+	str := ""
+	for _, strVal := range vals {
+		err = strVal.As(&str)
+		if err != nil {
+			return strings, err
+		}
+
+		strings = append(strings, str)
+	}
+
+	return strings, nil
+}
+
+func tfUnmarshalStringMap(val tftypes.Value) (map[string]string, error) {
+	strings := map[string]string{}
+	vals := map[string]tftypes.Value{}
+	err := val.As(&vals)
+	if err != nil {
+		return strings, err
+	}
+
+	str := ""
+	for strKey, strVal := range vals {
+		err = strVal.As(&str)
+		if err != nil {
+			return strings, err
+		}
+
+		strings[strKey] = str
+	}
+
+	return strings, nil
+}
+
+func tfMarshalStringValue(val string) tftypes.Value {
 	if val == "" {
 		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
 	}
 
 	return tftypes.NewValue(tftypes.String, val)
+}
+
+func tfMarshalStringSlice(vals []string) tftypes.Value {
+	if len(vals) == 0 {
+		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)
+	}
+
+	values := []tftypes.Value{}
+	for _, val := range vals {
+		values = append(values, tftypes.NewValue(tftypes.String, val))
+	}
+
+	return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, values)
+}
+
+func tfMarshalStringMap(vals map[string]string) tftypes.Value {
+	if len(vals) == 0 {
+		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
+	}
+
+	values := map[string]tftypes.Value{}
+	for key, val := range vals {
+		values[key] = tftypes.NewValue(tftypes.String, val)
+	}
+
+	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)
 }

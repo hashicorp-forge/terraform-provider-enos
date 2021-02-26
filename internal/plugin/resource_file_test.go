@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-type testAccResourceFileCase struct {
+type testAccResourceTemplate struct {
 	name  string
 	state State
 	check resource.TestCheckFunc
@@ -54,7 +54,7 @@ EOF
 		}
 	}`))
 
-	cases := []testAccResourceFileCase{}
+	cases := []testAccResourceTemplate{}
 
 	keyNoPass := newFileState()
 	keyNoPass.ID = "foo"
@@ -65,7 +65,7 @@ EOF
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	keyNoPass.Transport.SSH.PrivateKey = privateKey
-	cases = append(cases, testAccResourceFileCase{
+	cases = append(cases, testAccResourceTemplate{
 		"private key value with no passphrase",
 		keyNoPass,
 		resource.ComposeTestCheckFunc(
@@ -85,7 +85,7 @@ EOF
 	keyPathNoPass.Transport.SSH.User = "ubuntu"
 	keyPathNoPass.Transport.SSH.Host = "localhost"
 	keyPathNoPass.Transport.SSH.PrivateKeyPath = "../fixtures/ssh.pem"
-	cases = append(cases, testAccResourceFileCase{
+	cases = append(cases, testAccResourceTemplate{
 		"private key from a file path with no passphrase",
 		keyPathNoPass,
 		resource.ComposeTestCheckFunc(),
@@ -102,7 +102,7 @@ EOF
 	passphrase, err := readTestFile("../fixtures/passphrase.txt")
 	require.NoError(t, err)
 	keyPass.Transport.SSH.Passphrase = passphrase
-	cases = append(cases, testAccResourceFileCase{
+	cases = append(cases, testAccResourceTemplate{
 		"private key value with passphrase value",
 		keyPass,
 		resource.ComposeTestCheckFunc(),
@@ -117,7 +117,7 @@ EOF
 	keyPassPath.Transport.SSH.Host = "localhost"
 	keyPassPath.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
 	keyPassPath.Transport.SSH.PassphrasePath = "../fixtures/passphrase.txt"
-	cases = append(cases, testAccResourceFileCase{
+	cases = append(cases, testAccResourceTemplate{
 		"private key value with passphrase from file path",
 		keyPassPath,
 		resource.ComposeTestCheckFunc(),
@@ -126,7 +126,9 @@ EOF
 
 	// To do a real test, set the environment variables when running `make testacc`
 	host, ok := os.LookupEnv("ENOS_TRANSPORT_HOST")
-	if ok {
+	if !ok {
+		t.Skip("SSH tests are skipped unless ENOS_TRANSPORT_* environment variables are set")
+	} else {
 		realTest := newFileState()
 		realTest.ID = "real"
 		realTest.Src = "../fixtures/src.txt"
@@ -135,7 +137,7 @@ EOF
 		realTest.Transport.SSH.Host = host
 		realTest.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_KEY_PATH")
 		realTest.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
-		cases = append(cases, testAccResourceFileCase{
+		cases = append(cases, testAccResourceTemplate{
 			"real_test",
 			realTest,
 			resource.ComposeTestCheckFunc(),

@@ -238,11 +238,11 @@ func (ts *dataTransportStateV1) Terraform5TypeSSH() tftypes.Type {
 // Terraform5ValueSSH is the tftypes.Value for the data transport SSH state.
 func (ts *dataTransportStateV1) Terraform5ValueSSH() tftypes.Value {
 	return tftypes.NewValue(ts.Terraform5TypeSSH(), map[string]tftypes.Value{
-		"user":             stringValue(ts.Transport.SSH.User),
-		"host":             stringValue(ts.Transport.SSH.Host),
-		"private_key":      stringValue(ts.Transport.SSH.PrivateKey),
-		"private_key_path": stringValue(ts.Transport.SSH.PrivateKeyPath),
-		"passphrase":       stringValue(ts.Transport.SSH.Passphrase),
-		"passphrase_path":  stringValue(ts.Transport.SSH.PassphrasePath),
+		"user":             tfMarshalStringValue(ts.Transport.SSH.User),
+		"host":             tfMarshalStringValue(ts.Transport.SSH.Host),
+		"private_key":      tfMarshalStringValue(ts.Transport.SSH.PrivateKey),
+		"private_key_path": tfMarshalStringValue(ts.Transport.SSH.PrivateKeyPath),
+		"passphrase":       tfMarshalStringValue(ts.Transport.SSH.Passphrase),
+		"passphrase_path":  tfMarshalStringValue(ts.Transport.SSH.PassphrasePath),
 	})
 }

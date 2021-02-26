@@ -44,8 +44,8 @@ resource "aws_instance" "target" {
 resource "enos_file" "foo" {
   depends_on = [aws_instance.target]
 
-  source      = "/tmp/foo"
-  destination = "/tmp/bar"
+  source      = "${path.module}/files/foo.txt"
+  destination = "/tmp/bar.txt"
   transport   = {
     ssh                = {
       user             = "ubuntu"
@@ -55,22 +55,20 @@ resource "enos_file" "foo" {
   }
 }
 
-/*
-data "enos_transport" "target" {
-  depends_on = [aws_instance.target]
+resource "enos_remote_exec" "foo" {
+  depends_on = [
+    aws_instance.target,
+    enos_file.foo
+  ]
 
-  ssh {
-    user = "ubuntu"
-    host = aws_instance.target.public_ip
-    private_key_path = var.key_path
+  inline  = ["cp /tmp/bar.txt /tmp/baz.txt"]
+  scripts = ["${path.module}/files/script.sh"]
+
+  transport            = {
+    ssh                = {
+      user             = "ubuntu"
+      host             = aws_instance.target.public_ip
+      private_key_path = var.key_path
+    }
   }
 }
-
-resource "enos_file" "foo" {
-  depends_on = [data.enos_transport.target]
-
-  source      = "/tmp/foo"
-  destination = "/tmp/enos/bar"
-  transport   = data.enos_transport.target.out
-}
-*/
