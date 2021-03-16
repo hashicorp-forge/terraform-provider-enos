@@ -37,9 +37,11 @@ jobs:
       - name: Acceptance Tests
         run: make testacc
 
-  go-lint:
+  terraform:
     runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest
+    container:
+      image: docker.mirror.hashicorp.services/hashicorp/terraform:0.14.6
+      options: "--entrypoint=\"\""
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -50,8 +52,15 @@ jobs:
           #TODO: figure out how to access hashicorp.com/qti/enos after build.
           # terraform init -backend=false
           # terraform validate
-      - name: Go Lint
-        run: golangci-lint run
+
+  go-lint:
+      runs-on: ubuntu-latest
+      container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+        - name: Go Lint
+          run: golangci-lint run
 
   # TODO:
   # Add security scan

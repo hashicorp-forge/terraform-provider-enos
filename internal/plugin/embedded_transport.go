@@ -356,24 +356,3 @@ func transportRequiredReplace(priorHost, proposedHost string) []*tftypes.Attribu
 
 	return nil
 }
-
-// transportReplacedAttributePaths returns a slice of changed attribute paths that
-// require the resource to be replaced.
-func transportReplacedAttributePaths(priorState, proposedState *embeddedTransportV1) []*tftypes.AttributePath {
-	attrs := []*tftypes.AttributePath{}
-
-	// We could be super conservative here and replace if _any_ transport option
-	// changes, however, I think host is the only surefire option that warrants
-	// replacement.
-	if priorState.SSH.Host != proposedState.SSH.Host {
-		attrs = append(attrs, &tftypes.AttributePath{
-			Steps: []tftypes.AttributePathStep{
-				tftypes.AttributeName("transport"),
-				tftypes.AttributeName("ssh"),
-				tftypes.AttributeName("host"),
-			},
-		})
-	}
-
-	return attrs
-}

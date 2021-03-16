@@ -23,17 +23,17 @@ ifeq ($(CI), true)
 		--rm-dist --snapshot \
 		--config build.goreleaser.yml
 else
-	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
+	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./dist/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
 
 	echo ${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH)
 	mkdir -p .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
-	cp ./bin/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
+	cp ./dist/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
 endif
 
 install: release
 	for os_arch in $$(ls -la ./dist | grep ${BINARY} | cut -f 2-3 -d '_') ; do \
-		mkdir -p .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch ; \
-		cp ./dist/${BINARY}_$$os_arch/${BINARY} .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/ ; \
+		mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch ; \
+		cp ./dist/${BINARY}_$$os_arch/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/ ; \
 	done
 
 test:
@@ -41,7 +41,7 @@ test:
 	echo $(TEST) | xargs -t -n4 go test -v $(TESTARGS) -timeout=30s -parallel=4
 
 tftest: install
-	terraform init -plugin-dir .terraform.d/plugins examples/core
+	terraform init examples/core
 	terraform fmt -check -recursive examples/core
 	terraform validate examples/core
 
