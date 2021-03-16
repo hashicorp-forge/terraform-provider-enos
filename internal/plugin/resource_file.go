@@ -10,7 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
 
-type file struct{}
+type file struct {
+	providerConfig *config
+}
 
 var _ resourcerouter.Resource = (*file)(nil)
 
@@ -25,7 +27,9 @@ type fileStateV1 struct {
 var _ State = (*fileStateV1)(nil)
 
 func newFile() *file {
-	return &file{}
+	return &file{
+		providerConfig: newProviderConfig(),
+	}
 }
 
 func newFileState() *fileStateV1 {
@@ -42,144 +46,56 @@ func (f *file) Schema() *tfprotov5.Schema {
 	return newFileState().Schema()
 }
 
+func (f *file) SetProviderConfig(providerConfig tftypes.Value) error {
+	return f.providerConfig.FromTerraform5Value(providerConfig)
+}
+
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
 func (f *file) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
-	res := &tfprotov5.ValidateResourceTypeConfigResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
 	newState := newFileState()
-	err := unmarshal(newState, req.Config)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
 
-	return res, err
+	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-//
-// Upgrading the resource state generally goes as follows:
-//
-//   1. Unmarshal the RawState to the corresponding tftypes.Value that matches
-//     schema version of the state we're upgrading from.
-//   2. Create a new tftypes.Value for the current state and migrate the old
-//    values to the new values.
-//   3. Upgrade the existing state with the new values and return the marshaled
-//    version of the current upgraded state.
-//
 func (f *file) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
-	res := &tfprotov5.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
+	newState := newFileState()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	switch req.Version {
-	case 1:
-		// 1. unmarshal the raw state against the type that maps to the raw state
-		// version. As this is version 1 and we're on version 1 we can use the
-		// current state type.
-		newState := newFileState()
-		rawStateValues, err := req.RawState.Unmarshal(newState.Terraform5Type())
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-				err,
-				"upgrade error",
-				"unable to map version 1 to the current state",
-			)))
-			return res, err
-		}
-
-		// 2. Since we're on version one we can pass the same values in without
-		// doing a transform.
-
-		// 3. Upgrade the current state with the new values, or in this case,
-		// the raw values.
-		res.UpgradedState, err = upgradeState(newState, rawStateValues)
-
-		return res, err
-	default:
-		err := newErrWithDiagnostics(
-			"Unexpected state version",
-			"The provider doesn't know how to upgrade from the current state version",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
+	return transportUtil.UpgradeResourceState(ctx, newState, req)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
 func (f *file) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
-	res := &tfprotov5.ReadResourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	// unmarshal and re-marshal the state to add default fields
 	newState := newFileState()
-	err := unmarshal(newState, req.CurrentState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
 
-	res.NewState, err = marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
+	return transportUtil.ReadResource(ctx, newState, req)
+}
 
-	return res, err
+// ImportResourceState is the request Terraform sends when it wants the provider
+// to import one or more resources specified by an ID.
+//
+// Importing a file doesn't make a lot of sense but we have to support the
+// function regardless. As our only interface is a string ID, supporting this
+// without provider level transport configuration would be absurdly difficult.
+// Until then this will simply be a no-op. If/When we implement that behavior
+// we could probably create use an identier that combines the source and
+// destination to import a file.
+func (f *file) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+	newState := newFileState()
+
+	return transportUtil.ImportResourceState(ctx, newState, req)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
 func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
-	res := &tfprotov5.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
 	priorState := newFileState()
-	err := unmarshal(priorState, req.PriorState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
 	proposedState := newFileState()
-	err = unmarshal(proposedState, req.ProposedNewState)
+	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, *f.providerConfig.Transport, req)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
 
@@ -194,46 +110,18 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 	}
 	proposedState.Sum = sum
 
-	// Make sure that nothing in the transport requires replacing
-	paths := transportReplacedAttributePaths(priorState.Transport, proposedState.Transport)
-	if len(paths) > 0 {
-		res.RequiresReplace = paths
-	}
-
-	res.PlannedState, err = marshal(proposedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	return res, err
+	return transportUtil.PlanMarshalPlannedState(ctx, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
-	res := &tfprotov5.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	addDiagnostic := func(res *tfprotov5.ApplyResourceChangeResponse, err error) (*tfprotov5.ApplyResourceChangeResponse, error) {
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-
-		return res, err
-	}
-
-	select {
-	case <-ctx.Done():
-		return addDiagnostic(res, ctx.Err())
-	default:
-	}
-
+	priorState := newFileState()
 	plannedState := newFileState()
-	err := unmarshal(plannedState, req.PlannedState)
+
+	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
 	if err != nil {
-		return addDiagnostic(res, err)
+		return res, err
 	}
 
 	// If our planned state does not have a source then the planned state terrafom
@@ -247,82 +135,39 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 	}
 	plannedState.ID = "static"
 
-	err = plannedState.Validate(ctx)
+	res, transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, *f.providerConfig.Transport)
 	if err != nil {
-		return addDiagnostic(res, err)
-	}
-
-	ssh, err := plannedState.Transport.Client(ctx)
-	defer ssh.Close() //nolint: staticcheck
-	if err != nil {
-		return addDiagnostic(res, err)
+		return res, err
 	}
 
 	src, err := tfile.Open(plannedState.Src)
-	defer ssh.Close() //nolint: staticcheck
+	defer src.Close() //nolint: staticcheck
 	if err != nil {
-		return addDiagnostic(res, wrapErrWithDiagnostics(
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
 			err, "invalid configuration", "unable to open source file", "source",
-		))
+		)))
+
+		return res, err
 	}
 
-	priorState := newFileState()
-	err = unmarshal(priorState, req.PriorState)
-	if err != nil {
-		return addDiagnostic(res, err)
-	}
-
-	// If we're missing a prior sum we haven't created it yet. If the prior and
+	// If we're missing a prior ID we haven't created it yet. If the prior and
 	// planned sum don't match then we're updating.
 	if priorState.ID == "" || (priorState.Sum != plannedState.Sum) {
+		ssh, err := transport.Client(ctx)
+		defer ssh.Close() //nolint: staticcheck
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
+		}
+
 		err = ssh.Copy(ctx, src, plannedState.Dst)
 		if err != nil {
-			return addDiagnostic(res, err)
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
 		}
 	}
 
-	res.NewState, err = marshal(plannedState)
-	if err != nil {
-		return addDiagnostic(res, err)
-	}
-
-	return res, err
-}
-
-// ImportResourceState is the request Terraform sends when it wants the provider
-// to import one or more resources specified by an ID.
-//
-// Importing a file doesn't make a lot of sense but we have to support the
-// function regardless. As our only interface is a string ID, supporting this
-// without provider level transport configuration would be absurdly difficult.
-// Until then this will simply be a no-op. If/When we implement that behavior
-// we could probably create use an identier that combines the source and
-// destination to import a file.
-func (f *file) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
-	res := &tfprotov5.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov5.ImportedResource{},
-		Diagnostics:       []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	newState := newFileState()
-	state, err := marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-	res.ImportedResources = append(res.ImportedResources, &tfprotov5.ImportedResource{
-		TypeName: req.TypeName,
-		State:    state,
-	})
-
-	return res, err
+	return transportUtil.ApplyMarshalNewState(ctx, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -380,7 +225,7 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 		return newErrWithDiagnostics("invalid configuration", "you must provide the destination location", "destination")
 	}
 
-	return fs.Transport.Validate(ctx)
+	return nil
 }
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
@@ -422,4 +267,9 @@ func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 		"sum":         tfMarshalStringValue(fs.Sum),
 		"transport":   fs.Transport.Terraform5Value(),
 	})
+}
+
+// EmbeddedTransport is a pointer to the state's embedded transport
+func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
+	return fs.Transport
 }

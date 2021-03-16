@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Test Terraform
         run: |
-          cd internal/config
+          cd examples/core
           terraform fmt -check
           #TODO: figure out how to access hashicorp.com/qti/enos after build.
           # terraform init -backend=false

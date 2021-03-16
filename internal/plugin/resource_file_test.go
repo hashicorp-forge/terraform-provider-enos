@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"regexp"
 	"testing"
@@ -20,11 +21,25 @@ type testAccResourceTemplate struct {
 	apply bool
 }
 
-// TestAccResourceFileTransport tests both the basic enos_file resource interface
+type testAccResourceTransportTemplate struct {
+	name      string
+	state     State
+	check     resource.TestCheckFunc
+	transport *embeddedTransportV1
+}
+
+// TestAccResourceFileResourceTransport tests both the basic enos_file resource interface
 // but also the embedded transport interface. As the embedded transport isn't
 // an actual resource we're doing it here.
-func TestAccResourceFileTransport(t *testing.T) {
-	var cfg = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+func TestAccResourceFileResourceTransport(t *testing.T) {
+	defer resetEnv(t)
+
+	var providerTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+		source = "{{.Src}}"
+		destination = "{{.Dst}}"
+	}`))
+
+	var resourceTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
 		source = "{{.Src}}"
 		destination = "{{.Dst}}"
 
@@ -54,7 +69,7 @@ EOF
 		}
 	}`))
 
-	cases := []testAccResourceTemplate{}
+	cases := []testAccResourceTransportTemplate{}
 
 	keyNoPass := newFileState()
 	keyNoPass.ID = "foo"
@@ -65,7 +80,7 @@ EOF
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	keyNoPass.Transport.SSH.PrivateKey = privateKey
-	cases = append(cases, testAccResourceTemplate{
+	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with no passphrase",
 		keyNoPass,
 		resource.ComposeTestCheckFunc(
@@ -75,7 +90,7 @@ EOF
 			resource.TestMatchResourceAttr("enos_file.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
 			resource.TestMatchResourceAttr("enos_file.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),
-		false,
+		keyNoPass.Transport,
 	})
 
 	keyPathNoPass := newFileState()
@@ -85,11 +100,11 @@ EOF
 	keyPathNoPass.Transport.SSH.User = "ubuntu"
 	keyPathNoPass.Transport.SSH.Host = "localhost"
 	keyPathNoPass.Transport.SSH.PrivateKeyPath = "../fixtures/ssh.pem"
-	cases = append(cases, testAccResourceTemplate{
+	cases = append(cases, testAccResourceTransportTemplate{
 		"private key from a file path with no passphrase",
 		keyPathNoPass,
 		resource.ComposeTestCheckFunc(),
-		false,
+		keyPathNoPass.Transport,
 	})
 
 	keyPass := newFileState()
@@ -102,11 +117,11 @@ EOF
 	passphrase, err := readTestFile("../fixtures/passphrase.txt")
 	require.NoError(t, err)
 	keyPass.Transport.SSH.Passphrase = passphrase
-	cases = append(cases, testAccResourceTemplate{
+	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with passphrase value",
 		keyPass,
 		resource.ComposeTestCheckFunc(),
-		false,
+		keyPass.Transport,
 	})
 
 	keyPassPath := newFileState()
@@ -117,50 +132,55 @@ EOF
 	keyPassPath.Transport.SSH.Host = "localhost"
 	keyPassPath.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
 	keyPassPath.Transport.SSH.PassphrasePath = "../fixtures/passphrase.txt"
-	cases = append(cases, testAccResourceTemplate{
+	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with passphrase from file path",
 		keyPassPath,
 		resource.ComposeTestCheckFunc(),
-		false,
+		keyPassPath.Transport,
 	})
 
-	// To do a real test, set the environment variables when running `make testacc`
-	host, ok := os.LookupEnv("ENOS_TRANSPORT_HOST")
-	if !ok {
-		t.Skip("SSH tests are skipped unless ENOS_TRANSPORT_* environment variables are set")
-	} else {
-		realTest := newFileState()
-		realTest.ID = "real"
-		realTest.Src = "../fixtures/src.txt"
-		realTest.Dst = "/tmp/dst"
-		realTest.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
-		realTest.Transport.SSH.Host = host
-		realTest.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_KEY_PATH")
-		realTest.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
-		cases = append(cases, testAccResourceTemplate{
-			"real_test",
-			realTest,
-			resource.ComposeTestCheckFunc(),
-			true,
-		})
-	}
-
 	for _, test := range cases {
-		t.Run(test.name, func(t *testing.T) {
+		// Run them with resource defined transport config
+		t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
+			unsetEnosEnv(t)
+			defer resetEnv(t)
+
 			buf := bytes.Buffer{}
-			err := cfg.Execute(&buf, test.state)
+			err := resourceTransport.Execute(&buf, test.state)
 			if err != nil {
 				t.Fatalf("error executing test template: %s", err.Error())
 			}
 
 			step := resource.TestStep{
-				Config: buf.String(),
-				Check:  test.check,
+				Config:             buf.String(),
+				Check:              test.check,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
 			}
 
-			if !test.apply {
-				step.PlanOnly = true
-				step.ExpectNonEmptyPlan = true
+			resource.Test(t, resource.TestCase{
+				ProtoV5ProviderFactories: testProviders,
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+
+		// Run them with provider config passed through the environment
+		t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
+			unsetEnosEnv(t)
+			setEnosEnv(t, test.transport)
+			defer resetEnv(t)
+
+			buf := bytes.Buffer{}
+			err := providerTransport.Execute(&buf, test.state)
+			if err != nil {
+				t.Fatalf("error executing test template: %s", err.Error())
+			}
+
+			step := resource.TestStep{
+				Config:             buf.String(),
+				Check:              test.check,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
 			}
 
 			resource.Test(t, resource.TestCase{
@@ -169,17 +189,93 @@ EOF
 			})
 		})
 	}
+
+	resetEnv(t)
+	// To do a real test, set the environment variables when running `make testacc`
+	host, ok := os.LookupEnv("ENOS_TRANSPORT_HOST")
+	if !ok {
+		t.Log("SSH tests are skipped unless ENOS_TRANSPORT_* environment variables are set")
+	} else {
+		cases := []testAccResourceTransportTemplate{}
+
+		realTest := newFileState()
+		realTest.ID = "real"
+		realTest.Src = "../fixtures/src.txt"
+		realTest.Dst = "/tmp/dst"
+		realTest.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
+		realTest.Transport.SSH.Host = host
+		realTest.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
+		realTest.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
+		cases = append(cases, testAccResourceTransportTemplate{
+			"real test",
+			realTest,
+			resource.ComposeTestCheckFunc(),
+			realTest.Transport,
+		})
+
+		for _, test := range cases {
+			// Run them with resource defined transport config
+			t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
+				defer resetEnv(t)
+
+				buf := bytes.Buffer{}
+				err := resourceTransport.Execute(&buf, test.state)
+				if err != nil {
+					t.Fatalf("error executing test template: %s", err.Error())
+				}
+
+				step := resource.TestStep{
+					Config:             buf.String(),
+					Check:              test.check,
+					PlanOnly:           false,
+					ExpectNonEmptyPlan: false,
+				}
+
+				resource.Test(t, resource.TestCase{
+					ProtoV5ProviderFactories: testProviders,
+					Steps:                    []resource.TestStep{step},
+				})
+			})
+
+			// Run them with provider config passed through the environment
+			t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
+				resetEnv(t)
+
+				buf := bytes.Buffer{}
+				err := providerTransport.Execute(&buf, test.state)
+				if err != nil {
+					t.Fatalf("error executing test template: %s", err.Error())
+				}
+
+				step := resource.TestStep{
+					Config:             buf.String(),
+					Check:              test.check,
+					PlanOnly:           false,
+					ExpectNonEmptyPlan: false,
+				}
+
+				resource.Test(t, resource.TestCase{
+					ProtoV5ProviderFactories: testProviders,
+					Steps:                    []resource.TestStep{step},
+				})
+			})
+		}
+	}
 }
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	state := newFileState()
-	state.ID = "foo"
-	state.Src = "/tmp/src"
-	state.Dst = "/tmp/dst"
-	state.Transport.SSH.User = "ubuntu"
-	state.Transport.SSH.Host = "localhost"
-	state.Transport.SSH.PrivateKey = "PRIVATE KEY"
-	state.Transport.SSH.PrivateKeyPath = "/path/to/key.pem"
+	state.Transport.SSH.Values = testMapPropertiesToStruct([]testProperty{
+		{"user", "ubuntu", &state.Transport.SSH.User},
+		{"host", "localhost", &state.Transport.SSH.Host},
+		{"private_key", "PRIVATE KEY", &state.Transport.SSH.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", &state.Transport.SSH.PrivateKeyPath},
+	})
+	testMapPropertiesToStruct([]testProperty{
+		{"id", "foo", &state.ID},
+		{"src", "/tmp/src", &state.Src},
+		{"dst", "/tmp/dst", &state.Dst},
+	})
 
 	marshaled, err := marshal(state)
 	require.NoError(t, err)
@@ -195,4 +291,25 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, state.Transport.SSH.Host, newState.Transport.SSH.Host)
 	assert.Equal(t, state.Transport.SSH.PrivateKey, newState.Transport.SSH.PrivateKey)
 	assert.Equal(t, state.Transport.SSH.PrivateKeyPath, newState.Transport.SSH.PrivateKeyPath)
+}
+
+func TestSetProviderConfig(t *testing.T) {
+	p := newProviderConfig()
+	f := newFile()
+
+	tr := newEmbeddedTransport()
+	tr.SSH.Values = testMapPropertiesToStruct([]testProperty{
+		{"user", "ubuntu", &tr.SSH.User},
+		{"host", "localhost", &tr.SSH.Host},
+		{"private_key", "PRIVATE KEY", &tr.SSH.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", &tr.SSH.PrivateKeyPath},
+	})
+
+	require.NoError(t, p.Transport.FromTerraform5Value(tr.Terraform5Value()))
+	require.NoError(t, f.SetProviderConfig(p.Terraform5Value()))
+
+	assert.Equal(t, "ubuntu", f.providerConfig.Transport.SSH.User)
+	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host)
+	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey)
+	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath)
 }

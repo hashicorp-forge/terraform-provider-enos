@@ -7,8 +7,14 @@ import (
 
 func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
 	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
+	if err != nil {
+		return &dyn, wrapErrWithDiagnostics(err,
+			"Unexpected configuration format",
+			"Failed to marshal the state to a Terraform type",
+		)
+	}
 
-	return &dyn, err
+	return &dyn, nil
 }
 
 func unmarshal(state Serializable, dyn *tfprotov5.DynamicValue) error {
@@ -70,7 +76,7 @@ func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov
 	return marshal(currentState)
 }
 
-// mapAttributesTo is a helper to ease mapping basic string, bool, and number tftypes.Types to corresponding go values. The val input should be a top-level marshaled tftypes.Object. The props is a property map that dictates which val field to map to the which go value. The value of the prop map should be a pointer to valid value. 
+// mapAttributesTo is a helper to ease mapping basic string, bool, and number tftypes.Types to corresponding go values. The val input should be a top-level marshaled tftypes.Object. The props is a property map that dictates which val field to map to the which go value. The value of the prop map should be a pointer to valid value.
 func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[string]tftypes.Value, error) {
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)

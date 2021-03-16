@@ -23,7 +23,7 @@ func TestSSH(t *testing.T) {
 	c, err := New(
 		WithUser(os.Getenv("ENOS_TRANSPORT_USER")),
 		WithHost(host),
-		WithKeyPath(os.Getenv("ENOS_TRANSPORT_KEY_PATH")),
+		WithKeyPath(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")),
 		WithPassphrasePath(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")),
 	)
 	require.NoError(t, err)

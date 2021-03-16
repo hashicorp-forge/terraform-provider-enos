@@ -79,33 +79,33 @@ func (s Server) StopProvider(ctx context.Context, req *tfprotov5.StopProviderReq
 }
 
 func (s Server) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
-	return s.resourceRouter.ValidateResourceTypeConfig(ctx, req)
+	return s.resourceRouter.ValidateResourceTypeConfig(ctx, req, s.provider.Config())
 }
 
 func (s Server) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
-	return s.resourceRouter.UpgradeResourceState(ctx, req)
+	return s.resourceRouter.UpgradeResourceState(ctx, req, s.provider.Config())
 }
 
 func (s Server) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
-	return s.resourceRouter.ReadResource(ctx, req)
+	return s.resourceRouter.ReadResource(ctx, req, s.provider.Config())
 }
 
 func (s Server) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
-	return s.resourceRouter.PlanResourceChange(ctx, req)
+	return s.resourceRouter.PlanResourceChange(ctx, req, s.provider.Config())
 }
 
 func (s Server) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
-	return s.resourceRouter.ApplyResourceChange(ctx, req)
+	return s.resourceRouter.ApplyResourceChange(ctx, req, s.provider.Config())
 }
 
 func (s Server) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
-	return s.resourceRouter.ImportResourceState(ctx, req)
+	return s.resourceRouter.ImportResourceState(ctx, req, s.provider.Config())
 }
 
 func (s Server) ValidateDataSourceConfig(ctx context.Context, req *tfprotov5.ValidateDataSourceConfigRequest) (*tfprotov5.ValidateDataSourceConfigResponse, error) {
-	return s.dataRouter.ValidateDataSourceConfig(ctx, req)
+	return s.dataRouter.ValidateDataSourceConfig(ctx, req, s.provider.Config())
 }
 
 func (s Server) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDataSourceRequest) (*tfprotov5.ReadDataSourceResponse, error) {
-	return s.dataRouter.ReadDataSource(ctx, req)
+	return s.dataRouter.ReadDataSource(ctx, req, s.provider.Config())
 }

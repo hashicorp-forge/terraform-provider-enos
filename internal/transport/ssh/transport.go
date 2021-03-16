@@ -114,20 +114,54 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 	default:
 	}
 
-	err = t.client.startSession(ctx)
-	defer func() { err = t.client.closeSession() }()
+	session, cleanup, err := t.client.newSession(ctx)
 	if err != nil {
 		return err
 	}
+	defer cleanup() // nolint: errcheck
 
-	stdin, err := t.client.session.StdinPipe()
+	stdin, err := session.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("creating SSH STDIN pipe: %w", err)
 	}
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("creating SSH STDOUT pipe: %w", err)
+	}
+	bufferedStdout := bufio.NewReader(stdout)
+
+	checkSCPStdout := func() error {
+		code, err := bufferedStdout.ReadByte()
+		if err != nil {
+			return fmt.Errorf("reading SCP session STDOUT: %w", err)
+		}
+
+		if code != 0 {
+			msg, _, err := bufferedStdout.ReadLine()
+			if err != nil {
+				return fmt.Errorf("reading SCP sesssion error message: %w", err)
+			}
+
+			return fmt.Errorf("running SCP session command: %s", string(msg))
+		}
+
+		return nil
+	}
+
 	errC := make(chan error, 1)
+	doneC := make(chan bool)
 
 	copyFile := func() {
+		defer stdin.Close()
+
 		_, err := fmt.Fprintln(stdin, "C0644", src.Size(), filepath.Base(dst))
+		if err != nil {
+			errC <- fmt.Errorf("writing file header: %w", err)
+			return
+		}
+
+		err = checkSCPStdout()
 		if err != nil {
 			errC <- fmt.Errorf("writing file header: %w", err)
 			return
@@ -147,17 +181,34 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 			return
 
 		}
-		errC <- nil
 
-		stdin.Close()
+		err = checkSCPStdout()
+		if err != nil {
+			errC <- fmt.Errorf("writing end of file: %w", err)
+			return
+		}
+
+		errC <- nil
+	}
+
+	waitForCommandToFinish := func() {
+		err = session.Wait()
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		doneC <- true
 	}
 
 	go copyFile()
 
-	err = t.client.session.Run(fmt.Sprintf("scp -tr %s", dst))
+	err = session.Run(fmt.Sprintf("scp -tr %s", dst))
 	if err != nil {
 		return fmt.Errorf("starting scp: %w", err)
 	}
+
+	go waitForCommandToFinish()
 
 	select {
 	case <-ctx.Done():
@@ -165,6 +216,8 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 		return err
 	case err = <-errC:
 		return err
+	case <-doneC:
+		return nil
 	}
 }
 
@@ -181,35 +234,34 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout io.Reade
 	default:
 	}
 
+	session, cleanup, err := t.client.newSession(ctx)
+	if err != nil {
+		errC <- err
+		return stdout, stderr, errC
+	}
+
 	disconnect := func() {
-		err = t.client.closeSession()
+		err = cleanup()
 		if err != nil {
 			errC <- err
 		}
 	}
 
-	err = t.client.startSession(ctx)
+	stdout, err = session.StdoutPipe()
 	if err != nil {
 		defer disconnect()
 		errC <- err
 		return stdout, stderr, errC
 	}
 
-	stdout, err = t.client.session.StdoutPipe()
+	stderr, err = session.StderrPipe()
 	if err != nil {
 		defer disconnect()
 		errC <- err
 		return stdout, stderr, errC
 	}
 
-	stderr, err = t.client.session.StderrPipe()
-	if err != nil {
-		defer disconnect()
-		errC <- err
-		return stdout, stderr, errC
-	}
-
-	err = t.client.session.Start(cmd.Cmd())
+	err = session.Start(cmd.Cmd())
 	if err != nil {
 		defer disconnect()
 		errC <- err
@@ -218,7 +270,7 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout io.Reade
 
 	waitForCommandToFinish := func() {
 		defer disconnect()
-		errC <- t.client.session.Wait()
+		errC <- session.Wait()
 	}
 
 	go waitForCommandToFinish()

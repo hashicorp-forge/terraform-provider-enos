@@ -9,7 +9,8 @@ import (
 )
 
 type transport struct {
-	state *dataTransportStateV1
+	state          *dataTransportStateV1
+	providerConfig *config
 }
 
 var _ datarouter.DataSource = (*transport)(nil)
@@ -23,7 +24,8 @@ var _ State = (*dataTransportStateV1)(nil)
 
 func newTransport() *transport {
 	return &transport{
-		state: newDataTransportState(),
+		state:          newDataTransportState(),
+		providerConfig: newProviderConfig(),
 	}
 }
 
@@ -39,6 +41,10 @@ func (t *transport) Name() string {
 
 func (t *transport) Schema() *tfprotov5.Schema {
 	return t.state.Schema()
+}
+
+func (t *transport) SetProviderConfig(meta tftypes.Value) error {
+	return t.providerConfig.FromTerraform5Value(meta)
 }
 
 // ValidateDataSourceConfig is the request Terraform sends when it wants to
@@ -185,7 +191,12 @@ func (ts *dataTransportStateV1) FromTerraform5Value(val tftypes.Value) error {
 		return nil
 	}
 
-	return ts.FromTerraform5ValueSSH(vals["ssh"])
+	err = ts.FromTerraform5ValueSSH(vals["ssh"])
+	if err != nil {
+		return err
+	}
+
+	return ts.Transport.FromTerraform5Value(val)
 }
 
 // We don't really need to validate at this point as the data source is essentially

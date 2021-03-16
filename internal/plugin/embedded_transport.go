@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
@@ -13,16 +15,16 @@ import (
 // resources and data source. It is intended to be used as ouput from the
 // transport data source and used as the transport input for all resources.
 type embeddedTransportV1 struct {
-	SSH *embeddedTransportSSHv1
+	SSH *embeddedTransportSSHv1 `json:"ssh"`
 }
 
 type embeddedTransportSSHv1 struct {
-	User           string
-	Host           string
-	PrivateKey     string
-	PrivateKeyPath string
-	Passphrase     string
-	PassphrasePath string
+	User           string `json:"user,omitempty"`
+	Host           string `json:"host,omitempty"`
+	PrivateKey     string `json:"private_key,omitempty"`
+	PrivateKeyPath string `json:"private_key_path,omitempty"`
+	Passphrase     string `json:"passphrase,omitempty"`
+	PassphrasePath string `json:"passphrase_path,omitempty"`
 
 	// We have two requirements for the embedded transport: users are able to
 	// specify any combination of configuration keys and their associated values,
@@ -38,6 +40,11 @@ type embeddedTransportSSHv1 struct {
 	// when we're unmarshaled and use them later when constructing our marshal
 	// schema.
 	Values map[string]tftypes.Value
+}
+
+// embeddedTransportPrivate is out private state
+type embeddedTransportPrivate struct {
+	Host string `json:"host,omitempty"`
 }
 
 func newEmbeddedTransport() *embeddedTransportV1 {
@@ -108,6 +115,10 @@ func (em *embeddedTransportV1) Terraform5Type() tftypes.Type {
 
 // Terraform5Type is the tftypes.Value
 func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
+	if len(em.SSH.Values) == 0 {
+		return tftypes.NewValue(em.Terraform5Type(), nil)
+	}
+
 	return tftypes.NewValue(em.Terraform5Type(), map[string]tftypes.Value{
 		"ssh": em.Terraform5ValueSSH(),
 	})
@@ -116,24 +127,9 @@ func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
 // Terraform5TypeSSH is the dynamically generated SSH tftypes.Type. It must
 // always match the schema that is passed in as user configuration.
 func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
-	defaultTypes := map[string]tftypes.Type{
-		"user":             tftypes.String,
-		"host":             tftypes.String,
-		"private_key":      tftypes.String,
-		"private_key_path": tftypes.String,
-		"passphrase":       tftypes.String,
-		"passphrase_path":  tftypes.String,
-	}
-
-	// The SSH Values are set if the struct is built dynamically from user
-	// config. If it's not set then return all of our defaults.
-	if len(em.SSH.Values) == 0 {
-		return tftypes.Object{AttributeTypes: defaultTypes}
-	}
-
 	newTypes := map[string]tftypes.Type{}
 	for name := range em.SSH.Values {
-		newTypes[name] = defaultTypes[name]
+		newTypes[name] = em.defaultSSHTypes()[name]
 	}
 
 	return tftypes.Object{AttributeTypes: newTypes}
@@ -142,25 +138,9 @@ func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
 // Terraform5ValueSSH is the dynamically generated SSH tftypes.Value. It must
 // always match the schema that is passed in as user configuration.
 func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
-	defaultValues := map[string]tftypes.Value{
-		"user":             tfMarshalStringValue(em.SSH.User),
-		"host":             tfMarshalStringValue(em.SSH.Host),
-		"private_key":      tfMarshalStringValue(em.SSH.PrivateKey),
-		"private_key_path": tfMarshalStringValue(em.SSH.PrivateKeyPath),
-
-		"passphrase":      tfMarshalStringValue(em.SSH.Passphrase),
-		"passphrase_path": tfMarshalStringValue(em.SSH.PassphrasePath),
-	}
-
-	// The SSH Values are set if the struct is built dynamically from user
-	// config. If it's not set then return all of our defaults.
-	if len(em.SSH.Values) == 0 {
-		return tftypes.NewValue(em.Terraform5TypeSSH(), defaultValues)
-	}
-
 	newValues := map[string]tftypes.Value{}
 	for name, val := range em.SSH.Values {
-		setVal, ok := defaultValues[name]
+		setVal, ok := em.defaultSSHValues()[name]
 		if ok {
 			newValues[name] = setVal
 			continue
@@ -170,6 +150,29 @@ func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
 	}
 
 	return tftypes.NewValue(em.Terraform5TypeSSH(), newValues)
+
+}
+
+func (em *embeddedTransportV1) defaultSSHTypes() map[string]tftypes.Type {
+	return map[string]tftypes.Type{
+		"user":             tftypes.String,
+		"host":             tftypes.String,
+		"private_key":      tftypes.String,
+		"private_key_path": tftypes.String,
+		"passphrase":       tftypes.String,
+		"passphrase_path":  tftypes.String,
+	}
+}
+
+func (em *embeddedTransportV1) defaultSSHValues() map[string]tftypes.Value {
+	return map[string]tftypes.Value{
+		"user":             tfMarshalStringValue(em.SSH.User),
+		"host":             tfMarshalStringValue(em.SSH.Host),
+		"private_key":      tfMarshalStringValue(em.SSH.PrivateKey),
+		"private_key_path": tfMarshalStringValue(em.SSH.PrivateKeyPath),
+		"passphrase":       tfMarshalStringValue(em.SSH.Passphrase),
+		"passphrase_path":  tfMarshalStringValue(em.SSH.PassphrasePath),
+	}
 }
 
 // Validate validates that transport can use the given configuration as a
@@ -257,6 +260,101 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 	}
 
 	return ssh.New(sshOpts...)
+}
+
+func (em *embeddedTransportV1) FromEnvironment() {
+	for _, key := range []struct {
+		name string
+		env  string
+		dst  *string
+	}{
+		{"user", "ENOS_TRANSPORT_USER", &em.SSH.User},
+		{"host", "ENOS_TRANSPORT_HOST", &em.SSH.Host},
+		{"private_key", "ENOS_TRANSPORT_PRIVATE_KEY", &em.SSH.PrivateKey},
+		{"private_key_path", "ENOS_TRANSPORT_PRIVATE_KEY_PATH", &em.SSH.PrivateKeyPath},
+		{"passphrase", "ENOS_TRANSPORT_PASSPHRASE", &em.SSH.Passphrase},
+		{"passphrase_path", "ENOS_TRANSPORT_PASSPHRASE_PATH", &em.SSH.PassphrasePath},
+	} {
+		val, ok := os.LookupEnv(key.env)
+		if ok {
+			*key.dst = val
+			em.SSH.Values[key.name] = tfMarshalStringValue(val)
+		}
+	}
+}
+
+// MergeInto merges the embeddedTranspor into another instance.
+func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) error {
+	startingVals := defaults.SSH.Values
+
+	overJSON, err := json.Marshal(em)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(overJSON, defaults)
+	if err != nil {
+		return err
+	}
+
+	defaults.SSH.Values = startingVals
+	for key, val := range em.SSH.Values {
+		defaults.SSH.Values[key] = val
+	}
+
+	return nil
+}
+
+// ToPrivate returns the embeddedTransportV1's private state
+func (em *embeddedTransportV1) ToPrivate() ([]byte, error) {
+	// We keep the host in private state because we need it to determine if
+	// the resource has changed. As we allow users to specify _all_ transport
+	// level configuration at the provider level, we cannot rely on saving it
+	// in the normal transport schema.
+	p := &embeddedTransportPrivate{
+		Host: em.SSH.Host,
+	}
+
+	return json.Marshal(p)
+}
+
+// FromPrivate loads the private state into the embeddedTransport
+func (em *embeddedTransportV1) FromPrivate(in []byte) error {
+	if len(in) == 0 {
+		return nil
+	}
+
+	p := &embeddedTransportPrivate{}
+	err := json.Unmarshal(in, p)
+	if err != nil {
+		return err
+	}
+
+	em.SSH.Host = p.Host
+
+	return nil
+}
+
+// transportRequiredReplace returns an attribute path to the host attribute
+// if it's changed
+func transportRequiredReplace(priorHost, proposedHost string) []*tftypes.AttributePath {
+	attrs := []*tftypes.AttributePath{}
+
+	if priorHost != proposedHost {
+		attrs = append(attrs, &tftypes.AttributePath{
+			Steps: []tftypes.AttributePathStep{
+				tftypes.AttributeName("transport"),
+				tftypes.AttributeName("ssh"),
+				tftypes.AttributeName("host"),
+			},
+		})
+	}
+
+	if len(attrs) > 0 {
+		return attrs
+	}
+
+	return nil
 }
 
 // transportReplacedAttributePaths returns a slice of changed attribute paths that

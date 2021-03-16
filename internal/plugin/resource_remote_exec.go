@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
 
-type remoteExec struct{}
+type remoteExec struct {
+	providerConfig *config
+}
 
 var _ resourcerouter.Resource = (*remoteExec)(nil)
 
@@ -30,7 +32,9 @@ type remoteExecStateV1 struct {
 var _ State = (*remoteExecStateV1)(nil)
 
 func newRemoteExec() *remoteExec {
-	return &remoteExec{}
+	return &remoteExec{
+		providerConfig: newProviderConfig(),
+	}
 }
 
 func newRemoteExecStateV1() *remoteExecStateV1 {
@@ -47,151 +51,44 @@ func (r *remoteExec) Schema() *tfprotov5.Schema {
 	return newRemoteExecStateV1().Schema()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
-// validate the resource's configuration.
-func (r *remoteExec) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
-	res := &tfprotov5.ValidateResourceTypeConfigResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	newState := newRemoteExecStateV1()
-	err := unmarshal(newState, req.Config)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	return res, err
+func (r *remoteExec) SetProviderConfig(meta tftypes.Value) error {
+	return r.providerConfig.FromTerraform5Value(meta)
 }
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// validate the resource's configuration.
+func (r *remoteExec) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+	newState := newRemoteExecStateV1()
+
+	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+}
+
+// UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-//
-// Upgrading the resource state generally goes as follows:
-//
-//   1. Unmarshal the RawState to the corresponding tftypes.Value that matches
-//     schema version of the state we're upgrading from.
-//   2. Create a new tftypes.Value for the current state and migrate the old
-//    values to the new values.
-//   3. Upgrade the existing state with the new values and return the marshaled
-//    version of the current upgraded state.
-//
 func (r *remoteExec) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
-	res := &tfprotov5.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
+	newState := newRemoteExecStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	switch req.Version {
-	case 1:
-		// 1. unmarshal the raw state against the type that maps to the raw state
-		// version. As this is version 1 and we're on version 1 we can use the
-		// current state type.
-		newState := newRemoteExecStateV1()
-		rawStateValues, err := req.RawState.Unmarshal(newState.Terraform5Type())
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-				err,
-				"upgrade error",
-				"unable to map version 1 to the current state",
-			)))
-			return res, err
-		}
-
-		// 2. Since we're on version one we can pass the same values in without
-		// doing a transform.
-
-		// 3. Upgrade the current state with the new values, or in this case,
-		// the raw values.
-		res.UpgradedState, err = upgradeState(newState, rawStateValues)
-
-		return res, err
-	default:
-		err := newErrWithDiagnostics(
-			"Unexpected state version",
-			"The provider doesn't know how to upgrade from the current state version",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
+	return transportUtil.UpgradeResourceState(ctx, newState, req)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
 func (r *remoteExec) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
-	res := &tfprotov5.ReadResourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	// unmarshal and re-marshal the state to add default fields
 	newState := newRemoteExecStateV1()
-	err := unmarshal(newState, req.CurrentState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
 
-	res.NewState, err = marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	return res, err
+	return transportUtil.ReadResource(ctx, newState, req)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
 func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
-	res := &tfprotov5.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
 	priorState := newRemoteExecStateV1()
-	err := unmarshal(priorState, req.PriorState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
 	proposedState := newRemoteExecStateV1()
-	err = unmarshal(proposedState, req.ProposedNewState)
+
+	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, *r.providerConfig.Transport, req)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
-	}
-
-	// Make sure that nothing in the transport requires replacing
-	paths := transportReplacedAttributePaths(priorState.Transport, proposedState.Transport)
-	if len(paths) > 0 {
-		res.RequiresReplace = paths
 	}
 
 	sha256, err := r.SHA256(ctx, proposedState)
@@ -202,112 +99,58 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 	}
 	proposedState.Sum = sha256
 
-	res.PlannedState, err = marshal(proposedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	return res, err
+	return transportUtil.PlanMarshalPlannedState(ctx, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
-	res := &tfprotov5.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
-
-	addDiagnostic := func(res *tfprotov5.ApplyResourceChangeResponse, err error) (*tfprotov5.ApplyResourceChangeResponse, error) {
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-
-		return res, err
-	}
-
-	select {
-	case <-ctx.Done():
-		return addDiagnostic(res, ctx.Err())
-	default:
-	}
-
+	priorState := newRemoteExecStateV1()
 	plannedState := newRemoteExecStateV1()
-	err := unmarshal(plannedState, req.PlannedState)
+
+	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
 	if err != nil {
-		return addDiagnostic(res, err)
+		return res, err
 	}
 
 	if len(plannedState.Inline) == 0 && len(plannedState.Scripts) == 0 {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
-
 		return res, err
 	}
 	plannedState.ID = "static"
 
-	err = plannedState.Validate(ctx)
+	res, transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, *r.providerConfig.Transport)
 	if err != nil {
-		return addDiagnostic(res, err)
-	}
-
-	priorState := newRemoteExecStateV1()
-	err = unmarshal(priorState, req.PriorState)
-	if err != nil {
-		return addDiagnostic(res, err)
+		return res, err
 	}
 
 	// If our priorState Sum is blank then we're creating the resource. If
 	// it's not blank and doesn't match the planned state we're updating.
 	if priorState.ID == "" || (priorState.Sum != "" && priorState.Sum != plannedState.Sum) {
-		err = r.ExecuteCommands(ctx, plannedState)
+		ssh, err := transport.Client(ctx)
+		defer ssh.Close() //nolint: staticcheck
 		if err != nil {
-			return addDiagnostic(res, err)
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
+		}
+
+		err = r.ExecuteCommands(ctx, plannedState, ssh)
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
 		}
 	}
 
-	res.NewState, err = marshal(plannedState)
-	if err != nil {
-		return addDiagnostic(res, err)
-	}
-
-	return res, err
+	return transportUtil.ApplyMarshalNewState(ctx, plannedState, transport)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-//
-// Importing a file doesn't make a lot of sense but we have to support the
-// function regardless. As our only interface is a string ID, supporting this
-// without provider level transport configuration would be absurdly difficult.
-// Until then this will simply be a no-op. If/When we implement that behavior
-// we could probably create use an identier that combines the source and
-// destination to import a file.
 func (r *remoteExec) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
-	res := &tfprotov5.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov5.ImportedResource{},
-		Diagnostics:       []*tfprotov5.Diagnostic{},
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
 	newState := newRemoteExecStateV1()
-	state, err := marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-	res.ImportedResources = append(res.ImportedResources, &tfprotov5.ImportedResource{
-		TypeName: req.TypeName,
-		State:    state,
-	})
 
-	return res, err
+	return transportUtil.ImportResourceState(ctx, newState, req)
 }
 
 // Schema is the file states Terraform schema.
@@ -392,18 +235,7 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 }
 
 // ExecuteCommands executes any commands or scripts.
-func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1) error {
-	var ssh it.Transport
-	var err error
-
-	ssh, err = state.Transport.Client(ctx)
-	defer ssh.Close() //nolint: staticcheck
-	if err != nil {
-		return wrapErrWithDiagnostics(
-			err, "creating transport", "failed to create remote transport",
-		)
-	}
-
+func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, ssh it.Transport) error {
 	var stderr string
 	for _, cmd := range state.Inline {
 		select {
@@ -414,7 +246,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		default:
 		}
 
-		_, stderr, err = ssh.Run(ctx, command.New(cmd, command.WithEnvVars(state.Env)))
+		_, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(state.Env)))
 		if err != nil {
 			return wrapErrWithDiagnostics(
 				err, "command failed", fmt.Sprintf("running inline command failed: %s", stderr),
@@ -425,6 +257,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 	var sha string
 	var script it.Copyable
 	var dst string
+	var err error
 
 	for _, path := range state.Scripts {
 		select {
@@ -514,7 +347,7 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 		}
 	}
 
-	return s.Transport.Validate(ctx)
+	return nil
 }
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
@@ -577,4 +410,8 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 		"scripts":     tfMarshalStringSlice(s.Scripts),
 		"environment": tfMarshalStringMap(s.Env),
 	})
+}
+
+func (s *remoteExecStateV1) EmbeddedTransport() *embeddedTransportV1 {
+	return s.Transport
 }

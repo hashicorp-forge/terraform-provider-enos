@@ -11,7 +11,18 @@ terraform {
   }
 }
 
-provider "enos" { }
+provider "enos" {
+  transport = {
+    ssh = {
+      user = "ubuntu"
+
+      # You can set any of the transport settings from the environment,
+      # e.g.: ENOS_TRANSPORT_PRIVATE_KEY_PATH=/path/to/key.pem
+
+      # private_key_path = "/Users/ryan/.ssh/id_rsa"
+    }
+  }
+}
 
 provider "aws" {
   region = "us-west-2"
@@ -46,11 +57,9 @@ resource "enos_file" "foo" {
 
   source      = "${path.module}/files/foo.txt"
   destination = "/tmp/bar.txt"
-  transport   = {
-    ssh                = {
-      user             = "ubuntu"
-      host             = aws_instance.target.public_ip
-      private_key_path = var.key_path
+  transport = {
+    ssh = {
+      host = aws_instance.target.public_ip
     }
   }
 }
@@ -64,11 +73,9 @@ resource "enos_remote_exec" "foo" {
   inline  = ["cp /tmp/bar.txt /tmp/baz.txt"]
   scripts = ["${path.module}/files/script.sh"]
 
-  transport            = {
-    ssh                = {
-      user             = "ubuntu"
-      host             = aws_instance.target.public_ip
-      private_key_path = var.key_path
+  transport = {
+    ssh = {
+      host = aws_instance.target.public_ip
     }
   }
 }

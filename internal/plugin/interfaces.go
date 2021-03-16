@@ -18,3 +18,8 @@ type Serializable interface {
 	Terraform5Value() tftypes.Value
 	FromTerraform5Value(val tftypes.Value) error
 }
+
+type StateWithTransport interface {
+	State
+	EmbeddedTransport() *embeddedTransportV1
+}
