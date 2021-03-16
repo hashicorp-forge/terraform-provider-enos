@@ -41,9 +41,9 @@ test:
 	echo $(TEST) | xargs -t -n4 go test -v $(TESTARGS) -timeout=30s -parallel=4
 
 tftest: install
-	terraform init -plugin-dir .terraform.d/plugins internal/config
-	terraform fmt -check -recursive internal/config
-	terraform validate internal/config
+	terraform init -plugin-dir .terraform.d/plugins examples/core
+	terraform fmt -check -recursive examples/core
+	terraform validate examples/core
 
 testacc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
