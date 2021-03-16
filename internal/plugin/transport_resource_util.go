@@ -178,40 +178,35 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 		return res, transport, err
 	}
 
-	if priorHost := prior.EmbeddedTransport().SSH.Host; priorHost != "" {
-		res.RequiresReplace = transportRequiredReplace(priorHost, transport.SSH.Host)
-	}
+	res.RequiresReplace = transportReplacedAttributePaths(prior.EmbeddedTransport(), proposed.EmbeddedTransport())
 
 	return res, transport, err
 }
 
 // PlanMarshalPlannedState marshals a proposed state and transport into a plan response
-func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, proposed StateWithTransport, transport *embeddedTransportV1) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov5.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) error {
 	var err error
-	res := &tfprotov5.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return ctx.Err()
 	default:
 	}
 
 	res.PlannedState, err = marshal(proposed)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return err
 	}
 
 	res.PlannedPrivate, err = transport.ToPrivate()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return err
 	}
 
-	return res, nil
+	return nil
 }
 
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
@@ -251,66 +246,62 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 
 // ApplyValidatePlannedAndBuildClient takes the planned state and provider transport,
 // validates them, and returns a new SSH transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, providerTransport embeddedTransportV1) (*tfprotov5.ApplyResourceChangeResponse, *embeddedTransportV1, error) {
-	res := &tfprotov5.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, providerTransport embeddedTransportV1) (*embeddedTransportV1, error) {
 	transport := &providerTransport
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, transport, ctx.Err()
+		return transport, ctx.Err()
 	default:
 	}
 
 	err := planned.EmbeddedTransport().MergeInto(transport)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		return transport, err
 	}
 
 	err = transport.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		return transport, err
 	}
 
 	err = planned.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		return transport, err
 	}
 
-	return res, transport, nil
+	return transport, nil
 }
 
 // ApplyMarshalNewState takes the planned state and transport and marshal it
 // into the new state
-func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, planned StateWithTransport, transport *embeddedTransportV1) (*tfprotov5.ApplyResourceChangeResponse, error) {
-	res := &tfprotov5.ApplyResourceChangeResponse{}
+func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) error {
 	var err error
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return ctx.Err()
 	default:
 	}
 
 	res.NewState, err = marshal(planned)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return err
 	}
 
 	res.Private, err = transport.ToPrivate()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return err
 	}
 
-	return res, nil
+	return nil
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider

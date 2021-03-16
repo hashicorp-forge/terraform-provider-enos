@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
 
-type {{.Struct}} struct{
+type {{.Struct}} struct {
 	providerConfig *config
 }
 
@@ -22,7 +22,9 @@ type {{.State}} struct {
 var _ State = (*{{.State}})(nil)
 
 func new{{.StructCap}}() *{{.Struct}} {
-	return &{{.Struct}}{}
+	return &{{.Struct}}{
+		providerConfig: newProviderConfig(),
+	}
 }
 
 func new{{.StateCap}}() *{{.State}} {
@@ -129,7 +131,9 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov5.Pla
 	// you need to marshal the transport, transport private, and proposed state,
 	// into the the planned state and return a response. This function does just
 	// that.
-	return transportUtil.PlanMarshalPlannedState(ctx, proposedState, transport)
+	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
+
+	return res, err
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
@@ -163,7 +167,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	// transport, transport private, and provider transport configuration. This
 	/// function does that for you. In the event of an error it returns a response
 	// that has the Diagnostics added for you.
-	res, transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, *r.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *r.providerConfig.Transport)
 	if err != nil {
 		return res, err
 	}
@@ -189,7 +193,9 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	// TODO: After you've performed your work you'll need to save marshal you
 	// plannedState and transport configuration and return a response. This
 	// function does that for you.
-	return transportUtil.ApplyMarshalNewState(ctx, plannedState, transport)
+	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
+
+	return res, err
 }
 
 // Schema is the file states Terraform schema.

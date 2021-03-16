@@ -9,7 +9,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    container: golang:1.15
+    container: golang:1.16
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
