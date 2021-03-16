@@ -3,10 +3,12 @@ HOSTNAME=hashicorp.com
 NAMESPACE=qti
 NAME=enos
 BINARY=terraform-provider-enos
+BIN_OS=$$(go env GOOS)
+BIN_ARCH=$$(go env GOARCH)
 VERSION=0.1
-OS_ARCH=darwin_amd64
 GLOBAL_BUILD_TAGS=-tags osusergo,netgo
 GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
+CI?=false
 
 default: install
 
@@ -14,16 +16,40 @@ build:
 	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ${BINARY}
 
 release:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_darwin_amd64
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_linux_amd64
+ifeq ($(CI), true)
+	docker run --rm --privileged --env VERSION=${VERSION} \
+		-v $(shell pwd):/go/src/github.com/user/repo \
+		-w /go/src/github.com/user/repo goreleaser/goreleaser build \
+		--rm-dist --snapshot \
+		--config build.goreleaser.yml
+else
+	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./dist/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
 
-install: build
-	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
-	mv ${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
+	echo ${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH)
+	mkdir -p .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
+	cp ./dist/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
+endif
+
+install: release
+	for os_arch in $$(ls -la ./dist | grep ${BINARY} | cut -f 2-3 -d '_') ; do \
+		mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch ; \
+		cp ./dist/${BINARY}_$$os_arch/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/ ; \
+	done
 
 test:
 	go test -vi $(TEST) || exit 1
 	echo $(TEST) | xargs -t -n4 go test -v $(TESTARGS) -timeout=30s -parallel=4
 
+tftest: install
+	terraform init examples/core
+	terraform fmt -check -recursive examples/core
+	terraform validate examples/core
+
 testacc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+
+lint:
+	golangci-lint run -v
+
+clean:
+	rm -rf dist bin .terraform*

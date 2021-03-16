@@ -1,0 +1,17 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+      # - shain/badgenstuff # testing for main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: golang:1.15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build code
+        run: CI='true' make release

@@ -9,6 +9,9 @@
 *.test
 bin/*
 
+# gorelease output directory
+dist/*
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -18,3 +21,8 @@ bin/*
 # Example terraform state
 examples/.terraform/*
 examples/*/*terraform*
+*.terraform*
+
+coverage*
+
+terraform-provider-enos

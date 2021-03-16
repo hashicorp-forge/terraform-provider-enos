@@ -2,10 +2,23 @@ name: Validate
 
 on:
   push:
-#     branches-ignore:
-#       - main
 
 jobs:
+  build-and-terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build code
+        run: make tftest # runs build + install make targets
+      # TODO:
+      # - name: Upload artifacts to actions workflow
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: ${{ github.event.repository.name }}-artifacts
+      #     path: |
+      #       ./bin/
+
   unit:
     runs-on: ubuntu-latest
     container: docker.mirror.hashicorp.services/library/golang:1.15
@@ -40,15 +53,14 @@ jobs:
           # terraform init -backend=false
           # terraform validate
 
-  #TODO: Fix codeql and opt in?
-  # codeql:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Initialize CodeQL
-  #       uses: github/codeql-action/init@v1
-  #       with:
-  #         languages: go
-  #     - run: |
-  #         make release
-  #     - name: Perform CodeQL Analysis
-  #       uses: github/codeql-action/analyze@v1
+  go-lint:
+      runs-on: ubuntu-latest
+      container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+        - name: Go Lint
+          run: golangci-lint run
+
+  # TODO:
+  # Add security scan
