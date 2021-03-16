@@ -3,6 +3,8 @@ HOSTNAME=hashicorp.com
 NAMESPACE=qti
 NAME=enos
 BINARY=terraform-provider-enos
+BIN_OS=$$(go env GOOS)
+BIN_ARCH=$$(go env GOARCH)
 VERSION=0.1
 GLOBAL_BUILD_TAGS=-tags osusergo,netgo
 GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
@@ -21,7 +23,11 @@ ifeq ($(CI), true)
 		--rm-dist --snapshot \
 		--config build.goreleaser.yml
 else
-	@echo "We only run releases through CI, please merge or *danger* set CI='true' *danger*"
+	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./bin/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
+
+	echo ${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH)
+	mkdir -p .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
+	cp ./bin/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
 endif
 
 install: release
