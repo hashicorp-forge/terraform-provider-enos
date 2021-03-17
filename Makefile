@@ -9,6 +9,7 @@ VERSION=0.1
 GLOBAL_BUILD_TAGS=-tags osusergo,netgo
 GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
 CI?=false
+GO_RELEASER_DOCKER_TAG=v0.159.0 # "latest" is not actually the latest
 
 default: install
 
@@ -19,7 +20,7 @@ release:
 ifeq ($(CI), true)
 	docker run --rm --privileged --env VERSION=${VERSION} \
 		-v $(shell pwd):/go/src/github.com/user/repo \
-		-w /go/src/github.com/user/repo goreleaser/goreleaser build \
+		-w /go/src/github.com/user/repo goreleaser/goreleaser:${GO_RELEASER_DOCKER_TAG} build \
 		--rm-dist --snapshot \
 		--config build.goreleaser.yml
 else
