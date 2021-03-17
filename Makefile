@@ -26,15 +26,17 @@ else
 	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./dist/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
 
 	echo ${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH)
-	mkdir -p .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
-	cp ./dist/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) .terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
+	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
+	cp ./dist/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
 endif
 
 install: release
+ifeq ($(CI), true)
 	for os_arch in $$(ls -la ./dist | grep ${BINARY} | cut -f 2-3 -d '_') ; do \
 		mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch ; \
 		cp ./dist/${BINARY}_$$os_arch/${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/ ; \
 	done
+endif
 
 test:
 	go test -vi $(TEST) || exit 1
