@@ -28,6 +28,24 @@ provider "aws" {
   region = "us-west-2"
 }
 
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnet_ids" "all" {
+  vpc_id = data.aws_vpc.default.id
+}
+
+module "target_sg" {
+  source = "terraform-aws-modules/security-group/aws//modules/ssh"
+
+  name        = "enos_core_example"
+  description = "Enos provider core example security group"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -44,12 +62,15 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
+data "enos_environment" "localhost" {
+}
+
 resource "aws_instance" "target" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   associate_public_ip_address = true
-  security_groups             = [var.security_group]
+  security_groups             = [module.target_sg.this_security_group_name]
 }
 
 resource "enos_file" "foo" {

@@ -24,6 +24,7 @@ type Temp struct {
 }
 
 var name = flag.String("name", "", "the name of the resource in camel_case, eg: remote_exec")
+var pluginType = flag.String("type", "resource", "the type of plugin source to make, 'resource' or 'datasource'")
 
 var snakeReg = regexp.MustCompile("(^[A-Za-z])|_([A-Za-z])")
 
@@ -58,37 +59,44 @@ func main() {
 	if *name == "" {
 		exit(fmt.Errorf("you must provide a name"))
 	}
+
+	if *pluginType != "resource" && *pluginType != "datasource" {
+		exit(fmt.Errorf("you must provide a valid source type: 'resource' or 'datasource'"))
+	}
+
 	temp := newTemp(*name)
 
-	templPath, err := filepath.Abs("./tools/create_resource/templ.text")
+	var err error
+	tmplPath := fmt.Sprintf("./tools/create_source/%s.go.tmpl", *pluginType)
+	destPath := fmt.Sprintf("./internal/plugin/%s_%s.go", *pluginType, temp.BaseName)
+	tmplPath, err = filepath.Abs(tmplPath)
+	if err != nil {
+		exit(err)
+	}
+	destPath, err = filepath.Abs(destPath)
 	if err != nil {
 		exit(err)
 	}
 
-	templF, err := os.Open(templPath)
-	defer templF.Close() // nolint: staticcheck
+	tmplF, err := os.Open(tmplPath)
+	defer tmplF.Close() // nolint: staticcheck
 	if err != nil {
 		exit(err)
 	}
 
 	buf := bytes.Buffer{}
-	_, err = buf.ReadFrom(templF)
+	_, err = buf.ReadFrom(tmplF)
 	if err != nil {
 		exit(err)
 	}
 
-	templ, err := template.New(temp.Name).Parse(buf.String())
+	tmpl, err := template.New(temp.Name).Parse(buf.String())
 	if err != nil {
 		exit(err)
 	}
 	buf.Reset()
 
-	err = templ.Execute(&buf, temp)
-	if err != nil {
-		exit(err)
-	}
-
-	destPath, err := filepath.Abs(fmt.Sprintf("./internal/plugin/resource_%s.go", temp.BaseName))
+	err = tmpl.Execute(&buf, temp)
 	if err != nil {
 		exit(err)
 	}
@@ -105,5 +113,5 @@ func main() {
 		exit(err)
 	}
 
-	fmt.Println("success! remember to register your resource in the server")
+	fmt.Printf("success! remember to register your %s in the server\n", *pluginType)
 }

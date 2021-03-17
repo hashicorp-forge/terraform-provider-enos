@@ -1,0 +1,163 @@
+package plugin
+
+import (
+	"context"
+
+	"github.com/hashicorp/enos-provider/internal/server/datarouter"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+)
+
+type {{.Struct}} struct {
+	providerConfig *config
+}
+
+var _ datarouter.DataSource = (*{{.Struct}})(nil)
+
+type {{.State}} struct {
+	ID string
+}
+
+var _ State = (*{{.State}})(nil)
+
+func new{{.StructCap}}() *{{.Struct}} {
+	return &{{.Struct}}{
+		providerConfig: newProviderConfig(),
+	}
+}
+
+func new{{.StateCap}}() *{{.State}} {
+	return &{{.State}}{}
+}
+
+func (d *{{.Struct}}) Name() string {
+	return "{{.Name}}"
+}
+
+func (d *{{.Struct}}) Schema() *tfprotov5.Schema {
+	return new{{.StateCap}}().Schema()
+}
+
+func (d *{{.Struct}}) SetProviderConfig(meta tftypes.Value) error {
+	return d.providerConfig.FromTerraform5Value(meta)
+}
+
+// ValidateDataSourceConfig is the request Terraform sends when it wants to
+// validate the data source's configuration.
+func (d *{{.Struct}}) ValidateDataSourceConfig(ctx context.Context, req *tfprotov5.ValidateDataSourceConfigRequest) (*tfprotov5.ValidateDataSourceConfigResponse, error) {
+	res := &tfprotov5.ValidateDataSourceConfigResponse{
+		Diagnostics: []*tfprotov5.Diagnostic{},
+	}
+
+	select {
+	case <-ctx.Done():
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		return res, ctx.Err()
+	default:
+	}
+
+	// unmarshal it to our known type to ensure whatever was passed in matches
+	// the correct schema.
+	newConfig := new{{.StateCap}}()
+	err := unmarshal(newConfig, req.Config)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+	}
+
+	return res, err
+}
+
+// ReadDataSource is the request Terraform sends when it wants to get the latest
+// state for the data source.
+func (d *{{.Struct}}) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDataSourceRequest) (*tfprotov5.ReadDataSourceResponse, error) {
+	res := &tfprotov5.ReadDataSourceResponse{
+		Diagnostics: []*tfprotov5.Diagnostic{},
+	}
+
+	select {
+	case <-ctx.Done():
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		return res, ctx.Err()
+	default:
+	}
+
+	newState := new{{.StateCap}}()
+
+	// unmarshal and re-marshal the state to add default fields
+	err := unmarshal(newState, req.Config)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return res, err
+	}
+
+	// TODO: Perform whatever actions you need and update the state
+
+	res.State, err = marshal(newState)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return res, err
+	}
+
+	return res, nil
+}
+
+// Schema is the file states Terraform schema.
+func (s *{{.State}}) Schema() *tfprotov5.Schema {
+	return &tfprotov5.Schema{
+		Version: 1,
+		Block: &tfprotov5.SchemaBlock{
+			Attributes: []*tfprotov5.SchemaAttribute{
+				// TODO: Add all state attributes
+				{
+					Name:     "id",
+					Type:     tftypes.String,
+					Computed: true,
+				},
+			},
+		},
+	}
+}
+
+// Validate validates the configuration.
+func (s *{{.State}}) Validate(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	// TODO: Validate any required attributes
+	/*
+		if s.Attribute == "" {
+			return newErrWithDiagnostics("invalid configuration", "you must provide the attribute", "attribute")
+		}
+	*/
+
+	return nil
+}
+
+// FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
+func (s *{{.State}}) FromTerraform5Value(val tftypes.Value) error {
+	// TODO: Add each state attribute
+	_, err := mapAttributesTo(val, map[string]interface{}{
+		"id": &s.ID,
+	})
+
+	return err
+}
+
+// Terraform5Type is the file state tftypes.Type.
+func (s *{{.State}}) Terraform5Type() tftypes.Type {
+	// TODO: Add each state attribute
+	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+		"id":        tftypes.String,
+	}}
+}
+
+// Terraform5Type is the file state tftypes.Value.
+func (s *{{.State}}) Terraform5Value() tftypes.Value {
+	// TODO: Add each state attribute
+	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
+		"id":        tfMarshalStringValue(s.ID),
+	})
+}

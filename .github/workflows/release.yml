@@ -9,9 +9,11 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    container: golang:1.15
+    container: docker.mirror.hashicorp.services/library/golang:1.16
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Build code
         run: CI='true' make release

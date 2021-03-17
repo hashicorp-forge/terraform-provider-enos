@@ -5,112 +5,14 @@ A terraform provider for quality infrastructure
 
 1. [Example](#example)
 1. [Provider configuration](#provider-configuration)
+1. [enos_environment](#enos_environment)
 1. [enos_file](#enos_file)
 1. [enos_remote_exec](#enos_remote_exec)
-1. [Creating new resources](#creating-new-resources)
+1. [Creating new sources](#creating-new-sources)
 
 ## Example
-Example of using the resource to copy files and run commands against a new
-Ec2 instance. It assumes that the security group name given provides SSH
-access on port 22 to the host machines public IP address.
 
-```hcl
-terraform {
-  required_providers {
-    enos = {
-      version = "~> 0.1"
-      source  = "hashicorp.com/qti/enos"
-    }
-
-    aws = {
-      source = "hashicorp/aws"
-    }
-  }
-}
-
-variable "key_name" {
-  type = string
-}
-
-variable "security_group" {
-  type = string
-}
-
-provider "enos" {
-  transport = {
-    ssh = {
-      user = "ubuntu"
-      private_key_path = "/path/to/your/private/key.pem"
-      # or ENOS_TRANSPORT_PRIVATE_KEY_PATH=/path/to/your/private/key.pem
-    }
-  }
-}
-
-provider "aws" {
-  region = "us-west-2"
-}
-
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  owners = ["099720109477"] # Canonical
-}
-
-resource "aws_instance" "target" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.micro"
-  key_name                    = var.key_name
-  associate_public_ip_address = true
-  security_groups             = [var.security_group]
-}
-
-resource "enos_file" "foo" {
-  depends_on = [aws_instance.target]
-
-  source      = "/path/to/file.txt"
-  destination = "/tmp/bar.txt"
-  transport = {
-    ssh = {
-      host = aws_instance.target.public_ip
-    }
-  }
-}
-
-resource "enos_remote_exec" "foo" {
-  depends_on = [
-    aws_instance.target,
-    enos_file.foo
-  ]
-
-  inline  = ["cp /tmp/bar.txt /tmp/baz.txt"]
-  scripts = ["${path.module}/files/script.sh"]
-
-  transport = {
-    ssh = {
-      host = aws_instance.target.public_ip
-    }
-  }
-}
-
-terraform {
-  required_providers {
-    enos = {
-      version = "~> 0.1"
-      source   = "hashicorp.com/qti/enos"
-    }
-  }
-}
-```
+You can find an example of how to use the enos provider in the [examples/core](https://github.com/hashicorp/enos-provider/blob/main/examples/core/README.md) section of the repository. 
 
 # Provider Configuration
 
@@ -151,15 +53,44 @@ provider "enos" {
 }
 ```
 
-# enos_file
+# enos_environment
+The enos_environment datasource is a datasource that we can use to pass environment
+specific information into our Terraform run. As enos relies on SSH to execute
+the bulk of it's actions, we a common problem is granting access to the host
+executing the Terraform run. As such, the enos_environment resource can be
+used to pass the public_ip_address to other Terraform resources that are creating
+security groups or managing firewalls.
 
+The following describes the enos_file schema:
+
+|key|description|
+|-|-|
+|id|The id of the datasource. It is always 'static'|
+|public_ip_address|The public IP address of the host executing Terraform|
+
+Example
+```hcl
+data "enos_environment" "localhost" { }
+
+module "security_group" {
+  source = "terraform-aws-modules/security-group/aws//modules/ssh"
+
+  name        = "enos_core_example"
+  description = "Enos provider core example security group"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+}
+```
+
+# enos_file
 The enos file resource is capable of copying a local file to a remote destination
 over an SSH transport.
 
 The following describes the enos_file schema
 
 |key|description|
-|:-|-:|
+|-|-|
 |id|The id of the resource. It is always 'static'|
 |sum|The SHA 256 sum of the source file. If the sum changes between runs the file will be uploaded again.|
 |source|The file path to the source file to copy|
@@ -197,7 +128,7 @@ remote instance over an SSH transport.
 The following describes the enos_remote_file schema
 
 |key|description|
-|:-|-:|
+|-|-|
 |id|The id of the resource. It is always 'static'|
 |sum|A digest of the inline commands, source files, and environment variables. If the sum changes between runs all commands will execute again|
 |environment|A map of key/value pairs to set as environment variable before running the commands or scripts.
@@ -229,12 +160,12 @@ resource "enos_remote_exec" "foo" {
 }
 ```
 
-# Creating new resources
-To ease the burden when creating new resources, we have a scaffolding generator that can take the name of the resource you wish to create and generates the many lines boilerplate for you. Simply run the following command and then address all the `TODO` statements in your newly generated resource.
+# Creating new sources
+To ease the burden when creating new resources and datasources, we have a scaffolding generator that can take the name of the resource you wish to create, along with the source type (resource or datasource), and output the scaffolding of a new source for you. Simply run the following command and then address all the `TODO` statements in your newly generated source.
 
 From the root directory of this repo, run:
 ```shell
-go run ./tools/create_resource -name <your_resource_name>
+go run ./tools/create_source -name <your_resource_name> -type <resource|datasource>
 ```
 
 Note that you should not prepend it with enos_, the utility will do that for you.

@@ -110,7 +110,9 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 	}
 	proposedState.Sum = sum
 
-	return transportUtil.PlanMarshalPlannedState(ctx, proposedState, transport)
+	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
+
+	return res, err
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
@@ -135,7 +137,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 	}
 	plannedState.ID = "static"
 
-	res, transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, *f.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *f.providerConfig.Transport)
 	if err != nil {
 		return res, err
 	}
@@ -167,7 +169,8 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 		}
 	}
 
-	return transportUtil.ApplyMarshalNewState(ctx, plannedState, transport)
+	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
+	return res, err
 }
 
 // Schema is the file states Terraform schema.

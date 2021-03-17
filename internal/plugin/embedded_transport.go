@@ -335,12 +335,10 @@ func (em *embeddedTransportV1) FromPrivate(in []byte) error {
 	return nil
 }
 
-// transportRequiredReplace returns an attribute path to the host attribute
-// if it's changed
-func transportRequiredReplace(priorHost, proposedHost string) []*tftypes.AttributePath {
+func transportReplacedAttributePaths(prior, proposed *embeddedTransportV1) []*tftypes.AttributePath {
 	attrs := []*tftypes.AttributePath{}
 
-	if priorHost != proposedHost {
+	if prior.SSH.Host != proposed.SSH.Host {
 		attrs = append(attrs, &tftypes.AttributePath{
 			Steps: []tftypes.AttributePathStep{
 				tftypes.AttributeName("transport"),

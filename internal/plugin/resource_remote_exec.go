@@ -99,7 +99,9 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 	}
 	proposedState.Sum = sha256
 
-	return transportUtil.PlanMarshalPlannedState(ctx, proposedState, transport)
+	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
+
+	return res, err
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
@@ -120,7 +122,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 	}
 	plannedState.ID = "static"
 
-	res, transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, *r.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *r.providerConfig.Transport)
 	if err != nil {
 		return res, err
 	}
@@ -142,7 +144,9 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		}
 	}
 
-	return transportUtil.ApplyMarshalNewState(ctx, plannedState, transport)
+	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
+
+	return res, err
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
