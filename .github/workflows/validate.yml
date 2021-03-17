@@ -12,19 +12,17 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Set up golang
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
       - name: Build code
-        run: make tftest # runs build + install make targets
-      # TODO:
-      # - name: Upload artifacts to actions workflow
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: ${{ github.event.repository.name }}-artifacts
-      #     path: |
-      #       ./bin/
+        # build the provider, install as terraform plugin, and validate example
+        # terraform that utilizes the provider.
+        run: make tftest
+        # TODO:
+        # - name: Upload artifacts to actions workflow
+        #   uses: actions/upload-artifact@v2
+        #   with:
+        #     name: ${{ github.event.repository.name }}-artifacts
+        #     path: |
+        #       ./bin/
 
   unit:
     runs-on: ubuntu-latest
@@ -47,24 +45,6 @@ jobs:
           fetch-depth: 0
       - name: Acceptance Tests
         run: make testacc
-
-  terraform:
-    runs-on: ubuntu-latest
-    container:
-      image: docker.mirror.hashicorp.services/hashicorp/terraform:0.14.6
-      options: "--entrypoint=\"\""
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Test Terraform
-        run: |
-          cd examples/core
-          terraform fmt -check
-          #TODO: figure out how to access hashicorp.com/qti/enos after build.
-          # terraform init -backend=false
-          # terraform validate
 
   go-lint:
     runs-on: ubuntu-latest
