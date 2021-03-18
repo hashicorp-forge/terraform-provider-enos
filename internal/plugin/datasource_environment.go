@@ -234,7 +234,7 @@ func (r *publicIPResolver) resolverFor(addr string) *net.Resolver {
 			d := net.Dialer{
 				Timeout: time.Millisecond * time.Duration(10000),
 			}
-			return d.DialContext(ctx, "udp", addr)
+			return d.DialContext(ctx, "udp4", addr)
 		},
 	}
 }
