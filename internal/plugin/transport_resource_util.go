@@ -137,26 +137,37 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWit
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
 // a request into prior and proposed states, builds a transport client,
 // verifies it, and returns the new transport.
-func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, providerTransport embeddedTransportV1, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, *embeddedTransportV1, error) {
+func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, *embeddedTransportV1, error) {
 	res := &tfprotov5.PlanResourceChangeResponse{
 		Diagnostics: []*tfprotov5.Diagnostic{},
 	}
-	transport := &providerTransport
-
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, transport, ctx.Err()
+		return res, nil, ctx.Err()
 	default:
 	}
 
-	err := unmarshal(prior, req.PriorState)
+	providerConfig, err := resource.GetProviderConfig()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return res, nil, err
+	}
+
+	transport, err := providerConfig.Transport.Copy()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return res, nil, err
+	}
+
+	err = unmarshal(prior, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, transport, err
 	}
 
-	err = prior.EmbeddedTransport().FromPrivate(req.PriorPrivate)
+	priorTransport := prior.EmbeddedTransport()
+	err = priorTransport.FromPrivate(req.PriorPrivate)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, transport, err
@@ -169,7 +180,8 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 	}
 
 	// Use any provider configuration
-	err = proposed.EmbeddedTransport().MergeInto(transport)
+	proposedTransport := proposed.EmbeddedTransport()
+	err = proposedTransport.MergeInto(transport)
 	if err != nil {
 		err = wrapErrWithDiagnostics(err,
 			"invalid configuration", "failed to merge resource and provider transport configuration", "transport", "ssh",
@@ -178,7 +190,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 		return res, transport, err
 	}
 
-	res.RequiresReplace = transportReplacedAttributePaths(prior.EmbeddedTransport(), proposed.EmbeddedTransport())
+	res.RequiresReplace = transportReplacedAttributePaths(priorTransport, proposedTransport)
 
 	return res, transport, err
 }
@@ -229,7 +241,8 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 		return res, err
 	}
 
-	err = planned.EmbeddedTransport().FromPrivate(req.PlannedPrivate)
+	transport := planned.EmbeddedTransport()
+	err = transport.FromPrivate(req.PlannedPrivate)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
@@ -246,8 +259,22 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 
 // ApplyValidatePlannedAndBuildClient takes the planned state and provider transport,
 // validates them, and returns a new SSH transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, providerTransport embeddedTransportV1) (*embeddedTransportV1, error) {
-	transport := &providerTransport
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, resource ResourceWithProviderConfig) (*embeddedTransportV1, error) {
+	providerConfig, err := resource.GetProviderConfig()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return nil, err
+	}
+
+	// Always work with a copy of the provider config so that we don't race
+	// for the pointer.
+	providerConfig, err = providerConfig.Copy()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return nil, err
+	}
+
+	transport := providerConfig.Transport
 
 	select {
 	case <-ctx.Done():
@@ -256,7 +283,14 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 	default:
 	}
 
-	err := planned.EmbeddedTransport().MergeInto(transport)
+	etP := planned.EmbeddedTransport()
+	et, err := etP.Copy()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return transport, err
+	}
+
+	err = et.MergeInto(transport)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return transport, err

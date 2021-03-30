@@ -15,6 +15,12 @@ import (
 // TestAccResourceRemoteExec tests the remote_exec resource
 func TestAccResourceRemoteExec(t *testing.T) {
 	var cfg = template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID}}" {
+		{{if .Content}}
+		content = <<EOF
+{{.Content}}
+EOF
+		{{end}}
+
 		{{if .Inline}}
 		inline = [
 		{{range .Inline}}
@@ -77,6 +83,7 @@ EOF
 	remoteExec.Env = map[string]string{"FOO": "BAR"}
 	remoteExec.Scripts = []string{"../fixtures/src.txt"}
 	remoteExec.Inline = []string{"touch /tmp/foo"}
+	remoteExec.Content = "some content"
 	remoteExec.Transport.SSH.User = "ubuntu"
 	remoteExec.Transport.SSH.Host = "localhost"
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
@@ -90,6 +97,7 @@ EOF
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "environment[FOO]", regexp.MustCompile(`^BAR$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "inline[0]", regexp.MustCompile(`^/tmp/foo$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "scripts[0]", regexp.MustCompile(`^../fixtures/src.txt$`)),
+			resource.TestMatchResourceAttr("enos_remote_exec.foo", "content", regexp.MustCompile(`^some content$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),
@@ -106,6 +114,7 @@ EOF
 		realTest.Env = map[string]string{"FOO": "BAR"}
 		realTest.Scripts = []string{"../fixtures/script.sh"}
 		realTest.Inline = []string{"touch /tmp/foo && rm /tmp/foo"}
+		realTest.Content = `echo "hello world" > /tmp/enos_remote_exec_script_content`
 		realTest.Transport.SSH.Host = host
 		cases = append(cases, testAccResourceTemplate{
 			"real test",

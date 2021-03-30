@@ -36,16 +36,6 @@ data "aws_subnet_ids" "all" {
   vpc_id = data.aws_vpc.default.id
 }
 
-module "target_sg" {
-  source = "terraform-aws-modules/security-group/aws//modules/ssh"
-
-  name        = "enos_core_example"
-  description = "Enos provider core example security group"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
-}
-
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -65,6 +55,24 @@ data "aws_ami" "ubuntu" {
 data "enos_environment" "localhost" {
 }
 
+data "template_file" "foo_template" {
+  template = file("${path.module}/files/foo.tmpl")
+
+  vars = {
+    "foo" = var.input_test
+  }
+}
+
+module "target_sg" {
+  source = "terraform-aws-modules/security-group/aws//modules/ssh"
+
+  name        = "enos_core_example"
+  description = "Enos provider core example security group"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+}
+
 resource "aws_instance" "target" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t3.micro"
@@ -73,11 +81,12 @@ resource "aws_instance" "target" {
   security_groups             = [module.target_sg.this_security_group_name]
 }
 
-resource "enos_file" "foo" {
+resource "enos_file" "from_source" {
   depends_on = [aws_instance.target]
 
   source      = "${path.module}/files/foo.txt"
-  destination = "/tmp/bar.txt"
+  destination = "/tmp/from_source.txt"
+
   transport = {
     ssh = {
       host = aws_instance.target.public_ip
@@ -85,14 +94,33 @@ resource "enos_file" "foo" {
   }
 }
 
-resource "enos_remote_exec" "foo" {
+resource "enos_file" "from_content" {
+  depends_on = [aws_instance.target]
+
+  content     = data.template_file.foo_template.rendered
+  destination = "/tmp/from_content.txt"
+
+  transport = {
+    ssh = {
+      host = aws_instance.target.public_ip
+    }
+  }
+}
+
+resource "enos_remote_exec" "all" {
   depends_on = [
     aws_instance.target,
-    enos_file.foo
+    enos_file.from_source,
+    enos_file.from_content,
   ]
 
-  inline  = ["cp /tmp/bar.txt /tmp/baz.txt"]
+  environment = {
+    HELLO_WORLD = "Hello, World!"
+  }
+
+  inline  = ["rm /tmp/from_source.txt /tmp/from_content.txt"]
   scripts = ["${path.module}/files/script.sh"]
+  content = data.template_file.foo_template.rendered
 
   transport = {
     ssh = {

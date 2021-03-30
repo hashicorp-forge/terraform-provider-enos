@@ -4,15 +4,25 @@
 A terraform provider for quality infrastructure
 
 1. [Example](#example)
+1. [Creating new sources](#creating-new-sources)
 1. [Provider configuration](#provider-configuration)
 1. [enos_environment](#enos_environment)
 1. [enos_file](#enos_file)
 1. [enos_remote_exec](#enos_remote_exec)
-1. [Creating new sources](#creating-new-sources)
 
-## Example
+# Example
 
-You can find an example of how to use the enos provider in the [examples/core](https://github.com/hashicorp/enos-provider/blob/main/examples/core/README.md) section of the repository. 
+You can find an example of how to use the enos provider in the [examples/core](https://github.com/hashicorp/enos-provider/blob/main/examples/core/) section of the repository.
+
+# Creating new sources
+To ease the burden when creating new resources and datasources, we have a scaffolding generator that can take the name of the resource you wish to create, along with the source type (resource or datasource), and output the scaffolding of a new source for you. Simply run the following command and then address all the `TODO` statements in your newly generated source.
+
+From the root directory of this repo, run:
+```shell
+go run ./tools/create_source -name <your_resource_name> -type <resource|datasource>
+```
+
+Note that you should not prepend it with enos_, the utility will do that for you.
 
 # Provider Configuration
 
@@ -28,7 +38,7 @@ Configuration precendence: Resource HCL > Provider Environment > Provider HCL
 The following configuration parameters are supported at the provider level:
 
 |ssh transport key|environment variable|
-|:-|-:|
+|-|-|
 |user|ENOS_TRANSPORT_USER|
 |host|ENOS_TRANSPORT_HOST|
 |private_key|ENOS_TRANSPORT_PRIVATE_KEY|
@@ -45,9 +55,9 @@ Example configuration
 provider "enos" {
   transport = {
     ssh = {
-      user = "ubuntu"
+      user             = "ubuntu"
       private_key_path = "/path/to/your/private/key.pem"
-      host = "192.168.0.1"
+      host             = "192.168.0.1"
     }
   }
 }
@@ -61,7 +71,7 @@ executing the Terraform run. As such, the enos_environment resource can be
 used to pass the public_ip_address to other Terraform resources that are creating
 security groups or managing firewalls.
 
-The following describes the enos_file schema:
+The following describes the enos_environment schema:
 
 |key|description|
 |-|-|
@@ -110,11 +120,12 @@ Example
 resource "enos_file" "foo" {
   source      = "/local/path/to/file.txt"
   destination = "/remote/destination/file.txt"
+  content     = data.template_file.some_template.rendered
 
   transport = {
     ssh = {
-      host = "192.168.0.1"
-      user = "ubuntu"
+      host             = "192.168.0.1"
+      user             = "ubuntu"
       private_key_path = "/path/to/private/key.pem"
     }
   }
@@ -125,7 +136,7 @@ resource "enos_file" "foo" {
 The enos remote exec resource is capable of running scripts or commands on a
 remote instance over an SSH transport.
 
-The following describes the enos_remote_file schema
+The following describes the enos_remote_file schema:
 
 |key|description|
 |-|-|
@@ -147,25 +158,20 @@ to the agent socket as defined with the `SSH_AUTH_SOCK` environment variable.
 Example
 ```hcl
 resource "enos_remote_exec" "foo" {
+  environment = {
+    FOO = "foo"
+  }
+
   inline  = ["touch /tmp/inline.txt"]
   scripts = ["/local/path/to/script.sh"]
+  content = data.template_file.some_template.rendered
 
   transport = {
     ssh = {
-      host = "192.168.0.1"
-      user = "ubuntu"
+      host             = "192.168.0.1"
+      user             = "ubuntu"
       private_key_path = "/path/to/private/key.pem"
     }
   }
 }
 ```
-
-# Creating new sources
-To ease the burden when creating new resources and datasources, we have a scaffolding generator that can take the name of the resource you wish to create, along with the source type (resource or datasource), and output the scaffolding of a new source for you. Simply run the following command and then address all the `TODO` statements in your newly generated source.
-
-From the root directory of this repo, run:
-```shell
-go run ./tools/create_source -name <your_resource_name> -type <resource|datasource>
-```
-
-Note that you should not prepend it with enos_, the utility will do that for you.

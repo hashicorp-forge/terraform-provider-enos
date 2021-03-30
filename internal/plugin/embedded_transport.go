@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sync"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
@@ -15,6 +16,7 @@ import (
 // resources and data source. It is intended to be used as ouput from the
 // transport data source and used as the transport input for all resources.
 type embeddedTransportV1 struct {
+	mu  sync.Mutex
 	SSH *embeddedTransportSSHv1 `json:"ssh"`
 }
 
@@ -49,6 +51,7 @@ type embeddedTransportPrivate struct {
 
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
+		mu: sync.Mutex{},
 		SSH: &embeddedTransportSSHv1{
 			Values: map[string]tftypes.Value{},
 		},
@@ -77,6 +80,9 @@ func (em *embeddedTransportV1) SchemaAttributeOut() *tfprotov5.SchemaAttribute {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Value with As().
 func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
 	if err != nil {
@@ -128,8 +134,9 @@ func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
 // always match the schema that is passed in as user configuration.
 func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
 	newTypes := map[string]tftypes.Type{}
+	defaultTypes := em.defaultSSHTypes()
 	for name := range em.SSH.Values {
-		newTypes[name] = em.defaultSSHTypes()[name]
+		newTypes[name] = defaultTypes[name]
 	}
 
 	return tftypes.Object{AttributeTypes: newTypes}
@@ -139,8 +146,9 @@ func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
 // always match the schema that is passed in as user configuration.
 func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
 	newValues := map[string]tftypes.Value{}
+	defaultValues := em.defaultSSHValues()
 	for name, val := range em.SSH.Values {
-		setVal, ok := em.defaultSSHValues()[name]
+		setVal, ok := defaultValues[name]
 		if ok {
 			newValues[name] = setVal
 			continue
@@ -150,7 +158,6 @@ func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
 	}
 
 	return tftypes.NewValue(em.Terraform5TypeSSH(), newValues)
-
 }
 
 func (em *embeddedTransportV1) defaultSSHTypes() map[string]tftypes.Type {
@@ -173,6 +180,29 @@ func (em *embeddedTransportV1) defaultSSHValues() map[string]tftypes.Value {
 		"passphrase":       tfMarshalStringValue(em.SSH.Passphrase),
 		"passphrase_path":  tfMarshalStringValue(em.SSH.PassphrasePath),
 	}
+}
+
+func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
+	newCopy := newEmbeddedTransport()
+
+	self, err := json.Marshal(em)
+	if err != nil {
+		return newCopy, err
+	}
+
+	err = json.Unmarshal(self, newCopy)
+	if err != nil {
+		return newCopy, err
+	}
+
+	for k, v := range em.SSH.Values {
+		newCopy.SSH.Values[k] = v
+	}
+
+	return newCopy, nil
 }
 
 // Validate validates that transport can use the given configuration as a
@@ -263,6 +293,9 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 }
 
 func (em *embeddedTransportV1) FromEnvironment() {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
 	for _, key := range []struct {
 		name string
 		env  string
@@ -285,6 +318,11 @@ func (em *embeddedTransportV1) FromEnvironment() {
 
 // MergeInto merges the embeddedTranspor into another instance.
 func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) error {
+	defaults.mu.Lock()
+	defer defaults.mu.Unlock()
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
 	startingVals := defaults.SSH.Values
 
 	overJSON, err := json.Marshal(em)
@@ -320,6 +358,9 @@ func (em *embeddedTransportV1) ToPrivate() ([]byte, error) {
 
 // FromPrivate loads the private state into the embeddedTransport
 func (em *embeddedTransportV1) FromPrivate(in []byte) error {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
 	if len(in) == 0 {
 		return nil
 	}
@@ -338,7 +379,7 @@ func (em *embeddedTransportV1) FromPrivate(in []byte) error {
 func transportReplacedAttributePaths(prior, proposed *embeddedTransportV1) []*tftypes.AttributePath {
 	attrs := []*tftypes.AttributePath{}
 
-	if prior.SSH.Host != proposed.SSH.Host {
+	if prior.SSH.Host != "" && proposed.SSH.Host != "" && (prior.SSH.Host != proposed.SSH.Host) {
 		attrs = append(attrs, &tftypes.AttributePath{
 			Steps: []tftypes.AttributePathStep{
 				tftypes.AttributeName("transport"),

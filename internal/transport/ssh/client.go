@@ -109,6 +109,7 @@ func (c *client) init(ctx context.Context) error {
 
 	c.mu = sync.Mutex{}
 	c.client = nil
+	c.keepaliveErrC = make(chan error, 1)
 
 	c.clientConfig = &xssh.ClientConfig{
 		Config:          xssh.Config{},
@@ -159,13 +160,12 @@ func (c *client) init(ctx context.Context) error {
 // Connect creates a TCP connection to the SSH server, initiates an SSH
 // handshake, creates an SSH client, and starts a background TCP keepalive
 // routine.  It will retry the TCP connection in 1 second increments until
-// either 15 seconds have elapsed or the context is done.
+// either 60 seconds have elapsed or the context is done.
 func (c *client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	var err error
-	c.keepaliveErrC = make(chan error, 1)
 
 	sshAgentConn, sshAgent, ok := c.connectSSHAgent()
 	if ok {
@@ -184,16 +184,17 @@ func (c *client) Connect(ctx context.Context) error {
 	// we'll fire off dial attempts every 3 seconds and get the first client
 	// that succeeds.
 
-	dialTimeout, cancel := context.WithTimeout(ctx, time.Duration(16*time.Second))
+	dialTimeout, cancel := context.WithTimeout(ctx, time.Duration(60*time.Second))
 	defer cancel()
 	dialTicker := time.NewTicker(3 * time.Second)
 
 	var dialErrs = make(chan error, 5)
 	var clientC = make(chan *xssh.Client)
-	c.clientConfig.Timeout = time.Second
+	c.clientConfig.Timeout = 2 * time.Second
 	dial := func() {
 		client, err := xssh.Dial("tcp", net.JoinHostPort(c.transportCfg.host, c.transportCfg.port), c.clientConfig)
 		if err == nil {
+			dialTicker.Stop()
 			clientC <- client
 			return
 		}
@@ -229,7 +230,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 15 second limit %w", err)))
+				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 60 second limit")))
 			default:
 			}
 
@@ -237,7 +238,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 15 second limit %w", err)))
+				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 60 second limit")))
 			case <-dialTicker.C:
 				go dial()
 			case client := <-clientC:
@@ -252,40 +253,40 @@ func (c *client) Connect(ctx context.Context) error {
 
 	keepaliveCtx, keepaliveCancel := context.WithCancel(ctx)
 	c.keepaliveCancel = keepaliveCancel
-	go c.startConnectionKeepalive(keepaliveCtx)
 
-	return nil
-}
+	startConnectionKeepalive := func(ctx context.Context, client *xssh.Client) {
+		// get a copy of the client so we don't race for the pointer on reconnects
+		t := time.NewTicker(1 * time.Second)
+		errCount := 0
+		defer t.Stop()
 
-func (c *client) startConnectionKeepalive(ctx context.Context) {
-	t := time.NewTicker(2 * time.Second)
-	errCount := 0
-	defer t.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			c.keepaliveErrC <- ctx.Err()
-			return
-		default:
-		}
-
-		select {
-		case <-t.C:
-			ok, _, err := c.client.SendRequest("enos@hashicorp.io", true, nil)
-			if !ok {
-				errCount++
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
 
-			if errCount == 5 {
-				c.keepaliveErrC <- err
+			select {
+			case <-t.C:
+				ok, _, err := client.SendRequest("enos@hashicorp.io", true, nil)
+				if !ok {
+					errCount++
+				}
+
+				if errCount == 5 {
+					c.keepaliveErrC <- err
+					return
+				}
+			case <-ctx.Done():
 				return
 			}
-		case <-ctx.Done():
-			c.keepaliveErrC <- ctx.Err()
-			return
 		}
 	}
+
+	go startConnectionKeepalive(keepaliveCtx, c.client)
+
+	return nil
 }
 
 func (c *client) Close() error {
@@ -331,20 +332,20 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	var session *xssh.Session
 	var cleanup func() error
 
-	wrapErr := func(err error) error {
-		return fmt.Errorf("creating SSH session %w", err)
+	wrapErr := func(err error, msg string) error {
+		return fmt.Errorf("%s: %w", msg, err)
 	}
 
 	if c.client == nil {
 		err = c.Connect(ctx)
 		if err != nil {
-			return session, cleanup, wrapErr(err)
+			return session, cleanup, wrapErr(err, "creating client connection")
 		}
 	}
 
 	session, err = c.client.NewSession()
 	if err != nil {
-		return session, cleanup, wrapErr(err)
+		return session, cleanup, wrapErr(err, "creating SSH session")
 	}
 
 	cleanup = func() error {
@@ -393,17 +394,17 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		// dial.
 		select {
 		case <-ctx.Done():
-			return session, cleanup, wrapErr(drainErrors(ctx.Err()))
+			return session, cleanup, wrapErr(drainErrors(nil), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(fmt.Errorf("exceeded 15 second limit %w", err)))
+			return session, cleanup, wrapErr(drainErrors(nil), "15 second request timeout exceeded")
 		default:
 		}
 
 		select {
 		case <-ctx.Done():
-			return session, cleanup, wrapErr(drainErrors(ctx.Err()))
+			return session, cleanup, wrapErr(drainErrors(nil), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(fmt.Errorf("exceeded 15 second limit %w", err)))
+			return session, cleanup, wrapErr(drainErrors(nil), "15 second request timeout exceeded")
 		case <-requestTicker.C:
 			go sendRequest()
 		case <-requestSuccess:

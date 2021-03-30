@@ -39,17 +39,27 @@ ifeq ($(CI), true)
 	done
 endif
 
+install-race-detector:
+	go build -race ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ./dist/${BINARY}_${VERSION}_${BIN_OS}_${BIN_ARCH}
+
+	echo ${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH)
+	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)
+	cp ./dist/${BINARY}_${VERSION}_$(BIN_OS)_$(BIN_ARCH) ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$(BIN_OS)_$(BIN_ARCH)/
+
 test:
 	go test -vi $(TEST) || exit 1
 	echo $(TEST) | xargs -t -n4 go test -v $(TESTARGS) -timeout=30s -parallel=4
 
-tftest: install
+test-tf: install
 	terraform init examples/core
 	terraform fmt -check -recursive examples/core
 	terraform validate examples/core
 
-testacc:
+test-acc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+
+test-race-detector:
+	GORACE=log_path=/tmp/gorace.log TF_ACC=1 go test -race $(TEST) -v $(TESTARGS) -timeout 120m
 
 lint:
 	golangci-lint run -v

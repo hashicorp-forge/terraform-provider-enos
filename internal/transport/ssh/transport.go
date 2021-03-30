@@ -118,7 +118,7 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 	if err != nil {
 		return err
 	}
-	defer cleanup() // nolint: errcheck
+	defer func() { err = cleanup() }()
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
@@ -260,6 +260,14 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout io.Reade
 		errC <- err
 		return stdout, stderr, errC
 	}
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		defer disconnect()
+		errC <- err
+		return stdout, stderr, errC
+	}
+	defer stdin.Close()
 
 	err = session.Start(cmd.Cmd())
 	if err != nil {

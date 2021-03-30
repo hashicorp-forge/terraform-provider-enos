@@ -27,6 +27,7 @@ func TestSSH(t *testing.T) {
 		WithPassphrasePath(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")),
 	)
 	require.NoError(t, err)
+	defer require.NoError(t, c.Close())
 
 	t.Run("copy", func(t *testing.T) {
 		f, err := os.Create("/tmp/ssh_test")
@@ -69,5 +70,14 @@ func TestSSH(t *testing.T) {
 		require.Error(t, err)
 
 		require.NoError(t, c.Close())
+	})
+
+	t.Run("nohup", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		defer cancel()
+
+		// Make sure we can nohup and end our session
+		_, _, err := c.Run(ctx, command.New("nohup sleep 7 &>/dev/null &"))
+		require.NoError(t, err)
 	})
 }

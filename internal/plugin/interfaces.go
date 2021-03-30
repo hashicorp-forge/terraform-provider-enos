@@ -23,3 +23,8 @@ type StateWithTransport interface {
 	State
 	EmbeddedTransport() *embeddedTransportV1
 }
+
+type ResourceWithProviderConfig interface {
+	SetProviderConfig(tftypes.Value) error
+	GetProviderConfig() (*config, error)
+}

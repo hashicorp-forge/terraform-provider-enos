@@ -15,7 +15,7 @@ jobs:
       - name: Build code
         # build the provider, install as terraform plugin, and validate example
         # terraform that utilizes the provider.
-        run: make tftest
+        run: make test-tf  # runs build + install make targets
         # TODO:
         # - name: Upload artifacts to actions workflow
         #   uses: actions/upload-artifact@v2
@@ -44,7 +44,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Acceptance Tests
-        run: make testacc
+        run: make test-acc
 
   go-lint:
     runs-on: ubuntu-latest

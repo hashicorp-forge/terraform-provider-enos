@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -16,6 +18,7 @@ import (
 
 type remoteExec struct {
 	providerConfig *config
+	mu             sync.Mutex
 }
 
 var _ resourcerouter.Resource = (*remoteExec)(nil)
@@ -23,6 +26,7 @@ var _ resourcerouter.Resource = (*remoteExec)(nil)
 type remoteExecStateV1 struct {
 	ID        string
 	Env       map[string]string
+	Content   string
 	Inline    []string
 	Scripts   []string
 	Sum       string
@@ -34,6 +38,7 @@ var _ State = (*remoteExecStateV1)(nil)
 func newRemoteExec() *remoteExec {
 	return &remoteExec{
 		providerConfig: newProviderConfig(),
+		mu:             sync.Mutex{},
 	}
 }
 
@@ -52,7 +57,17 @@ func (r *remoteExec) Schema() *tfprotov5.Schema {
 }
 
 func (r *remoteExec) SetProviderConfig(meta tftypes.Value) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return r.providerConfig.FromTerraform5Value(meta)
+}
+
+func (r *remoteExec) GetProviderConfig() (*config, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.providerConfig.Copy()
 }
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
@@ -85,19 +100,23 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 	priorState := newRemoteExecStateV1()
 	proposedState := newRemoteExecStateV1()
 
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, *r.providerConfig.Transport, req)
+	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
 
-	sha256, err := r.SHA256(ctx, proposedState)
-	if err != nil {
-		err = wrapErrWithDiagnostics(err, "invalid configuration", "unable to read all scripts", "scripts")
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+	// Since content is optional we need to make sure we only update the sum
+	// if we known it.
+	if !proposedState.hasUnknownAttributes() {
+		sha256, err := r.SHA256(ctx, proposedState)
+		if err != nil {
+			err = wrapErrWithDiagnostics(err, "invalid configuration", "unable to read all scripts", "scripts")
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
+		}
+		proposedState.Sum = sha256
 	}
-	proposedState.Sum = sha256
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 
@@ -115,14 +134,14 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		return res, err
 	}
 
-	if len(plannedState.Inline) == 0 && len(plannedState.Scripts) == 0 {
+	if plannedState.shouldDelete() {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
 		return res, err
 	}
 	plannedState.ID = "static"
 
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *r.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
 	if err != nil {
 		return res, err
 	}
@@ -194,6 +213,12 @@ func (s *remoteExecStateV1) Schema() *tfprotov5.Schema {
 					},
 					Optional: true,
 				},
+				{
+					Name:      "content",
+					Type:      tftypes.String,
+					Optional:  true,
+					Sensitive: true,
+				},
 				s.Transport.SchemaAttributeTransport(),
 			},
 		},
@@ -212,11 +237,26 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 	// aggregate of the environment variables, inline commands, and scripts.
 	ag := strings.Builder{}
 
+	if state.Content != "" {
+		content := tfile.NewReader(state.Content)
+		defer content.Close()
+
+		sha, err := tfile.SHA256(content)
+		if err != nil {
+			return "", wrapErrWithDiagnostics(
+				err, "invalid configuration", "unable to determine content SHA256 sum", "content",
+			)
+		}
+
+		ag.WriteString(sha)
+	}
+
 	for _, cmd := range state.Inline {
 		ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(state.Env))))
 	}
 
 	var sha string
+	var file it.Copyable
 	var err error
 	for _, path := range state.Scripts {
 		select {
@@ -225,10 +265,18 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 		default:
 		}
 
-		sha, err = tfile.SHA256(path)
+		file, err = tfile.Open(path)
+		defer file.Close() // nolint: staticcheck
 		if err != nil {
 			return "", wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
+			)
+		}
+
+		sha, err = tfile.SHA256(file)
+		if err != nil {
+			return "", wrapErrWithDiagnostics(
+				err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
 			)
 		}
 
@@ -240,7 +288,7 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 
 // ExecuteCommands executes any commands or scripts.
 func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, ssh it.Transport) error {
-	var stderr string
+
 	for _, cmd := range state.Inline {
 		select {
 		case <-ctx.Done():
@@ -258,28 +306,8 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		}
 	}
 
-	var sha string
-	var script it.Copyable
-	var dst string
-	var err error
-
 	for _, path := range state.Scripts {
-		select {
-		case <-ctx.Done():
-			return wrapErrWithDiagnostics(
-				ctx.Err(), "timed out", "context deadline exceeded while running scripts",
-			)
-		default:
-		}
-
-		sha, err = tfile.SHA256(path)
-		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
-			)
-		}
-
-		script, err = tfile.Open(path)
+		script, err := tfile.Open(path)
 		defer script.Close() // nolint: staticcheck
 		if err != nil {
 			return wrapErrWithDiagnostics(
@@ -287,37 +315,78 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 			)
 		}
 
-		// TODO: Eventually we'll probably have to support /tmp being mounted
-		// with no exec. In those cases we'll have to make this configurable
-		// or find another strategy for executing scripts.
-		dst = fmt.Sprintf("/tmp/%s.sh", sha)
-		err = ssh.Copy(ctx, script, dst)
+		err = r.copyAndRun(ctx, ssh, script, "script", state.Env)
 		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running inline command failed: %s", stderr),
-			)
+			return err
 		}
+	}
 
-		_, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("chmod 0777 %s", dst), command.WithEnvVars(state.Env)))
-		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running changing ownership on script: %s", stderr),
-			)
-		}
+	if state.Content != "" {
+		content := tfile.NewReader(state.Content)
+		defer content.Close()
 
-		_, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("bash %s", dst), command.WithEnvVars(state.Env)))
+		err := r.copyAndRun(ctx, ssh, content, "content", state.Env)
 		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running executing script: %s", stderr),
-			)
+			return err
 		}
+	}
 
-		_, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("rm %s", dst), command.WithEnvVars(state.Env)))
-		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running executing script: %s", stderr),
-			)
-		}
+	return nil
+}
+
+func (r *remoteExec) copyAndRun(ctx context.Context, ssh it.Transport, src it.Copyable, srcType string, env map[string]string) error {
+	select {
+	case <-ctx.Done():
+		return wrapErrWithDiagnostics(
+			ctx.Err(), "timed out", "context deadline exceeded while running scripts",
+		)
+	default:
+	}
+
+	sha, err := tfile.SHA256(src)
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "invalid configuration", fmt.Sprintf("unable to determine %s SHA256 sum", srcType), srcType,
+		)
+	}
+
+	_, err = src.Seek(0, io.SeekStart)
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "invalid configuration", fmt.Sprintf("unable to seek to %s start", srcType), srcType,
+		)
+	}
+
+	// TODO: Eventually we'll probably have to support /tmp being mounted
+	// with no exec. In those cases we'll have to make this configurable
+	// or find another strategy for executing scripts.
+	dst := fmt.Sprintf("/tmp/%s.sh", sha)
+	err = ssh.Copy(ctx, src, dst)
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "command failed", "running inline command failed",
+		)
+	}
+
+	_, stderr, err := ssh.Run(ctx, command.New(fmt.Sprintf("chmod 0777 %s", dst), command.WithEnvVars(env)))
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "command failed", fmt.Sprintf("running changing ownership on script: %s", stderr),
+		)
+	}
+
+	_, stderr, err = ssh.Run(ctx, command.New(dst, command.WithEnvVars(env)))
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "command failed", fmt.Sprintf("executing script: %s", stderr),
+		)
+	}
+
+	_, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("rm -f %s", dst), command.WithEnvVars(env)))
+	if err != nil {
+		return wrapErrWithDiagnostics(
+			err, "command failed", fmt.Sprintf("removing script file: %s", stderr),
+		)
 	}
 
 	return nil
@@ -332,9 +401,9 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	// Make sure that we have either an inline or script command
-	if len(s.Inline) == 0 && len(s.Scripts) == 0 {
-		return newErrWithDiagnostics("invalid configuration", "you must provide either inline commands or scripts", "inline")
+	// Make sure that we have content, inline commands or scripts
+	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+		return newErrWithDiagnostics("invalid configuration", "you must provide content, inline commands or scripts", "content")
 	}
 
 	// Make sure the scripts exist
@@ -357,39 +426,43 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *remoteExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":  &s.ID,
-		"sum": &s.Sum,
+		"id":      &s.ID,
+		"content": &s.Content,
+		"sum":     &s.Sum,
 	})
 	if err != nil {
 		return err
 	}
 
-	if vals["environment"].IsKnown() && !vals["environment"].IsNull() {
-		s.Env, err = tfUnmarshalStringMap(vals["environment"])
+	env, ok := vals["environment"]
+	if ok {
+		s.Env, err = tfUnmarshalStringMap(env)
 		if err != nil {
 			return err
 		}
 	}
 
-	if vals["inline"].IsKnown() && !vals["inline"].IsNull() {
-		s.Inline, err = tfUnmarshalStringSlice(vals["inline"])
+	inline, ok := vals["inline"]
+	if ok {
+		s.Inline, err = tfUnmarshalStringSlice(inline)
 		if err != nil {
 			return err
 		}
 	}
 
-	if vals["scripts"].IsKnown() && !vals["scripts"].IsNull() {
-		s.Scripts, err = tfUnmarshalStringSlice(vals["scripts"])
+	scripts, ok := vals["scripts"]
+	if ok {
+		s.Scripts, err = tfUnmarshalStringSlice(scripts)
 		if err != nil {
 			return err
 		}
 	}
 
-	if !vals["transport"].IsKnown() {
-		return nil
+	if vals["transport"].IsKnown() {
+		return s.Transport.FromTerraform5Value(vals["transport"])
 	}
 
-	return s.Transport.FromTerraform5Value(vals["transport"])
+	return nil
 }
 
 // Terraform5Type is the file state tftypes.Type.
@@ -400,6 +473,7 @@ func (s *remoteExecStateV1) Terraform5Type() tftypes.Type {
 		"environment": tftypes.Map{AttributeType: tftypes.String},
 		"inline":      tftypes.List{ElementType: tftypes.String},
 		"scripts":     tftypes.List{ElementType: tftypes.String},
+		"content":     tftypes.String,
 		"transport":   s.Transport.Terraform5Type(),
 	}}
 }
@@ -409,6 +483,7 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          tfMarshalStringValue(s.ID),
 		"sum":         tfMarshalStringValue(s.Sum),
+		"content":     tfMarshalStringOptionalValue(s.Content),
 		"transport":   s.Transport.Terraform5Value(),
 		"inline":      tfMarshalStringSlice(s.Inline),
 		"scripts":     tfMarshalStringSlice(s.Scripts),
@@ -418,4 +493,34 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 
 func (s *remoteExecStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
+}
+
+func (s *remoteExecStateV1) shouldDelete() bool {
+	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+		return true
+	}
+
+	return false
+}
+
+func (s *remoteExecStateV1) hasUnknownAttributes() bool {
+	if s.Content == UnknownString {
+		return true
+	}
+
+	for _, ary := range [][]string{s.Scripts, s.Inline} {
+		for _, val := range ary {
+			if val == UnknownString {
+				return true
+			}
+		}
+	}
+
+	for _, val := range s.Env {
+		if val == UnknownString {
+			return true
+		}
+	}
+
+	return false
 }

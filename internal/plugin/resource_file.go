@@ -2,7 +2,9 @@ package plugin
 
 import (
 	"context"
+	"sync"
 
+	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
@@ -12,6 +14,7 @@ import (
 
 type file struct {
 	providerConfig *config
+	mu             sync.Mutex
 }
 
 var _ resourcerouter.Resource = (*file)(nil)
@@ -20,6 +23,7 @@ type fileStateV1 struct {
 	ID        string
 	Src       string
 	Dst       string
+	Content   string
 	Sum       string
 	Transport *embeddedTransportV1
 }
@@ -29,6 +33,7 @@ var _ State = (*fileStateV1)(nil)
 func newFile() *file {
 	return &file{
 		providerConfig: newProviderConfig(),
+		mu:             sync.Mutex{},
 	}
 }
 
@@ -47,7 +52,17 @@ func (f *file) Schema() *tfprotov5.Schema {
 }
 
 func (f *file) SetProviderConfig(providerConfig tftypes.Value) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	return f.providerConfig.FromTerraform5Value(providerConfig)
+}
+
+func (f *file) GetProviderConfig() (*config, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.providerConfig.Copy()
 }
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
@@ -94,21 +109,33 @@ func (f *file) ImportResourceState(ctx context.Context, req *tfprotov5.ImportRes
 func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
 	priorState := newFileState()
 	proposedState := newFileState()
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, *f.providerConfig.Transport, req)
+
+	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, f, req)
 	if err != nil {
 		return res, err
 	}
 
-	// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
-	sum, err := tfile.SHA256(proposedState.Src)
-	if err != nil {
-		err = wrapErrWithDiagnostics(err,
-			"invalid configuration", "unable to obtain source file SHA256 sum", "source",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+	// If we have unknown attributes we can't generate a valid Sum
+	if !proposedState.hasUnknownAttributes() {
+		// Load the file source
+		src, srcType, err := proposedState.openSourceOrContent()
+		defer src.Close() // nolint: staticcheck
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
+		}
+
+		// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
+		sum, err := tfile.SHA256(src)
+		if err != nil {
+			err = wrapErrWithDiagnostics(err,
+				"invalid configuration", "unable to obtain file SHA256 sum", srcType,
+			)
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			return res, err
+		}
+		proposedState.Sum = sum
 	}
-	proposedState.Sum = sum
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 
@@ -126,9 +153,9 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 		return res, err
 	}
 
-	// If our planned state does not have a source then the planned state terrafom
-	// gave us is null, therefore we're supposed to delete the resource.
-	if plannedState.Src == "" {
+	// If our planned state does not have a source or content then the planned state
+	// terrafom gave us is null, therefore we're supposed to delete the resource.
+	if plannedState.Src == "" && plannedState.Content == "" {
 		// Currently this is a no-op. If we decide to make file delete destructive
 		// we'll need to remove the remote file.
 		res.NewState, err = marshalDelete(plannedState)
@@ -137,18 +164,15 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 	}
 	plannedState.ID = "static"
 
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *f.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, f)
 	if err != nil {
 		return res, err
 	}
 
-	src, err := tfile.Open(plannedState.Src)
+	src, _, err := plannedState.openSourceOrContent()
 	defer src.Close() //nolint: staticcheck
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-			err, "invalid configuration", "unable to open source file", "source",
-		)))
-
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
 
@@ -192,12 +216,18 @@ func (fs *fileStateV1) Schema() *tfprotov5.Schema {
 				{
 					Name:     "source",
 					Type:     tftypes.String,
-					Required: true,
+					Optional: true,
 				},
 				{
 					Name:     "destination",
 					Type:     tftypes.String,
 					Required: true,
+				},
+				{
+					Name:      "content",
+					Type:      tftypes.String,
+					Optional:  true,
+					Sensitive: true,
 				},
 				fs.Transport.SchemaAttributeTransport(),
 			},
@@ -214,14 +244,20 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	if fs.Src == "" {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the source location", "source")
+	if fs.Src == "" && fs.Content == "" {
+		return newErrWithDiagnostics("invalid configuration", "you must provide either the source location or file content", "source")
 	}
 
-	f, err := tfile.Open(fs.Src)
-	defer f.Close() // nolint: staticcheck
-	if err != nil {
-		return newErrWithDiagnostics("invalid configuration", "unable to open source file", "source")
+	if fs.Src != "" && fs.Content != "" {
+		return newErrWithDiagnostics("invalid configuration", "you must provide only of of the source location or file content", "source")
+	}
+
+	if fs.Src != "" && fs.Src != UnknownString {
+		f, err := tfile.Open(fs.Src)
+		defer f.Close() // nolint: staticcheck
+		if err != nil {
+			return newErrWithDiagnostics("invalid configuration", "unable to open source file", "source")
+		}
 	}
 
 	if fs.Dst == "" {
@@ -237,17 +273,18 @@ func (fs *fileStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"id":          &fs.ID,
 		"source":      &fs.Src,
 		"destination": &fs.Dst,
+		"content":     &fs.Content,
 		"sum":         &fs.Sum,
 	})
 	if err != nil {
 		return err
 	}
 
-	if !vals["transport"].IsKnown() {
-		return nil
+	if vals["transport"].IsKnown() {
+		return fs.Transport.FromTerraform5Value(vals["transport"])
 	}
 
-	return fs.Transport.FromTerraform5Value(vals["transport"])
+	return nil
 }
 
 // Terraform5Type is the file state tftypes.Type.
@@ -256,6 +293,7 @@ func (fs *fileStateV1) Terraform5Type() tftypes.Type {
 		"id":          tftypes.String,
 		"source":      tftypes.String,
 		"destination": tftypes.String,
+		"content":     tftypes.String,
 		"sum":         tftypes.String,
 		"transport":   fs.Transport.Terraform5Type(),
 	}}
@@ -265,8 +303,9 @@ func (fs *fileStateV1) Terraform5Type() tftypes.Type {
 func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(fs.Terraform5Type(), map[string]tftypes.Value{
 		"id":          tfMarshalStringValue(fs.ID),
-		"source":      tfMarshalStringValue(fs.Src),
+		"source":      tfMarshalStringOptionalValue(fs.Src),
 		"destination": tfMarshalStringValue(fs.Dst),
+		"content":     tfMarshalStringOptionalValue(fs.Content),
 		"sum":         tfMarshalStringValue(fs.Sum),
 		"transport":   fs.Transport.Terraform5Value(),
 	})
@@ -275,4 +314,33 @@ func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 // EmbeddedTransport is a pointer to the state's embedded transport
 func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return fs.Transport
+}
+
+// openSourceOrContent returns a stream of the source content
+func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
+	var err error
+	var src it.Copyable
+	var srcType string
+
+	if fs.Src != "" {
+		srcType = "source"
+		src, err = tfile.Open(fs.Src)
+		if err != nil {
+			err = wrapErrWithDiagnostics(err,
+				"invalid configuration", "unable to open source file", srcType,
+			)
+			return src, srcType, err
+		}
+	} else {
+		srcType = "content"
+		src = tfile.NewReader(fs.Content)
+	}
+
+	return src, srcType, nil
+}
+
+// hasUnknownAttributes determines if the source or content is not known
+// yet.
+func (fs *fileStateV1) hasUnknownAttributes() bool {
+	return (fs.Src == UnknownString || fs.Content == UnknownString)
 }

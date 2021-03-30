@@ -54,7 +54,7 @@ func (c *cmd) Cmd() string {
 		cmd.WriteString(fmt.Sprintf("%s='%s' ", key, val))
 	}
 
-	cmd.WriteString(fmt.Sprintf("%s\n", c.cmd))
+	cmd.WriteString(c.cmd)
 
 	return cmd.String()
 }

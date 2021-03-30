@@ -5,6 +5,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
 
+// UnknownString is a special value we assign to when unmarshaling an unknown
+// string value onto types.
+const UnknownString = "__XX_TFTYPES_UNKNOWN_STRING"
+
+// UnknownStringValue is an unknown string in the Terraform wire format
+var UnknownStringValue = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+
 func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
 	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
 	if err != nil {
@@ -85,6 +92,21 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 	}
 
 	for key, to := range props {
+		val, ok := vals[key]
+		if !ok {
+			continue
+		}
+
+		// Handle cases where a value is going to be given but is unknown
+		if val == UnknownStringValue {
+			toPtr, ok := to.(*string)
+
+			if ok {
+				*toPtr = UnknownString
+				continue
+			}
+		}
+
 		if !vals[key].IsKnown() || vals[key].IsNull() {
 			continue
 		}
@@ -108,9 +130,13 @@ func tfUnmarshalStringSlice(val tftypes.Value) ([]string, error) {
 
 	str := ""
 	for _, strVal := range vals {
-		err = strVal.As(&str)
-		if err != nil {
-			return strings, err
+		if strVal.IsKnown() && !strVal.IsNull() {
+			err = strVal.As(&str)
+			if err != nil {
+				return strings, err
+			}
+		} else {
+			str = UnknownString
 		}
 
 		strings = append(strings, str)
@@ -129,9 +155,13 @@ func tfUnmarshalStringMap(val tftypes.Value) (map[string]string, error) {
 
 	str := ""
 	for strKey, strVal := range vals {
-		err = strVal.As(&str)
-		if err != nil {
-			return strings, err
+		if strVal.IsKnown() && !strVal.IsNull() {
+			err = strVal.As(&str)
+			if err != nil {
+				return strings, err
+			}
+		} else {
+			str = UnknownString
 		}
 
 		strings[strKey] = str
@@ -141,8 +171,20 @@ func tfUnmarshalStringMap(val tftypes.Value) (map[string]string, error) {
 }
 
 func tfMarshalStringValue(val string) tftypes.Value {
+	if val == "" || val == UnknownString {
+		return UnknownStringValue
+	}
+
+	return tftypes.NewValue(tftypes.String, val)
+}
+
+func tfMarshalStringOptionalValue(val string) tftypes.Value {
 	if val == "" {
-		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+		return tftypes.NewValue(tftypes.String, nil)
+	}
+
+	if val == UnknownString {
+		return UnknownStringValue
 	}
 
 	return tftypes.NewValue(tftypes.String, val)
@@ -155,7 +197,11 @@ func tfMarshalStringSlice(vals []string) tftypes.Value {
 
 	values := []tftypes.Value{}
 	for _, val := range vals {
-		values = append(values, tftypes.NewValue(tftypes.String, val))
+		if val == UnknownString {
+			values = append(values, UnknownStringValue)
+		} else {
+			values = append(values, tftypes.NewValue(tftypes.String, val))
+		}
 	}
 
 	return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, values)
@@ -168,7 +214,11 @@ func tfMarshalStringMap(vals map[string]string) tftypes.Value {
 
 	values := map[string]tftypes.Value{}
 	for key, val := range vals {
-		values[key] = tftypes.NewValue(tftypes.String, val)
+		if val == UnknownString {
+			values[key] = UnknownStringValue
+		} else {
+			values[key] = tftypes.NewValue(tftypes.String, val)
+		}
 	}
 
 	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)

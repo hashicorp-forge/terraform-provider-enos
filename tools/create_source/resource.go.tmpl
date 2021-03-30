@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
@@ -10,6 +11,7 @@ import (
 
 type {{.Struct}} struct {
 	providerConfig *config
+	mu             sync.Mutex
 }
 
 var _ resourcerouter.Resource = (*{{.Struct}})(nil)
@@ -24,6 +26,7 @@ var _ State = (*{{.State}})(nil)
 func new{{.StructCap}}() *{{.Struct}} {
 	return &{{.Struct}}{
 		providerConfig: newProviderConfig(),
+		mu:             sync.Mutex{},
 	}
 }
 
@@ -42,7 +45,17 @@ func (r *{{.Struct}}) Schema() *tfprotov5.Schema {
 }
 
 func (r *{{.Struct}}) SetProviderConfig(meta tftypes.Value) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return r.providerConfig.FromTerraform5Value(meta)
+}
+
+func (r *{{.Struct}}) GetProviderConfig() (*config, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.providerConfig.Copy()
 }
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
@@ -119,7 +132,7 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov5.Pla
 	// and private data loaded, as well as a response with an errors encountered
 	// represented as diagnostics. Most of the time you will not need to write
 	// your own version of this, but beware.
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, *r.providerConfig.Transport, req)
+	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req)
 	if err != nil {
 		return res, err
 	}
@@ -167,7 +180,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	// transport, transport private, and provider transport configuration. This
 	/// function does that for you. In the event of an error it returns a response
 	// that has the Diagnostics added for you.
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, *r.providerConfig.Transport)
+	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
 	if err != nil {
 		return res, err
 	}

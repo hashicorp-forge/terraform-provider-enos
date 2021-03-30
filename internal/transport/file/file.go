@@ -7,17 +7,17 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-type copyable struct {
+type copyableFile struct {
 	info   os.FileInfo
 	handle *os.File
 }
 
-var _ it.Copyable = (*copyable)(nil)
+var _ it.Copyable = (*copyableFile)(nil)
 
 // Open takes a path and return a Copyable
 func Open(path string) (it.Copyable, error) {
 	var err error
-	f := &copyable{}
+	f := &copyableFile{}
 
 	f.handle, err = os.Open(path)
 	if err != nil {
@@ -29,38 +29,38 @@ func Open(path string) (it.Copyable, error) {
 	return f, err
 }
 
-func (f *copyable) Name() string {
+func (f *copyableFile) Name() string {
 	return f.info.Name()
 }
 
-func (f *copyable) Size() int64 {
+func (f *copyableFile) Size() int64 {
 	return f.info.Size()
 }
 
-func (f *copyable) Mode() os.FileMode {
+func (f *copyableFile) Mode() os.FileMode {
 	return f.info.Mode()
 }
 
-func (f *copyable) ModTime() time.Time {
+func (f *copyableFile) ModTime() time.Time {
 	return f.info.ModTime()
 }
 
-func (f *copyable) IsDir() bool {
+func (f *copyableFile) IsDir() bool {
 	return f.info.IsDir()
 }
 
-func (f *copyable) Sys() interface{} {
+func (f *copyableFile) Sys() interface{} {
 	return f.info.Sys()
 }
 
-func (f *copyable) Read(until []byte) (int, error) {
+func (f *copyableFile) Read(until []byte) (int, error) {
 	return f.handle.Read(until)
 }
 
-func (f *copyable) Close() error {
+func (f *copyableFile) Close() error {
 	return f.handle.Close()
 }
 
-func (f *copyable) Seek(offset int64, whence int) (int64, error) {
+func (f *copyableFile) Seek(offset int64, whence int) (int64, error) {
 	return f.handle.Seek(offset, whence)
 }

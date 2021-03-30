@@ -35,12 +35,30 @@ func TestAccResourceFileResourceTransport(t *testing.T) {
 	defer resetEnv(t)
 
 	var providerTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+		{{if .Src}}
 		source = "{{.Src}}"
+		{{end}}
+
+		{{if .Content}}
+		content = <<EOF
+{{.Content}}
+EOF
+		{{end}}
+
 		destination = "{{.Dst}}"
 	}`))
 
 	var resourceTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+		{{if .Src}}
 		source = "{{.Src}}"
+		{{end}}
+
+		{{if .Content}}
+		content = <<EOF
+{{.Content}}"
+EOF
+		{{end}}
+
 		destination = "{{.Dst}}"
 
 		transport = {
@@ -139,6 +157,21 @@ EOF
 		keyPassPath.Transport,
 	})
 
+	content := newFileState()
+	content.ID = "foo"
+	content.Content = "hello world"
+	content.Dst = "/tmp/dst"
+	content.Transport.SSH.User = "ubuntu"
+	content.Transport.SSH.Host = "localhost"
+	content.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
+	content.Transport.SSH.PassphrasePath = "../fixtures/passphrase.txt"
+	cases = append(cases, testAccResourceTransportTemplate{
+		"with string content instead of source file",
+		content,
+		resource.ComposeTestCheckFunc(),
+		content.Transport,
+	})
+
 	for _, test := range cases {
 		// Run them with resource defined transport config
 		t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
@@ -198,19 +231,34 @@ EOF
 	} else {
 		cases := []testAccResourceTransportTemplate{}
 
-		realTest := newFileState()
-		realTest.ID = "real"
-		realTest.Src = "../fixtures/src.txt"
-		realTest.Dst = "/tmp/dst"
-		realTest.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
-		realTest.Transport.SSH.Host = host
-		realTest.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
-		realTest.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
+		realTestSrc := newFileState()
+		realTestSrc.ID = "real"
+		realTestSrc.Src = "../fixtures/src.txt"
+		realTestSrc.Dst = "/tmp/real_test_src"
+		realTestSrc.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
+		realTestSrc.Transport.SSH.Host = host
+		realTestSrc.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
+		realTestSrc.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
 		cases = append(cases, testAccResourceTransportTemplate{
-			"real test",
-			realTest,
+			"real test source file",
+			realTestSrc,
 			resource.ComposeTestCheckFunc(),
-			realTest.Transport,
+			realTestSrc.Transport,
+		})
+
+		realTestContent := newFileState()
+		realTestContent.ID = "real"
+		realTestContent.Content = "string"
+		realTestContent.Dst = "/tmp/real_test_content"
+		realTestContent.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
+		realTestContent.Transport.SSH.Host = host
+		realTestContent.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
+		realTestContent.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
+		cases = append(cases, testAccResourceTransportTemplate{
+			"real test content",
+			realTestContent,
+			resource.ComposeTestCheckFunc(),
+			realTestContent.Transport,
 		})
 
 		for _, test := range cases {

@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 	"io"
-	"os"
 )
 
 // Transport is a generic transport interface
@@ -21,7 +20,6 @@ type Command interface {
 
 // Copyable is an interface for a copyable file
 type Copyable interface {
-	io.ReadCloser
-	io.Seeker
-	os.FileInfo
+	io.ReadSeekCloser
+	Size() int64
 }
