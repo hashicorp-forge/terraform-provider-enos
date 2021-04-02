@@ -26,3 +26,6 @@ examples/*/*terraform*
 coverage*
 
 terraform-provider-enos
+
+# mirror
+mirror/*.tfvars

@@ -4,7 +4,13 @@
 A terraform provider for quality infrastructure
 
 1. [Example](#example)
+1. [Installation](#installing-the-provider)
+  1. [Network mirror](#network-mirror)
+  1. [Build from source](#build-from-source)
 1. [Creating new sources](#creating-new-sources)
+1. [Publishing to the network mirror](#publishing-to-the-network-mirror)
+  1. [S3 bucket access](#s3-bucket-access)
+  1. [Publishing the artfiacts](#publishing-the-artifacts)
 1. [Provider configuration](#provider-configuration)
 1. [enos_environment](#enos_environment)
 1. [enos_file](#enos_file)
@@ -14,15 +20,93 @@ A terraform provider for quality infrastructure
 
 You can find an example of how to use the enos provider in the [examples/core](https://github.com/hashicorp/enos-provider/blob/main/examples/core/) section of the repository.
 
+# Installing the provider
+
+The provider is intended to be used as an internal testing tool, as such we want
+to keep it off the public registry. Since we don't have an internal provider registry
+there are two methods of installing the provider:
+
+## Network mirror
+
+The easiest method is to install the latest stable version from the S3 network
+mirror. To do so you'll need to drop some configuration into `~/.terraformrc`
+
+```hcl
+provider_installation {
+  network_mirror {
+    url = "https://enos-provider.s3-us-west-2.amazonaws.com/"
+  }
+  direct {
+    exclude = [
+      "hashicorp.com/qti/enos"
+    ]
+  }
+}
+```
+
+This configuration will tell Terraform to resolve plugins from the network mirror
+and never attempt to pull it from the public registry.
+
+NOTE: Currently the network mirror is not public so if you wish to use this
+option you'll need to have your IP address allowlisted. Reach out to #team-quality
+for that.
+
+If you prefer keeping this configuration out of your personal Terraform CLI
+configuration you can write it to any file and use the `TF_CLI_CONFIG_FILE`
+environment variable to tell Terraform where the configuration is located.
+
+## Build from source
+
+Another option is to build the provider from source and copy it into your provider
+cache.
+
+We've wrapped this into our default `make` target, so running `make` from the root
+of this repository should handle it as long as you have `go` installed.
+
+NOTE: If you use this method, all modules that use the enos provider will have to
+explicitly specify and configure the enos provider, inheritance won't work.
+
 # Creating new sources
-To ease the burden when creating new resources and datasources, we have a scaffolding generator that can take the name of the resource you wish to create, along with the source type (resource or datasource), and output the scaffolding of a new source for you. Simply run the following command and then address all the `TODO` statements in your newly generated source.
+To ease the burden when creating new resources and datasources, we have a scaffolding
+generator that can take the name of the resource you wish to create, along with
+the source type (resource or datasource), and output the scaffolding of a new
+source for you. Simply run the following command and then address all the `TODO`
+statements in your newly generated source.
 
 From the root directory of this repo, run:
 ```shell
-go run ./tools/create_source -name <your_resource_name> -type <resource|datasource>
+go run ./tools/create-source -name <your_resource_name> -type <resource|datasource>
 ```
 
 Note that you should not prepend it with enos_, the utility will do that for you.
+
+# Publishing to the network mirror
+
+In order to provider a network mirror we have to convert our build artifacts into
+archives and metadata that Terraform can remotely access. To do this you'll need
+access to the S3 bucket and provider developer toolchain installed.
+
+## S3 bucket access
+
+The enos-provider S3 bucket resides in the `vault_team_dev` account. You will
+need a `developer` role on that account to gain write access to the bucket. To
+download the artifacts from the S3 bucket you'll need your IP address added to
+the bucket policy that is maintained in the [mirror](./mirror) section of the
+repository.
+
+## Publishing the artifacts
+
+To publish you will need write access to the S3 bucket, your IP address allowlisted
+in the S3 bucket policy (see previous section), the `go` compiler installed, and
+`docker` installed and running. All of the following commands should be run from
+the root of the repository.
+
+1. Increment the version specified in the [VERSION](./VERSION) file.
+  If you fail to do this you'll overwrite the existing artifacts that exist for
+  that version.
+1. Remove any previous build artifacts. Run `rm ./dist/*`
+1. Build the release artifacts. Run `CI=true make`
+1. Publish the artifacts. Run `go run ./tools/populate-mirror -dist ./dist -bucket enos-provider`
 
 # Provider Configuration
 
