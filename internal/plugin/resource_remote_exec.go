@@ -12,6 +12,8 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp/enos-provider/internal/ui"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
@@ -30,6 +32,8 @@ type remoteExecStateV1 struct {
 	Inline    []string
 	Scripts   []string
 	Sum       string
+	Stderr    string
+	Stdout    string
 	Transport *embeddedTransportV1
 }
 
@@ -156,7 +160,9 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 			return res, err
 		}
 
-		err = r.ExecuteCommands(ctx, plannedState, ssh)
+		ui, err := r.ExecuteCommands(ctx, plannedState, ssh)
+		plannedState.Stdout = ui.Stdout().String()
+		plannedState.Stderr = ui.Stderr().String()
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
@@ -218,6 +224,16 @@ func (s *remoteExecStateV1) Schema() *tfprotov5.Schema {
 					Type:      tftypes.String,
 					Optional:  true,
 					Sensitive: true,
+				},
+				{
+					Name:     "stderr",
+					Type:     tftypes.String,
+					Computed: true,
+				},
+				{
+					Name:     "stdout",
+					Type:     tftypes.String,
+					Computed: true,
 				},
 				s.Transport.SchemaAttributeTransport(),
 			},
@@ -286,22 +302,28 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(ag.String()))), nil
 }
 
-// ExecuteCommands executes any commands or scripts.
-func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, ssh it.Transport) error {
+// ExecuteCommands executes any commands or scripts and returns the STDOUT, STDERR,
+// and any errors encountered.
+func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, ssh it.Transport) (ui.UI, error) {
+	var err error
+	merr := &multierror.Error{}
+	ui := ui.NewBuffered()
 
 	for _, cmd := range state.Inline {
 		select {
 		case <-ctx.Done():
-			return wrapErrWithDiagnostics(
+			return ui, wrapErrWithDiagnostics(
 				ctx.Err(), "timed out", "context deadline exceeded while running inline commands",
 			)
 		default:
 		}
 
-		_, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(state.Env)))
-		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running inline command failed: %s", stderr),
+		stdout, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(state.Env)))
+		merr = multierror.Append(merr, err)
+		merr = multierror.Append(merr, ui.Append(stdout, stderr))
+		if err := merr.ErrorOrNil(); err != nil {
+			return ui, wrapErrWithDiagnostics(
+				err, "command failed", fmt.Sprintf("running inline command failed: %s", err.Error()),
 			)
 		}
 	}
@@ -310,14 +332,14 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		script, err := tfile.Open(path)
 		defer script.Close() // nolint: staticcheck
 		if err != nil {
-			return wrapErrWithDiagnostics(
+			return ui, wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
 
-		err = r.copyAndRun(ctx, ssh, script, "script", state.Env)
+		err = r.copyAndRun(ctx, ui, ssh, script, "script", state.Env)
 		if err != nil {
-			return err
+			return ui, err
 		}
 	}
 
@@ -325,16 +347,19 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		content := tfile.NewReader(state.Content)
 		defer content.Close()
 
-		err := r.copyAndRun(ctx, ssh, content, "content", state.Env)
+		err = r.copyAndRun(ctx, ui, ssh, content, "content", state.Env)
 		if err != nil {
-			return err
+			return ui, err
 		}
 	}
 
-	return nil
+	return ui, nil
 }
 
-func (r *remoteExec) copyAndRun(ctx context.Context, ssh it.Transport, src it.Copyable, srcType string, env map[string]string) error {
+// copyAndRun copies the copyable source to the target using the SSH transport,
+// sets the environment variables and executes the content of the source.
+// It returns STDOUT, STDERR, and any errors encountered.
+func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, ssh it.Transport, src it.Copyable, srcType string, env map[string]string) error {
 	select {
 	case <-ctx.Done():
 		return wrapErrWithDiagnostics(
@@ -342,6 +367,8 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ssh it.Transport, src it.Co
 		)
 	default:
 	}
+
+	merr := &multierror.Error{}
 
 	sha, err := tfile.SHA256(src)
 	if err != nil {
@@ -364,28 +391,34 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ssh it.Transport, src it.Co
 	err = ssh.Copy(ctx, src, dst)
 	if err != nil {
 		return wrapErrWithDiagnostics(
-			err, "command failed", "running inline command failed",
+			err, "command failed", "copying src file content to remote script",
 		)
 	}
 
-	_, stderr, err := ssh.Run(ctx, command.New(fmt.Sprintf("chmod 0777 %s", dst), command.WithEnvVars(env)))
-	if err != nil {
+	stdout, stderr, err := ssh.Run(ctx, command.New(fmt.Sprintf("chmod 0777 %s", dst), command.WithEnvVars(env)))
+	merr = multierror.Append(merr, err)
+	merr = multierror.Append(merr, ui.Append(stdout, stderr))
+	if merr.ErrorOrNil() != nil {
 		return wrapErrWithDiagnostics(
-			err, "command failed", fmt.Sprintf("running changing ownership on script: %s", stderr),
+			merr.ErrorOrNil(), "command failed", fmt.Sprintf("running changing ownership on script: %s", merr.Error()),
 		)
 	}
 
-	_, stderr, err = ssh.Run(ctx, command.New(dst, command.WithEnvVars(env)))
-	if err != nil {
+	stdout, stderr, err = ssh.Run(ctx, command.New(dst, command.WithEnvVars(env)))
+	merr = multierror.Append(merr, err)
+	merr = multierror.Append(merr, ui.Append(stdout, stderr))
+	if merr.ErrorOrNil() != nil {
 		return wrapErrWithDiagnostics(
-			err, "command failed", fmt.Sprintf("executing script: %s", stderr),
+			merr.ErrorOrNil(), "command failed", fmt.Sprintf("executing script: %s", merr.Error()),
 		)
 	}
 
-	_, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("rm -f %s", dst), command.WithEnvVars(env)))
-	if err != nil {
+	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("rm -f %s", dst), command.WithEnvVars(env)))
+	merr = multierror.Append(merr, err)
+	merr = multierror.Append(merr, ui.Append(stdout, stderr))
+	if merr.ErrorOrNil() != nil {
 		return wrapErrWithDiagnostics(
-			err, "command failed", fmt.Sprintf("removing script file: %s", stderr),
+			merr.ErrorOrNil(), "command failed", fmt.Sprintf("removing script file: %s", merr.Error()),
 		)
 	}
 
@@ -429,6 +462,8 @@ func (s *remoteExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"id":      &s.ID,
 		"content": &s.Content,
 		"sum":     &s.Sum,
+		"stdout":  &s.Stdout,
+		"stderr":  &s.Stderr,
 	})
 	if err != nil {
 		return err
@@ -470,6 +505,8 @@ func (s *remoteExecStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":          tftypes.String,
 		"sum":         tftypes.String,
+		"stdout":      tftypes.String,
+		"stderr":      tftypes.String,
 		"environment": tftypes.Map{AttributeType: tftypes.String},
 		"inline":      tftypes.List{ElementType: tftypes.String},
 		"scripts":     tftypes.List{ElementType: tftypes.String},
@@ -483,6 +520,8 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          tfMarshalStringValue(s.ID),
 		"sum":         tfMarshalStringValue(s.Sum),
+		"stdout":      tfMarshalStringValue(s.Stdout),
+		"stderr":      tfMarshalStringValue(s.Stderr),
 		"content":     tfMarshalStringOptionalValue(s.Content),
 		"transport":   s.Transport.Terraform5Value(),
 		"inline":      tfMarshalStringSlice(s.Inline),

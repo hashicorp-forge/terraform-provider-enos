@@ -94,6 +94,8 @@ EOF
 		remoteExec,
 		resource.ComposeTestCheckFunc(
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "id", regexp.MustCompile(`^foo$`)),
+			resource.TestMatchResourceAttr("enos_remote_exec.foo", "stdout", regexp.MustCompile(`^$`)),
+			resource.TestMatchResourceAttr("enos_remote_exec.foo", "stderr", regexp.MustCompile(`^$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "environment[FOO]", regexp.MustCompile(`^BAR$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "inline[0]", regexp.MustCompile(`^/tmp/foo$`)),
 			resource.TestMatchResourceAttr("enos_remote_exec.foo", "scripts[0]", regexp.MustCompile(`^../fixtures/src.txt$`)),

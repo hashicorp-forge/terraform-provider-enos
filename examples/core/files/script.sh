@@ -1,3 +1,4 @@
 #!/bin/bash
 
-echo "${HELLO_WORLD}"
+# echo to both STDOUT and STDERR
+echo "${HELLO_WORLD}" | tee >(cat >&2)
