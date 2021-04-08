@@ -124,6 +124,16 @@ EOF
 			resource.ComposeTestCheckFunc(),
 			true,
 		})
+		noStdoutOrStderr := newRemoteExecStateV1()
+		noStdoutOrStderr.ID = "foo"
+		noStdoutOrStderr.Inline = []string{"exit 0"}
+		noStdoutOrStderr.Transport.SSH.Host = host
+		cases = append(cases, testAccResourceTemplate{
+			"NoStdoutOrStderr",
+			noStdoutOrStderr,
+			resource.ComposeTestCheckFunc(),
+			true,
+		})
 	}
 
 	for _, test := range cases {

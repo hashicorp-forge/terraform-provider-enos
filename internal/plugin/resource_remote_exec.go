@@ -169,6 +169,14 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		}
 	}
 
+	if plannedState.Stderr == "" {
+		plannedState.Stderr = NullComputedString
+	}
+
+	if plannedState.Stdout == "" {
+		plannedState.Stdout = NullComputedString
+	}
+
 	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 
 	return res, err

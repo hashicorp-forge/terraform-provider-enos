@@ -226,8 +226,8 @@ The following describes the enos_remote_file schema:
 |-|-|
 |id|The id of the resource. It is always 'static'|
 |sum|A digest of the inline commands, source files, and environment variables. If the sum changes between runs all commands will execute again|
-|stdout|The aggregate STDOUT of all inline commnads, scripts, or content|
-|stderr|The aggregate STDERR of all inline commnads, scripts, or content|
+|stdout|The aggregate STDOUT of all inline commnads, scripts, or content. Terraform's wire format cannot discern between unknown and empty values, as such, stdout will return a blank space if nothing is written to stdout|
+|stderr|The aggregate STDERR of all inline commnads, scripts, or content. Terraform's wire format cannot discern between unknown and empty values, as such, stderr will return a blank space if nothing is written to stderr|
 |environment|A map of key/value pairs to set as environment variable before running the commands or scripts.
 |inline|An array of commands to run|
 |scripts|An array of paths to scripts to run|
