@@ -14,6 +14,7 @@ func Server() tfprotov5.ProviderServer {
 		server.RegisterDataRouter(dr.New(
 			dr.RegisterDataSource(newTransport()),
 			dr.RegisterDataSource(newEnvironment()),
+			dr.RegisterDataSource(newArtifactoryItem()),
 		)),
 		server.RegisterResourceRouter(rr.New(
 			rr.RegisterResource(newFile()),

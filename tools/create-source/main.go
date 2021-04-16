@@ -67,7 +67,7 @@ func main() {
 	temp := newTemp(*name)
 
 	var err error
-	tmplPath := fmt.Sprintf("./tools/create_source/%s.go.tmpl", *pluginType)
+	tmplPath := fmt.Sprintf("./tools/create-source/%s.go.tmpl", *pluginType)
 	destPath := fmt.Sprintf("./internal/plugin/%s_%s.go", *pluginType, temp.BaseName)
 	tmplPath, err = filepath.Abs(tmplPath)
 	if err != nil {

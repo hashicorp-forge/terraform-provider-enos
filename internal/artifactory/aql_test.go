@@ -1,0 +1,134 @@
+package artifactory
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestSearchAQL(t *testing.T) {
+	_, okacc := os.LookupEnv("TF_ACC")
+	username, okuser := os.LookupEnv("ARTIFACTORY_USER")
+	token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
+	version, okver := os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
+	revision, okrev := os.LookupEnv("ARTIFACTORY_REVISION")
+
+	if !(okacc && okuser && oktoken && okver && okrev) {
+		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACATORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
+		t.Skip()
+		return
+	}
+
+	client := NewClient(
+		WithHost("https://artifactory.hashicorp.engineering/artifactory"),
+		WithUsername(username),
+		WithToken(token),
+	)
+
+	for _, test := range []struct {
+		Name string
+		Args []SearchAQLOpt
+	}{
+		{
+			Name: "all search fields",
+			Args: []SearchAQLOpt{
+				WithRepo("hashicorp-packagespec-buildcache-local*"),
+				WithPath("cache-v1/vault-enterprise/*"),
+				WithName("*.zip"),
+				WithProperties(map[string]string{
+					"artifactType":    "package",
+					"productVersion":  version,
+					"productRevision": revision,
+					"GOOS":            "linux",
+					"GOARCH":          "amd64",
+					"EDITION":         "ent",
+				}),
+			},
+		},
+		{
+			Name: "no repo",
+			Args: []SearchAQLOpt{
+				WithPath("cache-v1/vault-enterprise/*"),
+				WithName("*.zip"),
+				WithProperties(map[string]string{
+					"artifactType":    "package",
+					"productVersion":  version,
+					"productRevision": revision,
+					"GOOS":            "linux",
+					"GOARCH":          "amd64",
+					"EDITION":         "ent",
+				}),
+			},
+		},
+		{
+			Name: "no path",
+			Args: []SearchAQLOpt{
+				WithRepo("hashicorp-packagespec-buildcache-local*"),
+				WithName("*.zip"),
+				WithProperties(map[string]string{
+					"artifactType":    "package",
+					"productVersion":  version,
+					"productRevision": revision,
+					"GOOS":            "linux",
+					"GOARCH":          "amd64",
+					"EDITION":         "ent",
+				}),
+			},
+		},
+		{
+			Name: "no name",
+			Args: []SearchAQLOpt{
+				WithRepo("hashicorp-packagespec-buildcache-local*"),
+				WithPath("cache-v1/vault-enterprise/*"),
+				WithProperties(map[string]string{
+					"artifactType":    "package",
+					"productVersion":  version,
+					"productRevision": revision,
+					"GOOS":            "linux",
+					"GOARCH":          "amd64",
+					"EDITION":         "ent",
+				}),
+			},
+		},
+		{
+			Name: "no properties",
+			Args: []SearchAQLOpt{
+				WithRepo("hashicorp-packagespec-buildcache-local*"),
+				WithPath("cache-v1/vault-enterprise/*"),
+				WithName("*.zip"),
+			},
+		},
+		{
+			Name: "only properties",
+			Args: []SearchAQLOpt{
+				WithProperties(map[string]string{
+					"artifactType":    "package",
+					"productVersion":  version,
+					"productRevision": revision,
+					"GOOS":            "linux",
+					"GOARCH":          "amd64",
+					"EDITION":         "ent",
+				}),
+			},
+		},
+	} {
+		t.Run(test.Name, func(t *testing.T) {
+			test.Args = append(test.Args, WithLimit("1"))
+			req := NewSearchAQLRequest(test.Args...)
+			res, err := client.SearchAQL(context.Background(), req)
+			require.NoError(t, err)
+			require.NotEmpty(t, res.Results)
+			require.Equal(t, ".zip", filepath.Ext(res.Results[0].Name))
+			require.NotEmpty(t, res.Results[0].Name)
+			require.NotEmpty(t, res.Results[0].Path)
+			require.NotEmpty(t, res.Results[0].Repo)
+			require.NotEmpty(t, res.Results[0].SHA256)
+			require.NotEmpty(t, res.Results[0].Size)
+			require.NotEmpty(t, res.Results[0].Type)
+			require.NotEmpty(t, res.Results[0].Properties)
+		})
+	}
+}

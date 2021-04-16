@@ -3,6 +3,7 @@ module github.com/hashicorp/enos-provider
 go 1.15
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/aws/aws-sdk-go v1.38.9 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.3.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.1.3 // indirect

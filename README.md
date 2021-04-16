@@ -3,18 +3,19 @@
 # enos-provider
 A terraform provider for quality infrastructure
 
-1. [Example](#example)
-1. [Installation](#installing-the-provider)
-  1. [Network mirror](#network-mirror)
-  1. [Build from source](#build-from-source)
-1. [Creating new sources](#creating-new-sources)
-1. [Publishing to the network mirror](#publishing-to-the-network-mirror)
-  1. [S3 bucket access](#s3-bucket-access)
-  1. [Publishing the artfiacts](#publishing-the-artifacts)
-1. [Provider configuration](#provider-configuration)
-1. [enos_environment](#enos_environment)
-1. [enos_file](#enos_file)
-1. [enos_remote_exec](#enos_remote_exec)
+- [Example](#example)
+- [Installation](#installing-the-provider)
+  - [Network mirror](#network-mirror)
+  - [Build from source](#build-from-source)
+- [Creating new sources](#creating-new-sources)
+- [Publishing to the network mirror](#publishing-to-the-network-mirror)
+  - [S3 bucket access](#s3-bucket-access)
+  - [Publishing the artfiacts](#publishing-the-artifacts)
+- [Provider configuration](#provider-configuration)
+- [enos_environment](#enos_environment)
+- [enos_artifactory_item](#enos_artifactory_item)
+- [enos_file](#enos_file)
+- [enos_remote_exec](#enos_remote_exec)
 
 # Example
 
@@ -174,6 +175,70 @@ module "security_group" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+}
+```
+
+# enos_artifactory_item
+The enos_environment datasource is a datasource that we can use to to search
+for items in artifactory. This is useful for finding build artifact URLs
+that we can then install. The datasource will return URLs to all matching
+items. The more specific your search criteria, the fewer results you'll receive.
+
+Note: the underlying implementation uses AQL to search for artifacts and uses
+the `$match` operator for every criteria. This means that you can use wildcards
+`*` for any field. See the [AQL developer guide](https://www.jfrog.com/confluence/display/JFROG/Artifactory+Query+Language)
+for more information.
+
+The following describes the enos_environment schema:
+
+|key|description|
+|-|-|
+|id|The id of the datasource. It is always 'static'|
+|username|The Artifactory API username. This will likely be your hashicorp email address|
+|token|The Artifactory API token. You can sign into Artifactory and generate one|
+|host|The Artifactory API host. It should be the fully qualified base URL|
+|repo|The Artifactory repository you want to search in|
+|path|The path inside the Artifactory repository to search in|
+|name|The artifact name|
+|properties|A map of properties to match on|
+|results|Items that were found that match the given search criteria|
+|results.name|The item name|
+|results.type|The item type|
+|results.url|The fully qualified URL to the item|
+|results.sha256|The SHA256 sum of the item|
+|results.size|The size of the item|
+
+Example
+```hcl
+data "enos_artifactory_item" "vault" {
+  username = "some-user@hashicorp.com"
+  token    = "1234abcd"
+
+  host = "https://artifactory.hashicorp.engineering/artifactory"
+  repo = "hashicorp-packagespec-buildcache-local*"
+  path = "cache-v1/vault-enterprise/*"
+  name = "*.zip"
+
+  properties = {
+    "EDITION"         = "ent"
+    "GOARCH"          = "amd64"
+    "GOOS"            = "linux"
+    "artifactType"    = "package"
+    "productRevision" = "f45845666b4e552bfc8ca775834a3ef6fc097fe0"
+    "productVersion"  = "1.7.0"
+  }
+}
+
+resource "enos_remote_exec" "download_vault" {
+  inline  = ["curl -f --user some-user@hashicorp.com:1234abcd -o /tmp/vault.zip -X GET ${data.enos_artifactory_item.vault.results[0].url}"]
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
 }
 ```
 
