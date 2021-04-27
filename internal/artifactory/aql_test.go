@@ -9,23 +9,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSearchAQL(t *testing.T) {
-	_, okacc := os.LookupEnv("TF_ACC")
-	username, okuser := os.LookupEnv("ARTIFACTORY_USER")
-	token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
-	version, okver := os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
-	revision, okrev := os.LookupEnv("ARTIFACTORY_REVISION")
+func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
+	var okacc, okuser, oktoken, okver, okrev bool
+	vars := map[string]string{}
+
+	_, okacc = os.LookupEnv("TF_ACC")
+	vars["username"], okuser = os.LookupEnv("ARTIFACTORY_USER")
+	vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+	vars["version"], okver = os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
+	vars["revision"], okrev = os.LookupEnv("ARTIFACTORY_REVISION")
 
 	if !(okacc && okuser && oktoken && okver && okrev) {
 		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACATORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
 		t.Skip()
-		return
+		return vars, false
 	}
+
+	return vars, true
+}
+
+func TestAccSearchAQL(t *testing.T) {
+	vars, _ := EnsureArtifactoryEnvVars(t)
 
 	client := NewClient(
 		WithHost("https://artifactory.hashicorp.engineering/artifactory"),
-		WithUsername(username),
-		WithToken(token),
+		WithUsername(vars["username"]),
+		WithToken(vars["token"]),
 	)
 
 	for _, test := range []struct {
@@ -40,8 +49,8 @@ func TestSearchAQL(t *testing.T) {
 				WithName("*.zip"),
 				WithProperties(map[string]string{
 					"artifactType":    "package",
-					"productVersion":  version,
-					"productRevision": revision,
+					"productVersion":  vars["version"],
+					"productRevision": vars["revision"],
 					"GOOS":            "linux",
 					"GOARCH":          "amd64",
 					"EDITION":         "ent",
@@ -55,8 +64,8 @@ func TestSearchAQL(t *testing.T) {
 				WithName("*.zip"),
 				WithProperties(map[string]string{
 					"artifactType":    "package",
-					"productVersion":  version,
-					"productRevision": revision,
+					"productVersion":  vars["version"],
+					"productRevision": vars["revision"],
 					"GOOS":            "linux",
 					"GOARCH":          "amd64",
 					"EDITION":         "ent",
@@ -70,8 +79,8 @@ func TestSearchAQL(t *testing.T) {
 				WithName("*.zip"),
 				WithProperties(map[string]string{
 					"artifactType":    "package",
-					"productVersion":  version,
-					"productRevision": revision,
+					"productVersion":  vars["version"],
+					"productRevision": vars["revision"],
 					"GOOS":            "linux",
 					"GOARCH":          "amd64",
 					"EDITION":         "ent",
@@ -85,8 +94,8 @@ func TestSearchAQL(t *testing.T) {
 				WithPath("cache-v1/vault-enterprise/*"),
 				WithProperties(map[string]string{
 					"artifactType":    "package",
-					"productVersion":  version,
-					"productRevision": revision,
+					"productVersion":  vars["version"],
+					"productRevision": vars["revision"],
 					"GOOS":            "linux",
 					"GOARCH":          "amd64",
 					"EDITION":         "ent",
@@ -106,8 +115,8 @@ func TestSearchAQL(t *testing.T) {
 			Args: []SearchAQLOpt{
 				WithProperties(map[string]string{
 					"artifactType":    "package",
-					"productVersion":  version,
-					"productRevision": revision,
+					"productVersion":  vars["version"],
+					"productRevision": vars["revision"],
 					"GOOS":            "linux",
 					"GOARCH":          "amd64",
 					"EDITION":         "ent",

@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"path"
 
 	"github.com/asaskevich/govalidator"
@@ -363,7 +364,7 @@ func (s *artifactoryItemStateV1) Search(ctx context.Context) error {
 		s.Results = append(s.Results, map[string]string{
 			"name":   result.Name,
 			"type":   result.Type,
-			"url":    path.Join(s.Host, result.Repo, result.Path, result.Name),
+			"url":    fmt.Sprintf("%s/%s", s.Host, path.Join(result.Repo, result.Path, result.Name)),
 			"sha256": result.SHA256,
 			"size":   result.Size.String(),
 		})

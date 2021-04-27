@@ -1,6 +1,6 @@
 module github.com/hashicorp/enos-provider
 
-go 1.15
+go 1.16
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
@@ -14,6 +14,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/terraform-plugin-go v0.2.1
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.4.3
+	github.com/mitchellh/cli v1.1.2 // indirect
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect

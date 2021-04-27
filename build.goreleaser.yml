@@ -1,13 +1,39 @@
+---
+before:
+  hooks:
+    - 'apk add upx'
+
 builds:
-  - # yaml list
+  - main: ./command/enos-flight-control
+    id: enos-flight-control
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    targets:
+      - linux_amd64
+      - darwin_amd64
+    flags:
+      - -trimpath
+      - -tags=osusergo,netgo
+    ldflags:
+      - -X main.GitCommit={{ .Commit }}
+      - -extldflags=-static -s -w
+    env:
+      - CGO_ENABLED=0
+    hooks:
+      post:
+        - 'mkdir -p ./internal/flightcontrol/binaries'
+        - 'cp {{ .Path }} ./internal/flightcontrol/binaries/{{ .Name }}'
+        - 'upx --ultra-brute ./internal/flightcontrol/binaries/{{ .Name }}'
+    binary: 'enos-flight-control_{{ .Target }}'
+
+  - main: ./command/plugin
     id: terraform-provider-enos
     mod_timestamp: '{{ .CommitTimestamp }}'
     targets:
       - linux_amd64
       - darwin_amd64
-    dir: .
     flags:
       - -trimpath
+      - -tags=osusergo,netgo
     ldflags:
       - -X main.GitCommit={{ .Commit }}
       - -extldflags=-static

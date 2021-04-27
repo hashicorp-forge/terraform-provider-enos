@@ -78,7 +78,7 @@ resource "aws_instance" "target" {
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   associate_public_ip_address = true
-  security_groups             = [module.target_sg.this_security_group_name]
+  security_groups             = [module.target_sg.security_group_name]
 }
 
 resource "enos_file" "from_source" {

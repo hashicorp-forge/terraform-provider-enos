@@ -8,8 +8,10 @@ jobs:
   build-and-terraform:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.16.3'
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
       - name: Build code
@@ -26,34 +28,41 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/library/golang:1.16
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.16.3'
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Build assets
+        run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
       - name: Test code
         run: make test
 
   acceptance:
     runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/library/golang:1.16
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.16.3'
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Build assets
+        run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
       - name: Acceptance Tests
         run: make test-acc
 
   go-lint:
     runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest
+    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest-alpine
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Build assets
+        run: 'apk add upx make && make flight-control-build'
       - name: Go Lint
         run: golangci-lint run --out-format=github-actions --timeout=5m0s
 

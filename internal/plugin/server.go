@@ -19,6 +19,7 @@ func Server() tfprotov5.ProviderServer {
 		server.RegisterResourceRouter(rr.New(
 			rr.RegisterResource(newFile()),
 			rr.RegisterResource(newRemoteExec()),
+			rr.RegisterResource(newBundleInstall()),
 		)),
 	)
 }

@@ -1,0 +1,37 @@
+package main
+
+import (
+	"os"
+
+	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/enos-provider/internal/flightcontrol/download"
+	"github.com/hashicorp/enos-provider/internal/flightcontrol/zip"
+)
+
+var ui = &cli.BasicUi{
+	Writer:      os.Stdout,
+	ErrorWriter: os.Stderr,
+	Reader:      os.Stdin,
+}
+
+func main() {
+	runner := &cli.CLI{
+		Name: os.Args[0],
+		Args: os.Args[1:],
+		Commands: map[string]cli.CommandFactory{
+			"download": func() (cli.Command, error) {
+				return download.NewCommand(ui)
+			},
+			"unzip": func() (cli.Command, error) {
+				return zip.NewUnzipCommand(ui)
+			},
+		},
+	}
+
+	code, err := runner.Run()
+	if err != nil {
+		ui.Error(err.Error())
+	}
+	os.Exit(code)
+}

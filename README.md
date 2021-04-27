@@ -12,10 +12,14 @@ A terraform provider for quality infrastructure
   - [S3 bucket access](#s3-bucket-access)
   - [Publishing the artfiacts](#publishing-the-artifacts)
 - [Provider configuration](#provider-configuration)
-- [enos_environment](#enos_environment)
-- [enos_artifactory_item](#enos_artifactory_item)
-- [enos_file](#enos_file)
-- [enos_remote_exec](#enos_remote_exec)
+- [Data Sources](#data-sources)
+  - [enos_environment](#enos_environment)
+  - [enos_artifactory_item](#enos_artifactory_item)
+- [Resources](#resources)
+  - [enos_file](#enos_file)
+  - [enos_remote_exec](#enos_remote_exec)
+  - [enos_bundle_install](#enos_bundle_install)
+- [Flight Control](#flight-control)
 
 # Example
 
@@ -148,6 +152,10 @@ provider "enos" {
 }
 ```
 
+# Data Sources
+
+The provider provides the following datasources.
+
 # enos_environment
 The enos_environment datasource is a datasource that we can use to pass environment
 specific information into our Terraform run. As enos relies on SSH to execute
@@ -242,6 +250,10 @@ resource "enos_remote_exec" "download_vault" {
 }
 ```
 
+# Resources
+
+The provider provides the following resources.
+
 # enos_file
 The enos file resource is capable of copying a local file to a remote destination
 over an SSH transport.
@@ -326,3 +338,120 @@ resource "enos_remote_exec" "foo" {
   }
 }
 ```
+
+# enos_bundle_install
+The enos bundle install resource is capable of installing HashiCorp release bundles
+from a local path, releases.hashicorp.com, or from Artifactory onto a remote node.
+
+While all three methods of install are supported, only one can be configured at
+a time.
+
+The following describes the enos_remote_file schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. It is always 'static'|
+|destination|The destination directory of the installed binary, eg: /usr/local/bin/|
+|path|The local path of the install bundle|
+|artifactory.username|The Artifactory API username. This will likely be your hashicorp email address|
+|artifactory.token|The Artifactory API token. You can sign into Artifactory and generate one|
+|artifactory.url|The Artifactory item URL|
+|artifactory.sha256|The Artifactory item SHA 256 sum|
+|release.product|The product name that you wish to install, eg: 'vault' or 'consul'|
+|release.version|The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest'|
+|release.edition|The edition of the product that you wish to install. Eg: 'oss', 'ent', 'ent.hsm', 'pro', etc.|
+|transport.ssh.host|The remote host you wish to copy the file to|
+|transport.ssh.user|The username to use when performing the SSH handshake|
+|transport.ssh.private_key|The text value of the private key you wish to use for SSH authentication|
+|transport.ssh.private_key_path|The path of the private key you wish to use for SSH authentication|
+|transport.ssh.passphrase|The text value of the passphrase for an encrypted private key|
+|transport.ssh.passphrase|The path of the passphrase for an encrypted private key|
+
+The resource is also capable of using the SSH agent. It will attempt to connect
+to the agent socket as defined with the `SSH_AUTH_SOCK` environment variable.
+
+Example
+```hcl
+resource "enos_bundle_install" "vault" {
+  # the destination is the directory when the binary will be placed
+  destination = "/opt/vault/bin"
+
+  # install from releases.hashicorp.com
+  release = {
+    product  = "vault"
+    version  = "1.7.0"
+    edition  = "ent"
+  }
+
+  # install from a local bundle
+  path = "/path/to/bundle.zip"
+
+  # install from artifactory
+  artifactory = {
+    username = "rcragun@hashicorp.com"
+    token    = "1234abcd.."
+    sha256   = "e1237bs.."
+    url      = "https:/artifactory.hashicorp.engineering/artifactory/...bundle.zip"
+  }
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+```
+
+# Flight control
+Enos works by executing remote commands on a target machine via an SSH transport
+session. It's resonably safe to assume that the remote target will provide some
+common POSIX commands for common tasks, however, there are some operations where
+there is no common POSIX utility we can rely on, such as making remote HTTP requests
+or unziping archives. While utilities that can provide those functions might
+be accessible via a package manager of some sort, installing global utlities and
+dealing with platform specific package managers can become a serious burden.
+
+Rather than cargo cult a brittle and complex shell script to manage various package
+managers, our solution to this problem is to bundle common operations into a binary
+called `enos-flight-control`. As part of our build pipeline we build this utility
+for every platform and architecture that we support and embed it into the plugin.
+During runtime the provider can install it on the remote machine and then call into
+it when we need advanced operations.
+
+## Commands
+
+### Download
+
+The download command downloads a file from a given URL.
+
+`enos-flight-control download --url https://some/remote/file.txt --destination /local/path/file.txt --mode 0755 --timeout 5m --sha256 02b3...`
+
+|flags|description|
+|-|-|
+|url|The URL of the remote resource to download|
+|destination|The destination location where the file will be written|
+|mode|The file mode for the downloaded file|
+|timeout|The maximum allowable time for the download operation|
+|sha256|An optional SHA256 sum of the file to be downloaded. If the resulting file does not match the SHA the utility will raise an error|
+|auth-user|Optional basic auth username|
+|auth-password|Optional basic auth password|
+
+### Unzip
+
+The unzip command unzips a zip archive.
+
+`enos-flight-control unzip --source /some/file.zip --destination /some/directory --create true`
+|flags|description|
+|-|-|
+|source|The path to the zip archive|
+|destination|The destination directory where the expanded files will be written|
+|mode|The file mode for expanded files|
+|create-destination|Whether or not create the destination directory if does not exist|
+|destination-mode|The file mode for the destination directory if it is to be created|
+
+## Remote flight
+
+The `remoteflight` package provides common functions to install and operate
+`enos-fligth-control` on remote machines through a transport.

@@ -27,5 +27,9 @@ coverage*
 
 terraform-provider-enos
 
+# Don't include the enos flight control binaries in source. Generate them before
+# compiling
+internal/flightcontrol/binaries/*
+
 # mirror
 mirror/*.tfvars

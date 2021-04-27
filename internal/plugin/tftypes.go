@@ -234,3 +234,13 @@ func tfMarshalStringMap(vals map[string]string) tftypes.Value {
 
 	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)
 }
+
+func tfStringsSetOrUnknown(args ...string) bool {
+	for _, arg := range args {
+		if arg != "" {
+			return true
+		}
+	}
+
+	return false
+}
