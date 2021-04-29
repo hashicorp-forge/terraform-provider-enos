@@ -74,9 +74,8 @@ func errToDiagnostic(err error) *tfprotov5.Diagnostic {
 	} else {
 		diag.Summary = err.Error()
 		detail := strings.Builder{}
-		detail.WriteString(fmt.Sprintf("%s %s", diagErr.detail, diagErr.Error()))
 		for {
-			err := errors.Unwrap(err)
+			err = errors.Unwrap(err)
 			if err == nil {
 				break
 			}

@@ -16,7 +16,7 @@ HASUPX:= $(shell upx dot 2> /dev/null)
 default: install
 
 build:
-	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -o ${BINARY} ./command/plugin
+	CGO_ENABLED=0 go build ${GLOBAL_BUILD_TAGS} ${GLOBAL_LD_FLAGS} -gcflags="all=-N -l" -o ${BINARY} ./command/plugin
 
 release:
 ifeq ($(CI), true)

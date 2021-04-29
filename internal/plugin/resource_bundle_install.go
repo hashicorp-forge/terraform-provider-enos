@@ -238,7 +238,7 @@ func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Trans
 
 	tmpDir, err := s.mkTmpDir(ctx, ssh)
 	if err != nil {
-		return err
+		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
 	}
 
 	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
@@ -256,18 +256,23 @@ func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Trans
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand bundle zip file", "destination")
 	}
 
-	return s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmDir(ctx, ssh, tmpDir)
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+	}
+
+	return nil
 }
 
 func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Transport) error {
 	platform, err := remoteflight.TargetPlatform(ctx, ssh)
 	if err != nil {
-		return fmt.Errorf("determining target host platform: %w", err)
+		return wrapErrWithDiagnostics(err, "transport", "determining target host platform", "transport")
 	}
 
 	arch, err := remoteflight.TargetArchitecture(ctx, ssh)
 	if err != nil {
-		return fmt.Errorf("determining target host architecture: %w", err)
+		return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
 	}
 
 	release, err := releases.NewRelease(
@@ -278,17 +283,17 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		releases.WithReleaseArch(arch),
 	)
 	if err != nil {
-		return fmt.Errorf("determining release: %w", err)
+		return wrapErrWithDiagnostics(err, "release", "determining release", "release")
 	}
 
 	sha256, err := release.SHA256()
 	if err != nil {
-		return fmt.Errorf("determining release SHA256 sum: %w", err)
+		return wrapErrWithDiagnostics(err, "release", "determining release SHA", "release")
 	}
 
 	tmpDir, err := s.mkTmpDir(ctx, ssh)
 	if err != nil {
-		return err
+		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
 	}
 
 	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
@@ -311,13 +316,18 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
 	}
 
-	return s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmDir(ctx, ssh, tmpDir)
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+	}
+
+	return nil
 }
 
 func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh it.Transport) error {
 	tmpDir, err := s.mkTmpDir(ctx, ssh)
 	if err != nil {
-		return err
+		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
 	}
 
 	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
@@ -342,7 +352,12 @@ func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh i
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
 	}
 
-	return s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmDir(ctx, ssh, tmpDir)
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+	}
+
+	return nil
 }
 
 // Schema is the file states Terraform schema.

@@ -94,8 +94,7 @@ func (r *Release) versionWithEdition() string {
 }
 
 func (r *Release) directoryURL() string {
-	urlTmp := "https://releases.hashicorp.com/%s/%s/"
-	return fmt.Sprintf(urlTmp, r.Product, r.versionWithEdition())
+	return fmt.Sprintf("https://releases.hashicorp.com/%s/%s/", r.Product, r.versionWithEdition())
 }
 
 func (r *Release) bundleArtifactName() string {
@@ -137,6 +136,10 @@ func DefaultGetSHA256Sums(rel *Release) (string, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
+	}
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("getting release SHA256SUMS: %s - %s", resp.Status, string(body))
 	}
 
 	return string(body), nil
