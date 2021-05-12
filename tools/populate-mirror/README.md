@@ -6,5 +6,6 @@ us to distribute the provider without running an internal private provider regis
 
 To use the tool, run from the root of the repository:
 ```sh
+CI=true make release
 go run ./tools/populate-mirror -dist ./dist -bucket enos-provider
 ```

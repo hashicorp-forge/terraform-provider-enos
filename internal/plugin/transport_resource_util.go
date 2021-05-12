@@ -93,7 +93,7 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 	}
 }
 
-// DefaultReadResource is the request Terraform sends when it wants to get the latest
+// ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
 func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
 	res := &tfprotov5.ReadResourceResponse{

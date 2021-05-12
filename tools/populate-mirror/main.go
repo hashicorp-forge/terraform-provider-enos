@@ -18,6 +18,8 @@ import (
 
 var distDir = flag.String("dist", "", "the output directory of goreleaser that build the artifacts")
 var bucketPath = flag.String("bucket", "", "the S3 bucket path")
+var providerName = flag.String("provider-name", "terraform-provider-enos", "the name of the provider")
+var providerID = flag.String("provider-id", "hashicorp.com/qti/enos", "the name of the provider")
 var timeout = flag.Duration("timeout", time.Duration(15*time.Minute), "maximum allowed time to run")
 var level = zap.LevelFlag("log", zap.InfoLevel, "the log level (error, warn, info, debug, trace)")
 
@@ -38,20 +40,20 @@ func main() {
 	})
 	exitIfErr(err)
 
-	mirror := mirror.NewLocal("terraform-provider-enos")
+	mirror := mirror.NewLocal(*providerName)
 	err = mirror.Initialize()
 	exitIfErr(err)
 	defer mirror.Close()
 
 	exitIfErr(mirror.SetLogLevel(*level))
 
-	exitIfErr(mirror.LoadRemoteIndex(ctx, s3Client, *bucketPath))
+	exitIfErr(mirror.LoadRemoteIndex(ctx, s3Client, *bucketPath, *providerID))
 
 	exitIfErr(mirror.AddGoreleaserBinariesFrom(*distDir))
 
 	exitIfErr(mirror.WriteMetadata())
 
-	exitIfErr(mirror.PublishToRemoteBucket(ctx, s3Client, *bucketPath, "hashicorp.com/qti/enos"))
+	exitIfErr(mirror.PublishToRemoteBucket(ctx, s3Client, *bucketPath, *providerID))
 
 	os.Exit(0)
 }

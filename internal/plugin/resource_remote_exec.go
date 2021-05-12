@@ -48,6 +48,9 @@ func newRemoteExec() *remoteExec {
 
 func newRemoteExecStateV1() *remoteExecStateV1 {
 	return &remoteExecStateV1{
+		Env:       map[string]string{},
+		Inline:    []string{},
+		Scripts:   []string{},
 		Transport: newEmbeddedTransport(),
 	}
 }
@@ -123,6 +126,9 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 	}
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
+	if err != nil {
+		return res, err
+	}
 
 	return res, err
 }

@@ -161,15 +161,20 @@ func (a *Artifacts) WriteMetadata() error {
 
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads
 // it. This way we can merge new builds with those in existing remote mirror.
-func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string) error {
+func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.log.Infow("attempting to get remote mirror index.json from bucket", "bucket", bucket)
+	a.log.Infow(
+		"attempting to get remote mirror index.json from bucket",
+		"bucket", bucket,
+		"id", providerID,
+	)
 
+	idxKey := aws.String(filepath.Join(providerID, "index.json"))
 	head, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
-		Key:    aws.String("index.json"),
+		Key:    idxKey,
 	})
 
 	if err != nil {
@@ -182,7 +187,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	downloader := manager.NewDownloader(s3Client)
 	_, err = downloader.Download(ctx, writer, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
-		Key:    aws.String("index.json"),
+		Key:    idxKey,
 	})
 	if err != nil {
 		return err

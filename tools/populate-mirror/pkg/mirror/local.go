@@ -77,8 +77,8 @@ func (l *Local) SetLogLevel(level zapcore.Level) error {
 }
 
 // LoadRemoteIndex fetches a remote index and loads it
-func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string) error {
-	return l.artifacts.LoadRemoteIndex(ctx, s3Client, bucket)
+func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
+	return l.artifacts.LoadRemoteIndex(ctx, s3Client, bucket, providerID)
 }
 
 // PublishToRemoteBucket publishes the local mirror artifacts into the remote
