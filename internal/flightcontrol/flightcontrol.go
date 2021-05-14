@@ -12,18 +12,9 @@ var Binaries embed.FS
 
 var binaryRegex = regexp.MustCompile(`enos-flight-control_(?P<platform>\w*)_(?P<arch>\w*)$`)
 
-// map[platform]=architecture
-var supportedTargets = map[string][]string{}
-var supportedTargetsParsed = false
-
 // SupportedTargets are the suppport platform and architecture combinations that
 // have been embedded.
 func SupportedTargets() (map[string][]string, error) {
-	if supportedTargetsParsed {
-		return supportedTargets, nil
-	}
-	supportedTargetsParsed = true
-
 	targets := map[string][]string{}
 
 	entries, err := Binaries.ReadDir("binaries")
@@ -45,15 +36,15 @@ func SupportedTargets() (map[string][]string, error) {
 		platform := matches[1]
 		arch := matches[2]
 
-		_, ok := supportedTargets[platform]
+		_, ok := targets[platform]
 		if !ok {
-			supportedTargets[platform] = []string{}
+			targets[platform] = []string{}
 		}
 
-		supportedTargets[platform] = append(supportedTargets[platform], arch)
+		targets[platform] = append(targets[platform], arch)
 	}
 
-	return supportedTargets, nil
+	return targets, nil
 }
 
 // SupportedTarget checks to see is a target is supported

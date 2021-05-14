@@ -55,6 +55,24 @@ data "aws_iam_policy_document" "enos_provider" {
       identifiers = ["*"]
     }
   }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObject"
+    ]
+
+    resources = [
+      "arn:aws:s3:::${var.bucket}",
+      "arn:aws:s3:::${var.bucket}/*"
+    ]
+
+     principals {
+      type = "*"
+      identifiers = ["*"]
+    }
+  }
 }
 
 resource "aws_s3_bucket" "enos-provider" {
