@@ -3,6 +3,7 @@ package download
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io/fs"
 	"os"
 	"strings"
@@ -35,6 +36,7 @@ type CommandArgs struct {
 	sha256       string
 	authUser     string
 	authPassword string
+	replace      bool
 }
 
 // Synopsis is the cli.Command synopsis
@@ -58,6 +60,7 @@ Options:
   --sha256         Verifies that the downloaded file matches the given SHA 256 sum
   --auth-user      The username to use for basic auth
   --auth-password  The password to use for basic auth
+  --replace        Replace the destination file if it exists
 
 `
 	return strings.TrimSpace(help)
@@ -90,6 +93,7 @@ func (a *CommandArgs) Parse(args []string) error {
 	a.flags.StringVar(&a.sha256, "sha256", "", "if given, verifies that the downloaded file matches the given SHA 256 sum")
 	a.flags.StringVar(&a.authUser, "auth-user", "", "if given, sets the basic auth username when making the HTTP request")
 	a.flags.StringVar(&a.authPassword, "auth-password", "", "if given, sets the basic auth password when making the HTTP request")
+	a.flags.BoolVar(&a.replace, "replace", false, "overwite the destination if it already exists")
 
 	err := a.flags.Parse(args)
 	if err != nil {
@@ -103,6 +107,19 @@ func (a *CommandArgs) Parse(args []string) error {
 func (c *Command) Download() error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.args.timeout)
 	defer cancel()
+
+	_, err := os.Stat(c.args.destination)
+	if err == nil {
+		// The destination file already exists
+		if !c.args.replace {
+			return fmt.Errorf("%s already exists. Set --replace=true to replace existing files", c.args.destination)
+		}
+
+		err = os.Remove(c.args.destination)
+		if err != nil {
+			return err
+		}
+	}
 
 	dst, err := os.OpenFile(c.args.destination, os.O_RDWR|os.O_CREATE, fs.FileMode(c.args.mode))
 	if err != nil {

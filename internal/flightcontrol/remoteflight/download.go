@@ -20,6 +20,7 @@ type DownloadRequest struct {
 	AuthUser          string
 	AuthPassword      string
 	Sudo              bool
+	Replace           bool
 }
 
 // DownloadResponse is a flight control download response
@@ -37,6 +38,7 @@ func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 		Timeout:           "5m",
 		Mode:              "0755",
 		Sudo:              false,
+		Replace:           false,
 	}
 
 	for _, opt := range opts {
@@ -123,6 +125,15 @@ func WithDownloadRequestUseSudo(useSudo bool) DownloadOpt {
 	}
 }
 
+// WithDownloadRequestReplace determines if the download command should replace
+// existing files
+func WithDownloadRequestReplace(replace bool) DownloadOpt {
+	return func(dr *DownloadRequest) *DownloadRequest {
+		dr.Replace = replace
+		return dr
+	}
+}
+
 // Download downloads a file on a remote machine with enos-flight-control
 func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
 	res := &DownloadResponse{}
@@ -133,12 +144,13 @@ func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest)
 	default:
 	}
 
-	cmd := fmt.Sprintf("%s download --url '%s' --destination '%s' --mode '%s' --timeout '%s'",
+	cmd := fmt.Sprintf("%s download --url '%s' --destination '%s' --mode '%s' --timeout '%s' --replace=%t",
 		dr.FlightControlPath,
 		dr.URL,
 		dr.Destination,
 		dr.Mode,
 		dr.Timeout,
+		dr.Replace,
 	)
 	if dr.Sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)

@@ -251,6 +251,7 @@ func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Trans
 		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
 		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
 		remoteflight.WithUnzipRequestUseSudo(true),
+		remoteflight.WithUnzipRequestReplace(true),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand bundle zip file", "destination")
@@ -311,6 +312,7 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
 		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
 		remoteflight.WithUnzipRequestUseSudo(true),
+		remoteflight.WithUnzipRequestReplace(true),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
@@ -347,6 +349,7 @@ func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh i
 		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
 		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
 		remoteflight.WithUnzipRequestUseSudo(true),
+		remoteflight.WithUnzipRequestReplace(true),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")

@@ -35,6 +35,7 @@ type UnzipCommandArgs struct {
 	createDest      bool
 	destinationMode int
 	mode            int
+	replace         bool
 }
 
 // Synopsis is the cli.Command synopsis
@@ -56,6 +57,7 @@ Options:
   --create-destination   Create destination directory
   --destination-mode     The destination directory mode if creating it
   --mode                 The desired file permissions of the expanded archive files
+  --replace              Replace any existing files with matching path
 
 `
 	return strings.TrimSpace(help)
@@ -86,6 +88,7 @@ func (a *UnzipCommandArgs) Parse(args []string) error {
 	a.flags.StringVar(&a.destination, "destination", "", "where to write the resulting file")
 	a.flags.BoolVar(&a.createDest, "create-destination", true, "create the destination directory if necessary")
 	a.flags.IntVar(&a.destinationMode, "destination-mode", 0o755, "the file permissions of the expanded archive files")
+	a.flags.BoolVar(&a.replace, "replace", false, "replace any existing files with matching paths")
 
 	err := a.flags.Parse(args)
 	if err != nil {
@@ -138,6 +141,20 @@ func (c *UnzipCommand) Unzip() error {
 	// Expand the files into the destination directory
 	for _, file := range archive.File {
 		dstPath := filepath.Join(c.args.destination, file.Name)
+
+		_, err := os.Stat(dstPath)
+		if err == nil {
+			// The destination file already exists
+			if !c.args.replace {
+				return fmt.Errorf("%s already exists. Set --replace=true to replace existing files", dstPath)
+			}
+
+			err = os.RemoveAll(dstPath)
+			if err != nil {
+				return err
+			}
+		}
+
 		dst, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE, fileMode)
 		if err != nil {
 			return err

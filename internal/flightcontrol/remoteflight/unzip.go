@@ -17,6 +17,7 @@ type UnzipRequest struct {
 	DestinationDirectoryMode   string
 	Sudo                       bool
 	CreateDestinationDirectory bool
+	Replace                    bool
 }
 
 // UnzipResponse is a flight control unzip response
@@ -34,6 +35,7 @@ func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
 		DestinationDirectoryMode:   "0755",
 		Sudo:                       false,
 		CreateDestinationDirectory: true,
+		Replace:                    false,
 	}
 
 	for _, opt := range opts {
@@ -106,6 +108,15 @@ func WithUnzipRequestUseSudo(useSudo bool) UnzipOpt {
 	}
 }
 
+// WithUnzipRequestReplace determines if the unzip command should overwrite
+// the destination file if it exists
+func WithUnzipRequestReplace(replace bool) UnzipOpt {
+	return func(ur *UnzipRequest) *UnzipRequest {
+		ur.Replace = replace
+		return ur
+	}
+}
+
 // Unzip unzips an archive on a remote machine with enos-flight-control
 func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*UnzipResponse, error) {
 	res := &UnzipResponse{}
@@ -116,18 +127,30 @@ func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*Unz
 	default:
 	}
 
-	cmd := fmt.Sprintf("%s unzip --source %s --destination %s --mode %s --destination-mode %s --create-destination %t",
+	cmd := fmt.Sprintf("%s unzip --source '%s' --destination '%s' --mode '%s' --destination-mode '%s' --create-destination=%t --replace=%t",
 		ur.FlightControlPath,
 		ur.SourcePath,
 		ur.DestinationDirectory,
 		ur.FileMode,
 		ur.DestinationDirectoryMode,
 		ur.CreateDestinationDirectory,
+		ur.Replace,
 	)
 	if ur.Sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
-	_, _, err := ssh.Run(ctx, command.New(cmd))
+
+	stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+	if err != nil {
+		if stdout != "" {
+			err = fmt.Errorf("%w: %s", err, stdout)
+		}
+		if stderr != "" {
+			err = fmt.Errorf("%w: %s", err, stderr)
+		}
+
+		return res, err
+	}
 
 	return res, err
 }
