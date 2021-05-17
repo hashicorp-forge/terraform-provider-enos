@@ -59,13 +59,21 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	}
 	defer sourceFile.Close()
 
-	sourceStat, err := sourceFile.Stat()
+	sourceInfo, err := sourceFile.Stat()
 	if err != nil {
 		return err
 	}
 
+	zipHeader, err := zip.FileInfoHeader(sourceInfo)
+	if err != nil {
+		return err
+	}
+	zipHeader.Method = zip.Deflate
+	zipHeader.Modified = sourceInfo.ModTime()
+	zipHeader.SetMode(sourceInfo.Mode())
+
 	zipper := zip.NewWriter(zipFile)
-	binZip, err := zipper.Create(sourceStat.Name())
+	binZip, err := zipper.CreateHeader(zipHeader)
 	if err != nil {
 		return err
 	}
