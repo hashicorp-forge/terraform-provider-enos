@@ -83,4 +83,8 @@ resource "aws_s3_bucket" "enos-provider" {
   website {
     index_document = "index.json"
   }
+
+  tags = {
+    hc-internet-facing = true
+  }
 }
