@@ -23,8 +23,10 @@ type Temp struct {
 	BaseName  string // resource_name
 }
 
-var name = flag.String("name", "", "the name of the resource in camel_case, eg: remote_exec")
-var pluginType = flag.String("type", "resource", "the type of plugin source to make, 'resource' or 'datasource'")
+var (
+	name       = flag.String("name", "", "the name of the resource in camel_case, eg: remote_exec")
+	pluginType = flag.String("type", "resource", "the type of plugin source to make, 'resource' or 'datasource'")
+)
 
 var snakeReg = regexp.MustCompile("(^[A-Za-z])|_([A-Za-z])")
 

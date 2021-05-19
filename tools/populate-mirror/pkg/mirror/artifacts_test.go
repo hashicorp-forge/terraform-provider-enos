@@ -14,10 +14,10 @@ import (
 
 func TestCreateZipArchiveFilePermissions(t *testing.T) {
 	modes := []fs.FileMode{
-		fs.FileMode(0666),
-		fs.FileMode(0523),
-		fs.FileMode(0556),
-		fs.FileMode(0712),
+		fs.FileMode(0o666),
+		fs.FileMode(0o523),
+		fs.FileMode(0o556),
+		fs.FileMode(0o712),
 	}
 
 	dir, err := os.MkdirTemp("", "")

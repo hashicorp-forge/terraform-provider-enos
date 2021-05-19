@@ -34,7 +34,7 @@ type testAccResourceTransportTemplate struct {
 func TestAccResourceFileResourceTransport(t *testing.T) {
 	defer resetEnv(t)
 
-	var providerTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+	providerTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
 		{{if .Src}}
 		source = "{{.Src}}"
 		{{end}}
@@ -48,7 +48,7 @@ EOF
 		destination = "{{.Dst}}"
 	}`))
 
-	var resourceTransport = template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
+	resourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
 		{{if .Src}}
 		source = "{{.Src}}"
 		{{end}}

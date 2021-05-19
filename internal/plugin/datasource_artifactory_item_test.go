@@ -42,7 +42,7 @@ func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 	state.Properties["GOARCH"] = "amd64"
 	state.Properties["EDITION"] = "ent"
 
-	var cfg = template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
+	cfg := template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
   username = "{{ .Username }}"
   token    = "{{ .Token }}"
 

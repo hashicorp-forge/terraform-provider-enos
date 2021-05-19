@@ -9,8 +9,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
 )
 
-var _ server.Provider = (*Provider)(nil)
-var _ Serializable = (*config)(nil)
+var (
+	_ server.Provider = (*Provider)(nil)
+	_ Serializable    = (*config)(nil)
+)
 
 // newProvider returns a new instance of the plugin provider server
 func newProvider() *Provider {

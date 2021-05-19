@@ -188,8 +188,8 @@ func (c *client) Connect(ctx context.Context) error {
 	defer cancel()
 	dialTicker := time.NewTicker(3 * time.Second)
 
-	var dialErrs = make(chan error, 5)
-	var clientC = make(chan *xssh.Client)
+	dialErrs := make(chan error, 5)
+	clientC := make(chan *xssh.Client)
 	c.clientConfig.Timeout = 2 * time.Second
 	dial := func() {
 		client, err := xssh.Dial("tcp", net.JoinHostPort(c.transportCfg.host, c.transportCfg.port), c.clientConfig)
@@ -361,8 +361,8 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	requestTimeout, cancel := context.WithTimeout(ctx, time.Duration(15*time.Second))
 	defer cancel()
 	requestTicker := time.NewTicker(2 * time.Second)
-	var requestErrs = make(chan error, 7)
-	var requestSuccess = make(chan bool)
+	requestErrs := make(chan error, 7)
+	requestSuccess := make(chan bool)
 
 	sendRequest := func() {
 		_, err = session.SendRequest("enos@hashicorp.io", true, nil)

@@ -14,7 +14,7 @@ import (
 
 // TestAccResourceRemoteExec tests the remote_exec resource
 func TestAccResourceRemoteExec(t *testing.T) {
-	var cfg = template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID}}" {
+	cfg := template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID}}" {
 		{{if .Content}}
 		content = <<EOF
 {{.Content}}

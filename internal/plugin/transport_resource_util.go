@@ -10,8 +10,7 @@ var transportUtil = &transportResourceUtil{}
 
 // transportResourceUtil is a container for helper functions that are useful
 // when building a plugin resource that uses an embedded transport.
-type transportResourceUtil struct {
-}
+type transportResourceUtil struct{}
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.

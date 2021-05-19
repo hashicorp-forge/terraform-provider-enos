@@ -77,7 +77,7 @@ func TestSupportedTargets(t *testing.T) {
 	targets, err := SupportedTargets()
 	require.NoError(t, err)
 	require.EqualValues(t, map[string][]string{
-		"darwin": []string{"amd64"},
-		"linux":  []string{"amd64"},
+		"darwin": {"amd64"},
+		"linux":  {"amd64"},
 	}, targets)
 }

@@ -2,13 +2,13 @@ package artifactory
 
 // supportedVaultTargets is our currently supported Vault build targets.
 var supportedVaultTargets = map[string][]string{
-	"darwin":  []string{"amd64"},
-	"freebsd": []string{"386", "amd64", "arm"},
-	"linux":   []string{"386", "amd64", "arm", "arm64"},
-	"netbsd":  []string{"386", "amd64"},
-	"openbsd": []string{"386", "amd64", "arm"},
-	"solaris": []string{"amd64"},
-	"windows": []string{"386", "amd64"},
+	"darwin":  {"amd64"},
+	"freebsd": {"386", "amd64", "arm"},
+	"linux":   {"386", "amd64", "arm", "arm64"},
+	"netbsd":  {"386", "amd64"},
+	"openbsd": {"386", "amd64", "arm"},
+	"solaris": {"amd64"},
+	"windows": {"386", "amd64"},
 }
 
 // supportedEditions is our currently supported Vault editions

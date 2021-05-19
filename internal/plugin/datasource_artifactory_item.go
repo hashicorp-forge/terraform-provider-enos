@@ -210,7 +210,6 @@ func (s *artifactoryItemStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"path":     &s.Path,
 		"name":     &s.Name,
 	})
-
 	if err != nil {
 		return err
 	}

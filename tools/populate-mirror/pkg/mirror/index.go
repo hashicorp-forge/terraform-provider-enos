@@ -40,5 +40,4 @@ func (i *Index) AsJSON(to io.Writer) error {
 
 // IndexValue is the value of Version in the Index. Currently it is a blank
 // object.
-type IndexValue struct {
-}
+type IndexValue struct{}

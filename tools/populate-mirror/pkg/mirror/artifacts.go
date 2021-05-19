@@ -47,7 +47,7 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 		"destination", zipFilePath,
 	)
 
-	zipFile, err := os.OpenFile(zipFilePath, os.O_RDWR|os.O_CREATE, 0755)
+	zipFile, err := os.OpenFile(zipFilePath, os.O_RDWR|os.O_CREATE, 0o755)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (a *Artifacts) WriteMetadata() error {
 	defer a.mu.Unlock()
 
 	path := filepath.Join(a.dir, "index.json")
-	idx, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
+	idx, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o755)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (a *Artifacts) WriteMetadata() error {
 
 	for version, release := range a.releases {
 		path := filepath.Join(a.dir, fmt.Sprintf("%s.json", version))
-		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
+		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o755)
 		if err != nil {
 			return err
 		}
@@ -184,7 +184,6 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 		Bucket: aws.String(bucket),
 		Key:    idxKey,
 	})
-
 	if err != nil {
 		a.log.Warn("index.json does not exist, this could be the first time we're running in this bucket")
 		return nil

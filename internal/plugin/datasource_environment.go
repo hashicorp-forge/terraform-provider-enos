@@ -26,8 +26,7 @@ type environmentStateV1 struct {
 	PublicIPAddress net.IP
 }
 
-type publicIPResolver struct {
-}
+type publicIPResolver struct{}
 
 var _ State = (*environmentStateV1)(nil)
 
