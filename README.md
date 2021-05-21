@@ -18,6 +18,7 @@ A terraform provider for quality infrastructure
 - [Resources](#resources)
   - [enos_file](#enos_file)
   - [enos_remote_exec](#enos_remote_exec)
+  - [enos_local_exec](#enos_local_exec)
   - [enos_bundle_install](#enos_bundle_install)
 - [Flight Control](#flight-control)
 
@@ -336,6 +337,34 @@ resource "enos_remote_exec" "foo" {
       private_key_path = "/path/to/private/key.pem"
     }
   }
+}
+```
+
+# enos_local_exec
+The enos local exec resource is capable of running scripts or commands locally.
+
+The following describes the enos_local_file schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. It is always 'static'|
+|sum|A digest of the inline commands, source files, and environment variables. If the sum changes between runs all commands will execute again|
+|stdout|The aggregate STDOUT of all inline commnads, scripts, or content. Terraform's wire format cannot discern between unknown and empty values, as such, stdout will return a blank space if nothing is written to stdout|
+|stderr|The aggregate STDERR of all inline commnads, scripts, or content. Terraform's wire format cannot discern between unknown and empty values, as such, stderr will return a blank space if nothing is written to stderr|
+|environment|A map of key/value pairs to set as environment variable before running the commands or scripts.
+|inline|An array of commands to run|
+|scripts|An array of paths to scripts to run|
+
+Example
+```hcl
+resource "enos_local_exec" "foo" {
+  environment = {
+    FOO = "foo"
+  }
+
+  inline  = ["touch /tmp/inline.txt"]
+  scripts = ["/local/path/to/script.sh"]
+  content = data.template_file.some_template.rendered
 }
 ```
 

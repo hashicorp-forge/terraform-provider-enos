@@ -35,7 +35,7 @@ func (t *transportResourceUtil) ValidateResourceTypeConfig(ctx context.Context, 
 	return res, err
 }
 
-// DefaultUpgradeResourceState is the request Terraform sends when it wants to
+// UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
 //
 // Upgrading the resource state generally goes as follows:
