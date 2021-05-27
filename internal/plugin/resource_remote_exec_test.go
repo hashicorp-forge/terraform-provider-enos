@@ -134,6 +134,38 @@ EOF
 			resource.ComposeTestCheckFunc(),
 			true,
 		})
+
+		t.Run("CanHandleUpdatedAttributesAndOutput", func(t *testing.T) {
+			steps := []resource.TestStep{}
+
+			for _, cmd := range []string{
+				"exit 0",
+				"echo 'stderr' 1>&2",
+				"echo 'stderr' 1>&2",
+				"echo 'stdout' && echo 'stderr' 1>&2",
+				"echo 'stdout' && echo 'stderr' 1>&2",
+				"exit 0",
+			} {
+				test := newRemoteExecStateV1()
+				test.ID = "foo"
+				test.Content = cmd
+				test.Transport.SSH.Host = host
+				buf := bytes.Buffer{}
+				err := cfg.Execute(&buf, test)
+				if err != nil {
+					t.Fatalf("error executing test template: %s", err.Error())
+				}
+
+				steps = append(steps, resource.TestStep{
+					Config: buf.String(),
+				})
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV5ProviderFactories: testProviders,
+				Steps:                    steps,
+			})
+		})
 	}
 
 	for _, test := range cases {

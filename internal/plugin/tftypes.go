@@ -9,15 +9,8 @@ import (
 // string value onto types.
 const UnknownString = "__XX_TFTYPES_UNKNOWN_STRING"
 
-// NullComputedString is a special value that we'll assign to string values
-// that are computed but blank
-const NullComputedString = "__XX_TFTYPES_NULL_STRING"
-
 // UnknownStringValue is an unknown string in the Terraform wire format
 var UnknownStringValue = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
-
-// NullComputedStringValue is a null computed string in the Terraform wire format
-var NullComputedStringValue = tftypes.NewValue(tftypes.String, " ")
 
 func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
 	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
@@ -182,10 +175,6 @@ func tfMarshalStringValue(val string) tftypes.Value {
 		return UnknownStringValue
 	}
 
-	if val == NullComputedString {
-		return NullComputedStringValue
-	}
-
 	return tftypes.NewValue(tftypes.String, val)
 }
 
@@ -194,6 +183,14 @@ func tfMarshalStringOptionalValue(val string) tftypes.Value {
 		return tftypes.NewValue(tftypes.String, nil)
 	}
 
+	if val == UnknownString {
+		return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+	}
+
+	return tftypes.NewValue(tftypes.String, val)
+}
+
+func tfMarshalStringAllowBlank(val string) tftypes.Value {
 	if val == UnknownString {
 		return UnknownStringValue
 	}

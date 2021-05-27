@@ -125,6 +125,26 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 		proposedState.Sum = sha256
 	}
 
+	// If our prior ID is blank we're creating the resource.
+	if priorState.ID == "" {
+		// When we create we need to ensure that we plan unknown output.
+		proposedState.Stdout = UnknownString
+		proposedState.Stderr = UnknownString
+	} else {
+		// We have a prior ID so we're either updating or staying the same.
+		if proposedState.hasUnknownAttributes() {
+			// If we have unknown attributes plan for a new sum and output.
+			proposedState.Sum = UnknownString
+			proposedState.Stdout = UnknownString
+			proposedState.Stderr = UnknownString
+		} else if priorState.Sum != "" && priorState.Sum != proposedState.Sum {
+			// If we have a new sum and it doesn't match the old one, we're
+			// updating and need to plan for new output.
+			proposedState.Stdout = UnknownString
+			proposedState.Stderr = UnknownString
+		}
+	}
+
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 	if err != nil {
 		return res, err
@@ -173,14 +193,6 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
-	}
-
-	if plannedState.Stderr == "" {
-		plannedState.Stderr = NullComputedString
-	}
-
-	if plannedState.Stdout == "" {
-		plannedState.Stdout = NullComputedString
 	}
 
 	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
@@ -534,8 +546,8 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          tfMarshalStringValue(s.ID),
 		"sum":         tfMarshalStringValue(s.Sum),
-		"stdout":      tfMarshalStringValue(s.Stdout),
-		"stderr":      tfMarshalStringValue(s.Stderr),
+		"stdout":      tfMarshalStringAllowBlank(s.Stdout),
+		"stderr":      tfMarshalStringAllowBlank(s.Stderr),
 		"content":     tfMarshalStringOptionalValue(s.Content),
 		"transport":   s.Transport.Terraform5Value(),
 		"inline":      tfMarshalStringSlice(s.Inline),
