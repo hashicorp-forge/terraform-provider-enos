@@ -14,6 +14,8 @@ import (
 
 // TestAccResourceBundleInstall tests the bundle_install resource
 func TestAccResourceBundleInstall(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("enos_bundle_install").Parse(`resource "enos_bundle_install" "{{.ID}}" {
 		destination = "{{ .Destination }}"
 

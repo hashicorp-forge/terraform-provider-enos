@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func readTestFile(path string) (string, error) {
@@ -79,6 +79,8 @@ func resetEnv(t *testing.T) {
 }
 
 func unsetEnosEnv(t *testing.T) {
+	t.Helper()
+
 	for _, eVar := range []string{
 		"ENOS_TRANSPORT_USER",
 		"ENOS_TRANSPORT_HOST",
@@ -92,6 +94,8 @@ func unsetEnosEnv(t *testing.T) {
 }
 
 func setEnosEnv(t *testing.T, et *embeddedTransportV1) {
+	t.Helper()
+
 	for key, val := range map[string]string{
 		"ENOS_TRANSPORT_USER":             et.SSH.User,
 		"ENOS_TRANSPORT_HOST":             et.SSH.Host,
@@ -107,6 +111,8 @@ func setEnosEnv(t *testing.T, et *embeddedTransportV1) {
 }
 
 func ensureEnosTransportEnvVars(t *testing.T) (map[string]string, bool) {
+	t.Helper()
+
 	var okacc, okuser, okhost, okpath bool
 	vars := map[string]string{}
 

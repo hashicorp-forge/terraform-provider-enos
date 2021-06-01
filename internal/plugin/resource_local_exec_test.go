@@ -83,6 +83,8 @@ EOF
 	})
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)
 			if err != nil {
@@ -104,6 +106,7 @@ EOF
 	}
 
 	t.Run("CanHandleUpdatedAttributesAndOutput", func(t *testing.T) {
+		t.Parallel()
 		steps := []resource.TestStep{}
 
 		for _, cmd := range []string{

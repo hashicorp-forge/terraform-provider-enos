@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 // UnknownString is a special value we assign to when unmarshaling an unknown
@@ -98,7 +98,7 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 		}
 
 		// Handle cases where a value is going to be given but is unknown
-		if val == UnknownStringValue {
+		if val.Equal(UnknownStringValue) {
 			toPtr, ok := to.(*string)
 
 			if ok {

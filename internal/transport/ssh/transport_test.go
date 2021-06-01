@@ -14,6 +14,8 @@ import (
 
 // TestSSH tests the SSH transport
 func TestSSH(t *testing.T) {
+	t.Parallel()
+
 	// Only performs the test if the environment variables are set
 	host, ok := os.LookupEnv("ENOS_TRANSPORT_HOST")
 	if !ok {

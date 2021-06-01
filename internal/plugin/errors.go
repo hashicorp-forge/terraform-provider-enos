@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 type errWithDiagnostics struct {
@@ -64,12 +64,11 @@ func errToDiagnostic(err error) *tfprotov5.Diagnostic {
 		diag.Detail = detail.String()
 
 		if len(diagErr.attributes) > 0 {
-			diag.Attribute = &tftypes.AttributePath{
-				Steps: []tftypes.AttributePathStep{},
-			}
+			steps := []tftypes.AttributePathStep{}
 			for _, attr := range diagErr.attributes {
-				diag.Attribute.Steps = append(diag.Attribute.Steps, tftypes.AttributeName(attr))
+				steps = append(steps, tftypes.AttributeName(attr))
 			}
+			diag.Attribute = tftypes.NewAttributePathWithSteps(steps)
 		}
 	} else {
 		diag.Summary = err.Error()

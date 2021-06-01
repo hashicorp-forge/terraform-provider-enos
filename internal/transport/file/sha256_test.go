@@ -7,6 +7,8 @@ import (
 )
 
 func TestSHA256(t *testing.T) {
+	t.Parallel()
+
 	t.Run("with file", func(t *testing.T) {
 		f, err := Open("./fixtures/sha256.txt")
 		require.NoError(t, err)

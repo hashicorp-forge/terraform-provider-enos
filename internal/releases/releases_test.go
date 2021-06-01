@@ -9,6 +9,8 @@ import (
 )
 
 func TestBundleURL(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		Rel      *Release
 		Expected string
@@ -87,6 +89,8 @@ b192e31e2c0ddc001ca39b25fb4b3c99e916f41e7dc2713ab1b542ce7304bf37  vault_1.7.0_wi
 `
 
 func TestSHA256(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		Rel      *Release
 		Expected string

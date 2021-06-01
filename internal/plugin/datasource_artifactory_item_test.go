@@ -16,6 +16,8 @@ import (
 // actual HashiCorp artifactory service to resolve items based on the search
 // criteria.
 func TestAccDataSourceArtifacotoryItem(t *testing.T) {
+	t.Parallel()
+
 	state := newArtifactoryItemStateV1()
 	_, okacc := os.LookupEnv("TF_ACC")
 	username, okuser := os.LookupEnv("ARTIFACTORY_USER")

@@ -9,6 +9,8 @@ import (
 )
 
 func TestFlightControlSupportedTarget(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		Platform      string
 		Archictecture string

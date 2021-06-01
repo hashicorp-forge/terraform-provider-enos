@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/server"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 var (

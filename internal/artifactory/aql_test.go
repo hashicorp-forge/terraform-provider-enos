@@ -10,6 +10,8 @@ import (
 )
 
 func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
+	t.Helper()
+
 	var okacc, okuser, oktoken, okver, okrev bool
 	vars := map[string]string{}
 

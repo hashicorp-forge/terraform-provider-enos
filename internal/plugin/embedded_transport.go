@@ -9,7 +9,7 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 // embeddedTransportV1 represents the embedded transport state for all
@@ -380,13 +380,11 @@ func transportReplacedAttributePaths(prior, proposed *embeddedTransportV1) []*tf
 	attrs := []*tftypes.AttributePath{}
 
 	if prior.SSH.Host != "" && proposed.SSH.Host != "" && (prior.SSH.Host != proposed.SSH.Host) {
-		attrs = append(attrs, &tftypes.AttributePath{
-			Steps: []tftypes.AttributePathStep{
-				tftypes.AttributeName("transport"),
-				tftypes.AttributeName("ssh"),
-				tftypes.AttributeName("host"),
-			},
-		})
+		attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
+			tftypes.AttributeName("transport"),
+			tftypes.AttributeName("ssh"),
+			tftypes.AttributeName("host"),
+		}))
 	}
 
 	if len(attrs) > 0 {
