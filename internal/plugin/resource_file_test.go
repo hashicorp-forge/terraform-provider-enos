@@ -312,6 +312,36 @@ EOF
 	}
 }
 
+// TestResourceFileTransportInvalidAttributes ensures that we can gracefully
+// handle invalid attributes in the transport configuration. Since it's a dynamic
+// psuedo type we cannot rely on Terraform's built-in validation.
+func TestResourceFileTransportInvalidAttributes(t *testing.T) {
+	cfg := `resource enos_file "bad_ssh" {
+	destination = "/tmp/dst"
+	content = "content"
+
+	transport = {
+		ssh = {
+			user = "ubuntu"
+			host = "localhost"
+			private_key_path = "../fixtures/ssh.pem"
+			not_an_arg = "boom"
+		}
+	}
+}`
+	resource.Test(t, resource.TestCase{
+		ProtoV5ProviderFactories: testProviders,
+		Steps: []resource.TestStep{
+			{
+				Config:             cfg,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+				ExpectError:        regexp.MustCompile(`not_an_arg`),
+			},
+		},
+	})
+}
+
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	state := newFileState()
 	state.Transport.SSH.Values = testMapPropertiesToStruct([]testProperty{

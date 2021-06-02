@@ -10,7 +10,7 @@ GLOBAL_BUILD_TAGS=-tags osusergo,netgo
 GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
 FLIGHTCONTROL_LD_FLAGS=-ldflags="-extldflags=-static -s -w"
 CI?=false
-GO_RELEASER_DOCKER_TAG=v0.159.0 # "latest" is not actually the latest
+GO_RELEASER_DOCKER_TAG=latest
 HASUPX:= $(shell upx dot 2> /dev/null)
 
 default: install

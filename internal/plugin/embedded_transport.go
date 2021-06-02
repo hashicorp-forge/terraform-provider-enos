@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 
@@ -105,6 +106,27 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
 			"unable to marshal transport SSH values", "transport", "ssh",
 		)
+	}
+
+	// Because the SSH type is a dynamic psuedo type we have to manually ensure
+	// that the user hasn't set any unknown attributes.
+	knownSSHAttr := func(attr string) error {
+		for known := range em.defaultSSHTypes() {
+			if attr == known {
+				return nil
+			}
+		}
+
+		return newErrWithDiagnostics("Unsupported argument",
+			fmt.Sprintf(`An argument named "%s" is not expected here.`, attr), "transport", "ssh", attr,
+		)
+	}
+
+	for sshAttr := range em.SSH.Values {
+		err := knownSSHAttr(sshAttr)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

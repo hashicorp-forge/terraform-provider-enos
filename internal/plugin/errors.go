@@ -3,7 +3,6 @@ package plugin
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -25,6 +24,10 @@ func (e errWithDiagnostics) Error() string {
 	return msg
 }
 
+func (e errWithDiagnostics) Unwrap() error {
+	return e.Err
+}
+
 func newErrWithDiagnostics(summary string, detail string, attributes ...string) error {
 	return errWithDiagnostics{
 		summary:    summary,
@@ -42,45 +45,38 @@ func wrapErrWithDiagnostics(err error, summary string, detail string, attributes
 	}
 }
 
+// errToDiagnostic takes and error and returns the innermost diagnostic error
+// If a diagnostic error isn't found in the chain then an aggregate chain
+// will be returned.
 func errToDiagnostic(err error) *tfprotov5.Diagnostic {
 	diag := &tfprotov5.Diagnostic{
 		Severity: tfprotov5.DiagnosticSeverityError,
+		Summary:  "Error",
+		Detail:   err.Error(),
 	}
 
-	var diagErr errWithDiagnostics
-	if errors.As(err, &diagErr) {
-		diag.Summary = diagErr.summary
-
-		detail := strings.Builder{}
-		detail.WriteString(fmt.Sprintf("%s %s", diagErr.detail, diagErr.Error()))
-
-		for {
-			err := errors.Unwrap(err)
-			if err == nil {
-				break
+	appendErrToDiag := func(diag *tfprotov5.Diagnostic, err error) {
+		var diagErr errWithDiagnostics
+		if errors.As(err, &diagErr) {
+			diag.Summary = diagErr.summary
+			diag.Detail = diagErr.detail
+			if len(diagErr.attributes) > 0 {
+				steps := []tftypes.AttributePathStep{}
+				for _, attr := range diagErr.attributes {
+					steps = append(steps, tftypes.AttributeName(attr))
+				}
+				diag.Attribute = tftypes.NewAttributePathWithSteps(steps)
 			}
-			detail.WriteString(err.Error())
 		}
-		diag.Detail = detail.String()
+	}
 
-		if len(diagErr.attributes) > 0 {
-			steps := []tftypes.AttributePathStep{}
-			for _, attr := range diagErr.attributes {
-				steps = append(steps, tftypes.AttributeName(attr))
-			}
-			diag.Attribute = tftypes.NewAttributePathWithSteps(steps)
+	// Go through the entire error chain to build a diagnostic
+	for {
+		if err == nil {
+			break
 		}
-	} else {
-		diag.Summary = err.Error()
-		detail := strings.Builder{}
-		for {
-			err = errors.Unwrap(err)
-			if err == nil {
-				break
-			}
-			detail.WriteString(err.Error())
-		}
-		diag.Detail = detail.String()
+		appendErrToDiag(diag, err)
+		err = errors.Unwrap(err)
 	}
 
 	return diag
