@@ -1,11 +1,11 @@
 ---
 name: Release
 
+# Run the release pipeline only on VERSION update
 on:
   push:
-    branches:
-      - main
-      # - shain/badgenstuff # testing for main
+    paths:
+      - 'VERSION'
 
 jobs:
   release:

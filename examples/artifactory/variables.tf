@@ -23,6 +23,6 @@ variable "artifactory_name" {
 }
 
 variable "artifactory_properties" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }

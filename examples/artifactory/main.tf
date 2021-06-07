@@ -28,10 +28,10 @@ resource "enos_bundle_install" "vault_from_artifactory" {
   destination = "/opt/vault/bin"
 
   artifactory = {
-    username    = var.artifactory_username
-    token       = var.artifactory_token
-    url         = data.enos_artifactory_item.vault.results[0].url
-    sha256      = data.enos_artifactory_item.vault.results[0].sha256
+    username = var.artifactory_username
+    token    = var.artifactory_token
+    url      = data.enos_artifactory_item.vault.results[0].url
+    sha256   = data.enos_artifactory_item.vault.results[0].sha256
   }
 }
 
@@ -50,6 +50,6 @@ resource "enos_bundle_install" "boundary_from_releases" {
 resource "enos_bundle_install" "fixture_from_local_path" {
   depends_on = [enos_bundle_install.boundary_from_releases]
 
-  path = "../../internal/fixtures/bundle.zip"
+  path        = "../../internal/fixtures/bundle.zip"
   destination = "/opt/fixture/bin"
 }

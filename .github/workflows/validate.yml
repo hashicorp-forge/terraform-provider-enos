@@ -2,19 +2,51 @@
 name: Validate
 
 on:
-  push:
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build-and-terraform:
+  go-lint:
+    name: "Go lint"
+    runs-on: ubuntu-latest
+    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest-alpine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build assets
+        run: 'apk add upx make && make flight-control-build'
+      - name: Go Lint
+        run: golangci-lint run --out-format=github-actions --timeout=5m0s
+
+  unit:
+    name: "Unit Tests"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v2
         with:
           go-version: '^1.16.3'
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build assets
+        run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
+      - name: Test code
+        run: make test
+
+  build-and-terraform:
+    name: "Build and Test Terraform"
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+      - uses: actions/setup-go@v2
         with:
-          fetch-depth: 0
-      - name: Build code
+          go-version: '^1.16.3'
+      - name: "Build code & Test core example"
         # build the provider, install as terraform plugin, and validate example
         # terraform that utilizes the provider.
         run: make test-tf  # runs build + install make targets
@@ -25,46 +57,154 @@ jobs:
         #     name: ${{ github.event.repository.name }}-artifacts
         #     path: |
         #       ./bin/
+      - name: "Terraform Test Artifactory Example"
+        # validate example terraform that utilizes the provider.
+        run: |
+          terraform -chdir=examples/artifactory init
+          terraform -chdir=examples/artifactory fmt -check -recursive
+          terraform -chdir=examples/artifactory validate
 
-  unit:
+  remotehost:
+    name: "Setup Remotehost"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v2
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          go-version: '^1.16.3'
-      - uses: actions/checkout@v2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::147451547303:role/github_actions-Enos-Provider
+          role-skip-session-tagging: true
+          role-duration-seconds: 3600
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
         with:
-          fetch-depth: 0
-      - name: Build assets
-        run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
-      - name: Test code
-        run: make test
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+        working-directory: ./ci-tests
+      - name: Setup Enos SSH Keys
+        id: sshkey
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./ci-tests/enos-ci-ssh-keypair.pem
+          chmod 600 ./ci-tests/enos-ci-ssh-keypair.pem
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config=backend.hcl
+        working-directory: ./ci-tests
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        working-directory: ./ci-tests
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      - name: Terraform Apply
+        id: apply
+        run: |
+          terraform apply -auto-approve
+          terraform output instance_public_ips | tr -d \" > ../host-ipall.txt
+          cat ../host-ipall.txt | grep -v instance_public_ips > ../host-ip.txt
+        working-directory: ./ci-tests
+      - name: Terraform Apply Status
+        if: steps.apply.outcome == 'failure'
+        run: exit 1
+      # We need to upload the host-ip.txt created in apply
+      # so we can use it in acceptance environment
+      - name: Upload Host IP
+        uses: actions/upload-artifact@v2
+        with:
+          name: hostip
+          path: host-ip.txt
+          retention-days: 1
 
   acceptance:
+    name: "Acceptance Tests"
     runs-on: ubuntu-latest
+    needs: remotehost
+    env:
+      ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+      ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+      ARTIFACTORY_PRODUCT_VERSION: "1.7.0"
+      ARTIFACTORY_REVISION: "f45845666b4e552bfc8ca775834a3ef6fc097fe0"
+      ENOS_TRANSPORT_USER: "ubuntu"
+      ENOS_TRANSPORT_PRIVATE_KEY_PATH: "./enos-ci-ssh-keypair.pem"
     steps:
-      - uses: actions/setup-go@v2
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::147451547303:role/github_actions-Enos-Provider
+          role-skip-session-tagging: true
+          role-duration-seconds: 3600
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Enos SSH Keys
+        id: sshkey
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./internal/plugin/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./internal/transport/ssh/enos-ci-ssh-keypair.pem
+          chmod 600 ./internal/plugin/enos-ci-ssh-keypair.pem
+          chmod 600 ./internal/transport/ssh/enos-ci-ssh-keypair.pem
+      - name: Setup Go
+        uses: actions/setup-go@v2
         with:
           go-version: '^1.16.3'
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Build assets
         run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
-      - name: Acceptance Tests
-        run: make test-acc
-
-  go-lint:
-    runs-on: ubuntu-latest
-    container: docker.mirror.hashicorp.services/golangci/golangci-lint:latest-alpine
-    steps:
-      - uses: actions/checkout@v2
+      # Download host-ip.txt created in Setup Remotehost
+      # and export it as ENOS_TRANSPORT_HOST after removing the debug lines
+      - name: Download Host IP from remotehost
+        uses: actions/download-artifact@v2
         with:
-          fetch-depth: 0
-      - name: Build assets
-        run: 'apk add upx make && make flight-control-build'
-      - name: Go Lint
-        run: golangci-lint run --out-format=github-actions --timeout=5m0s
+          name: hostip
+      - name: Acceptance Tests
+        run: |
+          export ENOS_TRANSPORT_HOST="$(cat host-ip.txt|sed '/^::/d')"
+          echo "ENOS_TRANSPORT_HOST is $ENOS_TRANSPORT_HOST"
+          echo "Set Enos Environment Variables $(env |grep ENOS)"
+          make test-acc
+
+  deleteremotehost:
+    name: "Delete Remotehost"
+    if: always()
+    needs: acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::147451547303:role/github_actions-Enos-Provider
+          role-skip-session-tagging: true
+          role-duration-seconds: 3600
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - name: Setup Enos SSH Keys
+        id: sshkey
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./ci-tests/enos-ci-ssh-keypair.pem
+          chmod 600 ./ci-tests/enos-ci-ssh-keypair.pem
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config=backend.hcl
+        working-directory: ./ci-tests
+      - name: Terraform Destroy
+        id: destroy
+        run: terraform destroy -auto-approve
+        working-directory: ./ci-tests
 
 # TODO:
 # Add security scan
