@@ -83,8 +83,6 @@ EOF
 	})
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)
 			if err != nil {
@@ -98,7 +96,7 @@ EOF
 				step.PlanOnly = true
 				step.ExpectNonEmptyPlan = true
 			}
-			resource.Test(t, resource.TestCase{
+			resource.ParallelTest(t, resource.TestCase{
 				ProtoV5ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})
@@ -106,7 +104,6 @@ EOF
 	}
 
 	t.Run("CanHandleUpdatedAttributesAndOutput", func(t *testing.T) {
-		t.Parallel()
 		steps := []resource.TestStep{}
 
 		for _, cmd := range []string{
@@ -131,7 +128,7 @@ EOF
 			})
 		}
 
-		resource.Test(t, resource.TestCase{
+		resource.ParallelTest(t, resource.TestCase{
 			ProtoV5ProviderFactories: testProviders,
 			Steps:                    steps,
 		})

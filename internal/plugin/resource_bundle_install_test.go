@@ -14,8 +14,6 @@ import (
 
 // TestAccResourceBundleInstall tests the bundle_install resource
 func TestAccResourceBundleInstall(t *testing.T) {
-	t.Parallel()
-
 	cfg := template.Must(template.New("enos_bundle_install").Parse(`resource "enos_bundle_install" "{{.ID}}" {
 		destination = "{{ .Destination }}"
 
@@ -215,7 +213,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 				step.ExpectNonEmptyPlan = true
 			}
 
-			resource.Test(t, resource.TestCase{
+			resource.ParallelTest(t, resource.TestCase{
 				ProtoV5ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})

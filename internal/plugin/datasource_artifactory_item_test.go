@@ -16,8 +16,6 @@ import (
 // actual HashiCorp artifactory service to resolve items based on the search
 // criteria.
 func TestAccDataSourceArtifacotoryItem(t *testing.T) {
-	t.Parallel()
-
 	state := newArtifactoryItemStateV1()
 	_, okacc := os.LookupEnv("TF_ACC")
 	username, okuser := os.LookupEnv("ARTIFACTORY_USER")
@@ -70,7 +68,7 @@ output "url" {
 	buf := bytes.Buffer{}
 	require.NoError(t, cfg.Execute(&buf, state))
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		ProtoV5ProviderFactories: testProviders,
 		Steps: []resource.TestStep{
 			{
