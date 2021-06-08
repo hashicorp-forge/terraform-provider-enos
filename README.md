@@ -484,3 +484,11 @@ The unzip command unzips a zip archive.
 
 The `remoteflight` package provides common functions to install and operate
 `enos-fligth-control` on remote machines through a transport.
+
+# Release Workflow:
+This repo uses the GitHub Actions workflow for CI/CD.
+Go Lint, Build, Terraform, Unit, and Acceptance tests are run on each PR.
+
+## Artifact publishing to `enos-provider-current` S3 bucket
+The artifacts are built and published to S3 bucket on PR merge, only if the `VERSION` file is updated.
+The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account.
