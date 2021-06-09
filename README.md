@@ -490,5 +490,6 @@ This repo uses the GitHub Actions workflow for CI/CD.
 Go Lint, Build, Terraform, Unit, and Acceptance tests are run on each PR.
 
 ## Artifact publishing to `enos-provider-current` S3 bucket
-The artifacts are built and published to S3 bucket on PR merge, only if the `VERSION` file is updated.
 The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account.
+The artifacts are built and published to S3 bucket on PR merge, only if the `VERSION` file is updated.
+You can also manually trigger the Release workflow from the GitHub Actions menu in this repo.
