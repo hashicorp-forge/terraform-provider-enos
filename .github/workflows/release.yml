@@ -1,8 +1,11 @@
 ---
 name: Release
 
-# Run the release pipeline only on VERSION update
 on:
+  # Allow the release pipeline to be triggered manually from GH Actions menu
+  # This will release the version in `VERSION` file on `main` branch
+  workflow_dispatch:
+  # Run the release pipeline on merge only when VERSION is updated
   push:
     paths:
       - 'VERSION'
@@ -20,8 +23,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-        ref: ${{ github.head_ref }}   # checkout the correct branch name
-        fetch-depth: 0                # fetch the whole repo history
+          ref: ${{ github.head_ref }}   # checkout the correct branch name
+          fetch-depth: 0                # fetch the whole repo history
       - name: Build and Install Artifacts
         run: CI='true' make
       - name: Publish to S3 bucket
