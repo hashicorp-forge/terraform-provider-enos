@@ -184,7 +184,7 @@ func tfMarshalStringOptionalValue(val string) tftypes.Value {
 	}
 
 	if val == UnknownString {
-		return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
 	}
 
 	return tftypes.NewValue(tftypes.String, val)
