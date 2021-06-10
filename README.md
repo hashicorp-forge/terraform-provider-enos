@@ -487,9 +487,29 @@ The `remoteflight` package provides common functions to install and operate
 
 # Release Workflow:
 This repo uses the GitHub Actions workflow for CI/CD.
-Go Lint, Build, Terraform, Unit, and Acceptance tests are run on each PR.
+This repo currently runs the following workflows:
+
+### Validate
+`Validate` workflow runs Go Lint, Build, Terraform, Unit, and Acceptance tests on each PR.
+
+### Release
+`Release` workflow is run on merge to `main` when `VERSION` is updated. This workflow publishes the Enos-provider
+artifacts to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account.
+You can also manually trigger the Release workflow from the GitHub Actions menu in this repo.
+
+### Test Current Release
+`Test Current Release` workflow is run only on successful completion of `Release` workflow.  This workflow installs and
+tests the latest Enos-provider artifact published to `enos-provider-current` bucket.
+
+### Promote
+`Promote` workflow can only be triggered manually from the GitHub Actions menu in this repo.  It requires the Provider
+version to be promoted as input. This workflow installs and tests the given provider version from `enos-provider-current`
+S3 bucket and publishes it to `enos-provider-stable` bucket after successful completion of the integration tests.
 
 ## Artifact publishing to `enos-provider-current` S3 bucket
-The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account.
-The artifacts are built and published to S3 bucket on PR merge, only if the `VERSION` file is updated.
-You can also manually trigger the Release workflow from the GitHub Actions menu in this repo.
+The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account
+by the `Release` workflow.
+
+## Artifact publishing to `enos-provider-stable` S3 bucket
+The Enos-provider artifacts are built and published to `enos-provider-stable` bucket in `quality_team_enos_ci` AWS account
+by the `Promote` workflow.
