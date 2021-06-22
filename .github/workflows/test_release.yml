@@ -14,7 +14,7 @@ jobs:
   test-current-release:
     name: "Install and Test Current Artifact"
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event == 'workflow_dispatch' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
