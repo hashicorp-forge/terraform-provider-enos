@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -294,5 +293,5 @@ func (r *publicIPResolver) resolveAWS(ctx context.Context) (net.IP, error) {
 		return nil, err
 	}
 
-	return net.ParseIP(strings.TrimSpace(fmt.Sprintf("%s", body))), nil
+	return net.ParseIP(strings.TrimSpace(string(body))), nil
 }

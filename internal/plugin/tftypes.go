@@ -1,6 +1,9 @@
 package plugin
 
 import (
+	"fmt"
+	"math/big"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -97,23 +100,56 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 			continue
 		}
 
-		// Handle cases where a value is going to be given but is unknown
-		if val.Equal(UnknownStringValue) {
-			toPtr, ok := to.(*string)
+		switch toType := to.(type) {
+		case string, *string:
+			// Handle cases where a value is going to be given but is unknown
+			if val.Equal(UnknownStringValue) {
+				toPtr, ok := to.(*string)
 
-			if ok {
-				*toPtr = UnknownString
+				if ok {
+					*toPtr = UnknownString
+					continue
+				}
+			}
+
+			if !vals[key].IsKnown() || vals[key].IsNull() {
 				continue
 			}
-		}
 
-		if !vals[key].IsKnown() || vals[key].IsNull() {
-			continue
-		}
+			err = vals[key].As(to)
+			if err != nil {
+				return vals, err
+			}
+		case *tfBool:
+			boolVal := &tfBool{}
+			err = boolVal.FromTFValue(val)
+			if err != nil {
+				return vals, err
+			}
+			*toType = *boolVal
+		case *tfNum:
+			numVal := &tfNum{}
+			err = numVal.FromTFValue(val)
+			if err != nil {
+				return vals, err
+			}
+			*toType = *numVal
+		case *tfStringSlice:
+			ssVal := &tfStringSlice{}
+			err = ssVal.FromTFValue(val)
+			if err != nil {
+				return vals, err
+			}
+			*toType = *ssVal
+		default:
+			if !vals[key].IsKnown() || vals[key].IsNull() {
+				continue
+			}
 
-		err = vals[key].As(to)
-		if err != nil {
-			return vals, err
+			err = vals[key].As(to)
+			if err != nil {
+				return vals, err
+			}
 		}
 	}
 
@@ -168,6 +204,102 @@ func tfUnmarshalStringMap(val tftypes.Value) (map[string]string, error) {
 	}
 
 	return strings, nil
+}
+
+// tfMarshalDynamicPsuedoTypeObject is for marshaling a dynamic psuedo-type that is
+// only a single level deep into an object. Currently this is experimental and only
+// supports string and bool attribute types.
+func tfMarshalDynamicPsuedoTypeObject(vals map[string]interface{}, optional map[string]struct{}) tftypes.Value {
+	if len(vals) == 0 {
+		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)
+	}
+
+	tfVals := map[string]tftypes.Value{}
+	tfTypes := map[string]tftypes.Type{}
+
+	for key, val := range vals {
+		switch t := val.(type) {
+		case string:
+			tfTypes[key] = tftypes.String
+			if val == UnknownString {
+				tfVals[key] = UnknownStringValue
+			} else {
+				tfVals[key] = tftypes.NewValue(tftypes.String, t)
+			}
+		case tfBool:
+			tfTypes[key] = t.TFType()
+			tfVals[key] = t.TFValue()
+		case tfNum:
+			tfTypes[key] = t.TFType()
+			tfVals[key] = t.TFValue()
+		case tfStringSlice:
+			tfTypes[key] = t.TFType()
+			tfVals[key] = t.TFValue()
+		case tftypes.Value:
+			tfTypes[key] = t.Type()
+			tfVals[key] = t
+		default:
+			continue
+		}
+	}
+
+	return tftypes.NewValue(tftypes.Object{
+		AttributeTypes:     tfTypes,
+		OptionalAttributes: optional,
+	}, tfVals)
+}
+
+// tfUnmarshalDynamicPsuedoType is for unmarshaling a dynamic psuedo-type that
+// is only a single level deep. Currently this is experimental and only supports
+// string and bool types.
+func tfUnmarshalDynamicPsuedoType(val tftypes.Value) (map[string]interface{}, error) {
+	res := map[string]interface{}{}
+	vals := map[string]tftypes.Value{}
+	err := val.As(&vals)
+	if err != nil {
+		return res, err
+	}
+
+	for key, val := range vals {
+		valType := val.Type()
+
+		if valType.Is(tftypes.String) {
+			str := ""
+			if val.IsKnown() && !val.IsNull() {
+				err = val.As(&str)
+				if err != nil {
+					return res, err
+				}
+			} else {
+				str = UnknownString
+			}
+			res[key] = str
+		} else if valType.Is(tftypes.Bool) {
+			boolVal := &tfBool{}
+			err = boolVal.FromTFValue(val)
+			if err != nil {
+				return res, err
+			}
+			res[key] = boolVal
+		} else if valType.Is(tftypes.Number) {
+			numVal := &tfNum{}
+			err = numVal.FromTFValue(val)
+			if err != nil {
+				return res, err
+			}
+			res[key] = numVal
+		} else if valType.Is(tftypes.DynamicPseudoType) && !val.IsKnown() {
+			// In cases where we get unknown values, eg: some attribute is
+			// set to unknown and we're planning, just set it to the raw
+			// tftypes.Value and we'll pass it back later.
+			res[key] = val
+		} else {
+			return res, fmt.Errorf("marshaling of type %s has not been implemented", valType.String())
+		}
+
+	}
+
+	return res, nil
 }
 
 func tfMarshalStringValue(val string) tftypes.Value {
@@ -240,4 +372,179 @@ func tfStringsSetOrUnknown(args ...string) bool {
 	}
 
 	return false
+}
+
+type tfBool struct {
+	unknown bool
+	null    bool
+	val     bool
+}
+
+func (b *tfBool) TFType() tftypes.Type {
+	return tftypes.Bool
+}
+
+func (b *tfBool) TFValue() tftypes.Value {
+	if b.unknown {
+		return tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)
+	}
+
+	if b.null {
+		return tftypes.NewValue(tftypes.Bool, nil)
+	}
+
+	return tftypes.NewValue(tftypes.Bool, b.val)
+}
+
+func (b *tfBool) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)):
+		b.unknown = true
+	case val.Equal(tftypes.NewValue(tftypes.Bool, nil)):
+		b.null = true
+	default:
+		var bv bool
+		err := val.As(&bv)
+		if err != nil {
+			return err
+		}
+		b.Set(bv)
+	}
+
+	return nil
+}
+
+func (b *tfBool) Get() (bool, bool) {
+	if b.unknown || b.null {
+		return b.val, false
+	}
+
+	return b.val, true
+}
+
+func (b *tfBool) Value() bool {
+	return b.val
+}
+
+func (b *tfBool) Set(val bool) {
+	b.unknown = false
+	b.null = false
+	b.val = val
+}
+
+type tfNum struct {
+	unknown bool
+	null    bool
+	val     int
+}
+
+func (b *tfNum) TFType() tftypes.Type {
+	return tftypes.Number
+}
+
+func (b *tfNum) TFValue() tftypes.Value {
+	if b.unknown {
+		return tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)
+	}
+
+	if b.null {
+		return tftypes.NewValue(tftypes.Number, nil)
+	}
+
+	return tftypes.NewValue(tftypes.Number, b.val)
+}
+
+func (b *tfNum) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)):
+		b.unknown = true
+	case val.Equal(tftypes.NewValue(tftypes.Number, nil)):
+		b.null = true
+	default:
+		i := big.Float{}
+		err := val.As(&i)
+		if err != nil {
+			return err
+		}
+		in, _ := i.Int64()
+		b.Set(int(in))
+	}
+
+	return nil
+}
+
+func (b *tfNum) Get() (int, bool) {
+	if b.unknown || b.null {
+		return b.val, false
+	}
+
+	return b.val, true
+}
+
+func (b *tfNum) Value() int {
+	return b.val
+}
+
+func (b *tfNum) Set(val int) {
+	b.unknown = false
+	b.null = false
+	b.val = val
+}
+
+type tfStringSlice struct {
+	unknown bool
+	null    bool
+	val     []string
+}
+
+func (b *tfStringSlice) TFType() tftypes.Type {
+	return tftypes.List{ElementType: tftypes.String}
+}
+
+func (b *tfStringSlice) TFValue() tftypes.Value {
+	if b.unknown {
+		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, tftypes.UnknownValue)
+	}
+
+	if b.null {
+		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)
+	}
+
+	return tfMarshalStringSlice(b.val)
+}
+
+func (b *tfStringSlice) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, tftypes.UnknownValue)):
+		b.unknown = true
+	case val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)):
+		b.null = true
+	default:
+		stringVals, err := tfUnmarshalStringSlice(val)
+		if err != nil {
+			return err
+		}
+
+		b.Set(stringVals)
+	}
+
+	return nil
+}
+
+func (b *tfStringSlice) Get() ([]string, bool) {
+	if b.unknown || b.null {
+		return b.val, false
+	}
+
+	return b.val, true
+}
+
+func (b *tfStringSlice) Value() []string {
+	return b.val
+}
+
+func (b *tfStringSlice) Set(val []string) {
+	b.unknown = false
+	b.null = false
+	b.val = val
 }

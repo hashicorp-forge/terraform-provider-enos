@@ -180,11 +180,11 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 	// it's not blank and doesn't match the planned state we're updating.
 	if priorState.ID == "" || (priorState.Sum != "" && priorState.Sum != plannedState.Sum) {
 		ssh, err := transport.Client(ctx)
-		defer ssh.Close() //nolint: staticcheck
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
+		defer ssh.Close() //nolint: staticcheck
 
 		ui, err := r.ExecuteCommands(ctx, plannedState, ssh)
 		plannedState.Stdout = ui.Stdout().String()
@@ -308,12 +308,12 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 		}
 
 		file, err = tfile.Open(path)
-		defer file.Close() // nolint: staticcheck
 		if err != nil {
 			return "", wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
+		defer file.Close() // nolint: staticcheck
 
 		sha, err = tfile.SHA256(file)
 		if err != nil {
@@ -356,12 +356,12 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 
 	for _, path := range state.Scripts {
 		script, err := tfile.Open(path)
-		defer script.Close() // nolint: staticcheck
 		if err != nil {
 			return ui, wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
+		defer script.Close() // nolint: staticcheck
 
 		err = r.copyAndRun(ctx, ui, ssh, script, "script", state.Env)
 		if err != nil {
@@ -470,13 +470,12 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 	var err error
 	for _, path := range s.Scripts {
 		f, err = tfile.Open(path)
-		defer f.Close() // nolint: staticcheck
-
 		if err != nil {
 			return wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
+		defer f.Close() // nolint: staticcheck
 	}
 
 	return nil

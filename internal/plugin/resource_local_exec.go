@@ -439,12 +439,12 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 		}
 
 		file, err = tfile.Open(path)
-		defer file.Close() // nolint: staticcheck
 		if err != nil {
 			return "", wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
+		defer file.Close() // nolint: staticcheck
 
 		sha, err = tfile.SHA256(file)
 		if err != nil {
@@ -597,13 +597,12 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 	var err error
 	for _, path := range s.Scripts {
 		f, err = tfile.Open(path)
-		defer f.Close() // nolint: staticcheck
-
 		if err != nil {
 			return wrapErrWithDiagnostics(
 				err, "invalid configuration", "unable to open script file", "scripts",
 			)
 		}
+		defer f.Close() // nolint: staticcheck
 	}
 
 	return nil

@@ -172,11 +172,11 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov5.
 	plannedState.ID = "static"
 
 	ssh, err := transport.Client(ctx)
-	defer ssh.Close() //nolint: staticcheck
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
+	defer ssh.Close() //nolint: staticcheck
 
 	if !priorState.equaltTo(plannedState) {
 		err = plannedState.Install(ctx, ssh)

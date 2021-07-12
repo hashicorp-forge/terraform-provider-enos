@@ -190,11 +190,11 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	plannedState.ID = plannedID
 
 	ssh, err := transport.Client(ctx)
-	defer ssh.Close() //nolint: staticcheck
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
+	defer ssh.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if priorState.ID == "" {

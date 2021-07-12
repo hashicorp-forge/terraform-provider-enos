@@ -119,11 +119,11 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 	if !proposedState.hasUnknownAttributes() {
 		// Load the file source
 		src, srcType, err := proposedState.openSourceOrContent()
-		defer src.Close() // nolint: staticcheck
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
+		defer src.Close() // nolint: staticcheck
 
 		// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
 		sum, err := tfile.SHA256(src)
@@ -170,21 +170,21 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 	}
 
 	src, _, err := plannedState.openSourceOrContent()
-	defer src.Close() //nolint: staticcheck
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
+	defer src.Close() //nolint: staticcheck
 
 	// If we're missing a prior ID we haven't created it yet. If the prior and
 	// planned sum don't match then we're updating.
 	if priorState.ID == "" || (priorState.Sum != plannedState.Sum) {
 		ssh, err := transport.Client(ctx)
-		defer ssh.Close() //nolint: staticcheck
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
+		defer ssh.Close() //nolint: staticcheck
 
 		err = ssh.Copy(ctx, src, plannedState.Dst)
 		if err != nil {
@@ -254,10 +254,10 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 
 	if fs.Src != "" && fs.Src != UnknownString {
 		f, err := tfile.Open(fs.Src)
-		defer f.Close() // nolint: staticcheck
 		if err != nil {
 			return newErrWithDiagnostics("invalid configuration", "unable to open source file", "source")
 		}
+		defer f.Close() // nolint: staticcheck
 	}
 
 	if fs.Dst == "" {

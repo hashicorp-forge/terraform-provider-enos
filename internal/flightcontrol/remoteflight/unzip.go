@@ -142,14 +142,7 @@ func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*Unz
 
 	stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
 	if err != nil {
-		if stdout != "" {
-			err = fmt.Errorf("%w: %s", err, stdout)
-		}
-		if stderr != "" {
-			err = fmt.Errorf("%w: %s", err, stderr)
-		}
-
-		return res, err
+		return res, WrapErrorWith(err, stdout, stderr)
 	}
 
 	return res, err

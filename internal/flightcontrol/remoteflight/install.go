@@ -4,14 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"path/filepath"
 	"regexp"
 
 	"github.com/hashicorp/enos-provider/internal/flightcontrol"
-	"github.com/hashicorp/enos-provider/internal/random"
 	"github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
 // DefaultPath is the default location of our binary
@@ -30,16 +28,12 @@ type InstallOpt func(*InstallRequest) *InstallRequest
 
 // NewInstallRequest takes functional options and returns a new install request
 func NewInstallRequest(opts ...InstallOpt) *InstallRequest {
-	var err error
 	ir := &InstallRequest{
 		Path: DefaultPath,
 	}
 
 	for _, opt := range opts {
 		ir = opt(ir)
-		if err != nil {
-			return ir
-		}
 	}
 
 	return ir
@@ -111,25 +105,13 @@ func Install(ctx context.Context, ssh transport.Transport, ir *InstallRequest) (
 	}
 
 	// Install the binary
-	tmpPath := fmt.Sprintf("/tmp/enos-flight-control-%s", random.ID())
-	err = ssh.Copy(ctx, file.NewReader(string(flightControl)), tmpPath)
+	err = CopyFile(ctx, ssh, NewCopyFileRequest(
+		WithCopyFileContent(tfile.NewReader(string(flightControl))),
+		WithCopyFileDestination(ir.Path),
+		WithCopyFileChmod("+x"),
+	))
 	if err != nil {
 		return res, fmt.Errorf("copying binary to target host: %w", err)
-	}
-
-	_, _, err = ssh.Run(ctx, command.New(fmt.Sprintf("chmod +x %s", tmpPath)))
-	if err != nil {
-		return res, fmt.Errorf("changing binary permissions: %w", err)
-	}
-
-	_, _, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, filepath.Dir(ir.Path))))
-	if err != nil {
-		return res, fmt.Errorf("creating destination install directory on target host: %w", err)
-	}
-
-	_, _, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mv %s %s`, tmpPath, ir.Path)))
-	if err != nil {
-		return res, fmt.Errorf("moving binary to target destination path: %w", err)
 	}
 
 	return res, nil

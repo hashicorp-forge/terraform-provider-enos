@@ -20,6 +20,8 @@ A terraform provider for quality infrastructure
   - [enos_remote_exec](#enos_remote_exec)
   - [enos_local_exec](#enos_local_exec)
   - [enos_bundle_install](#enos_bundle_install)
+  - [enos_vault_start](#enos_vault_start)
+  - [enos_vault_init](#enos_vault_init)
 - [Flight Control](#flight-control)
 
 # Example
@@ -422,6 +424,150 @@ resource "enos_bundle_install" "vault" {
     sha256   = "e1237bs.."
     url      = "https:/artifactory.hashicorp.engineering/artifactory/...bundle.zip"
   }
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+```
+
+# enos_vault_start
+The enos vault start resource is capable of configuring and starting a Vault
+service. It handles creating the configuration directory, the configuration file,
+the license file, the systemd unit, and starting the service.
+
+*NOTE: Currently all `config` sub-sections must be set due to an issue with Optional attributes
+in `terraform-plugin-go` and Terraform. Until it has been resolved you must set
+all of them. Because of this limitation, not all configuration stanzas have been implemented yet*
+
+The following describes the enos_vault_start schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. It is always 'static'|
+|bin_path|The fully qualified path to the Vault binary|
+|config_dir|An optional path where Vault configuration will live. Default: '/etc/vault.d'|
+|config.api_addr|The Vault [api_addr](https://www.vaultproject.io/docs/configuration#api_addr) value|
+|config.cluster_addr|The Vault [cluster_addr](https://www.vaultproject.io/docs/configuration#cluster_addr) value|
+|config.listener.type|The Vault [listener](https://www.vaultproject.io/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener|
+|config.listener.attributes|The Vault [listener](https://www.vaultproject.io/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener|
+|config.storage.type|The Vault [storage](https://www.vaultproject.io/docs/configuration/storage) type|
+|config.storage.attributes|The Vault [storage](https://www.vaultproject.io/docs/configuration/storage) parameters for the given storage type|
+|config.seal.type|The Vault [seal](https://www.vaultproject.io/docs/configuration/seal) type|
+|config.seal.attributes|The Vault [seal](https://www.vaultproject.io/docs/configuration/seal) parameters for the given seal type|
+|config.ui|Enable or disable the Vault UI|
+|license|An optional Vault license|
+|unit_name|An optional name for the systemd unit. Default: 'vault'|
+|username|An optional name for the vault system user. Default: 'vault'|
+|transport.ssh.host|The remote host you wish to copy the file to|
+|transport.ssh.user|The username to use when performing the SSH handshake|
+|transport.ssh.private_key|The text value of the private key you wish to use for SSH authentication|
+|transport.ssh.private_key_path|The path of the private key you wish to use for SSH authentication|
+|transport.ssh.passphrase|The text value of the passphrase for an encrypted private key|
+|transport.ssh.passphrase|The path of the passphrase for an encrypted private key|
+
+The resource is also capable of using the SSH agent. It will attempt to connect
+to the agent socket as defined with the `SSH_AUTH_SOCK` environment variable.
+
+Example
+```hcl
+resource "enos_vault_start" "vault" {
+  bin_path       = "/opt/vault/bin/vault"
+
+  config_dir     = "/etc/vault.d"
+
+  config         = {
+    api_addr     = "${aws_instance.target.private_ip}:8200"
+    cluster_addr = "${aws_instance.target.private_ip}:8201"
+    listener     = {
+      type       = "tcp"
+      attributes = {
+        address     = "0.0.0.0:8200"
+        tls_disable = "true"
+      }
+    }
+    storage = {
+      type       = "consul"
+      attributes = {
+        address = "127.0.0.1:8500"
+        path    = "vault"
+      }
+    }
+    seal = {
+      type       = "awskms"
+      attributes = {
+        kms_key_id = data.aws_kms_key.kms_key.id
+      }
+    }
+    ui = true
+  }
+
+  license   = var.vault_license
+
+  unit_name = "vault"
+
+  username  = "vault"
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+```
+
+# enos_vault_init
+The enos vault init resource is capable initializing a Vault cluster.
+
+The following describes the enos_vault_init schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. It is always 'static'|
+|bin_path|The fully qualified path to the Vault binary|
+|key_shares|The number of [key shares](https://www.vaultproject.io/docs/commands/operator/init#key-shares)|
+|key_threshold|The [key threshold](https://www.vaultproject.io/docs/commands/operator/init#key-threshold)|
+|pgp_keys|A list of [pgp keys](https://www.vaultproject.io/docs/commands/operator/init#pgp-keys)|
+|root_token_pgp_key|The root token [pgp keys](https://www.vaultproject.io/docs/commands/operator/init#root-token-pgp-key)|
+|recovery_shares|The number of [recovery shares](https://www.vaultproject.io/docs/commands/operator/init#recovery-shares)|
+|recovery_threshold|The [recovery threshold](https://www.vaultproject.io/docs/commands/operator/init#recovery-threshold)|
+|recovery_pgp_keys|A list of [recovery pgp keys](https://www.vaultproject.io/docs/commands/operator/init#recovery-pgp-keys)|
+|stored_shares|The number of [stored shares](https://www.vaultproject.io/docs/commands/operator/init#stored-shares)|
+|consul_auto|Enable or disable [consul auto discovery](https://www.vaultproject.io/docs/commands/operator/init#consul-auto)|
+|consul_service|The name of the [consul service](https://www.vaultproject.io/docs/commands/operator/init#consul-service)|
+|unseal_keys_b64|The generated unseal keys in base 64|
+|unseal_keys_hex|The generated unseal keys in hex|
+|unseal_keys_shares|The number of unseal key shares|
+|unseal_keys_threshold|The number of unseal key shares required to unseal|
+|root_token|The root token|
+|recovery_keys_b64|The generated recovery keys in base 64|
+|recovery_keys_hex|The generated recovery keys in hex|
+|recovery_keys_shares|The number of recovery key shares|
+|recovery_keys_threshold|The number of recovery key shares required to recovery|
+|transport.ssh.host|The remote host you wish to copy the file to|
+|transport.ssh.user|The username to use when performing the SSH handshake|
+|transport.ssh.private_key|The text value of the private key you wish to use for SSH authentication|
+|transport.ssh.private_key_path|The path of the private key you wish to use for SSH authentication|
+|transport.ssh.passphrase|The text value of the passphrase for an encrypted private key|
+|transport.ssh.passphrase|The path of the passphrase for an encrypted private key|
+
+The resource is also capable of using the SSH agent. It will attempt to connect
+to the agent socket as defined with the `SSH_AUTH_SOCK` environment variable.
+
+Example
+```hcl
+resource "enos_vault_init" "vault" {
+  bin_path   = "/opt/vault/bin/vault"
+  vault_addr = enos_vault_start.vault.config.api_addr
+
+  recovery_shares    = 5
+  recovery_threshold = 3
 
   transport = {
     ssh = {

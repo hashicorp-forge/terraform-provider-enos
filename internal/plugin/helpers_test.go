@@ -21,10 +21,10 @@ func readTestFile(path string) (string, error) {
 	}
 
 	handle, err := os.Open(abs)
-	defer handle.Close() // nolint: staticcheck
 	if err != nil {
 		return res, err
 	}
+	defer handle.Close() // nolint: staticcheck
 
 	buf := bytes.Buffer{}
 	_, err = buf.ReadFrom(handle)
