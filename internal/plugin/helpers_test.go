@@ -38,15 +38,15 @@ func readTestFile(path string) (string, error) {
 type testProperty struct {
 	n string
 	v string
-	d *string
+	d *tfString
 }
 
 func testMapPropertiesToStruct(props []testProperty) map[string]tftypes.Value {
 	values := map[string]tftypes.Value{}
 
 	for _, prop := range props {
-		*prop.d = prop.v
-		values[prop.n] = tfMarshalStringValue(prop.v)
+		prop.d.Set(prop.v)
+		values[prop.n] = prop.d.TFValue()
 	}
 
 	return values
@@ -96,7 +96,7 @@ func unsetEnosEnv(t *testing.T) {
 func setEnosEnv(t *testing.T, et *embeddedTransportV1) {
 	t.Helper()
 
-	for key, val := range map[string]string{
+	for key, val := range map[string]*tfString{
 		"ENOS_TRANSPORT_USER":             et.SSH.User,
 		"ENOS_TRANSPORT_HOST":             et.SSH.Host,
 		"ENOS_TRANSPORT_PRIVATE_KEY":      et.SSH.PrivateKey,
@@ -104,8 +104,9 @@ func setEnosEnv(t *testing.T, et *embeddedTransportV1) {
 		"ENOS_TRANSPORT_PASSPHRASE":       et.SSH.Passphrase,
 		"ENOS_TRANSPORT_PASSPHRASE_PATH":  et.SSH.PassphrasePath,
 	} {
-		if val != "" {
-			assert.NoError(t, os.Setenv(key, val))
+		v, ok := val.Get()
+		if ok {
+			assert.NoError(t, os.Setenv(key, v))
 		}
 	}
 }

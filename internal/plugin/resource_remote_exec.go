@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
@@ -26,14 +27,14 @@ type remoteExec struct {
 var _ resourcerouter.Resource = (*remoteExec)(nil)
 
 type remoteExecStateV1 struct {
-	ID        string
-	Env       map[string]string
-	Content   string
-	Inline    []string
-	Scripts   []string
-	Sum       string
-	Stderr    string
-	Stdout    string
+	ID        *tfString
+	Env       *tfStringMap
+	Content   *tfString
+	Inline    *tfStringSlice
+	Scripts   *tfStringSlice
+	Sum       *tfString
+	Stderr    *tfString
+	Stdout    *tfString
 	Transport *embeddedTransportV1
 }
 
@@ -48,9 +49,14 @@ func newRemoteExec() *remoteExec {
 
 func newRemoteExecStateV1() *remoteExecStateV1 {
 	return &remoteExecStateV1{
-		Env:       map[string]string{},
-		Inline:    []string{},
-		Scripts:   []string{},
+		ID:        newTfString(),
+		Env:       newTfStringMap(),
+		Content:   newTfString(),
+		Inline:    newTfStringSlice(),
+		Scripts:   newTfStringSlice(),
+		Sum:       newTfString(),
+		Stderr:    newTfString(),
+		Stdout:    newTfString(),
 		Transport: newEmbeddedTransport(),
 	}
 }
@@ -122,26 +128,33 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
-		proposedState.Sum = sha256
+		proposedState.Sum.Set(sha256)
+	} else if _, ok := proposedState.Sum.Get(); !ok {
+		proposedState.Sum.Unknown = true
 	}
 
 	// If our prior ID is blank we're creating the resource.
-	if priorState.ID == "" {
+	if _, ok := priorState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
 		// When we create we need to ensure that we plan unknown output.
-		proposedState.Stdout = UnknownString
-		proposedState.Stderr = UnknownString
+		proposedState.Stdout.Unknown = true
+		proposedState.Stderr.Unknown = true
 	} else {
 		// We have a prior ID so we're either updating or staying the same.
 		if proposedState.hasUnknownAttributes() {
 			// If we have unknown attributes plan for a new sum and output.
-			proposedState.Sum = UnknownString
-			proposedState.Stdout = UnknownString
-			proposedState.Stderr = UnknownString
-		} else if priorState.Sum != "" && priorState.Sum != proposedState.Sum {
-			// If we have a new sum and it doesn't match the old one, we're
-			// updating and need to plan for new output.
-			proposedState.Stdout = UnknownString
-			proposedState.Stderr = UnknownString
+			proposedState.Sum.Unknown = true
+			proposedState.Stdout.Unknown = true
+			proposedState.Stderr.Unknown = true
+		} else if priorSum, ok := priorState.Sum.Get(); ok {
+			if proposedSum, ok := proposedState.Sum.Get(); ok {
+				if priorSum != proposedSum {
+					// If we have a new sum and it doesn't match the old one, we're
+					// updating and need to plan for new output.
+					proposedState.Stdout.Unknown = true
+					proposedState.Stderr.Unknown = true
+				}
+			}
 		}
 	}
 
@@ -169,7 +182,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		res.NewState, err = marshalDelete(plannedState)
 		return res, err
 	}
-	plannedState.ID = "static"
+	plannedState.ID.Set("static")
 
 	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
 	if err != nil {
@@ -178,7 +191,11 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 
 	// If our priorState Sum is blank then we're creating the resource. If
 	// it's not blank and doesn't match the planned state we're updating.
-	if priorState.ID == "" || (priorState.Sum != "" && priorState.Sum != plannedState.Sum) {
+	_, pok := priorState.ID.Get()
+	priorSum, prsumok := priorState.Sum.Get()
+	plannedSum, plsumok := plannedState.Sum.Get()
+
+	if !pok || !prsumok || !plsumok || (priorSum != plannedSum) {
 		ssh, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -187,8 +204,8 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		defer ssh.Close() //nolint: staticcheck
 
 		ui, err := r.ExecuteCommands(ctx, plannedState, ssh)
-		plannedState.Stdout = ui.Stdout().String()
-		plannedState.Stderr = ui.Stderr().String()
+		plannedState.Stdout.Set(ui.Stdout().String())
+		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
@@ -279,8 +296,8 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 	// aggregate of the environment variables, inline commands, and scripts.
 	ag := strings.Builder{}
 
-	if state.Content != "" {
-		content := tfile.NewReader(state.Content)
+	if cont, ok := state.Content.Get(); ok {
+		content := tfile.NewReader(cont)
 		defer content.Close()
 
 		sha, err := tfile.SHA256(content)
@@ -293,36 +310,41 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 		ag.WriteString(sha)
 	}
 
-	for _, cmd := range state.Inline {
-		ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(state.Env))))
+	if inline, ok := state.Inline.GetStrings(); ok {
+		env, _ := state.Env.GetStrings()
+		for _, cmd := range inline {
+			ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(env))))
+		}
 	}
 
-	var sha string
-	var file it.Copyable
-	var err error
-	for _, path := range state.Scripts {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		default:
-		}
+	if scripts, ok := state.Scripts.GetStrings(); ok {
+		var sha string
+		var file it.Copyable
+		var err error
+		for _, path := range scripts {
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			default:
+			}
 
-		file, err = tfile.Open(path)
-		if err != nil {
-			return "", wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
-			)
-		}
-		defer file.Close() // nolint: staticcheck
+			file, err = tfile.Open(path)
+			if err != nil {
+				return "", wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to open script file", "scripts",
+				)
+			}
+			defer file.Close() // nolint: staticcheck
 
-		sha, err = tfile.SHA256(file)
-		if err != nil {
-			return "", wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
-			)
-		}
+			sha, err = tfile.SHA256(file)
+			if err != nil {
+				return "", wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
+				)
+			}
 
-		ag.WriteString(sha)
+			ag.WriteString(sha)
+		}
 	}
 
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(ag.String()))), nil
@@ -334,46 +356,51 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 	var err error
 	merr := &multierror.Error{}
 	ui := ui.NewBuffered()
+	env, _ := state.Env.GetStrings()
 
-	for _, cmd := range state.Inline {
-		select {
-		case <-ctx.Done():
-			return ui, wrapErrWithDiagnostics(
-				ctx.Err(), "timed out", "context deadline exceeded while running inline commands",
-			)
-		default:
-		}
+	if inline, ok := state.Inline.GetStrings(); ok {
+		for _, cmd := range inline {
+			select {
+			case <-ctx.Done():
+				return ui, wrapErrWithDiagnostics(
+					ctx.Err(), "timed out", "context deadline exceeded while running inline commands",
+				)
+			default:
+			}
 
-		stdout, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(state.Env)))
-		merr = multierror.Append(merr, err)
-		merr = multierror.Append(merr, ui.Append(stdout, stderr))
-		if err := merr.ErrorOrNil(); err != nil {
-			return ui, wrapErrWithDiagnostics(
-				err, "command failed", fmt.Sprintf("running inline command failed: %s", err.Error()),
-			)
-		}
-	}
-
-	for _, path := range state.Scripts {
-		script, err := tfile.Open(path)
-		if err != nil {
-			return ui, wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
-			)
-		}
-		defer script.Close() // nolint: staticcheck
-
-		err = r.copyAndRun(ctx, ui, ssh, script, "script", state.Env)
-		if err != nil {
-			return ui, err
+			stdout, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(env)))
+			merr = multierror.Append(merr, err)
+			merr = multierror.Append(merr, ui.Append(stdout, stderr))
+			if err := merr.ErrorOrNil(); err != nil {
+				return ui, wrapErrWithDiagnostics(
+					err, "command failed", fmt.Sprintf("running inline command failed: %s", err.Error()),
+				)
+			}
 		}
 	}
 
-	if state.Content != "" {
-		content := tfile.NewReader(state.Content)
+	if scripts, ok := state.Scripts.GetStrings(); ok {
+		for _, path := range scripts {
+			script, err := tfile.Open(path)
+			if err != nil {
+				return ui, wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to open script file", "scripts",
+				)
+			}
+			defer script.Close() // nolint: staticcheck
+
+			err = r.copyAndRun(ctx, ui, ssh, script, "script", env)
+			if err != nil {
+				return ui, err
+			}
+		}
+	}
+
+	if cont, ok := state.Content.Get(); ok {
+		content := tfile.NewReader(cont)
 		defer content.Close()
 
-		err = r.copyAndRun(ctx, ui, ssh, content, "content", state.Env)
+		err = r.copyAndRun(ctx, ui, ssh, content, "content", env)
 		if err != nil {
 			return ui, err
 		}
@@ -413,39 +440,17 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, ssh it.Transport,
 	// TODO: Eventually we'll probably have to support /tmp being mounted
 	// with no exec. In those cases we'll have to make this configurable
 	// or find another strategy for executing scripts.
-	dst := fmt.Sprintf("/tmp/%s.sh", sha)
-	err = ssh.Copy(ctx, src, dst)
-	if err != nil {
-		return wrapErrWithDiagnostics(
-			err, "command failed", "copying src file content to remote script",
-		)
-	}
-
-	stdout, stderr, err := ssh.Run(ctx, command.New(fmt.Sprintf("chmod 0777 %s", dst), command.WithEnvVars(env)))
+	res, err := remoteflight.RunScript(ctx, ssh, remoteflight.NewRunScriptRequest(
+		remoteflight.WithRunScriptContent(src),
+		remoteflight.WithRunScriptDestination(fmt.Sprintf("/tmp/%s.sh", sha)),
+		remoteflight.WithRunScriptEnv(env),
+		remoteflight.WithRunScriptChmod("0777"),
+	))
 	merr = multierror.Append(merr, err)
-	merr = multierror.Append(merr, ui.Append(stdout, stderr))
-	if merr.ErrorOrNil() != nil {
-		return wrapErrWithDiagnostics(
-			merr.ErrorOrNil(), "command failed", fmt.Sprintf("running changing ownership on script: %s", merr.Error()),
-		)
-	}
+	merr = multierror.Append(merr, ui.Append(res.Stdout, res.Stderr))
 
-	stdout, stderr, err = ssh.Run(ctx, command.New(dst, command.WithEnvVars(env)))
-	merr = multierror.Append(merr, err)
-	merr = multierror.Append(merr, ui.Append(stdout, stderr))
 	if merr.ErrorOrNil() != nil {
-		return wrapErrWithDiagnostics(
-			merr.ErrorOrNil(), "command failed", fmt.Sprintf("executing script: %s", merr.Error()),
-		)
-	}
-
-	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("rm -f %s", dst), command.WithEnvVars(env)))
-	merr = multierror.Append(merr, err)
-	merr = multierror.Append(merr, ui.Append(stdout, stderr))
-	if merr.ErrorOrNil() != nil {
-		return wrapErrWithDiagnostics(
-			merr.ErrorOrNil(), "command failed", fmt.Sprintf("removing script file: %s", merr.Error()),
-		)
+		return wrapErrWithDiagnostics(merr.ErrorOrNil(), "command failed", merr.Error())
 	}
 
 	return nil
@@ -461,21 +466,27 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 	}
 
 	// Make sure that we have content, inline commands or scripts
-	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+	_, okcnt := s.Content.Get()
+	_, okin := s.Inline.Get()
+	_, okscr := s.Scripts.Get()
+
+	if !okcnt && !okin && !okscr {
 		return newErrWithDiagnostics("invalid configuration", "you must provide content, inline commands or scripts", "content")
 	}
 
 	// Make sure the scripts exist
-	var f it.Copyable
-	var err error
-	for _, path := range s.Scripts {
-		f, err = tfile.Open(path)
-		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
-			)
+	if scripts, ok := s.Scripts.GetStrings(); ok {
+		var f it.Copyable
+		var err error
+		for _, path := range scripts {
+			f, err = tfile.Open(path)
+			if err != nil {
+				return wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to open script file", "scripts",
+				)
+			}
+			defer f.Close() // nolint: staticcheck
 		}
-		defer f.Close() // nolint: staticcheck
 	}
 
 	return nil
@@ -484,38 +495,17 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *remoteExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":      &s.ID,
-		"content": &s.Content,
-		"sum":     &s.Sum,
-		"stdout":  &s.Stdout,
-		"stderr":  &s.Stderr,
+		"id":          s.ID,
+		"content":     s.Content,
+		"sum":         s.Sum,
+		"stdout":      s.Stdout,
+		"stderr":      s.Stderr,
+		"environment": s.Env,
+		"inline":      s.Inline,
+		"scripts":     s.Scripts,
 	})
 	if err != nil {
 		return err
-	}
-
-	env, ok := vals["environment"]
-	if ok {
-		s.Env, err = tfUnmarshalStringMap(env)
-		if err != nil {
-			return err
-		}
-	}
-
-	inline, ok := vals["inline"]
-	if ok {
-		s.Inline, err = tfUnmarshalStringSlice(inline)
-		if err != nil {
-			return err
-		}
-	}
-
-	scripts, ok := vals["scripts"]
-	if ok {
-		s.Scripts, err = tfUnmarshalStringSlice(scripts)
-		if err != nil {
-			return err
-		}
 	}
 
 	if vals["transport"].IsKnown() {
@@ -528,14 +518,14 @@ func (s *remoteExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *remoteExecStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":          tftypes.String,
-		"sum":         tftypes.String,
-		"stdout":      tftypes.String,
-		"stderr":      tftypes.String,
-		"environment": tftypes.Map{AttributeType: tftypes.String},
-		"inline":      tftypes.List{ElementType: tftypes.String},
-		"scripts":     tftypes.List{ElementType: tftypes.String},
-		"content":     tftypes.String,
+		"id":          s.ID.TFType(),
+		"sum":         s.Sum.TFType(),
+		"stdout":      s.Stdout.TFType(),
+		"stderr":      s.Stderr.TFType(),
+		"environment": s.Env.TFType(),
+		"inline":      s.Inline.TFType(),
+		"scripts":     s.Scripts.TFType(),
+		"content":     s.Content.TFType(),
 		"transport":   s.Transport.Terraform5Type(),
 	}}
 }
@@ -543,15 +533,15 @@ func (s *remoteExecStateV1) Terraform5Type() tftypes.Type {
 // Terraform5Type is the file state tftypes.Value.
 func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":          tfMarshalStringValue(s.ID),
-		"sum":         tfMarshalStringValue(s.Sum),
-		"stdout":      tfMarshalStringAllowBlank(s.Stdout),
-		"stderr":      tfMarshalStringAllowBlank(s.Stderr),
-		"content":     tfMarshalStringOptionalValue(s.Content),
+		"id":          s.ID.TFValue(),
+		"sum":         s.Sum.TFValue(),
+		"stdout":      s.Stdout.TFValue(),
+		"stderr":      s.Stderr.TFValue(),
+		"content":     s.Content.TFValue(),
 		"transport":   s.Transport.Terraform5Value(),
-		"inline":      tfMarshalStringSlice(s.Inline),
-		"scripts":     tfMarshalStringSlice(s.Scripts),
-		"environment": tfMarshalStringMap(s.Env),
+		"inline":      s.Inline.TFValue(),
+		"scripts":     s.Scripts.TFValue(),
+		"environment": s.Env.TFValue(),
 	})
 }
 
@@ -560,7 +550,11 @@ func (s *remoteExecStateV1) EmbeddedTransport() *embeddedTransportV1 {
 }
 
 func (s *remoteExecStateV1) shouldDelete() bool {
-	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+	_, okcnt := s.Content.Get()
+	_, okin := s.Inline.Get()
+	_, okscr := s.Scripts.Get()
+
+	if !okcnt && !okin && !okscr {
 		return true
 	}
 
@@ -568,20 +562,24 @@ func (s *remoteExecStateV1) shouldDelete() bool {
 }
 
 func (s *remoteExecStateV1) hasUnknownAttributes() bool {
-	if s.Content == UnknownString {
+	if s.Content.Unknown || s.Scripts.Unknown || s.Inline.Unknown || s.Env.Unknown {
 		return true
 	}
 
-	for _, ary := range [][]string{s.Scripts, s.Inline} {
-		for _, val := range ary {
-			if val == UnknownString {
-				return true
-			}
+	if _, ok := s.Scripts.Get(); ok {
+		if !s.Scripts.FullyKnown() {
+			return true
 		}
 	}
 
-	for _, val := range s.Env {
-		if val == UnknownString {
+	if _, ok := s.Inline.Get(); ok {
+		if !s.Inline.FullyKnown() {
+			return true
+		}
+	}
+
+	if _, ok := s.Env.Get(); ok {
+		if !s.Env.FullyKnown() {
 			return true
 		}
 	}

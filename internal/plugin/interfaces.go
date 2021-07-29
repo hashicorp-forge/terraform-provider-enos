@@ -19,6 +19,12 @@ type Serializable interface {
 	FromTerraform5Value(val tftypes.Value) error
 }
 
+type TFType interface {
+	TFType() tftypes.Type
+	TFValue() tftypes.Value
+	FromTFValue(val tftypes.Value) error
+}
+
 type StateWithTransport interface {
 	State
 	EmbeddedTransport() *embeddedTransportV1

@@ -28,14 +28,14 @@ type localExec struct {
 var _ resourcerouter.Resource = (*localExec)(nil)
 
 type localExecStateV1 struct {
-	ID      string
-	Env     map[string]string
-	Content string
-	Inline  []string
-	Scripts []string
-	Sum     string
-	Stderr  string
-	Stdout  string
+	ID      *tfString
+	Env     *tfStringMap
+	Content *tfString
+	Inline  *tfStringSlice
+	Scripts *tfStringSlice
+	Sum     *tfString
+	Stderr  *tfString
+	Stdout  *tfString
 }
 
 var _ State = (*localExecStateV1)(nil)
@@ -48,7 +48,16 @@ func newLocalExec() *localExec {
 }
 
 func newLocalExecStateV1() *localExecStateV1 {
-	return &localExecStateV1{}
+	return &localExecStateV1{
+		ID:      newTfString(),
+		Env:     newTfStringMap(),
+		Content: newTfString(),
+		Inline:  newTfStringSlice(),
+		Scripts: newTfStringSlice(),
+		Sum:     newTfString(),
+		Stderr:  newTfString(),
+		Stdout:  newTfString(),
+	}
 }
 
 func (l *localExec) Name() string {
@@ -215,26 +224,33 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanR
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
-		proposedState.Sum = sha256
+		proposedState.Sum.Set(sha256)
+	} else if _, ok := proposedState.Sum.Get(); !ok {
+		proposedState.Sum.Unknown = true
 	}
 
 	// If our prior ID is blank we're creating the resource.
-	if priorState.ID == "" {
+	if _, ok := priorState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
 		// When we create we need to ensure that we plan unknown output.
-		proposedState.Stdout = UnknownString
-		proposedState.Stderr = UnknownString
+		proposedState.Stdout.Unknown = true
+		proposedState.Stderr.Unknown = true
 	} else {
 		// We have a prior ID so we're either updating or staying the same.
 		if proposedState.hasUnknownAttributes() {
-			// If we have unknown attributes plan for a new sum and output.
-			proposedState.Sum = UnknownString
-			proposedState.Stdout = UnknownString
-			proposedState.Stderr = UnknownString
-		} else if priorState.Sum != "" && priorState.Sum != proposedState.Sum {
-			// If we have a new sum and it doesn't match the old one, we're
-			// updating and need to plan for new output.
-			proposedState.Stdout = UnknownString
-			proposedState.Stderr = UnknownString
+			// If we have Unknown attributes plan for a new sum and output.
+			proposedState.Sum.Unknown = true
+			proposedState.Stdout.Unknown = true
+			proposedState.Stderr.Unknown = true
+		} else if priorSum, ok := priorState.Sum.Get(); ok {
+			if proposedSum, ok := proposedState.Sum.Get(); ok {
+				if priorSum != proposedSum {
+					// If we have a new sum and it doesn't match the old one, we're
+					// updating and need to plan for new output.
+					proposedState.Stdout.Unknown = true
+					proposedState.Stderr.Unknown = true
+				}
+			}
 		}
 	}
 
@@ -281,7 +297,7 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.Appl
 		res.NewState, err = marshalDelete(plannedState)
 		return res, err
 	}
-	plannedState.ID = "static"
+	plannedState.ID.Set("static")
 
 	err = plannedState.Validate(ctx)
 	if err != nil {
@@ -291,10 +307,14 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.Appl
 
 	// If our priorState Sum is blank then we're creating the resource. If
 	// it's not blank and doesn't match the planned state we're updating.
-	if priorState.ID == "" || (priorState.Sum != "" && priorState.Sum != plannedState.Sum) {
+	_, pok := priorState.ID.Get()
+	priorSum, prsumok := priorState.Sum.Get()
+	plannedSum, plsumok := plannedState.Sum.Get()
+
+	if !pok || !prsumok || !plsumok || (priorSum != plannedSum) {
 		ui, err := l.ExecuteCommands(ctx, plannedState)
-		plannedState.Stdout = ui.Stdout().String()
-		plannedState.Stderr = ui.Stderr().String()
+		plannedState.Stdout.Set(ui.Stdout().String())
+		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
@@ -410,8 +430,8 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 	// aggregate of the environment variables, inline commands, and scripts.
 	ag := strings.Builder{}
 
-	if state.Content != "" {
-		content := tfile.NewReader(state.Content)
+	if cont, ok := state.Content.Get(); ok {
+		content := tfile.NewReader(cont)
 		defer content.Close()
 
 		sha, err := tfile.SHA256(content)
@@ -424,36 +444,41 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 		ag.WriteString(sha)
 	}
 
-	for _, cmd := range state.Inline {
-		ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(state.Env))))
+	env, _ := state.Env.GetStrings()
+	if inline, ok := state.Inline.GetStrings(); ok {
+		for _, cmd := range inline {
+			ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(env))))
+		}
 	}
 
 	var sha string
 	var file it.Copyable
 	var err error
-	for _, path := range state.Scripts {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		default:
-		}
+	if scripts, ok := state.Scripts.GetStrings(); ok {
+		for _, path := range scripts {
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			default:
+			}
 
-		file, err = tfile.Open(path)
-		if err != nil {
-			return "", wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
-			)
-		}
-		defer file.Close() // nolint: staticcheck
+			file, err = tfile.Open(path)
+			if err != nil {
+				return "", wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to open script file", "scripts",
+				)
+			}
+			defer file.Close() // nolint: staticcheck
 
-		sha, err = tfile.SHA256(file)
-		if err != nil {
-			return "", wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
-			)
-		}
+			sha, err = tfile.SHA256(file)
+			if err != nil {
+				return "", wrapErrWithDiagnostics(
+					err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
+				)
+			}
 
-		ag.WriteString(sha)
+			ag.WriteString(sha)
+		}
 	}
 
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(ag.String()))), nil
@@ -464,43 +489,47 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1) (ui.UI, error) {
 	ui := ui.NewBuffered()
 
-	for _, line := range state.Inline {
-		// continue early if line has no commands
-		if line == "" {
-			continue
-		}
+	if inline, ok := state.Inline.GetStrings(); ok {
+		for _, line := range inline {
+			// continue early if line has no commands
+			if line == "" {
+				continue
+			}
 
-		source := strings.NewReader(line)
+			source := strings.NewReader(line)
 
-		err := l.copyAndRun(ctx, source, ui, state)
-		if err != nil {
-			return ui, err
-		}
-	}
-
-	for _, path := range state.Scripts {
-		source, err := os.Open(path)
-		if err != nil {
-			return ui, err
-		}
-		defer source.Close()
-
-		info, err := source.Stat()
-		if err != nil {
-			return ui, err
-		}
-		if info.IsDir() {
-			return ui, fmt.Errorf("%s is a directory but should be a file", source.Name())
-		}
-
-		err = l.copyAndRun(ctx, source, ui, state)
-		if err != nil {
-			return ui, err
+			err := l.copyAndRun(ctx, source, ui, state)
+			if err != nil {
+				return ui, err
+			}
 		}
 	}
 
-	if state.Content != "" {
-		source := strings.NewReader(state.Content)
+	if scripts, ok := state.Scripts.GetStrings(); ok {
+		for _, path := range scripts {
+			source, err := os.Open(path)
+			if err != nil {
+				return ui, err
+			}
+			defer source.Close()
+
+			info, err := source.Stat()
+			if err != nil {
+				return ui, err
+			}
+			if info.IsDir() {
+				return ui, fmt.Errorf("%s is a directory but should be a file", source.Name())
+			}
+
+			err = l.copyAndRun(ctx, source, ui, state)
+			if err != nil {
+				return ui, err
+			}
+		}
+	}
+
+	if cont, ok := state.Content.Get(); ok {
+		source := strings.NewReader(cont)
 
 		err := l.copyAndRun(ctx, source, ui, state)
 		if err != nil {
@@ -543,8 +572,10 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 
 	cmd := exec.CommandContext(ctx, "bash", destination.Name())
 
-	for k, v := range state.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	if env, ok := state.Env.GetStrings(); ok {
+		for k, v := range env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 
 	stdoutP, err := cmd.StdoutPipe()
@@ -588,14 +619,17 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 	}
 
 	// Make sure that we have content, inline commands or scripts
-	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+	_, okc := s.Content.Get()
+	_, oki := s.Inline.Get()
+	scripts, oks := s.Scripts.GetStrings()
+	if !okc && !oki && !oks {
 		return newErrWithDiagnostics("invalid configuration", "you must provide content, inline commands or scripts", "content")
 	}
 
 	// Make sure the scripts exist
 	var f it.Copyable
 	var err error
-	for _, path := range s.Scripts {
+	for _, path := range scripts {
 		f, err = tfile.Open(path)
 		if err != nil {
 			return wrapErrWithDiagnostics(
@@ -610,39 +644,18 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *localExecStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":      &s.ID,
-		"content": &s.Content,
-		"sum":     &s.Sum,
-		"stdout":  &s.Stdout,
-		"stderr":  &s.Stderr,
+	_, err := mapAttributesTo(val, map[string]interface{}{
+		"id":          s.ID,
+		"content":     s.Content,
+		"sum":         s.Sum,
+		"stdout":      s.Stdout,
+		"stderr":      s.Stderr,
+		"environment": s.Env,
+		"inline":      s.Inline,
+		"scripts":     s.Scripts,
 	})
 	if err != nil {
 		return err
-	}
-
-	env, ok := vals["environment"]
-	if ok {
-		s.Env, err = tfUnmarshalStringMap(env)
-		if err != nil {
-			return err
-		}
-	}
-
-	inline, ok := vals["inline"]
-	if ok {
-		s.Inline, err = tfUnmarshalStringSlice(inline)
-		if err != nil {
-			return err
-		}
-	}
-
-	scripts, ok := vals["scripts"]
-	if ok {
-		s.Scripts, err = tfUnmarshalStringSlice(scripts)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -651,33 +664,36 @@ func (s *localExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *localExecStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":          tftypes.String,
-		"sum":         tftypes.String,
-		"stdout":      tftypes.String,
-		"stderr":      tftypes.String,
-		"environment": tftypes.Map{AttributeType: tftypes.String},
-		"inline":      tftypes.List{ElementType: tftypes.String},
-		"scripts":     tftypes.List{ElementType: tftypes.String},
-		"content":     tftypes.String,
+		"id":          s.ID.TFType(),
+		"sum":         s.Sum.TFType(),
+		"stdout":      s.Stdout.TFType(),
+		"stderr":      s.Stderr.TFType(),
+		"environment": s.Env.TFType(),
+		"inline":      s.Inline.TFType(),
+		"scripts":     s.Scripts.TFType(),
+		"content":     s.Content.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *localExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":          tfMarshalStringValue(s.ID),
-		"sum":         tfMarshalStringValue(s.Sum),
-		"stdout":      tfMarshalStringAllowBlank(s.Stdout),
-		"stderr":      tfMarshalStringAllowBlank(s.Stderr),
-		"content":     tfMarshalStringOptionalValue(s.Content),
-		"inline":      tfMarshalStringSlice(s.Inline),
-		"scripts":     tfMarshalStringSlice(s.Scripts),
-		"environment": tfMarshalStringMap(s.Env),
+		"id":          s.ID.TFValue(),
+		"sum":         s.Sum.TFValue(),
+		"stdout":      s.Stdout.TFValue(),
+		"stderr":      s.Stderr.TFValue(),
+		"content":     s.Content.TFValue(),
+		"inline":      s.Inline.TFValue(),
+		"scripts":     s.Scripts.TFValue(),
+		"environment": s.Env.TFValue(),
 	})
 }
 
 func (s *localExecStateV1) shouldDelete() bool {
-	if s.Content == "" && len(s.Inline) == 0 && len(s.Scripts) == 0 {
+	_, okc := s.Content.Get()
+	_, oki := s.Inline.Get()
+	_, oks := s.Scripts.GetStrings()
+	if !okc && !oki && !oks {
 		return true
 	}
 
@@ -685,20 +701,24 @@ func (s *localExecStateV1) shouldDelete() bool {
 }
 
 func (s *localExecStateV1) hasUnknownAttributes() bool {
-	if s.Content == UnknownString {
+	if s.Content.Unknown || s.Scripts.Unknown || s.Inline.Unknown || s.Env.Unknown {
 		return true
 	}
 
-	for _, ary := range [][]string{s.Scripts, s.Inline} {
-		for _, val := range ary {
-			if val == UnknownString {
-				return true
-			}
+	if _, ok := s.Inline.Get(); ok {
+		if !s.Inline.FullyKnown() {
+			return true
 		}
 	}
 
-	for _, val := range s.Env {
-		if val == UnknownString {
+	if _, ok := s.Env.Get(); ok {
+		if !s.Env.FullyKnown() {
+			return true
+		}
+	}
+
+	if _, ok := s.Scripts.Get(); ok {
+		if !s.Scripts.FullyKnown() {
 			return true
 		}
 	}

@@ -12,7 +12,6 @@ func Server() tfprotov5.ProviderServer {
 	return server.New(
 		server.RegisterProvider(newProvider()),
 		server.RegisterDataRouter(dr.New(
-			dr.RegisterDataSource(newTransport()),
 			dr.RegisterDataSource(newEnvironment()),
 			dr.RegisterDataSource(newArtifactoryItem()),
 		)),

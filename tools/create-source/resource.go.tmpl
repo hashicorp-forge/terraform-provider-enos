@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 type {{.Struct}} struct {
@@ -17,7 +17,7 @@ type {{.Struct}} struct {
 var _ resourcerouter.Resource = (*{{.Struct}})(nil)
 
 type {{.State}} struct {
-	ID        string
+	ID        *tfString
 	Transport *embeddedTransportV1
 }
 
@@ -32,6 +32,7 @@ func new{{.StructCap}}() *{{.Struct}} {
 
 func new{{.StateCap}}() *{{.State}} {
 	return &{{.State}}{
+		ID: newTfString(),
 		Transport: newEmbeddedTransport(),
 	}
 }
@@ -140,6 +141,11 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov5.Pla
 	// TODO: Update the proposedState if necessary. Make sure nothing in the proposed
 	// state requires replacing.
 
+	// TODO: Set any computed attributes that you determine during apply to Unknown
+	if _, ok := priorState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
+	}
+
 	// TODO: After you've updated the proposedState and any RequiresReplace,
 	// you need to marshal the transport, transport private, and proposed state,
 	// into the the planned state and return a response. This function does just
@@ -167,7 +173,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
 	/*
-		if plannedState.Something == "" {
+		if _, ok := plannedState.Something.Get(); !ok {
 			// Delete the resource
 			res.NewState, err = marshalDelete(plannedState)
 
@@ -187,7 +193,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 
 	// TODO: Get the planned state's ID
 	plannedID := "something"
-	plannedState.ID = plannedID
+	plannedState.ID.Set(plannedID)
 
 	ssh, err := transport.Client(ctx)
 	if err != nil {
@@ -197,10 +203,13 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 	defer ssh.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
-	if priorState.ID == "" {
+	if priorID, ok := priorState.ID.Get(); !ok  {
 		// TODO: create the resource with the ssh client
-	} else if priorState.ID != "" && priorState.ID != plannedID {
-		// TODO: update the resource with the ssh client
+	} else {
+		plannedID, ok := plannedState.ID.Get()
+		if !ok || (priorID != plannedID) {
+			// TODO: update the resource with the ssh client
+		}
 	}
 
 	// TODO: After you've performed your work you'll need to save marshal you
@@ -252,7 +261,7 @@ func (s *{{.State}}) Validate(ctx context.Context) error {
 func (s *{{.State}}) FromTerraform5Value(val tftypes.Value) error {
 	// TODO: Add each state attribute
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id": &s.ID,
+		"id": s.ID,
 	})
 	if err != nil {
 		return err
@@ -269,7 +278,7 @@ func (s *{{.State}}) FromTerraform5Value(val tftypes.Value) error {
 func (s *{{.State}}) Terraform5Type() tftypes.Type {
 	// TODO: Add each state attribute
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":        tftypes.String,
+		"id":        s.ID.TFType(),
 		"transport": s.Transport.Terraform5Type(),
 	}}
 }
@@ -278,7 +287,7 @@ func (s *{{.State}}) Terraform5Type() tftypes.Type {
 func (s *{{.State}}) Terraform5Value() tftypes.Value {
 	// TODO: Add each state attribute
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":        tfMarshalStringValue(s.ID),
+		"id":        s.ID.TFValue(),
 		"transport": s.Transport.Terraform5Value(),
 	})
 }

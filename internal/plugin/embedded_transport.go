@@ -22,12 +22,12 @@ type embeddedTransportV1 struct {
 }
 
 type embeddedTransportSSHv1 struct {
-	User           string `json:"user,omitempty"`
-	Host           string `json:"host,omitempty"`
-	PrivateKey     string `json:"private_key,omitempty"`
-	PrivateKeyPath string `json:"private_key_path,omitempty"`
-	Passphrase     string `json:"passphrase,omitempty"`
-	PassphrasePath string `json:"passphrase_path,omitempty"`
+	User           *tfString
+	Host           *tfString
+	PrivateKey     *tfString
+	PrivateKeyPath *tfString
+	Passphrase     *tfString
+	PassphrasePath *tfString
 
 	// We have two requirements for the embedded transport: users are able to
 	// specify any combination of configuration keys and their associated values,
@@ -54,7 +54,13 @@ func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
 		mu: sync.Mutex{},
 		SSH: &embeddedTransportSSHv1{
-			Values: map[string]tftypes.Value{},
+			User:           newTfString(),
+			Host:           newTfString(),
+			PrivateKey:     newTfString(),
+			PrivateKeyPath: newTfString(),
+			Passphrase:     newTfString(),
+			PassphrasePath: newTfString(),
+			Values:         map[string]tftypes.Value{},
 		},
 	}
 }
@@ -95,12 +101,12 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 	}
 
 	em.SSH.Values, err = mapAttributesTo(vals["ssh"], map[string]interface{}{
-		"user":             &em.SSH.User,
-		"host":             &em.SSH.Host,
-		"private_key":      &em.SSH.PrivateKey,
-		"private_key_path": &em.SSH.PrivateKeyPath,
-		"passphrase":       &em.SSH.Passphrase,
-		"passphrase_path":  &em.SSH.PassphrasePath,
+		"user":             em.SSH.User,
+		"host":             em.SSH.Host,
+		"private_key":      em.SSH.PrivateKey,
+		"private_key_path": em.SSH.PrivateKeyPath,
+		"passphrase":       em.SSH.Passphrase,
+		"passphrase_path":  em.SSH.PassphrasePath,
 	})
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
@@ -184,23 +190,23 @@ func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
 
 func (em *embeddedTransportV1) defaultSSHTypes() map[string]tftypes.Type {
 	return map[string]tftypes.Type{
-		"user":             tftypes.String,
-		"host":             tftypes.String,
-		"private_key":      tftypes.String,
-		"private_key_path": tftypes.String,
-		"passphrase":       tftypes.String,
-		"passphrase_path":  tftypes.String,
+		"user":             em.SSH.User.TFType(),
+		"host":             em.SSH.Host.TFType(),
+		"private_key":      em.SSH.PrivateKey.TFType(),
+		"private_key_path": em.SSH.PrivateKeyPath.TFType(),
+		"passphrase":       em.SSH.Passphrase.TFType(),
+		"passphrase_path":  em.SSH.Passphrase.TFType(),
 	}
 }
 
 func (em *embeddedTransportV1) defaultSSHValues() map[string]tftypes.Value {
 	return map[string]tftypes.Value{
-		"user":             tfMarshalStringValue(em.SSH.User),
-		"host":             tfMarshalStringValue(em.SSH.Host),
-		"private_key":      tfMarshalStringValue(em.SSH.PrivateKey),
-		"private_key_path": tfMarshalStringValue(em.SSH.PrivateKeyPath),
-		"passphrase":       tfMarshalStringValue(em.SSH.Passphrase),
-		"passphrase_path":  tfMarshalStringValue(em.SSH.PassphrasePath),
+		"user":             em.SSH.User.TFValue(),
+		"host":             em.SSH.Host.TFValue(),
+		"private_key":      em.SSH.PrivateKey.TFValue(),
+		"private_key_path": em.SSH.PrivateKeyPath.TFValue(),
+		"passphrase":       em.SSH.Passphrase.TFValue(),
+		"passphrase_path":  em.SSH.PassphrasePath.TFValue(),
 	}
 }
 
@@ -238,15 +244,17 @@ func (em *embeddedTransportV1) Validate(ctx context.Context) error {
 	}
 
 	// Assume SSH since it's the only allowed transport
-	if em.SSH.User == "" {
+	if _, ok := em.SSH.User.Get(); !ok {
 		return newErrWithDiagnostics("Invalid configuration", "you must provide the transport SSH user", "ssh", "user")
 	}
 
-	if em.SSH.Host == "" {
+	if _, ok := em.SSH.Host.Get(); !ok {
 		return newErrWithDiagnostics("Invalid configuration", "you must provide the transport SSH host", "ssh", "host")
 	}
 
-	if em.SSH.PrivateKey == "" && em.SSH.PrivateKeyPath == "" {
+	privateKey, okpk := em.SSH.PrivateKey.Get()
+	privakteKeyPath, okpkp := em.SSH.PrivateKeyPath.Get()
+	if !okpk && !okpkp {
 		return newErrWithDiagnostics("Invalid configuration", "you must provide either the private_key or private_key_path", "ssh", "private_key")
 	}
 
@@ -254,24 +262,24 @@ func (em *embeddedTransportV1) Validate(ctx context.Context) error {
 	// session but it will attempt to read and parse any keys or passphrases.
 	sshOpts := []ssh.Opt{
 		ssh.WithContext(ctx),
-		ssh.WithUser(em.SSH.User),
-		ssh.WithHost(em.SSH.Host),
+		ssh.WithUser(em.SSH.User.Value()),
+		ssh.WithHost(em.SSH.Host.Value()),
 	}
 
-	if em.SSH.PrivateKey != "" {
-		sshOpts = append(sshOpts, ssh.WithKey(em.SSH.PrivateKey))
+	if okpk {
+		sshOpts = append(sshOpts, ssh.WithKey(privateKey))
 	}
 
-	if em.SSH.PrivateKeyPath != "" {
-		sshOpts = append(sshOpts, ssh.WithKeyPath(em.SSH.PrivateKeyPath))
+	if okpkp {
+		sshOpts = append(sshOpts, ssh.WithKeyPath(privakteKeyPath))
 	}
 
-	if em.SSH.Passphrase != "" {
-		sshOpts = append(sshOpts, ssh.WithPassphrase(em.SSH.Passphrase))
+	if pass, ok := em.SSH.Passphrase.Get(); ok {
+		sshOpts = append(sshOpts, ssh.WithPassphrase(pass))
 	}
 
-	if em.SSH.PassphrasePath != "" {
-		sshOpts = append(sshOpts, ssh.WithPassphrasePath(em.SSH.PassphrasePath))
+	if path, ok := em.SSH.PassphrasePath.Get(); ok {
+		sshOpts = append(sshOpts, ssh.WithPassphrasePath(path))
 	}
 
 	_, err := ssh.New(sshOpts...)
@@ -291,23 +299,23 @@ func (em *embeddedTransportV1) Validate(ctx context.Context) error {
 func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error) {
 	sshOpts := []ssh.Opt{
 		ssh.WithContext(ctx),
-		ssh.WithUser(em.SSH.User),
-		ssh.WithHost(em.SSH.Host),
+		ssh.WithUser(em.SSH.User.Value()),
+		ssh.WithHost(em.SSH.Host.Value()),
 	}
 
-	if key := em.SSH.PrivateKey; key != "" {
+	if key, ok := em.SSH.PrivateKey.Get(); ok {
 		sshOpts = append(sshOpts, ssh.WithKey(key))
 	}
 
-	if keyPath := em.SSH.PrivateKeyPath; keyPath != "" {
+	if keyPath, ok := em.SSH.PrivateKeyPath.Get(); ok {
 		sshOpts = append(sshOpts, ssh.WithKeyPath(keyPath))
 	}
 
-	if pass := em.SSH.Passphrase; pass != "" {
+	if pass, ok := em.SSH.Passphrase.Get(); ok {
 		sshOpts = append(sshOpts, ssh.WithPassphrase(pass))
 	}
 
-	if passPath := em.SSH.PassphrasePath; passPath != "" {
+	if passPath, ok := em.SSH.PassphrasePath.Get(); ok {
 		sshOpts = append(sshOpts, ssh.WithPassphrasePath(passPath))
 	}
 
@@ -321,19 +329,19 @@ func (em *embeddedTransportV1) FromEnvironment() {
 	for _, key := range []struct {
 		name string
 		env  string
-		dst  *string
+		dst  *tfString
 	}{
-		{"user", "ENOS_TRANSPORT_USER", &em.SSH.User},
-		{"host", "ENOS_TRANSPORT_HOST", &em.SSH.Host},
-		{"private_key", "ENOS_TRANSPORT_PRIVATE_KEY", &em.SSH.PrivateKey},
-		{"private_key_path", "ENOS_TRANSPORT_PRIVATE_KEY_PATH", &em.SSH.PrivateKeyPath},
-		{"passphrase", "ENOS_TRANSPORT_PASSPHRASE", &em.SSH.Passphrase},
-		{"passphrase_path", "ENOS_TRANSPORT_PASSPHRASE_PATH", &em.SSH.PassphrasePath},
+		{"user", "ENOS_TRANSPORT_USER", em.SSH.User},
+		{"host", "ENOS_TRANSPORT_HOST", em.SSH.Host},
+		{"private_key", "ENOS_TRANSPORT_PRIVATE_KEY", em.SSH.PrivateKey},
+		{"private_key_path", "ENOS_TRANSPORT_PRIVATE_KEY_PATH", em.SSH.PrivateKeyPath},
+		{"passphrase", "ENOS_TRANSPORT_PASSPHRASE", em.SSH.Passphrase},
+		{"passphrase_path", "ENOS_TRANSPORT_PASSPHRASE_PATH", em.SSH.PassphrasePath},
 	} {
 		val, ok := os.LookupEnv(key.env)
 		if ok {
-			*key.dst = val
-			em.SSH.Values[key.name] = tfMarshalStringValue(val)
+			key.dst.Set(val)
+			em.SSH.Values[key.name] = key.dst.TFValue()
 		}
 	}
 }
@@ -347,14 +355,21 @@ func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) error {
 
 	startingVals := defaults.SSH.Values
 
-	overJSON, err := json.Marshal(em)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(overJSON, defaults)
-	if err != nil {
-		return err
+	for _, attr := range []struct {
+		over *tfString
+		into *tfString
+	}{
+		{em.SSH.User, defaults.SSH.User},
+		{em.SSH.Host, defaults.SSH.Host},
+		{em.SSH.PrivateKey, defaults.SSH.PrivateKey},
+		{em.SSH.PrivateKeyPath, defaults.SSH.PrivateKeyPath},
+		{em.SSH.Passphrase, defaults.SSH.Passphrase},
+		{em.SSH.PassphrasePath, defaults.SSH.PassphrasePath},
+	} {
+		over, ok := attr.over.Get()
+		if ok {
+			attr.into.Set(over)
+		}
 	}
 
 	defaults.SSH.Values = startingVals
@@ -372,7 +387,7 @@ func (em *embeddedTransportV1) ToPrivate() ([]byte, error) {
 	// level configuration at the provider level, we cannot rely on saving it
 	// in the normal transport schema.
 	p := &embeddedTransportPrivate{
-		Host: em.SSH.Host,
+		Host: em.SSH.Host.Value(),
 	}
 
 	return json.Marshal(p)
@@ -393,20 +408,23 @@ func (em *embeddedTransportV1) FromPrivate(in []byte) error {
 		return err
 	}
 
-	em.SSH.Host = p.Host
+	em.SSH.Host.Set(p.Host)
 
 	return nil
 }
 
 func transportReplacedAttributePaths(prior, proposed *embeddedTransportV1) []*tftypes.AttributePath {
 	attrs := []*tftypes.AttributePath{}
-
-	if prior.SSH.Host != "" && proposed.SSH.Host != "" && (prior.SSH.Host != proposed.SSH.Host) {
-		attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
-			tftypes.AttributeName("transport"),
-			tftypes.AttributeName("ssh"),
-			tftypes.AttributeName("host"),
-		}))
+	if priorHost, ok := prior.SSH.Host.Get(); ok {
+		if proposedHost, ok := proposed.SSH.Host.Get(); ok {
+			if priorHost != proposedHost {
+				attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
+					tftypes.AttributeName("transport"),
+					tftypes.AttributeName("ssh"),
+					tftypes.AttributeName("host"),
+				}))
+			}
+		}
 	}
 
 	if len(attrs) > 0 {

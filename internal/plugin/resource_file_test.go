@@ -34,54 +34,54 @@ type testAccResourceTransportTemplate struct {
 func TestAccResourceFileResourceTransport(t *testing.T) {
 	defer resetEnv(t)
 
-	providerTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
-		{{if .Src}}
-		source = "{{.Src}}"
+	providerTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
+		{{if .Src.Value}}
+		source = "{{.Src.Value}}"
 		{{end}}
 
-		{{if .Content}}
+		{{if .Content.Value}}
 		content = <<EOF
-{{.Content}}
+{{.Content.Value}}
 EOF
 		{{end}}
 
-		destination = "{{.Dst}}"
+		destination = "{{.Dst.Value}}"
 	}`))
 
-	resourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID}}" {
-		{{if .Src}}
-		source = "{{.Src}}"
+	resourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
+		{{if .Src.Value}}
+		source = "{{.Src.Value}}"
 		{{end}}
 
-		{{if .Content}}
+		{{if .Content.Value}}
 		content = <<EOF
-{{.Content}}"
+{{.Content.Value}}"
 EOF
 		{{end}}
 
-		destination = "{{.Dst}}"
+		destination = "{{.Dst.Value}}"
 
 		transport = {
 			ssh = {
-				user = "{{.Transport.SSH.User}}"
-				host = "{{.Transport.SSH.Host}}"
+				user = "{{.Transport.SSH.User.Value}}"
+				host = "{{.Transport.SSH.Host.Value}}"
 
-				{{if .Transport.SSH.PrivateKey}}
+				{{if .Transport.SSH.PrivateKey.Value}}
 				private_key = <<EOF
-{{.Transport.SSH.PrivateKey}}
+{{.Transport.SSH.PrivateKey.Value}}
 EOF
 				{{end}}
 
-				{{if .Transport.SSH.PrivateKeyPath}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath}}"
+				{{if .Transport.SSH.PrivateKeyPath.Value}}
+				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.Passphrase}}
-				passphrase = "{{.Transport.SSH.Passphrase}}"
+				{{if .Transport.SSH.Passphrase.Value}}
+				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.PassphrasePath}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath}}"
+				{{if .Transport.SSH.PassphrasePath.Value}}
+				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
 				{{end}}
 			}
 		}
@@ -90,14 +90,14 @@ EOF
 	cases := []testAccResourceTransportTemplate{}
 
 	keyNoPass := newFileState()
-	keyNoPass.ID = "foo"
-	keyNoPass.Src = "../fixtures/src.txt"
-	keyNoPass.Dst = "/tmp/dst"
-	keyNoPass.Transport.SSH.User = "ubuntu"
-	keyNoPass.Transport.SSH.Host = "localhost"
+	keyNoPass.ID.Set("foo")
+	keyNoPass.Src.Set("../fixtures/src.txt")
+	keyNoPass.Dst.Set("/tmp/dst")
+	keyNoPass.Transport.SSH.User.Set("ubuntu")
+	keyNoPass.Transport.SSH.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	keyNoPass.Transport.SSH.PrivateKey = privateKey
+	keyNoPass.Transport.SSH.PrivateKey.Set(privateKey)
 	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with no passphrase",
 		keyNoPass,
@@ -112,12 +112,12 @@ EOF
 	})
 
 	keyPathNoPass := newFileState()
-	keyPathNoPass.ID = "foo"
-	keyPathNoPass.Src = "../fixtures/src.txt"
-	keyPathNoPass.Dst = "/tmp/dst"
-	keyPathNoPass.Transport.SSH.User = "ubuntu"
-	keyPathNoPass.Transport.SSH.Host = "localhost"
-	keyPathNoPass.Transport.SSH.PrivateKeyPath = "../fixtures/ssh.pem"
+	keyPathNoPass.ID.Set("foo")
+	keyPathNoPass.Src.Set("../fixtures/src.txt")
+	keyPathNoPass.Dst.Set("/tmp/dst")
+	keyPathNoPass.Transport.SSH.User.Set("ubuntu")
+	keyPathNoPass.Transport.SSH.Host.Set("localhost")
+	keyPathNoPass.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh.pem")
 	cases = append(cases, testAccResourceTransportTemplate{
 		"private key from a file path with no passphrase",
 		keyPathNoPass,
@@ -126,15 +126,15 @@ EOF
 	})
 
 	keyPass := newFileState()
-	keyPass.ID = "foo"
-	keyPass.Src = "../fixtures/src.txt"
-	keyPass.Dst = "/tmp/dst"
-	keyPass.Transport.SSH.User = "ubuntu"
-	keyPass.Transport.SSH.Host = "localhost"
-	keyPass.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
+	keyPass.ID.Set("foo")
+	keyPass.Src.Set("../fixtures/src.txt")
+	keyPass.Dst.Set("/tmp/dst")
+	keyPass.Transport.SSH.User.Set("ubuntu")
+	keyPass.Transport.SSH.Host.Set("localhost")
+	keyPass.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	passphrase, err := readTestFile("../fixtures/passphrase.txt")
 	require.NoError(t, err)
-	keyPass.Transport.SSH.Passphrase = passphrase
+	keyPass.Transport.SSH.Passphrase.Set(passphrase)
 	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with passphrase value",
 		keyPass,
@@ -143,13 +143,13 @@ EOF
 	})
 
 	keyPassPath := newFileState()
-	keyPassPath.ID = "foo"
-	keyPassPath.Src = "../fixtures/src.txt"
-	keyPassPath.Dst = "/tmp/dst"
-	keyPassPath.Transport.SSH.User = "ubuntu"
-	keyPassPath.Transport.SSH.Host = "localhost"
-	keyPassPath.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
-	keyPassPath.Transport.SSH.PassphrasePath = "../fixtures/passphrase.txt"
+	keyPassPath.ID.Set("foo")
+	keyPassPath.Src.Set("../fixtures/src.txt")
+	keyPassPath.Dst.Set("/tmp/dst")
+	keyPassPath.Transport.SSH.User.Set("ubuntu")
+	keyPassPath.Transport.SSH.Host.Set("localhost")
+	keyPassPath.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
+	keyPassPath.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
 	cases = append(cases, testAccResourceTransportTemplate{
 		"private key value with passphrase from file path",
 		keyPassPath,
@@ -158,13 +158,13 @@ EOF
 	})
 
 	content := newFileState()
-	content.ID = "foo"
-	content.Content = "hello world"
-	content.Dst = "/tmp/dst"
-	content.Transport.SSH.User = "ubuntu"
-	content.Transport.SSH.Host = "localhost"
-	content.Transport.SSH.PrivateKeyPath = "../fixtures/ssh_pass.pem"
-	content.Transport.SSH.PassphrasePath = "../fixtures/passphrase.txt"
+	content.ID.Set("foo")
+	content.Content.Set("hello world")
+	content.Dst.Set("/tmp/dst")
+	content.Transport.SSH.User.Set("ubuntu")
+	content.Transport.SSH.Host.Set("localhost")
+	content.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
+	content.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
 	cases = append(cases, testAccResourceTransportTemplate{
 		"with string content instead of source file",
 		content,
@@ -232,13 +232,13 @@ EOF
 		cases := []testAccResourceTransportTemplate{}
 
 		realTestSrc := newFileState()
-		realTestSrc.ID = "real"
-		realTestSrc.Src = "../fixtures/src.txt"
-		realTestSrc.Dst = "/tmp/real_test_src"
-		realTestSrc.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
-		realTestSrc.Transport.SSH.Host = host
-		realTestSrc.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
-		realTestSrc.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
+		realTestSrc.ID.Set("real")
+		realTestSrc.Src.Set("../fixtures/src.txt")
+		realTestSrc.Dst.Set("/tmp/real_test_src")
+		realTestSrc.Transport.SSH.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
+		realTestSrc.Transport.SSH.Host.Set(host)
+		realTestSrc.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
+		realTestSrc.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"real test source file",
 			realTestSrc,
@@ -247,13 +247,13 @@ EOF
 		})
 
 		realTestContent := newFileState()
-		realTestContent.ID = "real"
-		realTestContent.Content = "string"
-		realTestContent.Dst = "/tmp/real_test_content"
-		realTestContent.Transport.SSH.User = os.Getenv("ENOS_TRANSPORT_USER")
-		realTestContent.Transport.SSH.Host = host
-		realTestContent.Transport.SSH.PrivateKeyPath = os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
-		realTestContent.Transport.SSH.PassphrasePath = os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")
+		realTestContent.ID.Set("real")
+		realTestContent.Content.Set("string")
+		realTestContent.Dst.Set("/tmp/real_test_content")
+		realTestContent.Transport.SSH.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
+		realTestContent.Transport.SSH.Host.Set(host)
+		realTestContent.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
+		realTestContent.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"real test content",
 			realTestContent,
@@ -344,15 +344,15 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	state := newFileState()
 	state.Transport.SSH.Values = testMapPropertiesToStruct([]testProperty{
-		{"user", "ubuntu", &state.Transport.SSH.User},
-		{"host", "localhost", &state.Transport.SSH.Host},
-		{"private_key", "PRIVATE KEY", &state.Transport.SSH.PrivateKey},
-		{"private_key_path", "/path/to/key.pem", &state.Transport.SSH.PrivateKeyPath},
+		{"user", "ubuntu", state.Transport.SSH.User},
+		{"host", "localhost", state.Transport.SSH.Host},
+		{"private_key", "PRIVATE KEY", state.Transport.SSH.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", state.Transport.SSH.PrivateKeyPath},
 	})
 	testMapPropertiesToStruct([]testProperty{
-		{"id", "foo", &state.ID},
-		{"src", "/tmp/src", &state.Src},
-		{"dst", "/tmp/dst", &state.Dst},
+		{"id", "foo", state.ID},
+		{"src", "/tmp/src", state.Src},
+		{"dst", "/tmp/dst", state.Dst},
 	})
 
 	marshaled, err := marshal(state)
@@ -377,17 +377,17 @@ func TestSetProviderConfig(t *testing.T) {
 
 	tr := newEmbeddedTransport()
 	tr.SSH.Values = testMapPropertiesToStruct([]testProperty{
-		{"user", "ubuntu", &tr.SSH.User},
-		{"host", "localhost", &tr.SSH.Host},
-		{"private_key", "PRIVATE KEY", &tr.SSH.PrivateKey},
-		{"private_key_path", "/path/to/key.pem", &tr.SSH.PrivateKeyPath},
+		{"user", "ubuntu", tr.SSH.User},
+		{"host", "localhost", tr.SSH.Host},
+		{"private_key", "PRIVATE KEY", tr.SSH.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", tr.SSH.PrivateKeyPath},
 	})
 
 	require.NoError(t, p.Transport.FromTerraform5Value(tr.Terraform5Value()))
 	require.NoError(t, f.SetProviderConfig(p.Terraform5Value()))
 
-	assert.Equal(t, "ubuntu", f.providerConfig.Transport.SSH.User)
-	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host)
-	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey)
-	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath)
+	assert.Equal(t, "ubuntu", f.providerConfig.Transport.SSH.User.Value())
+	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host.Value())
+	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey.Value())
+	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath.Value())
 }

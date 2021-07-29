@@ -30,25 +30,25 @@ type bundleInstall struct {
 var _ resourcerouter.Resource = (*bundleInstall)(nil)
 
 type bundleInstallStateV1 struct {
-	ID          string
-	Path        string
-	Destination string
+	ID          *tfString
+	Path        *tfString
+	Destination *tfString
 	Release     *bundleInstallStateV1Release
 	Artifactory *bundleInstallStateV1Artifactory
 	Transport   *embeddedTransportV1
 }
 
 type bundleInstallStateV1Artifactory struct {
-	Username string
-	Token    string
-	URL      string
-	SHA256   string
+	Username *tfString
+	Token    *tfString
+	URL      *tfString
+	SHA256   *tfString
 }
 
 type bundleInstallStateV1Release struct {
-	Product string
-	Version string
-	Edition string
+	Product *tfString
+	Version *tfString
+	Edition *tfString
 }
 
 var _ State = (*bundleInstallStateV1)(nil)
@@ -62,9 +62,21 @@ func newBundleInstall() *bundleInstall {
 
 func newBundleInstallStateV1() *bundleInstallStateV1 {
 	return &bundleInstallStateV1{
-		Artifactory: &bundleInstallStateV1Artifactory{},
-		Release:     &bundleInstallStateV1Release{},
-		Transport:   newEmbeddedTransport(),
+		ID:          newTfString(),
+		Path:        newTfString(),
+		Destination: newTfString(),
+		Artifactory: &bundleInstallStateV1Artifactory{
+			Username: newTfString(),
+			Token:    newTfString(),
+			URL:      newTfString(),
+			SHA256:   newTfString(),
+		},
+		Release: &bundleInstallStateV1Release{
+			Product: newTfString(),
+			Version: newTfString(),
+			Edition: newTfString(),
+		},
+		Transport: newEmbeddedTransport(),
 	}
 }
 
@@ -133,10 +145,14 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req *tfprotov5.P
 		return res, err
 	}
 
-	// Handle setting the default edition
-	if proposedState.Release.Product != "" {
-		if proposedState.Release.Edition == "" {
-			proposedState.Release.Edition = "oss"
+	if _, ok := proposedState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
+	}
+
+	// Make sure that we set a default edition if we have a product
+	if _, ok := proposedState.Release.Product.Get(); ok {
+		if _, ok := proposedState.Release.Edition.Get(); !ok {
+			proposedState.Release.Edition.Set("oss")
 		}
 	}
 
@@ -157,7 +173,7 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov5.
 	}
 
 	// If we don't have destination, a required attribute, we must be deleting
-	if plannedState.Destination == "" {
+	if _, ok := plannedState.Destination.Get(); !ok {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
 
@@ -169,7 +185,7 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov5.
 		return res, err
 	}
 
-	plannedState.ID = "static"
+	plannedState.ID.Set("static")
 
 	ssh, err := transport.Client(ctx)
 	if err != nil {
@@ -199,57 +215,57 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) er
 		return err
 	}
 
-	if s.Path != "" {
+	if _, ok := s.Path.Get(); ok {
 		return s.installFromPath(ctx, ssh)
 	}
 
-	if s.Release.Version != "" && s.Release.Product != "" {
+	_, pok := s.Release.Product.Get()
+	_, vok := s.Release.Version.Get()
+	if pok && vok {
 		return s.installFromRelease(ctx, ssh)
 	}
 
 	return s.installFromArtifactory(ctx, ssh)
 }
 
-func (s *bundleInstallStateV1) mkTmpDir(ctx context.Context, ssh it.Transport) (string, error) {
-	tmpDir := fmt.Sprintf("/tmp/enos_bundle_install_%s", random.ID())
-	_, _, err := ssh.Run(ctx, command.New(fmt.Sprintf("mkdir -p %s", tmpDir)))
+func (s *bundleInstallStateV1) rmPath(ctx context.Context, ssh it.Transport, path string) error {
+	_, _, err := ssh.Run(ctx, command.New(fmt.Sprintf("rm -rf '%s'", path)))
 	if err != nil {
-		return tmpDir, wrapErrWithDiagnostics(err, "create temporary directory", "unable to create temporary directory on destination host", "destination")
-	}
-
-	return tmpDir, nil
-}
-
-func (s *bundleInstallStateV1) rmDir(ctx context.Context, ssh it.Transport, dir string) error {
-	_, _, err := ssh.Run(ctx, command.New(fmt.Sprintf("rm -rf '%s'", dir)))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "remove directory", "removing directory")
+		return wrapErrWithDiagnostics(err, "removing path", fmt.Sprintf("removing path %s", path))
 	}
 
 	return nil
 }
 
 func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Transport) error {
-	src, err := tfile.Open(s.Path)
+	path, ok := s.Path.Get()
+	if !ok {
+		return newErrWithDiagnostics("invalid configuration", "you must supply a path", "path")
+	}
+
+	src, err := tfile.Open(path)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "invalid configuration", "unable to open source bundle path", "path")
 	}
 	defer src.Close()
 
-	tmpDir, err := s.mkTmpDir(ctx, ssh)
+	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
+	err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
+		remoteflight.WithCopyFileContent(src),
+		remoteflight.WithCopyFileDestination(bundlePath),
+	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
+		return wrapErrWithDiagnostics(err, "copy bundle", "unable to copy bundle to remote machine", "path")
 	}
 
-	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
-	err = ssh.Copy(ctx, src, bundleFilePath)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "unable to copy", "unable copy bundle file", "path")
+	dest, ok := s.Destination.Get()
+	if !ok {
+		return newErrWithDiagnostics("invalid configuration", "you must supply a destination", "destination")
 	}
 
 	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
-		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
+		remoteflight.WithUnzipRequestSourcePath(bundlePath),
+		remoteflight.WithUnzipRequestDestinationDir(dest),
 		remoteflight.WithUnzipRequestUseSudo(true),
 		remoteflight.WithUnzipRequestReplace(true),
 	))
@@ -257,9 +273,9 @@ func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Trans
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand bundle zip file", "destination")
 	}
 
-	err = s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmPath(ctx, ssh, bundlePath)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+		return err
 	}
 
 	return nil
@@ -276,10 +292,25 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
 	}
 
+	prod, ok := s.Release.Product.Get()
+	if !ok {
+		return newErrWithDiagnostics("release", "you must supply a release product", "release", "product")
+	}
+
+	ver, ok := s.Release.Version.Get()
+	if !ok {
+		return newErrWithDiagnostics("release", "you must supply a release version", "release", "version")
+	}
+
+	ed, ok := s.Release.Edition.Get()
+	if !ok {
+		return newErrWithDiagnostics("release", "you must supply a release edition", "release", "edition")
+	}
+
 	release, err := releases.NewRelease(
-		releases.WithReleaseProduct(s.Release.Product),
-		releases.WithReleaseVersion(s.Release.Version),
-		releases.WithReleaseEdition(s.Release.Edition),
+		releases.WithReleaseProduct(prod),
+		releases.WithReleaseVersion(ver),
+		releases.WithReleaseEdition(ed),
 		releases.WithReleasePlatform(platform),
 		releases.WithReleaseArch(arch),
 	)
@@ -292,15 +323,9 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		return wrapErrWithDiagnostics(err, "release", "determining release SHA", "release")
 	}
 
-	tmpDir, err := s.mkTmpDir(ctx, ssh)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
-	}
-
-	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
-
+	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
 	_, err = remoteflight.Download(ctx, ssh, remoteflight.NewDownloadRequest(
-		remoteflight.WithDownloadRequestDestination(bundleFilePath),
+		remoteflight.WithDownloadRequestDestination(bundlePath),
 		remoteflight.WithDownloadRequestURL(release.BundleURL()),
 		remoteflight.WithDownloadRequestSHA256(sha256),
 	))
@@ -308,9 +333,14 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		return wrapErrWithDiagnostics(err, "download bundle", "unable to download release bundle zip file")
 	}
 
+	dest, ok := s.Destination.Get()
+	if !ok {
+		return wrapErrWithDiagnostics(err, "release", "you must supply a destination", "destination")
+	}
+
 	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
-		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
+		remoteflight.WithUnzipRequestSourcePath(bundlePath),
+		remoteflight.WithUnzipRequestDestinationDir(dest),
 		remoteflight.WithUnzipRequestUseSudo(true),
 		remoteflight.WithUnzipRequestReplace(true),
 	))
@@ -318,36 +348,56 @@ func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Tr
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
 	}
 
-	err = s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmPath(ctx, ssh, bundlePath)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+		return err
 	}
 
 	return nil
 }
 
 func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh it.Transport) error {
-	tmpDir, err := s.mkTmpDir(ctx, ssh)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "creating temporary directory", "transport")
+	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
+
+	url, ok := s.Artifactory.URL.Get()
+	if !ok {
+		return newErrWithDiagnostics("you must supply an artifactory url", "artifactory", "url")
 	}
 
-	bundleFilePath := fmt.Sprintf("%s/bundle.zip", tmpDir)
+	username, ok := s.Artifactory.Username.Get()
+	if !ok {
+		return newErrWithDiagnostics("you must supply an artifactory username", "artifactory", "username")
+	}
 
-	_, err = remoteflight.Download(ctx, ssh, remoteflight.NewDownloadRequest(
-		remoteflight.WithDownloadRequestDestination(bundleFilePath),
-		remoteflight.WithDownloadRequestURL(s.Artifactory.URL),
-		remoteflight.WithDownloadRequestAuthUser(s.Artifactory.Username),
-		remoteflight.WithDownloadRequestAuthPassword(s.Artifactory.Token),
-		remoteflight.WithDownloadRequestSHA256(s.Artifactory.SHA256),
+	token, ok := s.Artifactory.Token.Get()
+	if !ok {
+		return newErrWithDiagnostics("you must supply an artifactory token", "artifactory", "token")
+	}
+
+	sha, ok := s.Artifactory.SHA256.Get()
+	if !ok {
+		return newErrWithDiagnostics("you must supply an artifactory sha256", "artifactory", "sha256")
+	}
+
+	_, err := remoteflight.Download(ctx, ssh, remoteflight.NewDownloadRequest(
+		remoteflight.WithDownloadRequestDestination(bundlePath),
+		remoteflight.WithDownloadRequestURL(url),
+		remoteflight.WithDownloadRequestAuthUser(username),
+		remoteflight.WithDownloadRequestAuthPassword(token),
+		remoteflight.WithDownloadRequestSHA256(sha),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "download bundle", "unable to download release bundle zip file")
 	}
 
+	dest, ok := s.Destination.Get()
+	if !ok {
+		return newErrWithDiagnostics("you must supply a destination", "destination")
+	}
+
 	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundleFilePath),
-		remoteflight.WithUnzipRequestDestinationDir(s.Destination),
+		remoteflight.WithUnzipRequestSourcePath(bundlePath),
+		remoteflight.WithUnzipRequestDestinationDir(dest),
 		remoteflight.WithUnzipRequestUseSudo(true),
 		remoteflight.WithUnzipRequestReplace(true),
 	))
@@ -355,9 +405,9 @@ func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh i
 		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
 	}
 
-	err = s.rmDir(ctx, ssh, tmpDir)
+	err = s.rmPath(ctx, ssh, bundlePath)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "removing temporary directory", "transport")
+		return err
 	}
 
 	return nil
@@ -412,15 +462,15 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 
 	// Make sure that only one install source is configured
 	sources := 0
-	if s.Path != "" {
+	if _, ok := s.Path.Get(); ok {
 		sources++
 	}
 
-	if s.Release.Product != "" {
+	if _, ok := s.Release.Product.Get(); ok {
 		sources++
 	}
 
-	if s.Artifactory.URL != "" {
+	if _, ok := s.Artifactory.URL.Get(); ok {
 		sources++
 	}
 
@@ -431,8 +481,8 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	}
 
 	// Make sure the path is valid if it is the install source
-	if s.Path != "" {
-		p, err := filepath.Abs(s.Path)
+	if path, ok := s.Path.Get(); ok {
+		p, err := filepath.Abs(path)
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "invalid configuration", "unable to expand path", "path")
 		}
@@ -446,19 +496,23 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	}
 
 	// Make sure our product is a valid combination
-	if s.Release.Product != "" {
-		if s.Release.Product == "vault" {
-			if !artifactory.SupportedVaultEdition(s.Release.Edition) {
+	if prod, ok := s.Release.Product.Get(); ok {
+		if prod == "vault" {
+			ed, ok := s.Release.Edition.Get()
+			if !ok {
+				return newErrWithDiagnostics("invalid configuration", "you must supply a vault edition", "release", "edition")
+			}
+			if !artifactory.SupportedVaultEdition(ed) {
 				return newErrWithDiagnostics("invalid configuration", "unsupported vault edition", "release", "edition")
 			}
 		}
 	}
 
 	// Make sure that artifactory URL is a valid URL
-	if s.Artifactory.URL != "" {
-		_, err := url.Parse(s.Artifactory.URL)
+	if u, ok := s.Artifactory.URL.Get(); ok {
+		_, err := url.Parse(u)
 		if err != nil {
-			return newErrWithDiagnostics("invalid configuration", "artifactory URL is invalid", "artifactory", "url")
+			return wrapErrWithDiagnostics(err, "invalid configuration", "artifactory URL is invalid", "artifactory", "url")
 		}
 	}
 
@@ -468,9 +522,9 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Value with As().
 func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":          &s.ID,
-		"destination": &s.Destination,
-		"path":        &s.Path,
+		"id":          s.ID,
+		"destination": s.Destination,
+		"path":        s.Path,
 	})
 	if err != nil {
 		return err
@@ -480,9 +534,9 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 	if ok {
 		if release.IsKnown() && !release.IsNull() {
 			_, err = mapAttributesTo(release, map[string]interface{}{
-				"product": &s.Release.Product,
-				"version": &s.Release.Version,
-				"edition": &s.Release.Edition,
+				"product": s.Release.Product,
+				"version": s.Release.Version,
+				"edition": s.Release.Edition,
 			})
 			if err != nil {
 				return err
@@ -494,10 +548,10 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 	if ok {
 		if atf.IsKnown() && !atf.IsNull() {
 			_, err = mapAttributesTo(atf, map[string]interface{}{
-				"username": &s.Artifactory.Username,
-				"token":    &s.Artifactory.Token,
-				"url":      &s.Artifactory.URL,
-				"sha256":   &s.Artifactory.SHA256,
+				"username": s.Artifactory.Username,
+				"token":    s.Artifactory.Token,
+				"url":      s.Artifactory.URL,
+				"sha256":   s.Artifactory.SHA256,
 			})
 			if err != nil {
 				return err
@@ -515,9 +569,9 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *bundleInstallStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":          tftypes.String,
-		"destination": tftypes.String,
-		"path":        tftypes.String,
+		"id":          s.ID.TFType(),
+		"destination": s.Destination.TFType(),
+		"path":        s.Path.TFType(),
 		"artifactory": s.ArtifactoryTerraform5Type(),
 		"release":     s.ReleaseTerraform5Type(),
 		"transport":   s.Transport.Terraform5Type(),
@@ -527,9 +581,9 @@ func (s *bundleInstallStateV1) Terraform5Type() tftypes.Type {
 // Terraform5Type is the file state tftypes.Value.
 func (s *bundleInstallStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":          tfMarshalStringValue(s.ID),
-		"destination": tfMarshalStringValue(s.Destination),
-		"path":        tfMarshalStringOptionalValue(s.Path),
+		"id":          s.ID.TFValue(),
+		"destination": s.Destination.TFValue(),
+		"path":        s.Path.TFValue(),
 		"artifactory": s.ArtifactoryTerraform5Value(),
 		"release":     s.ReleaseTerraform5Value(),
 		"transport":   s.Transport.Terraform5Value(),
@@ -538,18 +592,18 @@ func (s *bundleInstallStateV1) Terraform5Value() tftypes.Value {
 
 func (s *bundleInstallStateV1) ArtifactoryTerraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"username": tftypes.String,
-		"token":    tftypes.String,
-		"url":      tftypes.String,
-		"sha256":   tftypes.String,
+		"username": s.Artifactory.Username.TFType(),
+		"token":    s.Artifactory.Token.TFType(),
+		"url":      s.Artifactory.URL.TFType(),
+		"sha256":   s.Artifactory.SHA256.TFType(),
 	}}
 }
 
 func (s *bundleInstallStateV1) ReleaseTerraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"product": tftypes.String,
-		"version": tftypes.String,
-		"edition": tftypes.String,
+		"product": s.Release.Product.TFType(),
+		"version": s.Release.Version.TFType(),
+		"edition": s.Release.Edition.TFType(),
 	}}
 }
 
@@ -557,10 +611,10 @@ func (s *bundleInstallStateV1) ArtifactoryTerraform5Value() tftypes.Value {
 	// As this is an optional value, return a nil object instead of nil values
 	if tfStringsSetOrUnknown(s.Artifactory.Username, s.Artifactory.Token, s.Artifactory.URL) {
 		return tftypes.NewValue(s.ArtifactoryTerraform5Type(), map[string]tftypes.Value{
-			"username": tfMarshalStringValue(s.Artifactory.Username),
-			"token":    tfMarshalStringValue(s.Artifactory.Token),
-			"url":      tfMarshalStringValue(s.Artifactory.URL),
-			"sha256":   tfMarshalStringValue(s.Artifactory.SHA256),
+			"username": s.Artifactory.Username.TFValue(),
+			"token":    s.Artifactory.Token.TFValue(),
+			"url":      s.Artifactory.URL.TFValue(),
+			"sha256":   s.Artifactory.SHA256.TFValue(),
 		})
 	}
 
@@ -571,9 +625,9 @@ func (s *bundleInstallStateV1) ReleaseTerraform5Value() tftypes.Value {
 	// As this is an optional value, return a nil object instead of nil values
 	if tfStringsSetOrUnknown(s.Release.Product, s.Release.Version, s.Release.Edition) {
 		return tftypes.NewValue(s.ReleaseTerraform5Type(), map[string]tftypes.Value{
-			"product": tfMarshalStringValue(s.Release.Product),
-			"version": tfMarshalStringValue(s.Release.Version),
-			"edition": tfMarshalStringValue(s.Release.Edition),
+			"product": s.Release.Product.TFValue(),
+			"version": s.Release.Version.TFValue(),
+			"edition": s.Release.Edition.TFValue(),
 		})
 	}
 

@@ -18,12 +18,12 @@ var testProviders = map[string]func() (tfprotov5.ProviderServer, error){
 func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	provider := newProvider()
 	provider.config.Transport.SSH.Values = testMapPropertiesToStruct([]testProperty{
-		{"user", "ubuntu", &provider.config.Transport.SSH.User},
-		{"host", "localhost", &provider.config.Transport.SSH.Host},
-		{"private_key", "PRIVATE KEY", &provider.config.Transport.SSH.PrivateKey},
-		{"private_key_path", "/path/to/key.pem", &provider.config.Transport.SSH.PrivateKeyPath},
-		{"passphrase", "secret", &provider.config.Transport.SSH.Passphrase},
-		{"passphrase_path", "/path/to/passphrase.txt", &provider.config.Transport.SSH.PassphrasePath},
+		{"user", "ubuntu", provider.config.Transport.SSH.User},
+		{"host", "localhost", provider.config.Transport.SSH.Host},
+		{"private_key", "PRIVATE KEY", provider.config.Transport.SSH.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", provider.config.Transport.SSH.PrivateKeyPath},
+		{"passphrase", "secret", provider.config.Transport.SSH.Passphrase},
+		{"passphrase_path", "/path/to/passphrase.txt", provider.config.Transport.SSH.PassphrasePath},
 	})
 
 	marshaled, err := marshal(provider.config)

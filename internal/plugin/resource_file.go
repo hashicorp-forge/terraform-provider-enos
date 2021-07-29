@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 
@@ -20,11 +21,14 @@ type file struct {
 var _ resourcerouter.Resource = (*file)(nil)
 
 type fileStateV1 struct {
-	ID        string
-	Src       string
-	Dst       string
-	Content   string
-	Sum       string
+	ID        *tfString
+	Src       *tfString
+	Dst       *tfString
+	Content   *tfString
+	Sum       *tfString
+	TmpDir    *tfString
+	Chmod     *tfString
+	Chown     *tfString
 	Transport *embeddedTransportV1
 }
 
@@ -39,6 +43,14 @@ func newFile() *file {
 
 func newFileState() *fileStateV1 {
 	return &fileStateV1{
+		ID:        newTfString(),
+		Src:       newTfString(),
+		Dst:       newTfString(),
+		Content:   newTfString(),
+		Sum:       newTfString(),
+		TmpDir:    newTfString(),
+		Chmod:     newTfString(),
+		Chown:     newTfString(),
 		Transport: newEmbeddedTransport(),
 	}
 }
@@ -115,6 +127,15 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 		return res, err
 	}
 
+	// ensure that computed attributes are unknown if we don't have a value
+	if _, ok := proposedState.Sum.Get(); !ok {
+		proposedState.Sum.Unknown = true
+	}
+
+	if _, ok := proposedState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
+	}
+
 	// If we have unknown attributes we can't generate a valid Sum
 	if !proposedState.hasUnknownAttributes() {
 		// Load the file source
@@ -134,7 +155,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
 		}
-		proposedState.Sum = sum
+		proposedState.Sum.Set(sum)
 	}
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
@@ -153,16 +174,15 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 		return res, err
 	}
 
-	// If our planned state does not have a source or content then the planned state
-	// terrafom gave us is null, therefore we're supposed to delete the resource.
-	if plannedState.Src == "" && plannedState.Content == "" {
-		// Currently this is a no-op. If we decide to make file delete destructive
-		// we'll need to remove the remote file.
+	// If our prior state has an ID but our planned does not we're deleting.
+	_, okprior := priorState.ID.Get()
+	_, okplan := plannedState.ID.Get()
+	if okprior && !okplan {
 		res.NewState, err = marshalDelete(plannedState)
-
 		return res, err
 	}
-	plannedState.ID = "static"
+
+	plannedState.ID.Set("static")
 
 	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, f)
 	if err != nil {
@@ -178,7 +198,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 
 	// If we're missing a prior ID we haven't created it yet. If the prior and
 	// planned sum don't match then we're updating.
-	if priorState.ID == "" || (priorState.Sum != plannedState.Sum) {
+	if !okprior || !priorState.Sum.Eq(plannedState.Sum) {
 		ssh, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -186,7 +206,22 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 		}
 		defer ssh.Close() //nolint: staticcheck
 
-		err = ssh.Copy(ctx, src, plannedState.Dst)
+		// Get our copy args
+		opts := []remoteflight.CopyFileRequestOpt{
+			remoteflight.WithCopyFileContent(src),
+			remoteflight.WithCopyFileDestination(plannedState.Dst.Value()),
+		}
+		if t, ok := plannedState.TmpDir.Get(); ok {
+			opts = append(opts, remoteflight.WithCopyFileTmpDir(t))
+		}
+		if chmod, ok := plannedState.Chmod.Get(); ok {
+			opts = append(opts, remoteflight.WithCopyFileChmod(chmod))
+		}
+		if chown, ok := plannedState.Chown.Get(); ok {
+			opts = append(opts, remoteflight.WithCopyFileChmod(chown))
+		}
+
+		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(opts...))
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return res, err
@@ -229,6 +264,21 @@ func (fs *fileStateV1) Schema() *tfprotov5.Schema {
 					Optional:  true,
 					Sensitive: true,
 				},
+				{
+					Name:     "tmp_dir",
+					Type:     tftypes.String,
+					Optional: true,
+				},
+				{
+					Name:     "chmod",
+					Type:     tftypes.String,
+					Optional: true,
+				},
+				{
+					Name:     "chown",
+					Type:     tftypes.String,
+					Optional: true,
+				},
 				fs.Transport.SchemaAttributeTransport(),
 			},
 		},
@@ -244,24 +294,27 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	if fs.Src == "" && fs.Content == "" {
+	src, okSrc := fs.Src.Get()
+	cnt, okCnt := fs.Content.Get()
+
+	if !okSrc && !okCnt {
 		return newErrWithDiagnostics("invalid configuration", "you must provide either the source location or file content", "source")
 	}
 
-	if fs.Src != "" && fs.Content != "" {
+	if okSrc && okCnt {
 		return newErrWithDiagnostics("invalid configuration", "you must provide only of of the source location or file content", "source")
 	}
 
-	if fs.Src != "" && fs.Src != UnknownString {
-		f, err := tfile.Open(fs.Src)
+	if okSrc {
+		f, err := tfile.Open(src)
 		if err != nil {
 			return newErrWithDiagnostics("invalid configuration", "unable to open source file", "source")
 		}
 		defer f.Close() // nolint: staticcheck
 	}
 
-	if fs.Dst == "" {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the destination location", "destination")
+	if okCnt && cnt == "" {
+		return newErrWithDiagnostics("invalid configuration", "you must provide content", "content")
 	}
 
 	return nil
@@ -270,11 +323,14 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (fs *fileStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":          &fs.ID,
-		"source":      &fs.Src,
-		"destination": &fs.Dst,
-		"content":     &fs.Content,
-		"sum":         &fs.Sum,
+		"id":          fs.ID,
+		"source":      fs.Src,
+		"destination": fs.Dst,
+		"content":     fs.Content,
+		"sum":         fs.Sum,
+		"tmp_dir":     fs.TmpDir,
+		"chmod":       fs.Chmod,
+		"chown":       fs.Chown,
 	})
 	if err != nil {
 		return err
@@ -290,11 +346,14 @@ func (fs *fileStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (fs *fileStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":          tftypes.String,
-		"source":      tftypes.String,
-		"destination": tftypes.String,
-		"content":     tftypes.String,
-		"sum":         tftypes.String,
+		"id":          fs.ID.TFType(),
+		"source":      fs.Src.TFType(),
+		"destination": fs.Dst.TFType(),
+		"content":     fs.Content.TFType(),
+		"sum":         fs.Sum.TFType(),
+		"tmp_dir":     fs.TmpDir.TFType(),
+		"chmod":       fs.Chmod.TFType(),
+		"chown":       fs.Chown.TFType(),
 		"transport":   fs.Transport.Terraform5Type(),
 	}}
 }
@@ -302,11 +361,14 @@ func (fs *fileStateV1) Terraform5Type() tftypes.Type {
 // Terraform5Type is the file state tftypes.Value.
 func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(fs.Terraform5Type(), map[string]tftypes.Value{
-		"id":          tfMarshalStringValue(fs.ID),
-		"source":      tfMarshalStringOptionalValue(fs.Src),
-		"destination": tfMarshalStringValue(fs.Dst),
-		"content":     tfMarshalStringOptionalValue(fs.Content),
-		"sum":         tfMarshalStringValue(fs.Sum),
+		"id":          fs.ID.TFValue(),
+		"source":      fs.Src.TFValue(),
+		"destination": fs.Dst.TFValue(),
+		"content":     fs.Content.TFValue(),
+		"sum":         fs.Sum.TFValue(),
+		"tmp_dir":     fs.TmpDir.TFValue(),
+		"chmod":       fs.Chmod.TFValue(),
+		"chown":       fs.Chown.TFValue(),
 		"transport":   fs.Transport.Terraform5Value(),
 	})
 }
@@ -322,18 +384,20 @@ func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 	var src it.Copyable
 	var srcType string
 
-	if fs.Src != "" {
+	if srcVal, ok := fs.Src.Get(); ok {
 		srcType = "source"
-		src, err = tfile.Open(fs.Src)
+		src, err = tfile.Open(srcVal)
 		if err != nil {
 			err = wrapErrWithDiagnostics(err,
 				"invalid configuration", "unable to open source file", srcType,
 			)
 			return src, srcType, err
 		}
-	} else {
+	} else if cntVal, ok := fs.Content.Get(); ok {
 		srcType = "content"
-		src = tfile.NewReader(fs.Content)
+		src = tfile.NewReader(cntVal)
+	} else {
+		return src, srcType, newErrWithDiagnostics("invalid configuration", "you must provide a source file or content", "source")
 	}
 
 	return src, srcType, nil
@@ -342,5 +406,5 @@ func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 // hasUnknownAttributes determines if the source or content is not known
 // yet.
 func (fs *fileStateV1) hasUnknownAttributes() bool {
-	return (fs.Src == UnknownString || fs.Content == UnknownString)
+	return (fs.Src.Unknown || fs.Content.Unknown)
 }

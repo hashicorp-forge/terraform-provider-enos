@@ -3,17 +3,16 @@ package plugin
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// UnknownString is a special value we assign to when unmarshaling an unknown
-// string value onto types.
-const UnknownString = "__XX_TFTYPES_UNKNOWN_STRING"
-
-// UnknownStringValue is an unknown string in the Terraform wire format
-var UnknownStringValue = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+var (
+	nullDSTVal    = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+	unknownDSTVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+)
 
 func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
 	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
@@ -86,7 +85,11 @@ func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov
 	return marshal(currentState)
 }
 
-// mapAttributesTo is a helper to ease mapping basic string, bool, and number tftypes.Types to corresponding go values. The val input should be a top-level marshaled tftypes.Object. The props is a property map that dictates which val field to map to the which go value. The value of the prop map should be a pointer to valid value.
+// mapAttributesTo is a helper that maps tftypes.Values into intermediary
+// types that are easier to use in providers. The val input should be a top-level
+// marshaled tftypes.Value. The props is a property map that dictates which val
+// field to map to the which go value. The value of the prop map should be a
+// pointer to valid value.
 func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[string]tftypes.Value, error) {
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
@@ -100,273 +103,33 @@ func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[strin
 			continue
 		}
 
-		switch toType := to.(type) {
-		case string, *string:
-			// Handle cases where a value is going to be given but is unknown
-			if val.Equal(UnknownStringValue) {
-				toPtr, ok := to.(*string)
-
-				if ok {
-					*toPtr = UnknownString
-					continue
-				}
-			}
-
+		tfType, ok := to.(TFType)
+		if ok {
+			err = tfType.FromTFValue(val)
+		} else {
 			if !vals[key].IsKnown() || vals[key].IsNull() {
 				continue
 			}
 
 			err = vals[key].As(to)
-			if err != nil {
-				return vals, err
-			}
-		case *tfBool:
-			boolVal := &tfBool{}
-			err = boolVal.FromTFValue(val)
-			if err != nil {
-				return vals, err
-			}
-			*toType = *boolVal
-		case *tfNum:
-			numVal := &tfNum{}
-			err = numVal.FromTFValue(val)
-			if err != nil {
-				return vals, err
-			}
-			*toType = *numVal
-		case *tfStringSlice:
-			ssVal := &tfStringSlice{}
-			err = ssVal.FromTFValue(val)
-			if err != nil {
-				return vals, err
-			}
-			*toType = *ssVal
-		default:
-			if !vals[key].IsKnown() || vals[key].IsNull() {
-				continue
-			}
+		}
 
-			err = vals[key].As(to)
-			if err != nil {
-				return vals, err
-			}
+		if err != nil {
+			return vals, err
 		}
 	}
 
 	return vals, nil
 }
 
-func tfUnmarshalStringSlice(val tftypes.Value) ([]string, error) {
-	strings := []string{}
-	vals := []tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
-		return strings, err
-	}
-
-	str := ""
-	for _, strVal := range vals {
-		if strVal.IsKnown() && !strVal.IsNull() {
-			err = strVal.As(&str)
-			if err != nil {
-				return strings, err
-			}
-		} else {
-			str = UnknownString
-		}
-
-		strings = append(strings, str)
-	}
-
-	return strings, nil
-}
-
-func tfUnmarshalStringMap(val tftypes.Value) (map[string]string, error) {
-	strings := map[string]string{}
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
-		return strings, err
-	}
-
-	str := ""
-	for strKey, strVal := range vals {
-		if strVal.IsKnown() && !strVal.IsNull() {
-			err = strVal.As(&str)
-			if err != nil {
-				return strings, err
-			}
-		} else {
-			str = UnknownString
-		}
-
-		strings[strKey] = str
-	}
-
-	return strings, nil
-}
-
-// tfMarshalDynamicPsuedoTypeObject is for marshaling a dynamic psuedo-type that is
-// only a single level deep into an object. Currently this is experimental and only
-// supports string and bool attribute types.
-func tfMarshalDynamicPsuedoTypeObject(vals map[string]interface{}, optional map[string]struct{}) tftypes.Value {
-	if len(vals) == 0 {
-		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)
-	}
-
-	tfVals := map[string]tftypes.Value{}
-	tfTypes := map[string]tftypes.Type{}
-
-	for key, val := range vals {
-		switch t := val.(type) {
-		case string:
-			tfTypes[key] = tftypes.String
-			if val == UnknownString {
-				tfVals[key] = UnknownStringValue
-			} else {
-				tfVals[key] = tftypes.NewValue(tftypes.String, t)
-			}
-		case tfBool:
-			tfTypes[key] = t.TFType()
-			tfVals[key] = t.TFValue()
-		case tfNum:
-			tfTypes[key] = t.TFType()
-			tfVals[key] = t.TFValue()
-		case tfStringSlice:
-			tfTypes[key] = t.TFType()
-			tfVals[key] = t.TFValue()
-		case tftypes.Value:
-			tfTypes[key] = t.Type()
-			tfVals[key] = t
-		default:
-			continue
-		}
-	}
-
-	return tftypes.NewValue(tftypes.Object{
-		AttributeTypes:     tfTypes,
-		OptionalAttributes: optional,
-	}, tfVals)
-}
-
-// tfUnmarshalDynamicPsuedoType is for unmarshaling a dynamic psuedo-type that
-// is only a single level deep. Currently this is experimental and only supports
-// string and bool types.
-func tfUnmarshalDynamicPsuedoType(val tftypes.Value) (map[string]interface{}, error) {
-	res := map[string]interface{}{}
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
-		return res, err
-	}
-
-	for key, val := range vals {
-		valType := val.Type()
-
-		if valType.Is(tftypes.String) {
-			str := ""
-			if val.IsKnown() && !val.IsNull() {
-				err = val.As(&str)
-				if err != nil {
-					return res, err
-				}
-			} else {
-				str = UnknownString
-			}
-			res[key] = str
-		} else if valType.Is(tftypes.Bool) {
-			boolVal := &tfBool{}
-			err = boolVal.FromTFValue(val)
-			if err != nil {
-				return res, err
-			}
-			res[key] = boolVal
-		} else if valType.Is(tftypes.Number) {
-			numVal := &tfNum{}
-			err = numVal.FromTFValue(val)
-			if err != nil {
-				return res, err
-			}
-			res[key] = numVal
-		} else if valType.Is(tftypes.DynamicPseudoType) && !val.IsKnown() {
-			// In cases where we get unknown values, eg: some attribute is
-			// set to unknown and we're planning, just set it to the raw
-			// tftypes.Value and we'll pass it back later.
-			res[key] = val
-		} else {
-			return res, fmt.Errorf("marshaling of type %s has not been implemented", valType.String())
-		}
-
-	}
-
-	return res, nil
-}
-
-func tfMarshalStringValue(val string) tftypes.Value {
-	if val == "" || val == UnknownString {
-		return UnknownStringValue
-	}
-
-	return tftypes.NewValue(tftypes.String, val)
-}
-
-func tfMarshalStringOptionalValue(val string) tftypes.Value {
-	if val == "" {
-		return tftypes.NewValue(tftypes.String, nil)
-	}
-
-	if val == UnknownString {
-		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
-	}
-
-	return tftypes.NewValue(tftypes.String, val)
-}
-
-func tfMarshalStringAllowBlank(val string) tftypes.Value {
-	if val == UnknownString {
-		return UnknownStringValue
-	}
-
-	return tftypes.NewValue(tftypes.String, val)
-}
-
-func tfMarshalStringSlice(vals []string) tftypes.Value {
-	if len(vals) == 0 {
-		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)
-	}
-
-	values := []tftypes.Value{}
-	for _, val := range vals {
-		if val == UnknownString {
-			values = append(values, UnknownStringValue)
-		} else {
-			values = append(values, tftypes.NewValue(tftypes.String, val))
-		}
-	}
-
-	return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, values)
-}
-
-func tfMarshalStringMap(vals map[string]string) tftypes.Value {
-	if len(vals) == 0 {
-		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
-	}
-
-	values := map[string]tftypes.Value{}
-	for key, val := range vals {
-		if val == UnknownString {
-			values[key] = UnknownStringValue
-		} else {
-			values[key] = tftypes.NewValue(tftypes.String, val)
-		}
-	}
-
-	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)
-}
-
-func tfStringsSetOrUnknown(args ...string) bool {
+func tfStringsSetOrUnknown(args ...*tfString) bool {
 	for _, arg := range args {
-		if arg != "" {
+		if arg.Unknown {
+			return true
+		}
+
+		_, ok := arg.Get()
+		if ok {
 			return true
 		}
 	}
@@ -374,10 +137,14 @@ func tfStringsSetOrUnknown(args ...string) bool {
 	return false
 }
 
+func newTfBool() *tfBool {
+	return &tfBool{Null: true}
+}
+
 type tfBool struct {
-	unknown bool
-	null    bool
-	val     bool
+	Unknown bool
+	Null    bool
+	Val     bool
 }
 
 func (b *tfBool) TFType() tftypes.Type {
@@ -385,23 +152,23 @@ func (b *tfBool) TFType() tftypes.Type {
 }
 
 func (b *tfBool) TFValue() tftypes.Value {
-	if b.unknown {
+	if b.Unknown {
 		return tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)
 	}
 
-	if b.null {
+	if b.Null {
 		return tftypes.NewValue(tftypes.Bool, nil)
 	}
 
-	return tftypes.NewValue(tftypes.Bool, b.val)
+	return tftypes.NewValue(tftypes.Bool, b.Val)
 }
 
 func (b *tfBool) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)):
-		b.unknown = true
-	case val.Equal(tftypes.NewValue(tftypes.Bool, nil)):
-		b.null = true
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.Bool, nil)):
+		b.Null = true
 	default:
 		var bv bool
 		err := val.As(&bv)
@@ -415,27 +182,39 @@ func (b *tfBool) FromTFValue(val tftypes.Value) error {
 }
 
 func (b *tfBool) Get() (bool, bool) {
-	if b.unknown || b.null {
-		return b.val, false
+	if b.Unknown || b.Null {
+		return b.Val, false
 	}
 
-	return b.val, true
+	return b.Val, true
 }
 
 func (b *tfBool) Value() bool {
-	return b.val
+	return b.Val
 }
 
 func (b *tfBool) Set(val bool) {
-	b.unknown = false
-	b.null = false
-	b.val = val
+	b.Unknown = false
+	b.Null = false
+	b.Val = val
+}
+
+func (b *tfBool) Eq(o *tfBool) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func newTfNum() *tfNum {
+	return &tfNum{Null: true}
 }
 
 type tfNum struct {
-	unknown bool
-	null    bool
-	val     int
+	Unknown bool
+	Null    bool
+	Val     int
 }
 
 func (b *tfNum) TFType() tftypes.Type {
@@ -443,23 +222,23 @@ func (b *tfNum) TFType() tftypes.Type {
 }
 
 func (b *tfNum) TFValue() tftypes.Value {
-	if b.unknown {
+	if b.Unknown {
 		return tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)
 	}
 
-	if b.null {
+	if b.Null {
 		return tftypes.NewValue(tftypes.Number, nil)
 	}
 
-	return tftypes.NewValue(tftypes.Number, b.val)
+	return tftypes.NewValue(tftypes.Number, b.Val)
 }
 
 func (b *tfNum) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)):
-		b.unknown = true
-	case val.Equal(tftypes.NewValue(tftypes.Number, nil)):
-		b.null = true
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Number, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.Number, nil)):
+		b.Null = true
 	default:
 		i := big.Float{}
 		err := val.As(&i)
@@ -474,27 +253,112 @@ func (b *tfNum) FromTFValue(val tftypes.Value) error {
 }
 
 func (b *tfNum) Get() (int, bool) {
-	if b.unknown || b.null {
-		return b.val, false
+	if b.Unknown || b.Null {
+		return b.Val, false
 	}
 
-	return b.val, true
+	return b.Val, true
 }
 
 func (b *tfNum) Value() int {
-	return b.val
+	return b.Val
 }
 
 func (b *tfNum) Set(val int) {
-	b.unknown = false
-	b.null = false
-	b.val = val
+	b.Unknown = false
+	b.Null = false
+	b.Val = val
+}
+
+func (b *tfNum) Eq(o *tfNum) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func newTfString() *tfString {
+	return &tfString{Null: true}
+}
+
+type tfString struct {
+	Unknown bool
+	Null    bool
+	Val     string
+}
+
+func (b *tfString) TFType() tftypes.Type {
+	return tftypes.String
+}
+
+func (b *tfString) TFValue() tftypes.Value {
+	if b.Unknown {
+		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	}
+
+	if b.Null {
+		return tftypes.NewValue(tftypes.String, nil)
+	}
+
+	return tftypes.NewValue(tftypes.String, b.Val)
+}
+
+func (b *tfString) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.String, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.String, nil)):
+		b.Null = true
+	default:
+		var sv string
+		err := val.As(&sv)
+		if err != nil {
+			return err
+		}
+		b.Set(sv)
+	}
+
+	return nil
+}
+
+func (b *tfString) Get() (string, bool) {
+	if b.Unknown || b.Null {
+		return b.Val, false
+	}
+
+	return b.Val, true
+}
+
+func (b *tfString) Value() string {
+	return b.Val
+}
+
+func (b *tfString) Set(val string) {
+	b.Unknown = false
+	b.Null = false
+	b.Val = val
+}
+
+func (b *tfString) Eq(o *tfString) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func newTfStringSlice() *tfStringSlice {
+	return &tfStringSlice{
+		Null: true,
+		Val:  []*tfString{},
+	}
 }
 
 type tfStringSlice struct {
-	unknown bool
-	null    bool
-	val     []string
+	Unknown bool
+	Null    bool
+	Val     []*tfString
 }
 
 func (b *tfStringSlice) TFType() tftypes.Type {
@@ -502,49 +366,673 @@ func (b *tfStringSlice) TFType() tftypes.Type {
 }
 
 func (b *tfStringSlice) TFValue() tftypes.Value {
-	if b.unknown {
+	if b.Unknown {
 		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, tftypes.UnknownValue)
 	}
 
-	if b.null {
+	if b.Null {
 		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)
 	}
 
-	return tfMarshalStringSlice(b.val)
+	if len(b.Val) == 0 {
+		return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)
+	}
+
+	values := []tftypes.Value{}
+	for _, val := range b.Val {
+		values = append(values, val.TFValue())
+	}
+
+	return tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, values)
 }
 
 func (b *tfStringSlice) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, tftypes.UnknownValue)):
-		b.unknown = true
-	case val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)):
-		b.null = true
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, nil)):
+		b.Null = true
 	default:
-		stringVals, err := tfUnmarshalStringSlice(val)
+		strs := []*tfString{}
+		vals := []tftypes.Value{}
+		err := val.As(&vals)
 		if err != nil {
 			return err
 		}
 
-		b.Set(stringVals)
+		for _, v := range vals {
+			str := newTfString()
+			err = str.FromTFValue(v)
+			if err != nil {
+				return err
+			}
+
+			strs = append(strs, str)
+		}
+
+		b.Set(strs)
 	}
 
 	return nil
 }
 
-func (b *tfStringSlice) Get() ([]string, bool) {
-	if b.unknown || b.null {
-		return b.val, false
+func (b *tfStringSlice) Get() ([]*tfString, bool) {
+	if b.Unknown || b.Null {
+		return b.Val, false
 	}
 
-	return b.val, true
+	return b.Val, true
 }
 
-func (b *tfStringSlice) Value() []string {
-	return b.val
+func (b *tfStringSlice) GetStrings() ([]string, bool) {
+	res := []string{}
+	strs, ok := b.Get()
+	if !ok {
+		return res, ok
+	}
+
+	for _, str := range strs {
+		v, ok := str.Get()
+		if !ok {
+			return res, ok
+		}
+
+		res = append(res, v)
+	}
+
+	return res, true
 }
 
-func (b *tfStringSlice) Set(val []string) {
-	b.unknown = false
-	b.null = false
-	b.val = val
+func (b *tfStringSlice) Value() []*tfString {
+	return b.Val
+}
+
+func (b *tfStringSlice) StringValue() []string {
+	strs, _ := b.GetStrings()
+	return strs
+}
+
+func (b *tfStringSlice) Set(val []*tfString) {
+	b.Unknown = false
+	b.Null = false
+	b.Val = val
+}
+
+func (b *tfStringSlice) SetStrings(strs []string) {
+	b.Unknown = false
+	b.Null = false
+	tfStrs := []*tfString{}
+	for _, str := range strs {
+		strVal := newTfString()
+		strVal.Set(str)
+		tfStrs = append(tfStrs, strVal)
+	}
+	b.Set(tfStrs)
+}
+
+func (b *tfStringSlice) Eq(o *tfStringSlice) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func (b *tfStringSlice) FullyKnown() bool {
+	strs, ok := b.Get()
+	if !ok {
+		return false
+	}
+
+	for _, str := range strs {
+		_, ok := str.Get()
+		if !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func newTfStringMap() *tfStringMap {
+	return &tfStringMap{
+		Null: true,
+		Val:  map[string]*tfString{},
+	}
+}
+
+type tfStringMap struct {
+	Unknown bool
+	Null    bool
+	Val     map[string]*tfString
+}
+
+func (b *tfStringMap) TFType() tftypes.Type {
+	return tftypes.Map{AttributeType: tftypes.String}
+}
+
+func (b *tfStringMap) TFValue() tftypes.Value {
+	if b.Unknown {
+		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, tftypes.UnknownValue)
+	}
+
+	if b.Null {
+		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
+	}
+
+	if len(b.Val) == 0 {
+		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
+	}
+
+	values := map[string]tftypes.Value{}
+	for key, val := range b.Val {
+		values[key] = val.TFValue()
+	}
+
+	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)
+}
+
+func (b *tfStringMap) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)):
+		b.Null = true
+	default:
+		strs := map[string]*tfString{}
+		vals := map[string]tftypes.Value{}
+		err := val.As(&vals)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range vals {
+			str := newTfString()
+			err = str.FromTFValue(v)
+			if err != nil {
+				return err
+			}
+
+			strs[k] = str
+		}
+
+		b.Set(strs)
+	}
+
+	return nil
+}
+
+func (b *tfStringMap) Get() (map[string]*tfString, bool) {
+	if b.Unknown || b.Null {
+		return b.Val, false
+	}
+
+	return b.Val, true
+}
+
+func (b *tfStringMap) GetStrings() (map[string]string, bool) {
+	res := map[string]string{}
+	strs, ok := b.Get()
+	if !ok {
+		return res, ok
+	}
+
+	for key, str := range strs {
+		v, ok := str.Get()
+		if !ok {
+			return res, ok
+		}
+
+		res[key] = v
+	}
+
+	return res, true
+}
+
+func (b *tfStringMap) Value() map[string]*tfString {
+	return b.Val
+}
+
+func (b *tfStringMap) StringValue() map[string]string {
+	strs, _ := b.GetStrings()
+	return strs
+}
+
+func (b *tfStringMap) Set(strs map[string]*tfString) {
+	b.Unknown = false
+	b.Null = false
+	b.Val = strs
+}
+
+func (b *tfStringMap) SetStrings(strs map[string]string) {
+	b.Unknown = false
+	b.Null = false
+	tfStrs := map[string]*tfString{}
+	for k, v := range strs {
+		strVal := newTfString()
+		strVal.Set(v)
+		tfStrs[k] = strVal
+	}
+	b.Set(tfStrs)
+}
+
+func (b *tfStringMap) Eq(o *tfStringMap) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func (b *tfStringMap) FullyKnown() bool {
+	val, ok := b.Get()
+	if !ok {
+		return false
+	}
+
+	for _, v := range val {
+		_, ok := v.Get()
+		if !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func newTfObject() *tfObject {
+	return &tfObject{
+		Null:      true,
+		AttrTypes: map[string]tftypes.Type{},
+		Val:       map[string]interface{}{},
+		Optional:  map[string]struct{}{},
+	}
+}
+
+type tfObject struct {
+	Unknown   bool
+	Null      bool
+	AttrTypes map[string]tftypes.Type
+	Val       map[string]interface{}
+	Optional  map[string]struct{}
+}
+
+func (b *tfObject) TFType() tftypes.Type {
+	// Sometimes objects represent DynamicPseudoType's. In this cases we want
+	// to iterate over the Val if any and ensure that we include them in the type.
+	for key, val := range b.Val {
+		tfType, ok := val.(TFType)
+		if ok {
+			b.AttrTypes[key] = tfType.TFType()
+		} else {
+			switch t := val.(type) {
+			case tftypes.Value:
+				b.AttrTypes[key] = t.Type()
+			default:
+				panic(fmt.Sprintf("AttrType(%s) not supported in tfObject. Did you forget to convert from a go type to a *tf* type?", t))
+			}
+		}
+	}
+
+	return tftypes.Object{
+		AttributeTypes:     b.AttrTypes,
+		OptionalAttributes: b.Optional,
+	}
+}
+
+func (b *tfObject) TFValue() tftypes.Value {
+	tfVals := map[string]tftypes.Value{}
+
+	for key, val := range b.Val {
+		tfType, ok := val.(TFType)
+		if ok {
+			tfVals[key] = tfType.TFValue()
+		} else {
+			switch t := val.(type) {
+			case tftypes.Value:
+				tfVals[key] = t
+			default:
+				panic(fmt.Sprintf("AttrType(%s) not supported in tfObject. Did you forget to convert from a go type to a *tf* type?", t))
+			}
+		}
+	}
+
+	if b.Unknown {
+		return tftypes.NewValue(b.TFType(), tftypes.UnknownValue)
+	}
+
+	if b.Null || len(b.Val) == 0 {
+		return tftypes.NewValue(b.TFType(), nil)
+	}
+
+	return tftypes.NewValue(b.TFType(), tfVals)
+}
+
+func (b *tfObject) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.DynamicPseudoType, nil)):
+		b.Null = true
+	default:
+		res := map[string]interface{}{}
+		vals := map[string]tftypes.Value{}
+		err := val.As(&vals)
+		if err != nil {
+			return err
+		}
+
+		for key, val := range vals {
+			valType := val.Type()
+			switch {
+			case valType.Is(tftypes.Bool):
+				boolVal := newTfBool()
+				err = boolVal.FromTFValue(val)
+				if err != nil {
+					return err
+				}
+				res[key] = boolVal
+			case valType.Is(tftypes.String):
+				strVal := newTfString()
+				err = strVal.FromTFValue(val)
+				if err != nil {
+					return err
+				}
+				res[key] = strVal
+			case valType.Is(tftypes.Number):
+				numVal := newTfNum()
+				err = numVal.FromTFValue(val)
+				if err != nil {
+					return err
+				}
+				res[key] = numVal
+			case valType.Is(tftypes.List{ElementType: tftypes.String}):
+				listVal := newTfStringSlice()
+				err = listVal.FromTFValue(val)
+				if err != nil {
+					return err
+				}
+				res[key] = listVal
+			case valType.Is(tftypes.Map{AttributeType: tftypes.String}):
+				mapVal := newTfStringMap()
+				err = mapVal.FromTFValue(val)
+				if err != nil {
+					return err
+				}
+				res[key] = mapVal
+			case valType.Is(tftypes.DynamicPseudoType) && !val.IsKnown():
+				// In cases where we get Unknown Values, eg: some attribute is
+				// set to Unknown and we're planning, just set it to the raw
+				// tftypes.Value and we'll pass it back later.
+				res[key] = val
+			default:
+				// We can't really use `Is()` or `Equal()` for types that include
+				// object since the AttributeTypes and OptionalAttributes have
+				// to be equal in order for that to match. So instead we'll
+				// cast here.
+				_, okObj := valType.(tftypes.Object)
+				l, okList := valType.(tftypes.List)
+				if okList {
+					_, okList = l.ElementType.(tftypes.Object)
+				}
+
+				if okObj || okList {
+					objVal := newTfObject()
+					err = objVal.FromTFValue(val)
+					if err != nil {
+						return err
+					}
+					res[key] = objVal
+					continue
+				}
+
+				return fmt.Errorf("marshaling of type %s has not been implemented", valType.String())
+			}
+		}
+
+		b.Set(res)
+	}
+
+	return nil
+}
+
+// Get will return the object as map of tf* types.
+func (b *tfObject) Get() (map[string]interface{}, bool) {
+	if b.Unknown || b.Null {
+		return b.Val, false
+	}
+
+	return b.Val, true
+}
+
+// GetObject will return the object as a map of native go types.
+func (b *tfObject) GetObject() (map[string]interface{}, bool) {
+	objs := map[string]interface{}{}
+
+	tfAttrs, ok := b.Get()
+	if !ok {
+		return objs, false
+	}
+
+	for key, obj := range tfAttrs {
+		switch t := obj.(type) {
+		case *tfString:
+			if str, ok := t.Get(); ok {
+				objs[key] = str
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfNum:
+			if num, ok := t.Get(); ok {
+				objs[key] = num
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfBool:
+			if b, ok := t.Get(); ok {
+				objs[key] = b
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfStringSlice:
+			if strs, ok := t.GetStrings(); ok {
+				objs[key] = strs
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfStringMap:
+			if strs, ok := t.GetStrings(); ok {
+				objs[key] = strs
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfObject:
+			if obj, ok := t.GetObject(); ok {
+				objs[key] = obj
+			} else {
+				return map[string]interface{}{}, false
+			}
+		case *tfObjectSlice:
+			if obj, ok := t.GetObjects(); ok {
+				objs[key] = obj
+			} else {
+				return map[string]interface{}{}, false
+			}
+		default:
+			objs[key] = obj
+		}
+	}
+
+	return objs, true
+}
+
+func (b *tfObject) Value() map[string]interface{} {
+	return b.Val
+}
+
+func (b *tfObject) Set(obj map[string]interface{}) {
+	b.Unknown = false
+	b.Null = false
+	b.Val = obj
+}
+
+func (b *tfObject) Eq(o *tfObject) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func newTfObjectSlice() *tfObjectSlice {
+	return &tfObjectSlice{
+		Null:      true,
+		Val:       []*tfObject{},
+		AttrTypes: map[string]tftypes.Type{},
+		Optional:  map[string]struct{}{},
+	}
+}
+
+type tfObjectSlice struct {
+	Unknown   bool
+	Null      bool
+	Val       []*tfObject
+	AttrTypes map[string]tftypes.Type
+	Optional  map[string]struct{}
+}
+
+func (b *tfObjectSlice) TFType() tftypes.Type {
+	return tftypes.List{ElementType: tftypes.Object{
+		AttributeTypes:     b.AttrTypes,
+		OptionalAttributes: b.Optional,
+	}}
+}
+
+func (b *tfObjectSlice) TFValue() tftypes.Value {
+	if b.Unknown {
+		return tftypes.NewValue(b.TFType(), tftypes.UnknownValue)
+	}
+
+	if b.Null || len(b.Val) == 0 {
+		return tftypes.NewValue(b.TFType(), nil)
+	}
+
+	values := []tftypes.Value{}
+	for _, val := range b.Val {
+		values = append(values, val.TFValue())
+	}
+
+	return tftypes.NewValue(b.TFType(), values)
+}
+
+func (b *tfObjectSlice) FromTFValue(val tftypes.Value) error {
+	switch {
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(b.TFType(), tftypes.UnknownValue)):
+		b.Unknown = true
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(b.TFType(), nil)):
+		b.Null = true
+	default:
+		objs := []*tfObject{}
+		vals := []tftypes.Value{}
+		err := val.As(&vals)
+		if err != nil {
+			return err
+		}
+
+		for _, val := range vals {
+			obj := newTfObject()
+			obj.AttrTypes = b.AttrTypes
+			obj.Optional = b.Optional
+			err = obj.FromTFValue(val)
+			if err != nil {
+				return err
+			}
+
+			objs = append(objs, obj)
+		}
+
+		b.Set(objs)
+	}
+
+	return nil
+}
+
+func (b *tfObjectSlice) Get() ([]*tfObject, bool) {
+	if b.Unknown || b.Null {
+		return b.Val, false
+	}
+
+	return b.Val, true
+}
+
+func (b *tfObjectSlice) GetObjects() ([]map[string]interface{}, bool) {
+	res := []map[string]interface{}{}
+	objs, ok := b.Get()
+	if !ok {
+		return res, ok
+	}
+
+	for _, obj := range objs {
+		v, ok := obj.GetObject()
+		if !ok {
+			return res, ok
+		}
+
+		res = append(res, v)
+	}
+
+	return res, true
+}
+
+func (b *tfObjectSlice) Value() []*tfObject {
+	return b.Val
+}
+
+func (b *tfObjectSlice) ObjectsValue() []map[string]interface{} {
+	obs, _ := b.GetObjects()
+	return obs
+}
+
+func (b *tfObjectSlice) Set(objs []*tfObject) {
+	b.Unknown = false
+	b.Null = false
+	b.Val = objs
+}
+
+func (b *tfObjectSlice) SetObjects(objs []map[string]interface{}) {
+	b.Unknown = false
+	b.Null = false
+	tfObjs := []*tfObject{}
+	for _, obj := range objs {
+		objVal := newTfObject()
+		objVal.AttrTypes = b.AttrTypes
+		objVal.Optional = b.Optional
+		objVal.Set(obj)
+		tfObjs = append(tfObjs, objVal)
+	}
+	b.Set(tfObjs)
+}
+
+func (b *tfObjectSlice) Eq(o *tfObjectSlice) bool {
+	if o == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(b, o)
+}
+
+func (b *tfObjectSlice) FullyKnown() bool {
+	objs, ok := b.Get()
+	if !ok {
+		return false
+	}
+
+	for _, obj := range objs {
+		_, ok := obj.Get()
+		if !ok {
+			return false
+		}
+	}
+
+	return true
 }

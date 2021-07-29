@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5/tftypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 type {{.Struct}} struct {
@@ -15,7 +15,7 @@ type {{.Struct}} struct {
 var _ datarouter.DataSource = (*{{.Struct}})(nil)
 
 type {{.State}} struct {
-	ID string
+	ID *tfString
 }
 
 var _ State = (*{{.State}})(nil)
@@ -27,7 +27,9 @@ func new{{.StructCap}}() *{{.Struct}} {
 }
 
 func new{{.StateCap}}() *{{.State}} {
-	return &{{.State}}{}
+	return &{{.State}}{
+		ID: newTfString(),
+	}
 }
 
 func (d *{{.Struct}}) Name() string {
@@ -158,6 +160,6 @@ func (s *{{.State}}) Terraform5Type() tftypes.Type {
 func (s *{{.State}}) Terraform5Value() tftypes.Value {
 	// TODO: Add each state attribute
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":        tfMarshalStringValue(s.ID),
+		"id":        s.ID.TFValue(),
 	})
 }

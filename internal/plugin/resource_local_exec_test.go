@@ -11,29 +11,29 @@ import (
 
 // TestAccResourceLocalExec tests the local_exec resource
 func TestAccResourceLocalExec(t *testing.T) {
-	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "{{.ID}}" {
-        {{if .Content}}
+	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "{{.ID.Value}}" {
+        {{if .Content.Value}}
         content = <<EOF
-{{.Content}}
+{{.Content.Value}}
 EOF
         {{end}}
-        {{if .Inline}}
+        {{if .Inline.StringValue}}
         inline = [
-        {{range .Inline}}
+        {{range .Inline.StringValue}}
             "{{.}}",
         {{end}}
         ]
         {{end}}
-        {{if .Scripts}}
+        {{if .Scripts.StringValue}}
         scripts = [
-        {{range .Scripts}}
+        {{range .Scripts.StringValue}}
             "{{.}}",
         {{end}}
         ]
         {{end}}
-        {{if .Env}}
+        {{if .Env.StringValue}}
         environment = {
-        {{range $name, $val := .Env}}
+        {{range $name, $val := .Env.StringValue}}
             "{{$name}}": "{{$val}}",
         {{end}}
         }
@@ -41,11 +41,11 @@ EOF
     }`))
 	cases := []testAccResourceTemplate{}
 	localExec := newLocalExecStateV1()
-	localExec.ID = "foo"
-	localExec.Env = map[string]string{"FOO": "BAR"}
-	localExec.Scripts = []string{"../fixtures/src.txt"}
-	localExec.Inline = []string{"touch /tmp/foo"}
-	localExec.Content = "some content"
+	localExec.ID.Set("foo")
+	localExec.Env.SetStrings(map[string]string{"FOO": "BAR"})
+	localExec.Scripts.SetStrings([]string{"../fixtures/src.txt"})
+	localExec.Inline.SetStrings([]string{"touch /tmp/foo"})
+	localExec.Content.Set("some content")
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		localExec,
@@ -61,11 +61,11 @@ EOF
 		false,
 	})
 	realTest := newLocalExecStateV1()
-	realTest.ID = "foo"
-	realTest.Env = map[string]string{"FOO": "BAR"}
-	realTest.Scripts = []string{"../fixtures/script.sh"}
-	realTest.Inline = []string{"touch /tmp/foo && rm /tmp/foo"}
-	realTest.Content = `echo "hello world" > /tmp/enos_local_exec_script_content`
+	realTest.ID.Set("foo")
+	realTest.Env.SetStrings(map[string]string{"FOO": "BAR"})
+	realTest.Scripts.SetStrings([]string{"../fixtures/script.sh"})
+	realTest.Inline.SetStrings([]string{"touch /tmp/foo && rm /tmp/foo"})
+	realTest.Content.Set(`echo "hello world" > /tmp/enos_local_exec_script_content`)
 	cases = append(cases, testAccResourceTemplate{
 		"real test",
 		realTest,
@@ -73,8 +73,8 @@ EOF
 		true,
 	})
 	noStdoutOrStderr := newLocalExecStateV1()
-	noStdoutOrStderr.ID = "foo"
-	noStdoutOrStderr.Inline = []string{"exit 0"}
+	noStdoutOrStderr.ID.Set("foo")
+	noStdoutOrStderr.Inline.SetStrings([]string{"exit 0"})
 	cases = append(cases, testAccResourceTemplate{
 		"NoStdoutOrStderr",
 		noStdoutOrStderr,
@@ -115,8 +115,8 @@ EOF
 			"exit 0",
 		} {
 			test := newLocalExecStateV1()
-			test.ID = "foo"
-			test.Content = cmd
+			test.ID.Set("foo")
+			test.Content.Set(cmd)
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test)
 			if err != nil {

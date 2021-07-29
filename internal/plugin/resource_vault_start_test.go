@@ -13,34 +13,34 @@ import (
 
 // TestAccResourceVaultStart tests the vault_start resource
 func TestAccResourceVaultStart(t *testing.T) {
-	cfg := template.Must(template.New("enos_vault_start").Parse(`resource "enos_vault_start" "{{.ID}}" {
-		{{if .BinPath}}
-		bin_path = "{{.BinPath}}"
+	cfg := template.Must(template.New("enos_vault_start").Parse(`resource "enos_vault_start" "{{.ID.Value}}" {
+		{{if .BinPath.Value}}
+		bin_path = "{{.BinPath.Value}}"
 		{{end}}
 
 		config = {
-			api_addr = "{{.Config.APIAddr}}"
-			cluster_addr = "{{.Config.ClusterAddr}}"
+			api_addr = "{{.Config.APIAddr.Value}}"
+			cluster_addr = "{{.Config.ClusterAddr.Value}}"
 			listener = {
-				type = "{{.Config.Listener.Type}}"
+				type = "{{.Config.Listener.Type.Value}}"
 				attributes = {
-					{{range $name, $val := .Config.Listener.Attrs}}
+					{{range $name, $val := .Config.Listener.Attrs.Value}}
 					{{$name}} = "{{$val}}"
 					{{end}}
 				}
 			}
 			seal = {
-				type = "{{.Config.Seal.Type}}"
+				type = "{{.Config.Seal.Type.Value}}"
 				attributes = {
-					{{range $name, $val := .Config.Seal.Attrs}}
+					{{range $name, $val := .Config.Seal.Attrs.Value}}
 					{{$name}} = "{{$val}}"
 					{{end}}
 				}
 			}
 			storage = {
-				type = "{{.Config.Storage.Type}}"
+				type = "{{.Config.Storage.Type.Value}}"
 				attributes = {
-					{{range $name, $val := .Config.Storage.Attrs}}
+					{{range $name, $val := .Config.Storage.Attrs.Value}}
 					{{$name}} = "{{$val}}"
 					{{end}}
 				}
@@ -48,48 +48,48 @@ func TestAccResourceVaultStart(t *testing.T) {
 			ui = true
 		}
 
-		{{if .ConfigDir}}
-		config_dir = "{{.ConfigDir}}"
+		{{if .ConfigDir.Value}}
+		config_dir = "{{.ConfigDir.Value}}"
 		{{end}}
 
-		{{if .License}}
-		license = "{{.License}}"
+		{{if .License.Value}}
+		license = "{{.License.Value}}"
 		{{end}}
 
-		{{if .SystemdUnitName}}
-		unit_name = "{{.SystemdUnitName}}"
+		{{if .SystemdUnitName.Value}}
+		unit_name = "{{.SystemdUnitName.Value}}"
 		{{end}}
 
-		{{if .Username}}
-		username = "{{.Username}}"
+		{{if .Username.Value}}
+		username = "{{.Username.Value}}"
 		{{end}}
 
 		transport = {
 			ssh = {
-				{{if .Transport.SSH.User}}
-				user = "{{.Transport.SSH.User}}"
+				{{if .Transport.SSH.User.Value}}
+				user = "{{.Transport.SSH.User.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.Host}}
-				host = "{{.Transport.SSH.Host}}"
+				{{if .Transport.SSH.Host.Value}}
+				host = "{{.Transport.SSH.Host.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.PrivateKey}}
+				{{if .Transport.SSH.PrivateKey.Value}}
 				private_key = <<EOF
-{{.Transport.SSH.PrivateKey}}
+{{.Transport.SSH.PrivateKey.Value}}
 EOF
 				{{end}}
 
-				{{if .Transport.SSH.PrivateKeyPath}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath}}"
+				{{if .Transport.SSH.PrivateKeyPath.Value}}
+				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.Passphrase}}
-				passphrase = "{{.Transport.SSH.Passphrase}}"
+				{{if .Transport.SSH.Passphrase.Value}}
+				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.PassphrasePath}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath}}"
+				{{if .Transport.SSH.PassphrasePath.Value}}
+				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
 				{{end}}
 			}
 		}
@@ -98,41 +98,33 @@ EOF
 	cases := []testAccResourceTemplate{}
 
 	vaultStart := newVaultStartStateV1()
-	vaultStart.ID = "foo"
-	vaultStart.BinPath = "/opt/vault/bin/vault"
-	vaultStart.ConfigDir = "/etc/vault.d"
-	vaultStart.Config = &vaultConfig{
-		APIAddr:     "http://127.0.0.1:8200",
-		ClusterAddr: "http://127.0.0.1:8201",
-		Listener: &vaultConfigBlock{
-			Type: "tcp",
-			Attrs: map[string]interface{}{
-				"address":     "0.0.0.0:8200",
-				"tls_disable": "true",
-			},
-		},
-		Storage: &vaultConfigBlock{
-			Type: "consul",
-			Attrs: map[string]interface{}{
-				"address": "127.0.0.1:8500",
-				"path":    "vault",
-			},
-		},
-		Seal: &vaultConfigBlock{
-			Type: "awskms",
-			Attrs: map[string]interface{}{
-				"kms_key_id": "some-key-id",
-			},
-		},
-	}
-	vaultStart.License = "some-license-key"
-	vaultStart.SystemdUnitName = "vault"
-	vaultStart.Username = "vault"
-	vaultStart.Transport.SSH.User = "ubuntu"
-	vaultStart.Transport.SSH.Host = "localhost"
+	vaultStart.ID.Set("foo")
+	vaultStart.BinPath.Set("/opt/vault/bin/vault")
+	vaultStart.ConfigDir.Set("/etc/vault.d")
+	vaultStart.Config.APIAddr.Set("http://127.0.0.1:8200")
+	vaultStart.Config.ClusterAddr.Set("http://127.0.0.1:8201")
+	vaultStart.Config.Listener.Type.Set("tcp")
+	vaultStart.Config.Listener.Attrs.Set(map[string]interface{}{
+		"address":     "0.0.0.0:8200",
+		"tls_disable": "true",
+	})
+	vaultStart.Config.Storage.Type.Set("consul")
+	vaultStart.Config.Storage.Attrs.Set(map[string]interface{}{
+		"address": "127.0.0.1:8500",
+		"path":    "vault",
+	})
+	vaultStart.Config.Seal.Type.Set("awskms")
+	vaultStart.Config.Seal.Attrs.Set(map[string]interface{}{
+		"kms_key_id": "some-key-id",
+	})
+	vaultStart.License.Set("some-license-key")
+	vaultStart.SystemdUnitName.Set("vault")
+	vaultStart.Username.Set("vault")
+	vaultStart.Transport.SSH.User.Set("ubuntu")
+	vaultStart.Transport.SSH.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	vaultStart.Transport.SSH.PrivateKey = privateKey
+	vaultStart.Transport.SSH.PrivateKey.Set(privateKey)
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		vaultStart,

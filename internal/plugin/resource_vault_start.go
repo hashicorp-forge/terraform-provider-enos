@@ -25,20 +25,20 @@ type vaultStart struct {
 var _ resourcerouter.Resource = (*vaultStart)(nil)
 
 type vaultStartStateV1 struct {
-	ID              string
-	BinPath         string
+	ID              *tfString
+	BinPath         *tfString
 	Config          *vaultConfig
-	ConfigDir       string
-	License         string
+	ConfigDir       *tfString
+	License         *tfString
 	Status          *tfNum
-	SystemdUnitName string
+	SystemdUnitName *tfString
 	Transport       *embeddedTransportV1
-	Username        string
+	Username        *tfString
 }
 
 type vaultConfig struct {
-	APIAddr     string
-	ClusterAddr string
+	APIAddr     *tfString
+	ClusterAddr *tfString
 	Listener    *vaultConfigBlock
 	Storage     *vaultConfigBlock
 	Seal        *vaultConfigBlock
@@ -46,9 +46,8 @@ type vaultConfig struct {
 }
 
 type vaultConfigBlock struct {
-	Type          string
-	Attrs         map[string]interface{}
-	OptionalAttrs map[string]struct{}
+	Type  *tfString
+	Attrs *tfObject
 }
 
 var _ State = (*vaultStartStateV1)(nil)
@@ -62,14 +61,29 @@ func newVaultStart() *vaultStart {
 
 func newVaultStartStateV1() *vaultStartStateV1 {
 	return &vaultStartStateV1{
-		Status:    &tfNum{},
-		Transport: newEmbeddedTransport(),
+		ID:      newTfString(),
+		BinPath: newTfString(),
 		Config: &vaultConfig{
-			Listener: &vaultConfigBlock{},
-			Seal:     &vaultConfigBlock{},
-			Storage:  &vaultConfigBlock{},
-			UI:       &tfBool{},
+			APIAddr:     newTfString(),
+			ClusterAddr: newTfString(),
+			Listener:    newVaultConfigBlock(),
+			Seal:        newVaultConfigBlock(),
+			Storage:     newVaultConfigBlock(),
+			UI:          newTfBool(),
 		},
+		ConfigDir:       newTfString(),
+		License:         newTfString(),
+		Status:          newTfNum(),
+		SystemdUnitName: newTfString(),
+		Transport:       newEmbeddedTransport(),
+		Username:        newTfString(),
+	}
+}
+
+func newVaultConfigBlock() *vaultConfigBlock {
+	return &vaultConfigBlock{
+		Type:  newTfString(),
+		Attrs: newTfObject(),
 	}
 }
 
@@ -124,79 +138,9 @@ func (r *vaultStart) UpgradeResourceState(ctx context.Context, req *tfprotov5.Up
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
 func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
-	res := &tfprotov5.ReadResourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
-	}
+	newState := newVaultStartStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
-	default:
-	}
-
-	state := newVaultStartStateV1()
-	err := unmarshal(state, req.CurrentState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	// It's possible that Terraform is calling this to read the resource during
-	// a subsequent run. In that case, it's also possible that our service
-	// status has changed. If we have enough configuration to build an SSH
-	// client we should attempt to get the status.
-	buildSSHClient := func() (it.Transport, error) {
-		stateTransport := state.EmbeddedTransport()
-		err = stateTransport.FromPrivate(req.Private)
-		if err != nil {
-			return nil, err
-		}
-
-		providerConfig, err := r.GetProviderConfig()
-		if err != nil {
-			return nil, err
-		}
-
-		transport, err := providerConfig.Transport.Copy()
-		if err != nil {
-			return nil, err
-		}
-
-		err = stateTransport.MergeInto(transport)
-		if err != nil {
-			return nil, err
-		}
-
-		return stateTransport.Client(ctx)
-	}
-
-	ssh, err := buildSSHClient()
-	if err == nil {
-		if state.BinPath != "" && state.BinPath != UnknownString {
-			code, err := vault.Status(ctx, ssh, vault.NewStatusRequest(
-				vault.WithStatusRequestBinPath(state.BinPath),
-				vault.WithStatusRequestVaultAddr(state.Config.APIAddr),
-			))
-			if err == nil {
-				state.Status.Set(int(code))
-			}
-		}
-	}
-
-	res.NewState, err = marshal(state)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	res.Private, err = state.EmbeddedTransport().ToPrivate()
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
-	}
-
-	return res, err
+	return transportUtil.ReadResource(ctx, newState, req)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -230,8 +174,9 @@ func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 	// before and can simply plan to have the same state since it'll be a no-op
 	// apply. If we haven't applied then we need to set all of our computed
 	// outputs to unknown values.
-	if priorState.ID == "" {
-		proposedState.Status.unknown = true
+	if _, ok := priorState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
+		proposedState.Status.Unknown = true
 	}
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
@@ -252,7 +197,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
-	if plannedState.BinPath == "" {
+	if _, ok := plannedState.BinPath.Get(); !ok {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
 
@@ -264,8 +209,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 		return res, err
 	}
 
-	plannedID := "static"
-	plannedState.ID = plannedID
+	plannedState.ID.Set("static")
 
 	ssh, err := transport.Client(ctx)
 	if err != nil {
@@ -275,7 +219,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 	defer ssh.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
-	if priorState.ID == "" {
+	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.startVault(ctx, ssh)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -361,7 +305,7 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	if s.BinPath == "" {
+	if _, ok := s.BinPath.Get(); !ok {
 		return newErrWithDiagnostics("invalid configuration", "you must provide a vault binary path", "attribute")
 	}
 
@@ -371,13 +315,13 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"bin_path":   &s.BinPath,
-		"config_dir": &s.ConfigDir,
-		"id":         &s.ID,
-		"license":    &s.License,
+		"bin_path":   s.BinPath,
+		"config_dir": s.ConfigDir,
+		"id":         s.ID,
+		"license":    s.License,
 		"status":     s.Status,
-		"unit_name":  &s.SystemdUnitName,
-		"username":   &s.Username,
+		"unit_name":  s.SystemdUnitName,
+		"username":   s.Username,
 	})
 	if err != nil {
 		return err
@@ -403,30 +347,30 @@ func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *vaultStartStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"bin_path":   tftypes.String,
+		"bin_path":   s.BinPath.TFType(),
 		"config":     s.Config.Terraform5Type(),
-		"config_dir": tftypes.String,
-		"id":         tftypes.String,
-		"license":    tftypes.String,
+		"config_dir": s.ConfigDir.TFType(),
+		"id":         s.ID.TFType(),
+		"license":    s.License.TFType(),
 		"status":     s.Status.TFType(),
-		"unit_name":  tftypes.String,
+		"unit_name":  s.SystemdUnitName.TFType(),
 		"transport":  s.Transport.Terraform5Type(),
-		"username":   tftypes.String,
+		"username":   s.Username.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *vaultStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"bin_path":   tfMarshalStringValue(s.BinPath),
+		"bin_path":   s.BinPath.TFValue(),
 		"config":     s.Config.Terraform5Value(),
-		"config_dir": tfMarshalStringOptionalValue(s.ConfigDir),
-		"id":         tfMarshalStringValue(s.ID),
-		"license":    tfMarshalStringOptionalValue(s.License),
+		"config_dir": s.ConfigDir.TFValue(),
+		"id":         s.ID.TFValue(),
+		"license":    s.License.TFValue(),
 		"status":     s.Status.TFValue(),
-		"unit_name":  tfMarshalStringOptionalValue(s.SystemdUnitName),
+		"unit_name":  s.SystemdUnitName.TFValue(),
 		"transport":  s.Transport.Terraform5Value(),
-		"username":   tfMarshalStringOptionalValue(s.Username),
+		"username":   s.Username.TFValue(),
 	})
 }
 
@@ -437,29 +381,19 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 
 // FromTerraform5Value unmarshals the value to the struct
 func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"type": &s.Type,
+	_, err := mapAttributesTo(val, map[string]interface{}{
+		"type":       s.Type,
+		"attributes": s.Attrs,
 	})
-	if err != nil {
-		return err
-	}
 
-	attrs, ok := vals["attributes"]
-	if ok {
-		s.Attrs, err = tfUnmarshalDynamicPsuedoType(attrs)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return err
 }
 
 // Terraform5Type is the tftypes.Type
 func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 	return tftypes.Object{
 		AttributeTypes: map[string]tftypes.Type{
-			"type":       tftypes.String,
+			"type":       s.Type.TFType(),
 			"attributes": tftypes.DynamicPseudoType,
 		},
 	}
@@ -468,8 +402,8 @@ func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 // Terraform5Type is the tftypes.Value
 func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"type":       tfMarshalStringValue(s.Type),
-		"attributes": tfMarshalDynamicPsuedoTypeObject(s.Attrs, s.OptionalAttrs),
+		"type":       s.Type.TFValue(),
+		"attributes": s.Attrs.TFValue(),
 	})
 }
 
@@ -488,8 +422,8 @@ func (c *vaultConfig) Terraform5Type() tftypes.Type {
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
-		"api_addr":     tfMarshalStringValue(c.APIAddr),
-		"cluster_addr": tfMarshalStringValue(c.ClusterAddr),
+		"api_addr":     c.APIAddr.TFValue(),
+		"cluster_addr": c.ClusterAddr.TFValue(),
 		"listener":     c.Listener.Terraform5Value(),
 		"seal":         c.Seal.Terraform5Value(),
 		"storage":      c.Storage.Terraform5Value(),
@@ -500,8 +434,8 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 // FromTerraform5Value unmarshals the value to the struct
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"api_addr":     &c.APIAddr,
-		"cluster_addr": &c.ClusterAddr,
+		"api_addr":     c.APIAddr,
+		"cluster_addr": c.ClusterAddr,
 		"ui":           c.UI,
 	})
 	if err != nil {
@@ -537,21 +471,47 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 
 // ToHCLConfig returns the vault config in the remoteflight HCLConfig format
 func (c *vaultConfig) ToHCLConfig() *vault.HCLConfig {
-	hclConfig := &vault.HCLConfig{
-		APIAddr:     c.APIAddr,
-		ClusterAddr: c.ClusterAddr,
-		Listener: &vault.HCLBlock{
-			Label: c.Listener.Type,
-			Attrs: c.Listener.Attrs,
-		},
-		Seal: &vault.HCLBlock{
-			Label: c.Seal.Type,
-			Attrs: c.Seal.Attrs,
-		},
-		Storage: &vault.HCLBlock{
-			Label: c.Storage.Type,
-			Attrs: c.Storage.Attrs,
-		},
+	hclConfig := &vault.HCLConfig{}
+
+	if apiAddr, ok := c.APIAddr.Get(); ok {
+		hclConfig.APIAddr = apiAddr
+	}
+
+	if clusterAddr, ok := c.ClusterAddr.Get(); ok {
+		hclConfig.ClusterAddr = clusterAddr
+	}
+
+	if listenerType, ok := c.Listener.Type.Get(); ok {
+		hclConfig.Listener = &vault.HCLBlock{
+			Label: listenerType,
+		}
+
+		attrs, ok := c.Listener.Attrs.GetObject()
+		if ok {
+			hclConfig.Listener.Attrs = attrs
+		}
+	}
+
+	if sealType, ok := c.Seal.Type.Get(); ok {
+		hclConfig.Seal = &vault.HCLBlock{
+			Label: sealType,
+		}
+
+		attrs, ok := c.Seal.Attrs.GetObject()
+		if ok {
+			hclConfig.Seal.Attrs = attrs
+		}
+	}
+
+	if storageType, ok := c.Storage.Type.Get(); ok {
+		hclConfig.Storage = &vault.HCLBlock{
+			Label: storageType,
+		}
+
+		attrs, ok := c.Storage.Attrs.GetObject()
+		if ok {
+			hclConfig.Storage.Attrs = attrs
+		}
 	}
 
 	ui, ok := c.UI.Get()
@@ -571,13 +531,13 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 	// Ensure that the vault user is created
 	vaultUsername := "vault"
-	if s.Username != "" && s.Username != UnknownString {
-		vaultUsername = s.Username
+	if user, ok := s.Username.Get(); ok {
+		vaultUsername = user
 	}
 
 	configDir := "/etc/vault.d"
-	if s.ConfigDir != "" && s.ConfigDir != UnknownString {
-		configDir = s.ConfigDir
+	if dir, ok := s.ConfigDir.Get(); ok {
+		configDir = dir
 	}
 
 	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
@@ -591,8 +551,8 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 	configFilePath := filepath.Join(configDir, "vault.hcl")
 	unitName := "vault"
-	if s.SystemdUnitName != "" && s.SystemdUnitName != UnknownString {
-		unitName = s.SystemdUnitName
+	if unit, ok := s.SystemdUnitName.Get(); ok {
+		unitName = unit
 	}
 
 	unit := remoteflight.SystemdUnit{
@@ -617,7 +577,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 			"Capabilities":          "CAP_IPC_LOCK+ep",
 			"CapabilityBoundingSet": "CAP_SYSLOG CAP_IPC_LOCK",
 			"NoNewPrivileges":       "yes",
-			"ExecStart":             fmt.Sprintf("%s server -config %s", s.BinPath, configFilePath),
+			"ExecStart":             fmt.Sprintf("%s server -config %s", s.BinPath.Value(), configFilePath),
 			"ExecReload":            "/bin/kill --signal HUP $MAINPID",
 			"KillMode":              "process",
 			"KillSignal":            "SIGINT",
@@ -635,13 +595,13 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 		},
 	}
 
-	if s.License != "" && s.License != UnknownString {
-		licensePath := filepath.Join(s.ConfigDir, "vault.lic")
+	if license, ok := s.License.Get(); ok {
+		licensePath := filepath.Join(configDir, "vault.lic")
 		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("640"),
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-			remoteflight.WithCopyFileContent(tfile.NewReader(s.License)),
+			remoteflight.WithCopyFileContent(tfile.NewReader(license)),
 		))
 
 		if err != nil {
@@ -680,24 +640,24 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 	// Restart the service and wait for it to be running
 	err = vault.Restart(timeoutCtx, ssh, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr),
+		vault.WithStatusRequestBinPath(s.BinPath.Value()),
+		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault service", "failed to start the vault service")
 	}
 
 	err = vault.WaitForStatus(timeoutCtx, ssh, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr),
+		vault.WithStatusRequestBinPath(s.BinPath.Value()),
+		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	), vault.StatusInitializedUnsealed, vault.StatusSealed)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault service", "waiting for vault service")
 	}
 
 	code, err := vault.Status(timeoutCtx, ssh, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr),
+		vault.WithStatusRequestBinPath(s.BinPath.Value()),
+		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	))
 	s.Status.Set(int(code))
 

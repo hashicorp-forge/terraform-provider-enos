@@ -14,32 +14,32 @@ import (
 
 // TestAccResourceRemoteExec tests the remote_exec resource
 func TestAccResourceRemoteExec(t *testing.T) {
-	cfg := template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID}}" {
-		{{if .Content}}
+	cfg := template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
+		{{if .Content.Value}}
 		content = <<EOF
-{{.Content}}
+{{.Content.Value}}
 EOF
 		{{end}}
 
-		{{if .Inline}}
+		{{if .Inline.StringValue}}
 		inline = [
-		{{range .Inline}}
+		{{range .Inline.StringValue}}
 			"{{.}}",
 		{{end}}
 		]
 		{{end}}
 
-		{{if .Scripts}}
+		{{if .Scripts.StringValue}}
 		scripts = [
-		{{range .Scripts}}
+		{{range .Scripts.StringValue}}
 			"{{.}}",
 		{{end}}
 		]
 		{{end}}
 
-		{{if .Env}}
+		{{if .Env.StringValue}}
 		environment = {
-		{{range $name, $val := .Env}}
+		{{range $name, $val := .Env.StringValue}}
 			"{{$name}}": "{{$val}}",
 		{{end}}
 		}
@@ -47,30 +47,30 @@ EOF
 
 		transport = {
 			ssh = {
-				{{if .Transport.SSH.User}}
-				user = "{{.Transport.SSH.User}}"
+				{{if .Transport.SSH.User.Value}}
+				user = "{{.Transport.SSH.User.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.Host}}
-				host = "{{.Transport.SSH.Host}}"
+				{{if .Transport.SSH.Host.Value}}
+				host = "{{.Transport.SSH.Host.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.PrivateKey}}
+				{{if .Transport.SSH.PrivateKey.Value}}
 				private_key = <<EOF
-{{.Transport.SSH.PrivateKey}}
+{{.Transport.SSH.PrivateKey.Value}}
 EOF
 				{{end}}
 
-				{{if .Transport.SSH.PrivateKeyPath}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath}}"
+				{{if .Transport.SSH.PrivateKeyPath.Value}}
+				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.Passphrase}}
-				passphrase = "{{.Transport.SSH.Passphrase}}"
+				{{if .Transport.SSH.Passphrase.Value}}
+				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
 				{{end}}
 
-				{{if .Transport.SSH.PassphrasePath}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath}}"
+				{{if .Transport.SSH.PassphrasePath.Value}}
+				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
 				{{end}}
 			}
 		}
@@ -79,16 +79,16 @@ EOF
 	cases := []testAccResourceTemplate{}
 
 	remoteExec := newRemoteExecStateV1()
-	remoteExec.ID = "foo"
-	remoteExec.Env = map[string]string{"FOO": "BAR"}
-	remoteExec.Scripts = []string{"../fixtures/src.txt"}
-	remoteExec.Inline = []string{"touch /tmp/foo"}
-	remoteExec.Content = "some content"
-	remoteExec.Transport.SSH.User = "ubuntu"
-	remoteExec.Transport.SSH.Host = "localhost"
+	remoteExec.ID.Set("foo")
+	remoteExec.Env.SetStrings(map[string]string{"FOO": "BAR"})
+	remoteExec.Scripts.SetStrings([]string{"../fixtures/src.txt"})
+	remoteExec.Inline.SetStrings([]string{"touch /tmp/foo"})
+	remoteExec.Content.Set("some content")
+	remoteExec.Transport.SSH.User.Set("ubuntu")
+	remoteExec.Transport.SSH.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	remoteExec.Transport.SSH.PrivateKey = privateKey
+	remoteExec.Transport.SSH.PrivateKey.Set(privateKey)
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		remoteExec,
@@ -112,12 +112,12 @@ EOF
 		t.Log("SSH tests are skipped unless ENOS_TRANSPORT_* environment variables are set")
 	} else {
 		realTest := newRemoteExecStateV1()
-		realTest.ID = "foo"
-		realTest.Env = map[string]string{"FOO": "BAR"}
-		realTest.Scripts = []string{"../fixtures/script.sh"}
-		realTest.Inline = []string{"touch /tmp/foo && rm /tmp/foo"}
-		realTest.Content = `echo "hello world" > /tmp/enos_remote_exec_script_content`
-		realTest.Transport.SSH.Host = host
+		realTest.ID.Set("foo")
+		realTest.Env.SetStrings(map[string]string{"FOO": "BAR"})
+		realTest.Scripts.SetStrings([]string{"../fixtures/script.sh"})
+		realTest.Inline.SetStrings([]string{"touch /tmp/foo && rm /tmp/foo"})
+		realTest.Content.Set(`echo "hello world" > /tmp/enos_remote_exec_script_content`)
+		realTest.Transport.SSH.Host.Set(host)
 		cases = append(cases, testAccResourceTemplate{
 			"real test",
 			realTest,
@@ -125,9 +125,9 @@ EOF
 			true,
 		})
 		noStdoutOrStderr := newRemoteExecStateV1()
-		noStdoutOrStderr.ID = "foo"
-		noStdoutOrStderr.Inline = []string{"exit 0"}
-		noStdoutOrStderr.Transport.SSH.Host = host
+		noStdoutOrStderr.ID.Set("foo")
+		noStdoutOrStderr.Inline.SetStrings([]string{"exit 0"})
+		noStdoutOrStderr.Transport.SSH.Host.Set(host)
 		cases = append(cases, testAccResourceTemplate{
 			"NoStdoutOrStderr",
 			noStdoutOrStderr,
@@ -147,9 +147,9 @@ EOF
 				"exit 0",
 			} {
 				test := newRemoteExecStateV1()
-				test.ID = "foo"
-				test.Content = cmd
-				test.Transport.SSH.Host = host
+				test.ID.Set("foo")
+				test.Content.Set(cmd)
+				test.Transport.SSH.Host.Set(host)
 				buf := bytes.Buffer{}
 				err := cfg.Execute(&buf, test)
 				if err != nil {

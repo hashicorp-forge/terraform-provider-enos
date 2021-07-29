@@ -21,8 +21,8 @@ type environment struct {
 var _ datarouter.DataSource = (*environment)(nil)
 
 type environmentStateV1 struct {
-	ID              string
-	PublicIPAddress net.IP
+	ID              *tfString
+	PublicIPAddress *tfString
 }
 
 type publicIPResolver struct{}
@@ -36,7 +36,10 @@ func newEnvironment() *environment {
 }
 
 func newEnvironmentStateV1() *environmentStateV1 {
-	return &environmentStateV1{}
+	return &environmentStateV1{
+		ID:              newTfString(),
+		PublicIPAddress: newTfString(),
+	}
 }
 
 func newPublicIPResolver() *publicIPResolver {
@@ -102,16 +105,17 @@ func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDat
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
-	newState.ID = "static"
+	newState.ID.Set("static")
 
-	ip := newPublicIPResolver()
-	newState.PublicIPAddress, err = ip.Resolve(ctx)
+	resolver := newPublicIPResolver()
+	ip, err := resolver.Resolve(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
 			err, "ip address", "failed to resolve public IP address",
 		)))
 		return res, err
 	}
+	newState.PublicIPAddress.Set(ip.String())
 
 	res.State, err = marshal(newState)
 	if err != nil {
@@ -156,39 +160,27 @@ func (s *environmentStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id": &s.ID,
+	_, err := mapAttributesTo(val, map[string]interface{}{
+		"id":                s.ID,
+		"public_ip_address": s.PublicIPAddress,
 	})
-	if err != nil {
-		return err
-	}
 
-	if vals["public_ip_address"].IsKnown() && !vals["public_ip_address"].IsNull() {
-		var ip string
-		err = vals["public_ip_address"].As(ip)
-		if err != nil {
-			return wrapErrWithDiagnostics(err, "invalid syntax", "failed to unmarshal value", "public_ip_address")
-		}
-
-		s.PublicIPAddress = net.ParseIP(ip)
-	}
-
-	return nil
+	return err
 }
 
 // Terraform5Type is the file state tftypes.Type.
 func (s *environmentStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                tftypes.String,
-		"public_ip_address": tftypes.String,
+		"id":                s.ID.TFType(),
+		"public_ip_address": s.PublicIPAddress.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *environmentStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":                tfMarshalStringValue(s.ID),
-		"public_ip_address": tfMarshalStringValue(s.PublicIPAddress.String()),
+		"id":                s.ID.TFValue(),
+		"public_ip_address": s.PublicIPAddress.TFValue(),
 	})
 }
 

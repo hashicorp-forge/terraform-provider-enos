@@ -20,9 +20,9 @@ type vaultInit struct {
 var _ resourcerouter.Resource = (*vaultInit)(nil)
 
 type vaultInitStateV1 struct {
-	ID        string
-	BinPath   string
-	VaultAddr string
+	ID        *tfString
+	BinPath   *tfString
+	VaultAddr *tfString
 	Transport *embeddedTransportV1
 	// inputs
 	KeyShares         *tfNum
@@ -31,9 +31,9 @@ type vaultInitStateV1 struct {
 	RecoveryShares    *tfNum
 	RecoveryThreshold *tfNum
 	RecoveryPGPKeys   *tfStringSlice
-	RootTokenPGPKey   string
+	RootTokenPGPKey   *tfString
 	ConsulAuto        *tfBool
-	ConsulService     string
+	ConsulService     *tfString
 	StoredShares      *tfNum
 	// outputs
 	UnsealKeysB64         *tfStringSlice
@@ -44,7 +44,7 @@ type vaultInitStateV1 struct {
 	RecoveryKeysHex       *tfStringSlice
 	RecoveryKeysShares    *tfNum
 	RecoveryKeysThreshold *tfNum
-	RootToken             string
+	RootToken             *tfString
 }
 
 var _ State = (*vaultInitStateV1)(nil)
@@ -58,25 +58,31 @@ func newVaultInit() *vaultInit {
 
 func newVaultInitStateV1() *vaultInitStateV1 {
 	return &vaultInitStateV1{
+		ID:        newTfString(),
+		BinPath:   newTfString(),
+		VaultAddr: newTfString(),
 		Transport: newEmbeddedTransport(),
 		// inputs
-		KeyShares:         &tfNum{},
-		KeyThreshold:      &tfNum{},
-		PGPKeys:           &tfStringSlice{},
-		RecoveryShares:    &tfNum{},
-		RecoveryThreshold: &tfNum{},
-		RecoveryPGPKeys:   &tfStringSlice{},
-		ConsulAuto:        &tfBool{},
-		StoredShares:      &tfNum{},
+		KeyShares:         newTfNum(),
+		KeyThreshold:      newTfNum(),
+		PGPKeys:           newTfStringSlice(),
+		RecoveryShares:    newTfNum(),
+		RecoveryThreshold: newTfNum(),
+		RecoveryPGPKeys:   newTfStringSlice(),
+		RootTokenPGPKey:   newTfString(),
+		ConsulAuto:        newTfBool(),
+		ConsulService:     newTfString(),
+		StoredShares:      newTfNum(),
 		// outputs
-		UnsealKeysB64:         &tfStringSlice{},
-		UnsealKeysHex:         &tfStringSlice{},
-		UnsealShares:          &tfNum{},
-		UnsealThreshold:       &tfNum{},
-		RecoveryKeysB64:       &tfStringSlice{},
-		RecoveryKeysHex:       &tfStringSlice{},
-		RecoveryKeysShares:    &tfNum{},
-		RecoveryKeysThreshold: &tfNum{},
+		UnsealKeysB64:         newTfStringSlice(),
+		UnsealKeysHex:         newTfStringSlice(),
+		UnsealShares:          newTfNum(),
+		UnsealThreshold:       newTfNum(),
+		RecoveryKeysB64:       newTfStringSlice(),
+		RecoveryKeysHex:       newTfStringSlice(),
+		RecoveryKeysShares:    newTfNum(),
+		RecoveryKeysThreshold: newTfNum(),
+		RootToken:             newTfString(),
 	}
 }
 
@@ -163,18 +169,19 @@ func (r *vaultInit) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanR
 	}
 
 	// When we're planning we need to determine if we've already applied before
-	// or if we're planning to apply. If we already have an ID we've been applied
-	// before and can simply plan to have the same state since it'll be a no-op
-	// apply. If we haven't applied then we need to set all of our computed
-	// outputs to unknown values.
-	if priorState.ID == "" {
-		proposedState.UnsealKeysB64.unknown = true
-		proposedState.UnsealKeysHex.unknown = true
-		proposedState.UnsealShares.unknown = true
-		proposedState.UnsealThreshold.unknown = true
-		proposedState.RecoveryKeysB64.unknown = true
-		proposedState.RecoveryKeysHex.unknown = true
-		proposedState.RootToken = UnknownString
+	// or if we're planning to apply for the first time. If we already have an
+	// ID we've been applied before and can simply plan to have the same state
+	// since it'll be a no-op apply. If we haven't applied then we need to set
+	// all of our computed outputs to unknown values.
+	if _, ok := priorState.ID.Get(); !ok {
+		proposedState.ID.Unknown = true
+		proposedState.UnsealKeysB64.Unknown = true
+		proposedState.UnsealKeysHex.Unknown = true
+		proposedState.UnsealShares.Unknown = true
+		proposedState.UnsealThreshold.Unknown = true
+		proposedState.RecoveryKeysB64.Unknown = true
+		proposedState.RecoveryKeysHex.Unknown = true
+		proposedState.RootToken.Unknown = true
 	}
 
 	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
@@ -193,7 +200,7 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req *tfprotov5.Appl
 		return res, err
 	}
 
-	if plannedState.BinPath == "" {
+	if _, ok := plannedState.BinPath.Get(); !ok {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
 
@@ -205,8 +212,7 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req *tfprotov5.Appl
 		return res, err
 	}
 
-	plannedID := "static"
-	plannedState.ID = plannedID
+	plannedState.ID.Set("static")
 
 	ssh, err := transport.Client(ctx)
 	if err != nil {
@@ -374,20 +380,20 @@ func (s *vaultInitStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *vaultInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":         &s.ID,
-		"bin_path":   &s.BinPath,
-		"vault_addr": &s.VaultAddr,
+		"id":         s.ID,
+		"bin_path":   s.BinPath,
+		"vault_addr": s.VaultAddr,
 		// inputs
 		"key_shares":         s.KeyShares,
 		"key_threshold":      s.KeyThreshold,
 		"pgp_keys":           s.PGPKeys,
-		"root_token_pgp_key": &s.RootTokenPGPKey,
+		"root_token_pgp_key": s.RootTokenPGPKey,
 		"recovery_shares":    s.RecoveryShares,
 		"recovery_threshold": s.RecoveryThreshold,
 		"recovery_pgp_keys":  s.RecoveryPGPKeys,
 		"stored_shares":      s.StoredShares,
 		"consul_auto":        s.ConsulAuto,
-		"consul_service":     &s.ConsulService,
+		"consul_service":     s.ConsulService,
 		// outputs
 		"unseal_keys_shares":      s.UnsealShares,
 		"unseal_keys_threshold":   s.UnsealThreshold,
@@ -397,7 +403,7 @@ func (s *vaultInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"recovery_keys_threshold": s.RecoveryKeysThreshold,
 		"recovery_keys_b64":       s.RecoveryKeysB64,
 		"recovery_keys_hex":       s.RecoveryKeysHex,
-		"root_token":              &s.RootToken,
+		"root_token":              s.RootToken,
 	})
 	if err != nil {
 		return err
@@ -413,21 +419,21 @@ func (s *vaultInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *vaultInitStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":         tftypes.String,
-		"bin_path":   tftypes.String,
-		"vault_addr": tftypes.String,
+		"id":         s.ID.TFType(),
+		"bin_path":   s.BinPath.TFType(),
+		"vault_addr": s.VaultAddr.TFType(),
 		"transport":  s.Transport.Terraform5Type(),
 		// inputs
 		"key_shares":         s.KeyShares.TFType(),
 		"key_threshold":      s.KeyThreshold.TFType(),
 		"pgp_keys":           s.PGPKeys.TFType(),
-		"root_token_pgp_key": tftypes.String,
+		"root_token_pgp_key": s.RootTokenPGPKey.TFType(),
 		"recovery_shares":    s.RecoveryShares.TFType(),
 		"recovery_threshold": s.RecoveryThreshold.TFType(),
 		"recovery_pgp_keys":  s.RecoveryPGPKeys.TFType(),
 		"stored_shares":      s.StoredShares.TFType(),
 		"consul_auto":        s.ConsulAuto.TFType(),
-		"consul_service":     tftypes.String,
+		"consul_service":     s.ConsulService.TFType(),
 		// outputs
 		"unseal_keys_b64":         s.UnsealKeysB64.TFType(),
 		"unseal_keys_hex":         s.UnsealKeysHex.TFType(),
@@ -437,28 +443,28 @@ func (s *vaultInitStateV1) Terraform5Type() tftypes.Type {
 		"recovery_keys_hex":       s.RecoveryKeysHex.TFType(),
 		"recovery_keys_shares":    s.RecoveryShares.TFType(),
 		"recovery_keys_threshold": s.RecoveryKeysThreshold.TFType(),
-		"root_token":              tftypes.String,
+		"root_token":              s.RootToken.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *vaultInitStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":         tfMarshalStringValue(s.ID),
-		"bin_path":   tfMarshalStringValue(s.BinPath),
-		"vault_addr": tfMarshalStringValue(s.VaultAddr),
+		"id":         s.ID.TFValue(),
+		"bin_path":   s.BinPath.TFValue(),
+		"vault_addr": s.VaultAddr.TFValue(),
 		"transport":  s.Transport.Terraform5Value(),
 		// inputs
 		"key_shares":         s.KeyShares.TFValue(),
 		"key_threshold":      s.KeyThreshold.TFValue(),
 		"pgp_keys":           s.PGPKeys.TFValue(),
-		"root_token_pgp_key": tfMarshalStringOptionalValue(s.RootTokenPGPKey),
+		"root_token_pgp_key": s.RootTokenPGPKey.TFValue(),
 		"recovery_shares":    s.RecoveryShares.TFValue(),
 		"recovery_threshold": s.RecoveryThreshold.TFValue(),
 		"recovery_pgp_keys":  s.RecoveryPGPKeys.TFValue(),
 		"stored_shares":      s.StoredShares.TFValue(),
 		"consul_auto":        s.ConsulAuto.TFValue(),
-		"consul_service":     tfMarshalStringOptionalValue(s.ConsulService),
+		"consul_service":     s.ConsulService.TFValue(),
 		// outputs
 		"unseal_keys_b64":         s.UnsealKeysB64.TFValue(),
 		"unseal_keys_hex":         s.UnsealKeysHex.TFValue(),
@@ -468,7 +474,7 @@ func (s *vaultInitStateV1) Terraform5Value() tftypes.Value {
 		"recovery_keys_hex":       s.RecoveryKeysHex.TFValue(),
 		"recovery_keys_shares":    s.RecoveryKeysShares.TFValue(),
 		"recovery_keys_threshold": s.RecoveryKeysThreshold.TFValue(),
-		"root_token":              tfMarshalStringValue(s.RootToken),
+		"root_token":              s.RootToken.TFValue(),
 	})
 }
 
@@ -491,95 +497,92 @@ func (s *vaultInitStateV1) Init(ctx context.Context, ssh it.Transport) error {
 	}
 
 	// Migrate the init response to the state
-	s.UnsealKeysB64.Set(res.UnsealKeysB64)
-	s.UnsealKeysHex.Set(res.UnsealKeysHex)
+	s.UnsealKeysB64.SetStrings(res.UnsealKeysB64)
+	s.UnsealKeysHex.SetStrings(res.UnsealKeysHex)
 	shares, err := res.UnsealShares.Int64()
 	if err != nil {
 		s.UnsealShares.Set(int(shares))
 	} else {
-		s.UnsealShares.null = true
-		s.UnsealShares.unknown = false
+		s.UnsealShares.Null = true
+		s.UnsealShares.Unknown = false
 	}
 	thresh, err := res.UnsealThreshold.Int64()
 	if err != nil {
 		s.UnsealThreshold.Set(int(thresh))
 	} else {
-		s.UnsealThreshold.null = true
-		s.UnsealThreshold.unknown = false
+		s.UnsealThreshold.Null = true
+		s.UnsealThreshold.Unknown = false
 	}
-	s.RecoveryKeysB64.Set(res.RecoveryKeysB64)
-	s.RecoveryKeysHex.Set(res.RecoveryKeysHex)
+	s.RecoveryKeysB64.SetStrings(res.RecoveryKeysB64)
+	s.RecoveryKeysHex.SetStrings(res.RecoveryKeysHex)
 	shares, err = res.RecoveryKeysShares.Int64()
 	if err != nil {
 		s.RecoveryKeysShares.Set(int(shares))
 	} else {
-		s.RecoveryKeysShares.null = true
-		s.RecoveryKeysShares.unknown = false
+		s.RecoveryKeysShares.Null = true
+		s.RecoveryKeysShares.Unknown = false
 	}
 	thresh, err = res.RecoveryKeysThreshold.Int64()
 	if err != nil {
 		s.RecoveryKeysThreshold.Set(int(thresh))
 	} else {
-		s.RecoveryKeysThreshold.null = true
-		s.RecoveryKeysThreshold.unknown = false
+		s.RecoveryKeysThreshold.Null = true
+		s.RecoveryKeysThreshold.Unknown = false
 	}
-	s.RootToken = res.RootToken
+	s.RootToken.Set(res.RootToken)
 
 	return nil
 }
 
 func (s *vaultInitStateV1) buildInitRequest() *vault.InitRequest {
-	opts := []vault.InitRequestOpt{
-		vault.WithInitRequestBinPath(s.BinPath),
-		vault.WithInitRequestVaultAddr(s.VaultAddr),
+	opts := []vault.InitRequestOpt{}
+
+	if binPath, ok := s.BinPath.Get(); ok {
+		opts = append(opts, vault.WithInitRequestBinPath(binPath))
 	}
 
-	keyShares, ok := s.KeyShares.Get()
-	if ok {
+	if vaultAddr, ok := s.VaultAddr.Get(); ok {
+		opts = append(opts, vault.WithInitRequestVaultAddr(vaultAddr))
+	}
+
+	if keyShares, ok := s.KeyShares.Get(); ok {
 		opts = append(opts, vault.WithInitRequestKeyShares(keyShares))
 	}
 
-	keyThreshold, ok := s.KeyThreshold.Get()
-	if ok {
+	if keyThreshold, ok := s.KeyThreshold.Get(); ok {
 		opts = append(opts, vault.WithInitRequestKeyThreshold(keyThreshold))
 	}
 
-	pgpKeys, ok := s.PGPKeys.Get()
-	if ok {
+	if pgpKeys, ok := s.PGPKeys.GetStrings(); ok {
 		opts = append(opts, vault.WithInitRequestPGPKeys(pgpKeys))
 	}
 
-	if s.RootTokenPGPKey != "" && s.RootTokenPGPKey != UnknownString {
-		opts = append(opts, vault.WithInitRequestRootTokenPGPKey(s.RootTokenPGPKey))
+	if rootTokenPGPKey, ok := s.RootTokenPGPKey.Get(); ok {
+		opts = append(opts, vault.WithInitRequestRootTokenPGPKey(rootTokenPGPKey))
 	}
 
-	recoveryShares, ok := s.RecoveryShares.Get()
-	if ok {
+	if recoveryShares, ok := s.RecoveryShares.Get(); ok {
 		opts = append(opts, vault.WithInitRequestRecoveryShares(recoveryShares))
 	}
 
-	recoveryThreshold, ok := s.RecoveryThreshold.Get()
-	if ok {
+	if recoveryThreshold, ok := s.RecoveryThreshold.Get(); ok {
 		opts = append(opts, vault.WithInitRequestRecoveryThreshold(recoveryThreshold))
 	}
 
-	recoveryPGPKeys, ok := s.RecoveryPGPKeys.Get()
-	if ok {
+	if recoveryPGPKeys, ok := s.RecoveryPGPKeys.GetStrings(); ok {
 		opts = append(opts, vault.WithInitRequestRecoveryPGPKeys(recoveryPGPKeys))
 	}
 
-	storedShares, ok := s.StoredShares.Get()
-	if ok {
+	if storedShares, ok := s.StoredShares.Get(); ok {
 		opts = append(opts, vault.WithInitRequestStoredShares(storedShares))
 	}
 
-	consulAuto, ok := s.ConsulAuto.Get()
-	if ok {
+	if consulAuto, ok := s.ConsulAuto.Get(); ok {
 		opts = append(opts, vault.WithInitRequestConsulAuto(consulAuto))
 	}
 
-	if s.ConsulService != "" && s.ConsulService != UnknownString {
-		opts = append(opts, vault.WithInitRequestConsulService(s.ConsulService))
+	if consulSvc, ok := s.ConsulService.Get(); ok {
+		opts = append(opts, vault.WithInitRequestConsulService(consulSvc))
 	}
 
 	return vault.NewInitRequest(opts...)

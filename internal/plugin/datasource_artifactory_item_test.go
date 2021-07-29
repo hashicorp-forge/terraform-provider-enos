@@ -29,31 +29,33 @@ func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 		return
 	}
 
-	state.Username = username
-	state.Token = token
-	state.Host = "https://artifactory.hashicorp.engineering/artifactory"
-	state.Repo = "hashicorp-packagespec-buildcache-local*"
-	state.Path = "cache-v1/vault-enterprise/*"
-	state.Name = "*.zip"
-	state.Properties["artifactType"] = "package"
-	state.Properties["productVersion"] = version
-	state.Properties["productRevision"] = revision
-	state.Properties["GOOS"] = "linux"
-	state.Properties["GOARCH"] = "amd64"
-	state.Properties["EDITION"] = "ent"
+	state.Username.Set(username)
+	state.Token.Set(token)
+	state.Host.Set("https://artifactory.hashicorp.engineering/artifactory")
+	state.Repo.Set("hashicorp-packagespec-buildcache-local*")
+	state.Path.Set("cache-v1/vault-enterprise/*")
+	state.Name.Set("*.zip")
+	state.Properties.SetStrings(map[string]string{
+		"artifactType":    "package",
+		"productVersion":  version,
+		"productRevision": revision,
+		"GOOS":            "linux",
+		"GOARCH":          "amd64",
+		"EDITION":         "ent",
+	})
 
 	cfg := template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
-  username = "{{ .Username }}"
-  token    = "{{ .Token }}"
+  username = "{{ .Username.Value }}"
+  token    = "{{ .Token.Value }}"
 
-  host = "{{ .Host }}"
-  repo = "{{ .Repo }}"
-  path = "{{ .Path }}"
-  name = "{{ .Name }}"
+  host = "{{ .Host.Value }}"
+  repo = "{{ .Repo.Value }}"
+  path = "{{ .Path.Value }}"
+  name = "{{ .Name.Value }}"
 
-  {{ if .Properties -}}
+  {{ if .Properties.StringValue -}}
   properties = {
-	{{ range $k, $v := .Properties -}}
+	{{ range $k, $v := .Properties.StringValue -}}
     "{{ $k }}" = "{{ $v }}"
 	{{ end -}}
   }

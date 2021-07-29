@@ -20,15 +20,15 @@ type artifactoryItem struct {
 var _ datarouter.DataSource = (*artifactoryItem)(nil)
 
 type artifactoryItemStateV1 struct {
-	ID         string
-	Username   string
-	Token      string
-	Host       string
-	Repo       string
-	Path       string
-	Name       string
-	Properties map[string]string
-	Results    []map[string]string
+	ID         *tfString
+	Username   *tfString
+	Token      *tfString
+	Host       *tfString
+	Repo       *tfString
+	Path       *tfString
+	Name       *tfString
+	Properties *tfStringMap
+	Results    *tfObjectSlice
 }
 
 var _ State = (*artifactoryItemStateV1)(nil)
@@ -40,9 +40,25 @@ func newArtifactoryItem() *artifactoryItem {
 }
 
 func newArtifactoryItemStateV1() *artifactoryItemStateV1 {
+	results := newTfObjectSlice()
+	results.AttrTypes = map[string]tftypes.Type{
+		"name":   tftypes.String,
+		"type":   tftypes.String,
+		"url":    tftypes.String,
+		"sha256": tftypes.String,
+		"size":   tftypes.String,
+	}
+
 	return &artifactoryItemStateV1{
-		Properties: map[string]string{},
-		Results:    []map[string]string{},
+		ID:         newTfString(),
+		Username:   newTfString(),
+		Token:      newTfString(),
+		Host:       newTfString(),
+		Repo:       newTfString(),
+		Path:       newTfString(),
+		Name:       newTfString(),
+		Properties: newTfStringMap(),
+		Results:    results,
 	}
 }
 
@@ -106,7 +122,7 @@ func (d *artifactoryItem) ReadDataSource(ctx context.Context, req *tfprotov5.Rea
 		return res, err
 	}
 
-	newState.ID = "static"
+	newState.ID.Set("static")
 
 	err = newState.Search(ctx)
 	if err != nil {
@@ -172,7 +188,7 @@ func (s *artifactoryItemStateV1) Schema() *tfprotov5.Schema {
 				},
 				{
 					Name:     "results",
-					Type:     s.ResultsTerraform5Type(),
+					Type:     s.Results.TFType(),
 					Computed: true,
 				},
 			},
@@ -188,11 +204,13 @@ func (s *artifactoryItemStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	if !govalidator.IsURL(s.Host) {
+	host, ok := s.Host.Get()
+	if !ok || !govalidator.IsURL(host) {
 		return newErrWithDiagnostics("invalid configuration", "the host must be a valid URL", "host")
 	}
 
-	if !govalidator.IsEmail(s.Username) {
+	username, ok := s.Username.Get()
+	if !ok || !govalidator.IsEmail(username) {
 		return newErrWithDiagnostics("invalid configuration", "the username must be a valid email address", "username")
 	}
 
@@ -201,53 +219,17 @@ func (s *artifactoryItemStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the		tftypes.Vault with As().
 func (s *artifactoryItemStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":       &s.ID,
-		"username": &s.Username,
-		"token":    &s.Token,
-		"host":     &s.Host,
-		"repo":     &s.Repo,
-		"path":     &s.Path,
-		"name":     &s.Name,
+	_, err := mapAttributesTo(val, map[string]interface{}{
+		"id":         s.ID,
+		"username":   s.Username,
+		"token":      s.Token,
+		"host":       s.Host,
+		"repo":       s.Repo,
+		"path":       s.Path,
+		"name":       s.Name,
+		"properties": s.Properties,
+		"results":    s.Results,
 	})
-	if err != nil {
-		return err
-	}
-
-	props, ok := vals["properties"]
-	if ok {
-		if props.IsKnown() && !props.IsNull() {
-			s.Properties, err = tfUnmarshalStringMap(props)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	results, ok := vals["results"]
-	if ok {
-		if results.IsKnown() && !results.IsNull() {
-			// Get a list of all the results as values
-			resVals := []tftypes.Value{}
-			err := results.As(&resVals)
-			if err != nil {
-				return err
-			}
-
-			// Convert the result values into our results
-			for _, res := range resVals {
-				if res.IsKnown() && !res.IsNull() {
-					to := map[string]string{}
-					err := res.As(&to)
-					if err != nil {
-						return err
-					}
-
-					s.Results = append(s.Results, to)
-				}
-			}
-		}
-	}
 
 	return err
 }
@@ -255,74 +237,31 @@ func (s *artifactoryItemStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *artifactoryItemStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":         tftypes.String,
-		"username":   tftypes.String,
-		"token":      tftypes.String,
-		"host":       tftypes.String,
-		"repo":       tftypes.String,
-		"path":       tftypes.String,
-		"name":       tftypes.String,
-		"properties": tftypes.Map{AttributeType: tftypes.String},
-		"results":    s.ResultsTerraform5Type(),
+		"id":         s.ID.TFType(),
+		"username":   s.Username.TFType(),
+		"token":      s.Token.TFType(),
+		"host":       s.Host.TFType(),
+		"repo":       s.Repo.TFType(),
+		"path":       s.Path.TFType(),
+		"name":       s.Name.TFType(),
+		"properties": s.Properties.TFType(),
+		"results":    s.Results.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *artifactoryItemStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":         tfMarshalStringValue(s.ID),
-		"username":   tfMarshalStringValue(s.Username),
-		"token":      tfMarshalStringValue(s.Token),
-		"host":       tfMarshalStringValue(s.Host),
-		"repo":       tfMarshalStringOptionalValue(s.Repo),
-		"path":       tfMarshalStringOptionalValue(s.Path),
-		"name":       tfMarshalStringOptionalValue(s.Name),
-		"properties": tfMarshalStringMap(s.Properties),
-		"results":    s.ResultsTerraform5Value(),
+		"id":         s.ID.TFValue(),
+		"username":   s.Username.TFValue(),
+		"token":      s.Token.TFValue(),
+		"host":       s.Host.TFValue(),
+		"repo":       s.Repo.TFValue(),
+		"path":       s.Path.TFValue(),
+		"name":       s.Name.TFValue(),
+		"properties": s.Properties.TFValue(),
+		"results":    s.Results.TFValue(),
 	})
-}
-
-// ResultsTerraform5Type is the results attribute as a terraform type
-func (s *artifactoryItemStateV1) ResultsTerraform5Type() tftypes.Type {
-	return tftypes.List{ElementType: s.ResultTerraform5Type()}
-}
-
-// ResultTerraform5AttributeTypes are a results attributes as a terraform type
-func (s *artifactoryItemStateV1) ResultTerraform5AttributeTypes() map[string]tftypes.Type {
-	return map[string]tftypes.Type{
-		"name":   tftypes.String,
-		"type":   tftypes.String,
-		"url":    tftypes.String,
-		"sha256": tftypes.String,
-		"size":   tftypes.String,
-	}
-}
-
-// ResultTerraform5Type is and individual result as a terraform type
-func (s *artifactoryItemStateV1) ResultTerraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: s.ResultTerraform5AttributeTypes(),
-	}
-}
-
-// ResultsTerraform5Value is the results as a terraform value
-func (s *artifactoryItemStateV1) ResultsTerraform5Value() tftypes.Value {
-	resVals := []tftypes.Value{}
-
-	for _, res := range s.Results {
-		resVal := map[string]tftypes.Value{}
-
-		for attr := range s.ResultTerraform5AttributeTypes() {
-			v, ok := res[attr]
-			if ok {
-				resVal[attr] = tfMarshalStringValue(v)
-			}
-		}
-
-		resVals = append(resVals, tftypes.NewValue(s.ResultTerraform5Type(), resVal))
-	}
-
-	return tftypes.NewValue(s.ResultsTerraform5Type(), resVals)
 }
 
 // Search queries the aritfactory API and parses the results
@@ -333,24 +272,37 @@ func (s *artifactoryItemStateV1) Search(ctx context.Context) error {
 	default:
 	}
 
+	host, ok := s.Host.Get()
+	if !ok {
+		return newErrWithDiagnostics("search client", "missing required artifactory client parameter", "host")
+	}
+	username, ok := s.Username.Get()
+	if !ok {
+		return newErrWithDiagnostics("search client", "missing required artifactory client parameter", "username")
+	}
+	token, ok := s.Token.Get()
+	if !ok {
+		return newErrWithDiagnostics("search client", "missing required artifactory client parameter", "token")
+	}
+
 	client := artifactory.NewClient(
-		artifactory.WithHost(s.Host),
-		artifactory.WithUsername(s.Username),
-		artifactory.WithToken(s.Token),
+		artifactory.WithHost(host),
+		artifactory.WithUsername(username),
+		artifactory.WithToken(token),
 	)
 
 	reqArgs := []artifactory.SearchAQLOpt{}
-	if s.Repo != "" && s.Repo != UnknownString {
-		reqArgs = append(reqArgs, artifactory.WithRepo(s.Repo))
+	if repo, ok := s.Repo.Get(); ok {
+		reqArgs = append(reqArgs, artifactory.WithRepo(repo))
 	}
-	if s.Path != "" && s.Path != UnknownString {
-		reqArgs = append(reqArgs, artifactory.WithPath(s.Path))
+	if path, ok := s.Path.Get(); ok {
+		reqArgs = append(reqArgs, artifactory.WithPath(path))
 	}
-	if s.Name != "" && s.Name != UnknownString {
-		reqArgs = append(reqArgs, artifactory.WithName(s.Name))
+	if name, ok := s.Name.Get(); ok {
+		reqArgs = append(reqArgs, artifactory.WithName(name))
 	}
-	if len(s.Properties) > 0 {
-		reqArgs = append(reqArgs, artifactory.WithProperties(s.Properties))
+	if props, ok := s.Properties.GetStrings(); ok {
+		reqArgs = append(reqArgs, artifactory.WithProperties(props))
 	}
 
 	req := artifactory.NewSearchAQLRequest(reqArgs...)
@@ -359,15 +311,31 @@ func (s *artifactoryItemStateV1) Search(ctx context.Context) error {
 		return wrapErrWithDiagnostics(err, "search failure", "failed to search for artifactory item")
 	}
 
+	results := []*tfObject{}
 	for _, result := range res.Results {
-		s.Results = append(s.Results, map[string]string{
-			"name":   result.Name,
-			"type":   result.Type,
-			"url":    fmt.Sprintf("%s/%s", s.Host, path.Join(result.Repo, result.Path, result.Name)),
-			"sha256": result.SHA256,
-			"size":   result.Size.String(),
+		r := newTfObject()
+		resName := newTfString()
+		resName.Set(result.Name)
+		resType := newTfString()
+		resType.Set(result.Type)
+		resURL := newTfString()
+		resURL.Set(fmt.Sprintf("%s/%s", host, path.Join(result.Repo, result.Path, result.Name)))
+		resSHA256 := newTfString()
+		resSHA256.Set(result.SHA256)
+		resSize := newTfString()
+		resSize.Set(result.Size.String())
+
+		r.Set(map[string]interface{}{
+			"name":   resName,
+			"type":   resType,
+			"url":    resURL,
+			"sha256": resSHA256,
+			"size":   resSize,
 		})
+		results = append(results, r)
 	}
+
+	s.Results.Set(results)
 
 	return nil
 }
