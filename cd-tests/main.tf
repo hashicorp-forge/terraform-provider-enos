@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 0.15.3"
+  required_version = ">= 0.15.3"
 
   backend "remote" {}
 
@@ -15,8 +15,10 @@ terraform {
 }
 
 provider "aws" {
+  alias  = "east"
   region = "us-east-1"
 }
+
 provider "enos" {
   transport = {
     ssh = {
@@ -25,8 +27,12 @@ provider "enos" {
     }
   }
 }
+
 module "enos_infra" {
   source = "app.terraform.io/hashicorp-qti/aws-infra/enos"
+  providers = {
+    aws = aws.east
+  }
 
   project_name = "qti-enos-provider"
   environment  = "ci"
@@ -70,9 +76,9 @@ module "vault_cluster" {
   vpc_id          = module.enos_infra.vpc_id
   kms_key_arn     = module.enos_infra.kms_key_arn
   consul_ips      = module.consul_cluster.instance_private_ips
-  vault_license   = "none"
+  vault_license   =file("/tmp/vault.hclic")
   vault_release = {
-    version = "1.7.0"
+    version = "1.8.0"
     edition = "ent"
   }
 }

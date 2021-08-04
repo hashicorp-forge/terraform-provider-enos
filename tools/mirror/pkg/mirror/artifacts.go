@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 
@@ -131,7 +132,7 @@ func (a *Artifacts) Insert(version, platform, arch string, archive *Archive) {
 	}
 
 	a.releases[version].AddArchive(platform, arch, archive)
-	a.idx.Versions[version] = &IndexValue{}
+	a.AddReleaseVersionToIndex(version)
 }
 
 // WriteMetadata writes the artifact collection as JSON metadata into the local
@@ -173,7 +174,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.log.Infow(
+	a.log.Debugw(
 		"attempting to get remote mirror index.json from bucket",
 		"bucket", bucket,
 		"id", providerID,
@@ -201,7 +202,114 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	}
 
 	a.idx = &Index{}
+
 	return json.Unmarshal(buf, a.idx)
+}
+
+// LoadRemoteReleaseMetedataForVersion fetches the version.json for a given
+// release from the remote bucket and loads it. We need this information to
+// known what and where release artifacts for the release are.
+func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3Client *s3.Client, bucket string, providerID string, version string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	key := aws.String(filepath.Join(providerID, fmt.Sprintf("%s.json", version)))
+
+	a.log.Debugw(
+		"attempting to get remote mirror file from bucket",
+		"bucket", bucket,
+		"id", providerID,
+		"key", key,
+	)
+
+	head, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    key,
+	})
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, int(head.ContentLength))
+	bufwriter := manager.NewWriteAtBuffer(buf)
+	downloader := manager.NewDownloader(s3Client)
+	_, err = downloader.Download(ctx, bufwriter, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    key,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.releases[version] = NewRelease()
+
+	return json.Unmarshal(buf, a.releases[version])
+}
+
+// HasVersion checks if the artifact version exists in the loaded index.json
+// of the remote mirror.
+func (a *Artifacts) HasVersion(ctx context.Context, version string) (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Debugw("checking if version exists",
+		"version", version,
+	)
+
+	if a.idx == nil {
+		return false, fmt.Errorf("no index")
+	}
+
+	_, ok := a.idx.Versions[version]
+
+	return ok, nil
+}
+
+// CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies artifacts from
+// a remote s3 mirror to another remote mirror
+func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, providerName string, providerID string, version string) error {
+	a.log.Infow("copying release artifacts between remote buckets", "source bucket", srcBucketName, "destination bucket", destBucketName)
+
+	err := a.LoadRemoteReleaseMetedataForVersion(ctx, destS3Client, srcBucketName, providerID, version)
+	if err != nil {
+		return err
+	}
+
+	filesToCopy := map[string]string{
+		path.Join(srcBucketName, providerID, fmt.Sprintf("%s.json", version)): path.Join(providerID, fmt.Sprintf("%s.json", version)),
+	}
+	for _, archive := range a.releases[version].Archives {
+		filesToCopy[path.Join(srcBucketName, providerID, archive.URL)] = path.Join(providerID, archive.URL)
+	}
+
+	for srcFile, destKey := range filesToCopy {
+		a.log.Debugw("copying file",
+			"bucket", destBucketName,
+			"source", srcFile,
+			"destination", destKey,
+		)
+
+		input := &s3.CopyObjectInput{
+			Bucket:     aws.String(destBucketName),
+			CopySource: aws.String(srcFile),
+			Key:        aws.String(destKey),
+			// Todo:
+			// ACL:        aws.String("bucket-owner-full-control"),
+		}
+
+		_, err := destS3Client.CopyObject(ctx, input)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// AddReleaseVersionToIndex adds the release version to the mirror index
+func (a *Artifacts) AddReleaseVersionToIndex(version string) {
+	a.idx.Versions[version] = &IndexValue{}
 }
 
 // PublishToRemoteBucket publishes the artifacts in the local mirror to the

@@ -53,7 +53,7 @@ func (l *Local) Initialize() error {
 	return err
 }
 
-// Close remoces all of the mirrors files
+// Close removes all of the mirrors files
 func (l *Local) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -79,6 +79,22 @@ func (l *Local) SetLogLevel(level zapcore.Level) error {
 // LoadRemoteIndex fetches a remote index and loads it
 func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
 	return l.artifacts.LoadRemoteIndex(ctx, s3Client, bucket, providerID)
+}
+
+// HasVersion checks if t the version exists in the bucket
+func (l *Local) HasVersion(ctx context.Context, version string) (bool, error) {
+	return l.artifacts.HasVersion(ctx, version)
+}
+
+// CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies release artifacts from source bucket
+// to the destination bucket.
+func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, providerName string, providerID string, version string) error {
+	return l.artifacts.CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx, srcBucketName, destS3Client, destBucketName, providerName, providerID, version)
+}
+
+// AddReleaseVersionToIndex adds a version to the release index
+func (l *Local) AddReleaseVersionToIndex(ctx context.Context, version string) {
+	l.artifacts.AddReleaseVersionToIndex(version)
 }
 
 // PublishToRemoteBucket publishes the local mirror artifacts into the remote
