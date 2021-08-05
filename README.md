@@ -55,10 +55,6 @@ provider_installation {
 This configuration will tell Terraform to resolve plugins from the network mirror
 and never attempt to pull it from the public registry.
 
-NOTE: Currently the network mirror is not public so if you wish to use this
-option you'll need to have your IP address allowlisted. Reach out to #team-quality
-for that.
-
 If you prefer keeping this configuration out of your personal Terraform CLI
 configuration you can write it to any file and use the `TF_CLI_CONFIG_FILE`
 environment variable to tell Terraform where the configuration is located.
