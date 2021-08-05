@@ -66,12 +66,18 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
       - name: Terraform Apply
+        continue-on-error: true
         id: apply
         run: terraform apply -auto-approve
         working-directory: ./cd-tests
-      - name: Terraform Apply Status
+      - name: Terraform Apply Retry
+        # Retry apply if it times out on Route table association
+        id: retry_apply
         if: steps.apply.outcome == 'failure'
-        run: exit 1
+        run: |
+          terraform plan -no-color
+          terraform apply -auto-approve
+        working-directory: ./cd-tests
       - name: Terraform Destroy
         id: destroy
         if: ${{ always() }}
