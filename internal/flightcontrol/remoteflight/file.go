@@ -102,7 +102,7 @@ func CopyFile(ctx context.Context, ssh it.Transport, file *CopyFileRequest) erro
 	}
 
 	if file.Chmod != "" {
-		stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("chmod %s %s", file.Chmod, tmpPath)))
+		stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chmod %s %s", file.Chmod, tmpPath)))
 		if err != nil {
 			return WrapErrorWith(err, stdout, stderr, "changing file permissions")
 		}
