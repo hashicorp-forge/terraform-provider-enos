@@ -22,6 +22,7 @@ func Server() tfprotov5.ProviderServer {
 			rr.RegisterResource(newBundleInstall()),
 			rr.RegisterResource(newVaultStart()),
 			rr.RegisterResource(newVaultInit()),
+			rr.RegisterResource(newVaultUnseal()),
 		)),
 	)
 }
