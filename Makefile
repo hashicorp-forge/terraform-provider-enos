@@ -56,7 +56,7 @@ flight-control-build:
 
 flight-control-pack:
 ifndef HASUPX
-	$(error "upx is required to pack enos-flight-control")
+	$(error "upx is required to pack enos-flight-control - get it via `brew install upx`")
 endif
 	pushd ./internal/flightcontrol/binaries || exit 1; \
 	upx --ultra-brute *; \

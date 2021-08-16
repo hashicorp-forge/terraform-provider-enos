@@ -64,8 +64,11 @@ environment variable to tell Terraform where the configuration is located.
 Another option is to build the provider from source and copy it into your provider
 cache.
 
-We've wrapped this into our default `make` target, so running `make` from the root
-of this repository should handle it as long as you have `go` installed.
+For local development, first you will need to build flight control. If you don't have `upx` installed, do this now: `brew install upx`. Next, run `make flight-control install` in the root of this repository.
+
+Alternatively, you can skip installing `upx` and run `make flight-control-build install` instead. Just keep in mind that the resulting binaries will be much larger this way as they won't be compressed with `upx`.
+
+You only need to build flight control once. Subsequently, you can just run `make` or `make install` to rebuild the provider. If you modify flight control, you will need to re-run `make flight-control`. 
 
 NOTE: If you use this method, all modules that use the enos provider will have to
 explicitly specify and configure the enos provider, inheritance won't work.
@@ -625,7 +628,7 @@ The unzip command unzips a zip archive.
 ## Remote flight
 
 The `remoteflight` package provides common functions to install and operate
-`enos-fligth-control` on remote machines through a transport.
+`enos-flight-control` on remote machines through a transport.
 
 # Release Workflow:
 This repo uses the GitHub Actions workflow for CI/CD.
