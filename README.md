@@ -1,17 +1,17 @@
-![Validation](https://github.com/hashicorp/enos-provider/.github/workflows/validate.yml/badge.svg)
+![Validation](https://github.com/hashicorp/enos-provider/actions/workflows/validate.yml/badge.svg)
 
 # enos-provider
 A terraform provider for quality infrastructure
 
 - [Example](#example)
-- [Installation](#installing-the-provider)
+- [Installing the provider](#installing-the-provider)
   - [Network mirror](#network-mirror)
   - [Build from source](#build-from-source)
 - [Creating new sources](#creating-new-sources)
 - [Publishing to the network mirror](#publishing-to-the-network-mirror)
   - [S3 bucket access](#s3-bucket-access)
-  - [Publishing the artfiacts](#publishing-the-artifacts)
-- [Provider configuration](#provider-configuration)
+  - [Publishing the artifacts](#publishing-the-artifacts)
+- [Provider Configuration](#provider-configuration)
 - [Data Sources](#data-sources)
   - [enos_environment](#enos_environment)
   - [enos_artifactory_item](#enos_artifactory_item)
@@ -22,7 +22,19 @@ A terraform provider for quality infrastructure
   - [enos_bundle_install](#enos_bundle_install)
   - [enos_vault_start](#enos_vault_start)
   - [enos_vault_init](#enos_vault_init)
-- [Flight Control](#flight-control)
+  - [enos_vault_unseal](#enos_vault_unseal)
+- [Flight control](#flight-control)
+  - [Commands](#commands)
+    - [Download](#download)
+    - [Unzip](#unzip)
+  - [Remote flight](#remote-flight)
+- [Release Workflow:](#release-workflow)
+    - [Validate](#validate)
+    - [Release](#release)
+    - [Test Current Release](#test-current-release)
+    - [Promote](#promote)
+  - [Artifact publishing to `enos-provider-current` S3 bucket](#artifact-publishing-to-enos-provider-current-s3-bucket)
+  - [Artifact publishing to `enos-provider-stable` S3 bucket](#artifact-publishing-to-enos-provider-stable-s3-bucket)
 
 # Example
 
@@ -68,7 +80,7 @@ For local development, first you will need to build flight control. If you don't
 
 Alternatively, you can skip installing `upx` and run `make flight-control-build install` instead. Just keep in mind that the resulting binaries will be much larger this way as they won't be compressed with `upx`.
 
-You only need to build flight control once. Subsequently, you can just run `make` or `make install` to rebuild the provider. If you modify flight control, you will need to re-run `make flight-control`. 
+You only need to build flight control once. Subsequently, you can just run `make` or `make install` to rebuild the provider. If you modify flight control, you will need to re-run `make flight-control`.
 
 NOTE: If you use this method, all modules that use the enos provider will have to
 explicitly specify and configure the enos provider, inheritance won't work.
@@ -158,7 +170,7 @@ provider "enos" {
 
 The provider provides the following datasources.
 
-# enos_environment
+## enos_environment
 The enos_environment datasource is a datasource that we can use to pass environment
 specific information into our Terraform run. As enos relies on SSH to execute
 the bulk of it's actions, we a common problem is granting access to the host
@@ -188,7 +200,7 @@ module "security_group" {
 }
 ```
 
-# enos_artifactory_item
+## enos_artifactory_item
 The enos_environment datasource is a datasource that we can use to to search
 for items in artifactory. This is useful for finding build artifact URLs
 that we can then install. The datasource will return URLs to all matching
@@ -256,7 +268,7 @@ resource "enos_remote_exec" "download_vault" {
 
 The provider provides the following resources.
 
-# enos_file
+## enos_file
 The enos file resource is capable of copying a local file to a remote destination
 over an SSH transport.
 
@@ -295,7 +307,7 @@ resource "enos_file" "foo" {
 }
 ```
 
-# enos_remote_exec
+## enos_remote_exec
 The enos remote exec resource is capable of running scripts or commands on a
 remote instance over an SSH transport.
 
@@ -341,7 +353,7 @@ resource "enos_remote_exec" "foo" {
 }
 ```
 
-# enos_local_exec
+## enos_local_exec
 The enos local exec resource is capable of running scripts or commands locally.
 
 The following describes the enos_local_file schema:
@@ -369,7 +381,7 @@ resource "enos_local_exec" "foo" {
 }
 ```
 
-# enos_bundle_install
+## enos_bundle_install
 The enos bundle install resource is capable of installing HashiCorp release bundles
 from a local path, releases.hashicorp.com, or from Artifactory onto a remote node.
 
@@ -434,7 +446,7 @@ resource "enos_bundle_install" "vault" {
 }
 ```
 
-# enos_vault_start
+## enos_vault_start
 The enos vault start resource is capable of configuring and starting a Vault
 service. It handles creating the configuration directory, the configuration file,
 the license file, the systemd unit, and starting the service.
@@ -521,7 +533,7 @@ resource "enos_vault_start" "vault" {
 }
 ```
 
-# enos_vault_init
+## enos_vault_init
 The enos vault init resource is capable initializing a Vault cluster.
 
 The following describes the enos_vault_init schema:
@@ -577,6 +589,44 @@ resource "enos_vault_init" "vault" {
   }
 }
 ```
+
+## enos_vault_unseal
+This resource will unseal a running vault cluster. For non-autounsealed vaults,
+it uses the `unseal_keys_hex` from the `enos_vault_init` resource and passes them
+to the appropriate `vault operator unseal` command. Auto-unsealed vaults have their
+seal status checked and will restart the service if needed.
+
+The following describes the enos_vault_unseal schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. It is always 'static'|
+|vault_addr|The configured `api_addr` from `vault_start`|
+|seal_type|The `seal_type` from `vault_start`|
+|unseal_keys|A list of `unseal_keys_hex` (or b64) provided by the output of `vault_init`|
+|transport.ssh.host|The remote host you wish to copy the file to|
+|transport.ssh.user|The username to use when performing the SSH handshake|
+|transport.ssh.private_key|The text value of the private key you wish to use for SSH authentication|
+|transport.ssh.private_key_path|The path of the private key you wish to use for SSH authentication|
+|transport.ssh.passphrase|The text value of the passphrase for an encrypted private key|
+|transport.ssh.passphrase|The path of the passphrase for an encrypted private key|
+
+
+Example
+```hcl
+resource "enos_vault_unseal" "vault" {
+  depends_on  = [enos_vault_init.vault]
+  bin_path   = "/opt/vault/bin/vault"
+  vault_addr  = enos_vault_start.vault.config.api_addr
+  seal_type   = enos_vault_start.vault.config.seal.type
+  unseal_keys = enos_vault_init.vault.unseal_keys_hex
+
+  transport = {
+    ssh = {
+      host = aws_instance.vault_instance.public_ip
+    }
+  }
+}```
 
 # Flight control
 Enos works by executing remote commands on a target machine via an SSH transport
