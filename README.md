@@ -626,7 +626,8 @@ resource "enos_vault_unseal" "vault" {
       host = aws_instance.vault_instance.public_ip
     }
   }
-}```
+}
+```
 
 # Flight control
 Enos works by executing remote commands on a target machine via an SSH transport

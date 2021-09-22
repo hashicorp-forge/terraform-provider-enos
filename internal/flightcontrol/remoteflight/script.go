@@ -134,7 +134,7 @@ func RunScript(ctx context.Context, ssh it.Transport, req *RunScriptRequest) (*R
 	res.Stderr = ui.Stderr().String()
 	res.Stdout = ui.Stdout().String()
 	if merr.ErrorOrNil() != nil {
-		return res, fmt.Errorf("executing script: %w", merr)
+		return res, fmt.Errorf("executing script: %w: %s", merr, stderr)
 	}
 
 	if req.NoCleanup {
