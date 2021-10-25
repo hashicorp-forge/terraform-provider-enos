@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -48,14 +48,14 @@ func wrapErrWithDiagnostics(err error, summary string, detail string, attributes
 // errToDiagnostic takes and error and returns the innermost diagnostic error
 // If a diagnostic error isn't found in the chain then an aggregate chain
 // will be returned.
-func errToDiagnostic(err error) *tfprotov5.Diagnostic {
-	diag := &tfprotov5.Diagnostic{
-		Severity: tfprotov5.DiagnosticSeverityError,
+func errToDiagnostic(err error) *tfprotov6.Diagnostic {
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
 		Summary:  "Error",
 		Detail:   err.Error(),
 	}
 
-	appendErrToDiag := func(diag *tfprotov5.Diagnostic, err error) {
+	appendErrToDiag := func(diag *tfprotov6.Diagnostic, err error) {
 		var diagErr errWithDiagnostics
 		if errors.As(err, &diagErr) {
 			diag.Summary = diagErr.summary

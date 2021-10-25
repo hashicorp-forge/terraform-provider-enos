@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -32,9 +32,9 @@ func newErrSetProviderConfig(err error) error {
 
 // DataSource is the DataSource
 type DataSource interface {
-	tfprotov5.DataSourceServer
+	tfprotov6.DataSourceServer
 	Name() string
-	Schema() *tfprotov5.Schema
+	Schema() *tfprotov6.Schema
 	SetProviderConfig(tftypes.Value) error
 }
 
@@ -46,8 +46,8 @@ type Router struct {
 	dataSources map[string]DataSource
 }
 
-// ValidateDataSourceConfig validates the data sources config
-func (r Router) ValidateDataSourceConfig(ctx context.Context, req *tfprotov5.ValidateDataSourceConfigRequest, meta tftypes.Value) (*tfprotov5.ValidateDataSourceConfigResponse, error) {
+// ValidateDataResourceConfig validates the data sources config
+func (r Router) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest, meta tftypes.Value) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
 	ds, ok := r.dataSources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedDataSource(req.TypeName)
@@ -58,11 +58,11 @@ func (r Router) ValidateDataSourceConfig(ctx context.Context, req *tfprotov5.Val
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return ds.ValidateDataSourceConfig(ctx, req)
+	return ds.ValidateDataResourceConfig(ctx, req)
 }
 
 // ReadDataSource refreshes the data sources state
-func (r Router) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDataSourceRequest, meta tftypes.Value) (*tfprotov5.ReadDataSourceResponse, error) {
+func (r Router) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest, meta tftypes.Value) (*tfprotov6.ReadDataSourceResponse, error) {
 	ds, ok := r.dataSources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedDataSource(req.TypeName)
@@ -102,8 +102,8 @@ func RegisterDataSource(data DataSource) func(Router) Router {
 }
 
 // Schemas returns the data router schemas
-func (r Router) Schemas() map[string]*tfprotov5.Schema {
-	schemas := map[string]*tfprotov5.Schema{}
+func (r Router) Schemas() map[string]*tfprotov6.Schema {
+	schemas := map[string]*tfprotov6.Schema{}
 	for name, dataSource := range r.dataSources {
 		schemas[name] = dataSource.Schema()
 	}

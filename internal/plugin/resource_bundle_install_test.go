@@ -214,7 +214,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			}
 
 			resource.ParallelTest(t, resource.TestCase{
-				ProtoV5ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})
 		})

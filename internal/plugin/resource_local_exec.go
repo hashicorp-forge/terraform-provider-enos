@@ -16,7 +16,7 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/enos-provider/internal/ui"
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -64,7 +64,7 @@ func (l *localExec) Name() string {
 	return "enos_local_exec"
 }
 
-func (l *localExec) Schema() *tfprotov5.Schema {
+func (l *localExec) Schema() *tfprotov6.Schema {
 	return newLocalExecStateV1().Schema()
 }
 
@@ -82,13 +82,13 @@ func (l *localExec) GetProviderConfig() (*config, error) {
 	return l.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (l *localExec) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (l *localExec) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := newLocalExecStateV1()
 
-	res := &tfprotov5.ValidateResourceTypeConfigResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.ValidateResourceConfigResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -109,11 +109,11 @@ func (l *localExec) ValidateResourceTypeConfig(ctx context.Context, req *tfproto
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := newLocalExecStateV1()
 
-	res := &tfprotov5.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.UpgradeResourceStateResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -158,11 +158,11 @@ func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov5.Upg
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (l *localExec) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (l *localExec) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := newLocalExecStateV1()
 
-	res := &tfprotov5.ReadResourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.ReadResourceResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -189,12 +189,12 @@ func (l *localExec) ReadResource(ctx context.Context, req *tfprotov5.ReadResourc
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := newLocalExecStateV1()
 	proposedState := newLocalExecStateV1()
 
-	res := &tfprotov5.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.PlanResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -265,12 +265,12 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanR
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := newLocalExecStateV1()
 	plannedState := newLocalExecStateV1()
 
-	res := &tfprotov5.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.ApplyResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -332,12 +332,12 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.Appl
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-func (l *localExec) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (l *localExec) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := newLocalExecStateV1()
 
-	res := &tfprotov5.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov5.ImportedResource{},
-		Diagnostics:       []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.ImportResourceStateResponse{
+		ImportedResources: []*tfprotov6.ImportedResource{},
+		Diagnostics:       []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -352,7 +352,7 @@ func (l *localExec) ImportResourceState(ctx context.Context, req *tfprotov5.Impo
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
-	res.ImportedResources = append(res.ImportedResources, &tfprotov5.ImportedResource{
+	res.ImportedResources = append(res.ImportedResources, &tfprotov6.ImportedResource{
 		TypeName: req.TypeName,
 		State:    importState,
 	})
@@ -361,11 +361,11 @@ func (l *localExec) ImportResourceState(ctx context.Context, req *tfprotov5.Impo
 }
 
 // Schema is the file states Terraform schema.
-func (s *localExecStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *localExecStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,
@@ -379,7 +379,7 @@ func (s *localExecStateV1) Schema() *tfprotov5.Schema {
 				{
 					Name: "environment",
 					Type: tftypes.Map{
-						AttributeType: tftypes.String,
+						ElementType: tftypes.String,
 					},
 					Optional: true,
 				},

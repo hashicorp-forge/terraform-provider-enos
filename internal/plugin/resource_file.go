@@ -9,7 +9,7 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -59,7 +59,7 @@ func (f *file) Name() string {
 	return "enos_file"
 }
 
-func (f *file) Schema() *tfprotov5.Schema {
+func (f *file) Schema() *tfprotov6.Schema {
 	return newFileState().Schema()
 }
 
@@ -77,17 +77,17 @@ func (f *file) GetProviderConfig() (*config, error) {
 	return f.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (f *file) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (f *file) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := newFileState()
 
-	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+	return transportUtil.ValidateResourceConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (f *file) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (f *file) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := newFileState()
 
 	return transportUtil.UpgradeResourceState(ctx, newState, req)
@@ -95,7 +95,7 @@ func (f *file) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeR
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (f *file) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (f *file) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := newFileState()
 
 	return transportUtil.ReadResource(ctx, newState, req)
@@ -110,7 +110,7 @@ func (f *file) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequ
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (f *file) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (f *file) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := newFileState()
 
 	return transportUtil.ImportResourceState(ctx, newState, req)
@@ -118,7 +118,7 @@ func (f *file) ImportResourceState(ctx context.Context, req *tfprotov5.ImportRes
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := newFileState()
 	proposedState := newFileState()
 
@@ -165,7 +165,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResour
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := newFileState()
 	plannedState := newFileState()
 
@@ -233,11 +233,11 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyReso
 }
 
 // Schema is the file states Terraform schema.
-func (fs *fileStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (fs *fileStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,

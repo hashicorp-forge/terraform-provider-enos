@@ -162,7 +162,7 @@ EOF
 			}
 
 			resource.Test(t, resource.TestCase{
-				ProtoV5ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders,
 				Steps:                    steps,
 			})
 		})
@@ -187,7 +187,7 @@ EOF
 			}
 
 			resource.ParallelTest(t, resource.TestCase{
-				ProtoV5ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})
 		})

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/server"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -41,12 +41,12 @@ func newProviderConfig() *config {
 }
 
 // Schema is the provider user configuration schema
-func (p *Provider) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (p *Provider) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
+		Block: &tfprotov6.SchemaBlock{
 			Version: 1,
-			Attributes: []*tfprotov5.SchemaAttribute{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				p.config.Transport.SchemaAttributeTransport(),
 			},
 		},
@@ -54,15 +54,14 @@ func (p *Provider) Schema() *tfprotov5.Schema {
 }
 
 // MetaSchema is the schema for the providers metadata
-func (p *Provider) MetaSchema() *tfprotov5.Schema {
+func (p *Provider) MetaSchema() *tfprotov6.Schema {
 	return nil
 }
 
-// PrepareConfig is called to give a provider a chance to modify the configuration
-// the user specified before validation.
-func (p *Provider) PrepareConfig(ctx context.Context, req *tfprotov5.PrepareProviderConfigRequest) (*tfprotov5.PrepareProviderConfigResponse, error) {
-	res := &tfprotov5.PrepareProviderConfigResponse{
-		Diagnostics:    []*tfprotov5.Diagnostic{},
+// Validate is called to give a provider a chance to validate the configuration
+func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProviderConfigRequest) (*tfprotov6.ValidateProviderConfigResponse, error) {
+	res := &tfprotov6.ValidateProviderConfigResponse{
+		Diagnostics:    []*tfprotov6.Diagnostic{},
 		PreparedConfig: req.Config,
 	}
 
@@ -73,17 +72,24 @@ func (p *Provider) PrepareConfig(ctx context.Context, req *tfprotov5.PrepareProv
 	default:
 	}
 
+	cfg := newProviderConfig()
+	err := unmarshal(cfg, req.Config)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return res, err
+	}
+
 	return res, nil
 }
 
 // Configure is called to pass the user-specified provider configuration to the
 // provider.
-func (p *Provider) Configure(ctx context.Context, req *tfprotov5.ConfigureProviderRequest) (*tfprotov5.ConfigureProviderResponse, error) {
+func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProviderRequest) (*tfprotov6.ConfigureProviderResponse, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	res := &tfprotov5.ConfigureProviderResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+	res := &tfprotov6.ConfigureProviderResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -107,8 +113,8 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov5.ConfigureProvid
 
 // Stop is called when Terraform would like providers to shut down as quickly
 // as possible, and usually represents an interrupt.
-func (p *Provider) Stop(ctx context.Context, req *tfprotov5.StopProviderRequest) (*tfprotov5.StopProviderResponse, error) {
-	return &tfprotov5.StopProviderResponse{}, nil
+func (p *Provider) Stop(ctx context.Context, req *tfprotov6.StopProviderRequest) (*tfprotov6.StopProviderResponse, error) {
+	return &tfprotov6.StopProviderResponse{}, nil
 }
 
 // Config returns the providers configuration as a Terraform5Value

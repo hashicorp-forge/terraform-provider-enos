@@ -9,7 +9,7 @@ import (
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -67,8 +67,8 @@ func newEmbeddedTransport() *embeddedTransportV1 {
 
 // SchemaAttributeTransport is our transport schema configuration attribute.
 // Resources that embed a transport should use this as transport schema.
-func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov5.SchemaAttribute {
-	return &tfprotov5.SchemaAttribute{
+func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov6.SchemaAttribute {
+	return &tfprotov6.SchemaAttribute{
 		Name:     "transport",
 		Type:     em.Terraform5Type(),
 		Optional: true, // We'll handle our own schema validation
@@ -77,8 +77,8 @@ func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov5.SchemaAttri
 
 // SchemaAttributeOut is our transport schema output object. The transport data
 // source can use this to output the user configuration as an object.
-func (em *embeddedTransportV1) SchemaAttributeOut() *tfprotov5.SchemaAttribute {
-	return &tfprotov5.SchemaAttribute{
+func (em *embeddedTransportV1) SchemaAttributeOut() *tfprotov6.SchemaAttribute {
+	return &tfprotov6.SchemaAttribute{
 		Name:     "out",
 		Type:     em.Terraform5Type(),
 		Computed: true,

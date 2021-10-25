@@ -218,21 +218,21 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 		{
 			"unknown",
 			&tfStringMap{Unknown: true, Val: map[string]*tfString{"foo": {Val: "foo"}}},
-			tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, tftypes.UnknownValue),
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, tftypes.UnknownValue),
 			map[string]string{},
 			false,
 		},
 		{
 			"null",
 			&tfStringMap{Null: true, Val: map[string]*tfString{"foo": {Val: "foo"}}},
-			tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil),
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil),
 			map[string]string{},
 			false,
 		},
 		{
 			"fully known",
 			&tfStringMap{Val: map[string]*tfString{"foo": {Val: "foo"}, "bar": {Val: "bar"}}},
-			tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, map[string]tftypes.Value{
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{
 				"foo": tftypes.NewValue(tftypes.String, "foo"),
 				"bar": tftypes.NewValue(tftypes.String, "bar"),
 			}),
@@ -242,7 +242,7 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 		{
 			"known with unknown child",
 			&tfStringMap{Val: map[string]*tfString{"foo": {Unknown: true}}},
-			tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, map[string]tftypes.Value{
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{
 				"foo": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
 			}),
 			map[string]string{},

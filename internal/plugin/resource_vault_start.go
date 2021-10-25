@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -91,7 +91,7 @@ func (r *vaultStart) Name() string {
 	return "enos_vault_start"
 }
 
-func (r *vaultStart) Schema() *tfprotov5.Schema {
+func (r *vaultStart) Schema() *tfprotov6.Schema {
 	return newVaultStartStateV1().Schema()
 }
 
@@ -109,12 +109,12 @@ func (r *vaultStart) GetProviderConfig() (*config, error) {
 	return r.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *vaultStart) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (r *vaultStart) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := newVaultStartStateV1()
 
-	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+	return transportUtil.ValidateResourceConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -129,7 +129,7 @@ func (r *vaultStart) ValidateResourceTypeConfig(ctx context.Context, req *tfprot
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (r *vaultStart) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (r *vaultStart) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := newVaultStartStateV1()
 
 	return transportUtil.UpgradeResourceState(ctx, newState, req)
@@ -137,7 +137,7 @@ func (r *vaultStart) UpgradeResourceState(ctx context.Context, req *tfprotov5.Up
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := newVaultStartStateV1()
 
 	return transportUtil.ReadResource(ctx, newState, req)
@@ -152,7 +152,7 @@ func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov5.ReadResour
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (r *vaultStart) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (r *vaultStart) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := newVaultStartStateV1()
 
 	return transportUtil.ImportResourceState(ctx, newState, req)
@@ -160,7 +160,7 @@ func (r *vaultStart) ImportResourceState(ctx context.Context, req *tfprotov5.Imp
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := newVaultStartStateV1()
 	proposedState := newVaultStartStateV1()
 
@@ -186,7 +186,7 @@ func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := newVaultStartStateV1()
 	plannedState := newVaultStartStateV1()
 
@@ -240,11 +240,11 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 }
 
 // Schema is the file states Terraform schema.
-func (s *vaultStartStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *vaultStartStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,

@@ -15,7 +15,7 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/enos-provider/internal/ui"
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -65,7 +65,7 @@ func (r *remoteExec) Name() string {
 	return "enos_remote_exec"
 }
 
-func (r *remoteExec) Schema() *tfprotov5.Schema {
+func (r *remoteExec) Schema() *tfprotov6.Schema {
 	return newRemoteExecStateV1().Schema()
 }
 
@@ -83,17 +83,17 @@ func (r *remoteExec) GetProviderConfig() (*config, error) {
 	return r.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *remoteExec) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (r *remoteExec) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := newRemoteExecStateV1()
 
-	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+	return transportUtil.ValidateResourceConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (r *remoteExec) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (r *remoteExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := newRemoteExecStateV1()
 
 	return transportUtil.UpgradeResourceState(ctx, newState, req)
@@ -101,7 +101,7 @@ func (r *remoteExec) UpgradeResourceState(ctx context.Context, req *tfprotov5.Up
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *remoteExec) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (r *remoteExec) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := newRemoteExecStateV1()
 
 	return transportUtil.ReadResource(ctx, newState, req)
@@ -109,7 +109,7 @@ func (r *remoteExec) ReadResource(ctx context.Context, req *tfprotov5.ReadResour
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := newRemoteExecStateV1()
 	proposedState := newRemoteExecStateV1()
 
@@ -168,7 +168,7 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov5.Plan
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := newRemoteExecStateV1()
 	plannedState := newRemoteExecStateV1()
 
@@ -219,18 +219,18 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov5.App
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-func (r *remoteExec) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (r *remoteExec) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := newRemoteExecStateV1()
 
 	return transportUtil.ImportResourceState(ctx, newState, req)
 }
 
 // Schema is the file states Terraform schema.
-func (s *remoteExecStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *remoteExecStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,
@@ -244,7 +244,7 @@ func (s *remoteExecStateV1) Schema() *tfprotov5.Schema {
 				{
 					Name: "environment",
 					Type: tftypes.Map{
-						AttributeType: tftypes.String,
+						ElementType: tftypes.String,
 					},
 					Optional: true,
 				},

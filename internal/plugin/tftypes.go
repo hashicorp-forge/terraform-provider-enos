@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -14,8 +14,8 @@ var (
 	unknownDSTVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
 )
 
-func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
-	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
+func marshal(state Serializable) (*tfprotov6.DynamicValue, error) {
+	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
 	if err != nil {
 		return &dyn, wrapErrWithDiagnostics(err,
 			"Unexpected configuration format",
@@ -26,7 +26,7 @@ func marshal(state Serializable) (*tfprotov5.DynamicValue, error) {
 	return &dyn, nil
 }
 
-func unmarshal(state Serializable, dyn *tfprotov5.DynamicValue) error {
+func unmarshal(state Serializable, dyn *tfprotov6.DynamicValue) error {
 	val, err := dyn.Unmarshal(state.Terraform5Type())
 	if err != nil {
 		return wrapErrWithDiagnostics(err,
@@ -46,8 +46,8 @@ func unmarshal(state Serializable, dyn *tfprotov5.DynamicValue) error {
 	return nil
 }
 
-func marshalDelete(state Serializable) (*tfprotov5.DynamicValue, error) {
-	dyn, err := tfprotov5.NewDynamicValue(state.Terraform5Type(), tftypes.NewValue(state.Terraform5Type(), nil))
+func marshalDelete(state Serializable) (*tfprotov6.DynamicValue, error) {
+	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), tftypes.NewValue(state.Terraform5Type(), nil))
 	if err != nil {
 		err = wrapErrWithDiagnostics(err,
 			"Unexpected configuration format",
@@ -61,8 +61,8 @@ func marshalDelete(state Serializable) (*tfprotov5.DynamicValue, error) {
 // upgradeState takes an existing state and the new values we're migrating.
 // It unmarshals the new values onto the current state and returns a new
 // marshaled upgraded state.
-func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov5.DynamicValue, error) {
-	upgraded, err := tfprotov5.NewDynamicValue(currentState.Terraform5Type(), newValues)
+func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov6.DynamicValue, error) {
+	upgraded, err := tfprotov6.NewDynamicValue(currentState.Terraform5Type(), newValues)
 	if err != nil {
 		return &upgraded, wrapErrWithDiagnostics(
 			err,
@@ -508,20 +508,20 @@ type tfStringMap struct {
 }
 
 func (b *tfStringMap) TFType() tftypes.Type {
-	return tftypes.Map{AttributeType: tftypes.String}
+	return tftypes.Map{ElementType: tftypes.String}
 }
 
 func (b *tfStringMap) TFValue() tftypes.Value {
 	if b.Unknown {
-		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, tftypes.UnknownValue)
+		return tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, tftypes.UnknownValue)
 	}
 
 	if b.Null {
-		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
+		return tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil)
 	}
 
 	if len(b.Val) == 0 {
-		return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)
+		return tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil)
 	}
 
 	values := map[string]tftypes.Value{}
@@ -529,14 +529,14 @@ func (b *tfStringMap) TFValue() tftypes.Value {
 		values[key] = val.TFValue()
 	}
 
-	return tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, values)
+	return tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, values)
 }
 
 func (b *tfStringMap) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, tftypes.UnknownValue)):
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, tftypes.UnknownValue)):
 		b.Unknown = true
-	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{AttributeType: tftypes.String}, nil)):
+	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil)):
 		b.Null = true
 	default:
 		strs := map[string]*tfString{}
@@ -753,7 +753,7 @@ func (b *tfObject) FromTFValue(val tftypes.Value) error {
 					return err
 				}
 				res[key] = listVal
-			case valType.Is(tftypes.Map{AttributeType: tftypes.String}):
+			case valType.Is(tftypes.Map{ElementType: tftypes.String}):
 				mapVal := newTfStringMap()
 				err = mapVal.FromTFValue(val)
 				if err != nil {

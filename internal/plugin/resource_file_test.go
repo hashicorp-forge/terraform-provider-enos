@@ -192,7 +192,7 @@ EOF
 			}
 
 			resource.ParallelTest(t, resource.TestCase{
-				ProtoV5ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})
 		})
@@ -217,7 +217,7 @@ EOF
 			}
 
 			resource.Test(t, resource.TestCase{
-				ProtoV5ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders,
 				Steps:                    []resource.TestStep{step},
 			})
 		})
@@ -280,7 +280,7 @@ EOF
 				}
 
 				resource.Test(t, resource.TestCase{
-					ProtoV5ProviderFactories: testProviders,
+					ProtoV6ProviderFactories: testProviders,
 					Steps:                    []resource.TestStep{step},
 				})
 			})
@@ -303,7 +303,7 @@ EOF
 				}
 
 				resource.Test(t, resource.TestCase{
-					ProtoV5ProviderFactories: testProviders,
+					ProtoV6ProviderFactories: testProviders,
 					Steps:                    []resource.TestStep{step},
 				})
 			})
@@ -329,7 +329,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	}
 }`
 	resource.Test(t, resource.TestCase{
-		ProtoV5ProviderFactories: testProviders,
+		ProtoV6ProviderFactories: testProviders,
 		Steps: []resource.TestStep{
 			{
 				Config:             cfg,

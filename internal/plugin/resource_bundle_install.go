@@ -18,7 +18,7 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -84,7 +84,7 @@ func (r *bundleInstall) Name() string {
 	return "enos_bundle_install"
 }
 
-func (r *bundleInstall) Schema() *tfprotov5.Schema {
+func (r *bundleInstall) Schema() *tfprotov6.Schema {
 	return newBundleInstallStateV1().Schema()
 }
 
@@ -102,17 +102,17 @@ func (r *bundleInstall) GetProviderConfig() (*config, error) {
 	return r.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *bundleInstall) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (r *bundleInstall) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := newBundleInstallStateV1()
 
-	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+	return transportUtil.ValidateResourceConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (r *bundleInstall) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (r *bundleInstall) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := newBundleInstallStateV1()
 
 	return transportUtil.UpgradeResourceState(ctx, newState, req)
@@ -120,7 +120,7 @@ func (r *bundleInstall) UpgradeResourceState(ctx context.Context, req *tfprotov5
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *bundleInstall) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (r *bundleInstall) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := newBundleInstallStateV1()
 
 	return transportUtil.ReadResource(ctx, newState, req)
@@ -128,7 +128,7 @@ func (r *bundleInstall) ReadResource(ctx context.Context, req *tfprotov5.ReadRes
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-func (r *bundleInstall) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (r *bundleInstall) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := newBundleInstallStateV1()
 
 	return transportUtil.ImportResourceState(ctx, newState, req)
@@ -136,7 +136,7 @@ func (r *bundleInstall) ImportResourceState(ctx context.Context, req *tfprotov5.
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *bundleInstall) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (r *bundleInstall) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := newBundleInstallStateV1()
 	proposedState := newBundleInstallStateV1()
 
@@ -163,7 +163,7 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req *tfprotov5.P
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := newBundleInstallStateV1()
 	plannedState := newBundleInstallStateV1()
 
@@ -414,11 +414,11 @@ func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh i
 }
 
 // Schema is the file states Terraform schema.
-func (s *bundleInstallStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *bundleInstallStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,

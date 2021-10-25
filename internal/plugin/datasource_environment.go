@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -50,7 +50,7 @@ func (d *environment) Name() string {
 	return "enos_environment"
 }
 
-func (d *environment) Schema() *tfprotov5.Schema {
+func (d *environment) Schema() *tfprotov6.Schema {
 	return newEnvironmentStateV1().Schema()
 }
 
@@ -58,11 +58,11 @@ func (d *environment) SetProviderConfig(meta tftypes.Value) error {
 	return d.providerConfig.FromTerraform5Value(meta)
 }
 
-// ValidateDataSourceConfig is the request Terraform sends when it wants to
+// ValidateDataResourceConfig is the request Terraform sends when it wants to
 // validate the data source's configuration.
-func (d *environment) ValidateDataSourceConfig(ctx context.Context, req *tfprotov5.ValidateDataSourceConfigRequest) (*tfprotov5.ValidateDataSourceConfigResponse, error) {
-	res := &tfprotov5.ValidateDataSourceConfigResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (d *environment) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
+	res := &tfprotov6.ValidateDataResourceConfigResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -85,9 +85,9 @@ func (d *environment) ValidateDataSourceConfig(ctx context.Context, req *tfproto
 
 // ReadDataSource is the request Terraform sends when it wants to get the latest
 // state for the data source.
-func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDataSourceRequest) (*tfprotov5.ReadDataSourceResponse, error) {
-	res := &tfprotov5.ReadDataSourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest) (*tfprotov6.ReadDataSourceResponse, error) {
+	res := &tfprotov6.ReadDataSourceResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -127,11 +127,11 @@ func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov5.ReadDat
 }
 
 // Schema is the file states Terraform schema.
-func (s *environmentStateV1) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *environmentStateV1) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
 					Type:     tftypes.String,

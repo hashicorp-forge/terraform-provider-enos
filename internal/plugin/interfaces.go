@@ -3,12 +3,12 @@ package plugin
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 type State interface {
-	Schema() *tfprotov5.Schema
+	Schema() *tfprotov6.Schema
 	Validate(context.Context) error
 	Serializable
 }

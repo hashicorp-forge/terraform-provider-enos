@@ -3,7 +3,7 @@ package plugin
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
 var transportUtil = &transportResourceUtil{}
@@ -14,9 +14,9 @@ type transportResourceUtil struct{}
 
 // ValidateResourceTypeConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (t *transportResourceUtil) ValidateResourceTypeConfig(ctx context.Context, state StateWithTransport, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
-	res := &tfprotov5.ValidateResourceTypeConfigResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state StateWithTransport, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+	res := &tfprotov6.ValidateResourceConfigResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -47,9 +47,9 @@ func (t *transportResourceUtil) ValidateResourceTypeConfig(ctx context.Context, 
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state StateWithTransport, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
-	res := &tfprotov5.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state StateWithTransport, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+	res := &tfprotov6.UpgradeResourceStateResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -94,9 +94,9 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
-	res := &tfprotov5.ReadResourceResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+	res := &tfprotov6.ReadResourceResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -136,9 +136,9 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWit
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
 // a request into prior and proposed states, builds a transport client,
 // verifies it, and returns the new transport.
-func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, *embeddedTransportV1, error) {
-	res := &tfprotov5.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, *embeddedTransportV1, error) {
+	res := &tfprotov6.PlanResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 	select {
 	case <-ctx.Done():
@@ -195,7 +195,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 }
 
 // PlanMarshalPlannedState marshals a proposed state and transport into a plan response
-func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov5.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) error {
+func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov6.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) error {
 	var err error
 
 	select {
@@ -222,9 +222,9 @@ func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res
 
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior StateWithTransport, planned StateWithTransport, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
-	res := &tfprotov5.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior StateWithTransport, planned StateWithTransport, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+	res := &tfprotov6.ApplyResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -258,7 +258,7 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 
 // ApplyValidatePlannedAndBuildClient takes the planned state and provider transport,
 // validates them, and returns a new SSH transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, resource ResourceWithProviderConfig) (*embeddedTransportV1, error) {
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, resource ResourceWithProviderConfig) (*embeddedTransportV1, error) {
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -312,7 +312,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 
 // ApplyMarshalNewState takes the planned state and transport and marshal it
 // into the new state
-func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov5.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) error {
+func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) error {
 	var err error
 
 	select {
@@ -342,10 +342,10 @@ func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *t
 //
 // Importing a enos resources doesn't make a lot of sense but we have to support the
 // function regardless.
-func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state StateWithTransport, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
-	res := &tfprotov5.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov5.ImportedResource{},
-		Diagnostics:       []*tfprotov5.Diagnostic{},
+func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state StateWithTransport, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+	res := &tfprotov6.ImportResourceStateResponse{
+		ImportedResources: []*tfprotov6.ImportedResource{},
+		Diagnostics:       []*tfprotov6.Diagnostic{},
 	}
 
 	select {
@@ -360,7 +360,7 @@ func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state S
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return res, err
 	}
-	res.ImportedResources = append(res.ImportedResources, &tfprotov5.ImportedResource{
+	res.ImportedResources = append(res.ImportedResources, &tfprotov6.ImportedResource{
 		TypeName: req.TypeName,
 		State:    importState,
 	})
