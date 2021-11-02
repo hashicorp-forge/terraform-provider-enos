@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -41,7 +41,7 @@ func (r *{{.Struct}}) Name() string {
 	return "{{.Name}}"
 }
 
-func (r *{{.Struct}}) Schema() *tfprotov5.Schema {
+func (r *{{.Struct}}) Schema() *tfprotov6.Schema {
 	return new{{.StateCap}}().Schema()
 }
 
@@ -59,15 +59,15 @@ func (r *{{.Struct}}) GetProviderConfig() (*config, error) {
 	return r.providerConfig.Copy()
 }
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *{{.Struct}}) ValidateResourceTypeConfig(ctx context.Context, req *tfprotov5.ValidateResourceTypeConfigRequest) (*tfprotov5.ValidateResourceTypeConfigResponse, error) {
+func (r *{{.Struct}}) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil simply ensures that the state can successfully
 	// unmarshal and remarshal. If you need to perform more validation than
 	// write a custom validation function.
-	return transportUtil.ValidateResourceTypeConfig(ctx, newState, req)
+	return transportUtil.ValidateResourceConfig(ctx, newState, req)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -82,7 +82,7 @@ func (r *{{.Struct}}) ValidateResourceTypeConfig(ctx context.Context, req *tfpro
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (r *{{.Struct}}) UpgradeResourceState(ctx context.Context, req *tfprotov5.UpgradeResourceStateRequest) (*tfprotov5.UpgradeResourceStateResponse, error) {
+func (r *{{.Struct}}) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil currently supports a single version of the
@@ -93,7 +93,7 @@ func (r *{{.Struct}}) UpgradeResourceState(ctx context.Context, req *tfprotov5.U
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *{{.Struct}}) ReadResource(ctx context.Context, req *tfprotov5.ReadResourceRequest) (*tfprotov5.ReadResourceResponse, error) {
+func (r *{{.Struct}}) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil only marshals and unmarshals to add default
@@ -111,7 +111,7 @@ func (r *{{.Struct}}) ReadResource(ctx context.Context, req *tfprotov5.ReadResou
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req *tfprotov5.ImportResourceStateRequest) (*tfprotov5.ImportResourceStateResponse, error) {
+func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
 	newState := new{{.StateCap}}()
 
 	// TODO: We don't support importing resources but we still need to implement
@@ -121,7 +121,7 @@ func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req *tfprotov5.Im
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov5.PlanResourceChangeRequest) (*tfprotov5.PlanResourceChangeResponse, error) {
+func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
 	priorState := new{{.StateCap}}()
 	proposedState := new{{.StateCap}}()
 
@@ -157,7 +157,7 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov5.Pla
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
+func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	priorState := new{{.StateCap}}()
 	plannedState := new{{.StateCap}}()
 
@@ -221,11 +221,11 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov5.Ap
 }
 
 // Schema is the file states Terraform schema.
-func (s *{{.State}}) Schema() *tfprotov5.Schema {
-	return &tfprotov5.Schema{
+func (s *{{.State}}) Schema() *tfprotov6.Schema {
+	return &tfprotov6.Schema{
 		Version: 1,
-		Block: &tfprotov5.SchemaBlock{
-			Attributes: []*tfprotov5.SchemaAttribute{
+		Block: &tfprotov6.SchemaBlock{
+			Attributes: []*tfprotov6.SchemaAttribute{
 				// TODO: Add all state attributes
 				{
 					Name:     "id",
