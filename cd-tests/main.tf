@@ -59,7 +59,10 @@ module "consul_cluster" {
 module "vault_cluster" {
   source = "app.terraform.io/hashicorp-qti/aws-vault/enos"
 
-  depends_on = [module.enos_infra]
+  depends_on = [
+    module.enos_infra,
+    module.consul_cluster,
+  ]
 
   project_name = "qti-enos-provider"
   environment  = "ci"
@@ -71,10 +74,10 @@ module "vault_cluster" {
   ubuntu_ami_id   = module.enos_infra.ubuntu_ami_id
   vpc_id          = module.enos_infra.vpc_id
   kms_key_arn     = module.enos_infra.kms_key_arn
-  consul_ips      = module.consul_cluster.instance_private_ips
+  consul_cluster_tag = module.consul_cluster.consul_cluster_tag
   vault_license   = file("/tmp/vault.hclic")
   vault_release = {
-    version = "1.8.0"
+    version = "1.8.5"
     edition = "ent"
   }
 }
