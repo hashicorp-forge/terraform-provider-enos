@@ -70,12 +70,13 @@ module "vault_cluster" {
     "Project Name" : "qti-enos-provider",
     "Environment" : "ci"
   }
-  ssh_aws_keypair = "enos-ci-ssh-keypair"
-  ubuntu_ami_id   = module.enos_infra.ubuntu_ami_id
-  vpc_id          = module.enos_infra.vpc_id
-  kms_key_arn     = module.enos_infra.kms_key_arn
+  ssh_aws_keypair    = "enos-ci-ssh-keypair"
+  ubuntu_ami_id      = module.enos_infra.ubuntu_ami_id
+  vpc_id             = module.enos_infra.vpc_id
+  kms_key_arn        = module.enos_infra.kms_key_arn
   consul_cluster_tag = module.consul_cluster.consul_cluster_tag
-  vault_license   = file("/tmp/vault.hclic")
+  consul_ips         = module.consul_cluster.instance_private_ips
+  vault_license      = file("/tmp/vault.hclic")
   vault_release = {
     version = "1.8.5"
     edition = "ent"
