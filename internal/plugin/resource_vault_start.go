@@ -556,6 +556,15 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	envFilePath := "/etc/vault.d/vault.env"
 	envFileContents := strings.Builder{}
 
+	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
+		remoteflight.WithUserName(vaultUsername),
+		remoteflight.WithUserHomeDir(configDir),
+		remoteflight.WithUserShell("/bin/false"),
+	))
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "vault user", "failed to find or create the vault user")
+	}
+
 	// Copy the license file if we have one
 	if license, ok := s.License.Get(); ok {
 		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
@@ -597,15 +606,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	// Manage the vault systemd service ourselves unless it has explicitly been
 	// set that we should not.
 	if manage, set := s.ManageService.Get(); !set || (set && manage) {
-		_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
-			remoteflight.WithUserName(vaultUsername),
-			remoteflight.WithUserHomeDir(configDir),
-			remoteflight.WithUserShell("/bin/false"),
-		))
-		if err != nil {
-			return wrapErrWithDiagnostics(err, "vault user", "failed to find or create the vault user")
-		}
-
 		unitName := "vault"
 		if unit, ok := s.SystemdUnitName.Get(); ok {
 			unitName = unit
