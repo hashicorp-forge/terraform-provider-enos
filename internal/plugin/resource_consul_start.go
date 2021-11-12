@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight/consul"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/consul"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -595,7 +595,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	defer cancel()
 
 	// Create the consul data directory
-	err = remoteflight.CreateDir(ctx, ssh, remoteflight.NewCreateDirRequest(
+	err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(dataDir),
 		remoteflight.WithDirChown(consulUsername),
 	))
@@ -604,7 +604,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	}
 
 	// Create the consul config directory
-	err = remoteflight.CreateDir(ctx, ssh, remoteflight.NewCreateDirRequest(
+	err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(configDir),
 		remoteflight.WithDirChown(consulUsername),
 	))

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight/vault"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -32,6 +33,7 @@ type vaultStartStateV1 struct {
 	License         *tfString
 	Status          *tfNum
 	SystemdUnitName *tfString
+	ManageService   *tfBool
 	Transport       *embeddedTransportV1
 	Username        *tfString
 }
@@ -75,6 +77,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		License:         newTfString(),
 		Status:          newTfNum(),
 		SystemdUnitName: newTfString(),
+		ManageService:   newTfBool(),
 		Transport:       newEmbeddedTransport(),
 		Username:        newTfString(),
 	}
@@ -286,6 +289,11 @@ func (s *vaultStartStateV1) Schema() *tfprotov6.Schema {
 					Optional: true,
 				},
 				{
+					Name:     "manage_service",
+					Type:     tftypes.Bool,
+					Optional: true,
+				},
+				{
 					Name:     "username", // vault username
 					Type:     tftypes.String,
 					Optional: true,
@@ -315,13 +323,14 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"bin_path":   s.BinPath,
-		"config_dir": s.ConfigDir,
-		"id":         s.ID,
-		"license":    s.License,
-		"status":     s.Status,
-		"unit_name":  s.SystemdUnitName,
-		"username":   s.Username,
+		"bin_path":       s.BinPath,
+		"config_dir":     s.ConfigDir,
+		"id":             s.ID,
+		"license":        s.License,
+		"status":         s.Status,
+		"unit_name":      s.SystemdUnitName,
+		"manage_service": s.ManageService,
+		"username":       s.Username,
 	})
 	if err != nil {
 		return err
@@ -347,30 +356,32 @@ func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *vaultStartStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"bin_path":   s.BinPath.TFType(),
-		"config":     s.Config.Terraform5Type(),
-		"config_dir": s.ConfigDir.TFType(),
-		"id":         s.ID.TFType(),
-		"license":    s.License.TFType(),
-		"status":     s.Status.TFType(),
-		"unit_name":  s.SystemdUnitName.TFType(),
-		"transport":  s.Transport.Terraform5Type(),
-		"username":   s.Username.TFType(),
+		"bin_path":       s.BinPath.TFType(),
+		"config":         s.Config.Terraform5Type(),
+		"config_dir":     s.ConfigDir.TFType(),
+		"id":             s.ID.TFType(),
+		"license":        s.License.TFType(),
+		"status":         s.Status.TFType(),
+		"unit_name":      s.SystemdUnitName.TFType(),
+		"manage_service": s.ManageService.TFType(),
+		"transport":      s.Transport.Terraform5Type(),
+		"username":       s.Username.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *vaultStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"bin_path":   s.BinPath.TFValue(),
-		"config":     s.Config.Terraform5Value(),
-		"config_dir": s.ConfigDir.TFValue(),
-		"id":         s.ID.TFValue(),
-		"license":    s.License.TFValue(),
-		"status":     s.Status.TFValue(),
-		"unit_name":  s.SystemdUnitName.TFValue(),
-		"transport":  s.Transport.Terraform5Value(),
-		"username":   s.Username.TFValue(),
+		"bin_path":       s.BinPath.TFValue(),
+		"config":         s.Config.Terraform5Value(),
+		"config_dir":     s.ConfigDir.TFValue(),
+		"id":             s.ID.TFValue(),
+		"license":        s.License.TFValue(),
+		"status":         s.Status.TFValue(),
+		"unit_name":      s.SystemdUnitName.TFValue(),
+		"manage_service": s.ManageService.TFValue(),
+		"transport":      s.Transport.Terraform5Value(),
+		"username":       s.Username.TFValue(),
 	})
 }
 
@@ -529,7 +540,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	// we'll update the status again.
 	s.Status.Set(int(vault.StatusUnknown))
 
-	// Ensure that the vault user is created
+	// Set up defaults
 	vaultUsername := "vault"
 	if user, ok := s.Username.Get(); ok {
 		vaultUsername = user
@@ -539,64 +550,14 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	if dir, ok := s.ConfigDir.Get(); ok {
 		configDir = dir
 	}
-
-	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
-		remoteflight.WithUserName(vaultUsername),
-		remoteflight.WithUserHomeDir(configDir),
-		remoteflight.WithUserShell("/bin/false"),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault user", "failed to find or create the vault user")
-	}
-
 	configFilePath := filepath.Join(configDir, "vault.hcl")
-	unitName := "vault"
-	if unit, ok := s.SystemdUnitName.Get(); ok {
-		unitName = unit
-	}
+	licensePath := filepath.Join(configDir, "vault.lic")
 
-	unit := remoteflight.SystemdUnit{
-		"Unit": {
-			"Description":           "HashiCorp Vault - A tool for managing secrets",
-			"Documentation":         "https://www.vaultproject.io/docs/",
-			"Requires":              "network-online.target",
-			"After":                 "network-online.target",
-			"ConditionFileNotEmpty": configFilePath,
-			"StartLimitIntervalSec": "60",
-			"StartLimitBurst":       "3",
-		},
-		"Service": {
-			"User":                  "vault",
-			"Group":                 "vault",
-			"ProtectSystem":         "full",
-			"ProtectHome":           "read-only",
-			"PrivateTmp":            "yes",
-			"PrivateDevices":        "yes",
-			"SecureBits":            "keep-caps",
-			"AmbientCapabilities":   "CAP_IPC_LOCK",
-			"Capabilities":          "CAP_IPC_LOCK+ep",
-			"CapabilityBoundingSet": "CAP_SYSLOG CAP_IPC_LOCK",
-			"NoNewPrivileges":       "yes",
-			"ExecStart":             fmt.Sprintf("%s server -config %s", s.BinPath.Value(), configFilePath),
-			"ExecReload":            "/bin/kill --signal HUP $MAINPID",
-			"KillMode":              "process",
-			"KillSignal":            "SIGINT",
-			"Restart":               "on-failure",
-			"RestartSec":            "5",
-			"TimeoutStopSec":        "30",
-			"StartLimitInterval":    "60",
-			"StartLimitIntervalSec": "60",
-			"StartLimitBurst":       "10",
-			"LimitNOFILE":           "65536",
-			"LimitMEMLOCK":          "infinity",
-		},
-		"Install": {
-			"WantedBy": "multi-user.target",
-		},
-	}
+	envFilePath := "/etc/vault.d/vault.env"
+	envFileContents := strings.Builder{}
 
+	// Copy the license file if we have one
 	if license, ok := s.License.Get(); ok {
-		licensePath := filepath.Join(configDir, "vault.lic")
 		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("640"),
@@ -608,19 +569,17 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 			return wrapErrWithDiagnostics(err, "vault license", "failed to copy vault license")
 		}
 
-		unit["Service"]["Environment"] = fmt.Sprintf("VAULT_LICENSE_PATH=%s", licensePath)
+		envFileContents.WriteString(fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
 	}
 
-	// Write the systemd unit
-	err = remoteflight.CreateSystemdUnitFile(ctx, ssh, remoteflight.NewCreateSystemdUnitFileRequest(
-		remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
-		remoteflight.WithSystemdUnitChmod("640"),
-		remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-		remoteflight.WithSystemdUnitFile(unit),
+	err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
+		remoteflight.WithCopyFileDestination(envFilePath),
+		remoteflight.WithCopyFileChmod("644"),
+		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
+		remoteflight.WithCopyFileContent(tfile.NewReader(envFileContents.String())),
 	))
-
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the vault systemd unit")
+		return wrapErrWithDiagnostics(err, "vault environment", "failed to create the vault environment file")
 	}
 
 	// Create the vault HCL configuration file
@@ -633,6 +592,77 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault configuration", "failed to create the vault configuration file")
+	}
+
+	// Manage the vault systemd service ourselves unless it has explicitly been
+	// set that we should not.
+	if manage, set := s.ManageService.Get(); !set || (set && manage) {
+		_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
+			remoteflight.WithUserName(vaultUsername),
+			remoteflight.WithUserHomeDir(configDir),
+			remoteflight.WithUserShell("/bin/false"),
+		))
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "vault user", "failed to find or create the vault user")
+		}
+
+		unitName := "vault"
+		if unit, ok := s.SystemdUnitName.Get(); ok {
+			unitName = unit
+		}
+
+		unit := remoteflight.SystemdUnit{
+			"Unit": {
+				"Description":           "HashiCorp Vault - A tool for managing secrets",
+				"Documentation":         "https://www.vaultproject.io/docs/",
+				"Requires":              "network-online.target",
+				"After":                 "network-online.target",
+				"ConditionFileNotEmpty": configFilePath,
+				"StartLimitIntervalSec": "60",
+				"StartLimitBurst":       "3",
+			},
+			"Service": {
+				"EnvironmentFile":       "/etc/vault.d/vault.env",
+				"User":                  "vault",
+				"Group":                 "vault",
+				"ProtectSystem":         "full",
+				"ProtectHome":           "read-only",
+				"PrivateTmp":            "yes",
+				"PrivateDevices":        "yes",
+				"SecureBits":            "keep-caps",
+				"AmbientCapabilities":   "CAP_IPC_LOCK",
+				"Capabilities":          "CAP_IPC_LOCK+ep",
+				"CapabilityBoundingSet": "CAP_SYSLOG CAP_IPC_LOCK",
+				"NoNewPrivileges":       "yes",
+				"ExecStart":             fmt.Sprintf("%s server -config %s", s.BinPath.Value(), configFilePath),
+				"ExecReload":            "/bin/kill --signal HUP $MAINPID",
+				"KillMode":              "process",
+				"KillSignal":            "SIGINT",
+				"Restart":               "on-failure",
+				"RestartSec":            "5",
+				"TimeoutStopSec":        "30",
+				"StartLimitInterval":    "60",
+				"StartLimitIntervalSec": "60",
+				"StartLimitBurst":       "10",
+				"LimitNOFILE":           "65536",
+				"LimitMEMLOCK":          "infinity",
+			},
+			"Install": {
+				"WantedBy": "multi-user.target",
+			},
+		}
+
+		// Write the systemd unit
+		err = remoteflight.CreateSystemdUnitFile(ctx, ssh, remoteflight.NewCreateSystemdUnitFileRequest(
+			remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
+			remoteflight.WithSystemdUnitChmod("640"),
+			remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
+			remoteflight.WithSystemdUnitFile(unit),
+		))
+
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the vault systemd unit")
+		}
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(1*time.Minute))

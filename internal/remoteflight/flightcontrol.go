@@ -12,24 +12,24 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// DefaultPath is the default location of our binary
-const DefaultPath = "/opt/qti/bin/enos-flight-control"
+// DefaultFlightControlPath is the default location of our binary
+const DefaultFlightControlPath = "/opt/qti/bin/enos-flight-control"
 
-// InstallRequest is a flight control install request
-type InstallRequest struct {
+// InstallFlightControlRequest is a flight control install request
+type InstallFlightControlRequest struct {
 	Path string
 }
 
-// InstallResponse is a flight control install response
-type InstallResponse struct{}
+// InstallFlightControlResponse is a flight control install response
+type InstallFlightControlResponse struct{}
 
-// InstallOpt is a functional option for an install request
-type InstallOpt func(*InstallRequest) *InstallRequest
+// InstallFlightControlOpt is a functional option for an install request
+type InstallFlightControlOpt func(*InstallFlightControlRequest) *InstallFlightControlRequest
 
-// NewInstallRequest takes functional options and returns a new install request
-func NewInstallRequest(opts ...InstallOpt) *InstallRequest {
-	ir := &InstallRequest{
-		Path: DefaultPath,
+// NewInstallFlightControlRequest takes functional options and returns a new install request
+func NewInstallFlightControlRequest(opts ...InstallFlightControlOpt) *InstallFlightControlRequest {
+	ir := &InstallFlightControlRequest{
+		Path: DefaultFlightControlPath,
 	}
 
 	for _, opt := range opts {
@@ -39,18 +39,18 @@ func NewInstallRequest(opts ...InstallOpt) *InstallRequest {
 	return ir
 }
 
-// WithInstallRequestPath sets the install path
-func WithInstallRequestPath(path string) InstallOpt {
-	return func(ir *InstallRequest) *InstallRequest {
+// WithInstallFlightControlRequestPath sets the install path
+func WithInstallFlightControlRequestPath(path string) InstallFlightControlOpt {
+	return func(ir *InstallFlightControlRequest) *InstallFlightControlRequest {
 		ir.Path = path
 		return ir
 	}
 }
 
-// Install installs the enos-flight-control binary on a remote host in an
+// InstallFlightControl installs the enos-flight-control binary on a remote host in an
 // idempotent fashion.
-func Install(ctx context.Context, ssh transport.Transport, ir *InstallRequest) (*InstallResponse, error) {
-	res := &InstallResponse{}
+func InstallFlightControl(ctx context.Context, ssh transport.Transport, ir *InstallFlightControlRequest) (*InstallFlightControlResponse, error) {
+	res := &InstallFlightControlResponse{}
 
 	select {
 	case <-ctx.Done():

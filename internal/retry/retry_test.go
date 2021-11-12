@@ -140,7 +140,7 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 
 // Test that if Timeout is set on the context, Retry times out accordingly
 func TestRetry_Timeout(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
 	var attempt int

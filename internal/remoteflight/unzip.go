@@ -30,7 +30,7 @@ type UnzipOpt func(*UnzipRequest) *UnzipRequest
 func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
 	var err error
 	ur := &UnzipRequest{
-		FlightControlPath:          DefaultPath,
+		FlightControlPath:          DefaultFlightControlPath,
 		FileMode:                   "0755",
 		DestinationDirectoryMode:   "0755",
 		Sudo:                       false,

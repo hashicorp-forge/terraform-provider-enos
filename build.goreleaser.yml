@@ -13,6 +13,7 @@ builds:
     flags:
       - -trimpath
       - -tags=osusergo,netgo
+      - -gcflags="all=-N -l"
     ldflags:
       - -X main.GitCommit={{ .Commit }}
       - -extldflags=-static -s -w
@@ -34,6 +35,7 @@ builds:
     flags:
       - -trimpath
       - -tags=osusergo,netgo
+      - -gcflags="all=-N -l"
     ldflags:
       - -X main.GitCommit={{ .Commit }}
       - -extldflags=-static

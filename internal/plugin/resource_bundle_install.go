@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -11,13 +10,10 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/artifactory"
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/random"
 	"github.com/hashicorp/enos-provider/internal/releases"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -172,8 +168,8 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov6.
 		return res, err
 	}
 
-	// If we don't have destination, a required attribute, we must be deleting
-	if _, ok := plannedState.Destination.Get(); !ok {
+	// If we don't have a valid package getter config we must be deleting
+	if _, err := plannedState.packageGetter(); err != nil {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
 
@@ -207,210 +203,185 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req *tfprotov6.
 	return res, err
 }
 
-func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) error {
-	// Install enos-flight-control because we need it to unzip bundles and download
-	// bundles from the release endpoint or artifactory.
-	_, err := remoteflight.Install(ctx, ssh, remoteflight.NewInstallRequest())
-	if err != nil {
-		return err
-	}
-
+// packageGetter attempts to determine what package getter we'll use to acquire
+// the install artifact.
+func (s *bundleInstallStateV1) packageGetter() (*remoteflight.PackageInstallGetter, error) {
 	if _, ok := s.Path.Get(); ok {
-		return s.installFromPath(ctx, ssh)
+		return remoteflight.PackageInstallGetterCopy, nil
 	}
 
-	_, pok := s.Release.Product.Get()
-	_, vok := s.Release.Version.Get()
-	if pok && vok {
-		return s.installFromRelease(ctx, ssh)
+	_, okP := s.Release.Product.Get()
+	_, okV := s.Release.Version.Get()
+	if okP && okV {
+		return remoteflight.PackageInstallGetterReleases, nil
 	}
 
-	return s.installFromArtifactory(ctx, ssh)
+	_, okURL := s.Artifactory.URL.Get()
+	_, okUsername := s.Artifactory.Username.Get()
+	_, okToken := s.Artifactory.Token.Get()
+	_, okSHA := s.Artifactory.SHA256.Get()
+
+	if okURL && okUsername && okToken && okSHA {
+		return remoteflight.PackageInstallGetterArtifactory, nil
+	}
+
+	return nil, remoteflight.ErrPackageInstallGetterUnknown
 }
 
-func (s *bundleInstallStateV1) rmPath(ctx context.Context, ssh it.Transport, path string) error {
-	_, _, err := ssh.Run(ctx, command.New(fmt.Sprintf("rm -rf '%s'", path)))
+// Install takes a context and transport and installs the artifact on the remote
+// host. Any errors that may be encountered are returned.
+func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) error {
+	opts := []remoteflight.PackageInstallRequestOpt{}
+
+	// Determine where we're going to get the package
+	getter, err := s.packageGetter()
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "removing path", fmt.Sprintf("removing path %s", path))
+		return wrapErrWithDiagnostics(err, "release", "determing package getter", "release")
+	}
+	opts = append(opts, remoteflight.WithPackageInstallGetter(getter))
+
+	// Now that that we know how we're going to get the package, configure the installation
+	// options for the getter and installer.
+	switch getter {
+	case remoteflight.PackageInstallGetterCopy:
+		// Install by copying an artifact from a local path
+		path, ok := s.Path.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must set a package path for a local copy install", "path")
+		}
+
+		installer := remoteflight.PackageInstallInstallerForFile(path)
+		if installer == remoteflight.PackageInstallInstallerZip {
+			// A destination is only required for zip bundles because other
+			// package types do not need to persist, as the package manager
+			// will install them.
+			dest, ok := s.Destination.Get()
+			if !ok {
+				return newErrWithDiagnostics("you must set a destination for a local copy install", "destination")
+			}
+
+			opts = append(opts, remoteflight.WithPackageInstallDestination(dest))
+		}
+
+		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
+			remoteflight.WithPackageInstallCopyPath(path),
+			remoteflight.WithPackageInstallInstaller(
+				remoteflight.PackageInstallInstallerForFile(path),
+			),
+		}...)
+	case remoteflight.PackageInstallGetterReleases:
+		// Install from releases.hashicorp.com. The releases distribution channel
+		// currently only contains the zip bundles. If we're installing
+		// from that endpoint we'll assume it's a zip bundle and require a destination.
+		dest, ok := s.Destination.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must set a destination for a releases install", "destination")
+		}
+
+		prod, ok := s.Release.Product.Get()
+		if !ok {
+			return newErrWithDiagnostics(
+				"you must set a release product to install from releases.hashicorp.com", "release", "product",
+			)
+		}
+		ver, ok := s.Release.Version.Get()
+		if !ok {
+			return newErrWithDiagnostics(
+				"you must set a release version to install from releases.hashicorp.com", "release", "version",
+			)
+		}
+
+		platform, err := remoteflight.TargetPlatform(ctx, ssh)
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "transport", "determining target host platform", "transport")
+		}
+
+		arch, err := remoteflight.TargetArchitecture(ctx, ssh)
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
+		}
+
+		ed, ok := s.Release.Edition.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must supply a release edition", "release", "edition")
+		}
+
+		release, err := releases.NewRelease(
+			releases.WithReleaseProduct(prod),
+			releases.WithReleaseVersion(ver),
+			releases.WithReleaseEdition(ed),
+			releases.WithReleasePlatform(platform),
+			releases.WithReleaseArch(arch),
+		)
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "release", "determining release", "release")
+		}
+
+		sha256, err := release.SHA256()
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "release", "determining release SHA", "release")
+		}
+
+		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
+			remoteflight.WithPackageInstallDestination(dest),
+			remoteflight.WithPackageInstallDownloadOpts(
+				remoteflight.WithDownloadRequestURL(release.BundleURL()),
+				remoteflight.WithDownloadRequestSHA256(sha256),
+			),
+			remoteflight.WithPackageInstallInstaller(remoteflight.PackageInstallInstallerZip),
+		}...)
+	case remoteflight.PackageInstallGetterArtifactory:
+		// Install from artifactory.
+		url, ok := s.Artifactory.URL.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must supply an artifactory url", "artifactory", "url")
+		}
+
+		installer := remoteflight.PackageInstallInstallerForFile(filepath.Base(url))
+		if installer == remoteflight.PackageInstallInstallerZip {
+			// A destination is only required for zip bundles because other
+			// package types do not need to persist, as the package manager
+			// will install them.
+			dest, ok := s.Destination.Get()
+			if !ok {
+				return newErrWithDiagnostics("you must set a destination for a local copy install", "destination")
+			}
+
+			opts = append(opts, remoteflight.WithPackageInstallDestination(dest))
+		}
+
+		username, ok := s.Artifactory.Username.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must supply an artifactory username", "artifactory", "username")
+		}
+
+		token, ok := s.Artifactory.Token.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must supply an artifactory token", "artifactory", "token")
+		}
+
+		sha, ok := s.Artifactory.SHA256.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must supply an artifactory sha256", "artifactory", "sha256")
+		}
+
+		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
+			remoteflight.WithPackageInstallDownloadOpts(
+				remoteflight.WithDownloadRequestURL(url),
+				remoteflight.WithDownloadRequestAuthUser(username),
+				remoteflight.WithDownloadRequestAuthPassword(token),
+				remoteflight.WithDownloadRequestSHA256(sha),
+			),
+			remoteflight.WithPackageInstallInstaller(installer),
+		}...)
+	case remoteflight.PackageInstallGetterRepository:
+		return remoteflight.ErrPackageInstallGetterUnsupported
+	default:
+		return remoteflight.ErrPackageInstallGetterUnknown
 	}
 
-	return nil
-}
-
-func (s *bundleInstallStateV1) installFromPath(ctx context.Context, ssh it.Transport) error {
-	path, ok := s.Path.Get()
-	if !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must supply a path", "path")
-	}
-
-	src, err := tfile.Open(path)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration", "unable to open source bundle path", "path")
-	}
-	defer src.Close()
-
-	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
-	err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
-		remoteflight.WithCopyFileContent(src),
-		remoteflight.WithCopyFileDestination(bundlePath),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "copy bundle", "unable to copy bundle to remote machine", "path")
-	}
-
-	dest, ok := s.Destination.Get()
-	if !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must supply a destination", "destination")
-	}
-
-	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundlePath),
-		remoteflight.WithUnzipRequestDestinationDir(dest),
-		remoteflight.WithUnzipRequestUseSudo(true),
-		remoteflight.WithUnzipRequestReplace(true),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand bundle zip file", "destination")
-	}
-
-	err = s.rmPath(ctx, ssh, bundlePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *bundleInstallStateV1) installFromRelease(ctx context.Context, ssh it.Transport) error {
-	platform, err := remoteflight.TargetPlatform(ctx, ssh)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "determining target host platform", "transport")
-	}
-
-	arch, err := remoteflight.TargetArchitecture(ctx, ssh)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
-	}
-
-	prod, ok := s.Release.Product.Get()
-	if !ok {
-		return newErrWithDiagnostics("release", "you must supply a release product", "release", "product")
-	}
-
-	ver, ok := s.Release.Version.Get()
-	if !ok {
-		return newErrWithDiagnostics("release", "you must supply a release version", "release", "version")
-	}
-
-	ed, ok := s.Release.Edition.Get()
-	if !ok {
-		return newErrWithDiagnostics("release", "you must supply a release edition", "release", "edition")
-	}
-
-	release, err := releases.NewRelease(
-		releases.WithReleaseProduct(prod),
-		releases.WithReleaseVersion(ver),
-		releases.WithReleaseEdition(ed),
-		releases.WithReleasePlatform(platform),
-		releases.WithReleaseArch(arch),
-	)
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "release", "determining release", "release")
-	}
-
-	sha256, err := release.SHA256()
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "release", "determining release SHA", "release")
-	}
-
-	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
-	_, err = remoteflight.Download(ctx, ssh, remoteflight.NewDownloadRequest(
-		remoteflight.WithDownloadRequestDestination(bundlePath),
-		remoteflight.WithDownloadRequestURL(release.BundleURL()),
-		remoteflight.WithDownloadRequestSHA256(sha256),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "download bundle", "unable to download release bundle zip file")
-	}
-
-	dest, ok := s.Destination.Get()
-	if !ok {
-		return wrapErrWithDiagnostics(err, "release", "you must supply a destination", "destination")
-	}
-
-	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundlePath),
-		remoteflight.WithUnzipRequestDestinationDir(dest),
-		remoteflight.WithUnzipRequestUseSudo(true),
-		remoteflight.WithUnzipRequestReplace(true),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
-	}
-
-	err = s.rmPath(ctx, ssh, bundlePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *bundleInstallStateV1) installFromArtifactory(ctx context.Context, ssh it.Transport) error {
-	bundlePath := fmt.Sprintf("/tmp/enos_bundle_install_%s.zip", random.ID())
-
-	url, ok := s.Artifactory.URL.Get()
-	if !ok {
-		return newErrWithDiagnostics("you must supply an artifactory url", "artifactory", "url")
-	}
-
-	username, ok := s.Artifactory.Username.Get()
-	if !ok {
-		return newErrWithDiagnostics("you must supply an artifactory username", "artifactory", "username")
-	}
-
-	token, ok := s.Artifactory.Token.Get()
-	if !ok {
-		return newErrWithDiagnostics("you must supply an artifactory token", "artifactory", "token")
-	}
-
-	sha, ok := s.Artifactory.SHA256.Get()
-	if !ok {
-		return newErrWithDiagnostics("you must supply an artifactory sha256", "artifactory", "sha256")
-	}
-
-	_, err := remoteflight.Download(ctx, ssh, remoteflight.NewDownloadRequest(
-		remoteflight.WithDownloadRequestDestination(bundlePath),
-		remoteflight.WithDownloadRequestURL(url),
-		remoteflight.WithDownloadRequestAuthUser(username),
-		remoteflight.WithDownloadRequestAuthPassword(token),
-		remoteflight.WithDownloadRequestSHA256(sha),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "download bundle", "unable to download release bundle zip file")
-	}
-
-	dest, ok := s.Destination.Get()
-	if !ok {
-		return newErrWithDiagnostics("you must supply a destination", "destination")
-	}
-
-	_, err = remoteflight.Unzip(ctx, ssh, remoteflight.NewUnzipRequest(
-		remoteflight.WithUnzipRequestSourcePath(bundlePath),
-		remoteflight.WithUnzipRequestDestinationDir(dest),
-		remoteflight.WithUnzipRequestUseSudo(true),
-		remoteflight.WithUnzipRequestReplace(true),
-	))
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "expand bundle", "unable to expand release bundle zip file", "destination")
-	}
-
-	err = s.rmPath(ctx, ssh, bundlePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err = remoteflight.PackageInstall(ctx, ssh, remoteflight.NewPackageInstallRequest(opts...))
+	return err
 }
 
 // Schema is the file states Terraform schema.
@@ -425,9 +396,10 @@ func (s *bundleInstallStateV1) Schema() *tfprotov6.Schema {
 					Computed: true,
 				},
 				{
-					Name:     "destination",
-					Type:     tftypes.String,
-					Required: true,
+					Name: "destination",
+					Type: tftypes.String,
+					// Required when using a zip bundle, optional for RPM and Deb artifacts
+					Optional: true,
 				},
 				{
 					Name:     "path",
@@ -493,10 +465,25 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "invalid configuration", "path base directory does not exist", "path")
 		}
+
+		if remoteflight.PackageInstallInstallerForFile(path) == remoteflight.PackageInstallInstallerZip {
+			// A destination is only required for zip bundles because other
+			// package types do not need to persist, as the package manager
+			// will install them.
+			_, ok := s.Destination.Get()
+			if !ok {
+				return newErrWithDiagnostics("you must set a destination for a local copy install of a zip bundle", "destination")
+			}
+		}
 	}
 
 	// Make sure our product is a valid combination
 	if prod, ok := s.Release.Product.Get(); ok {
+		_, ok := s.Destination.Get()
+		if !ok {
+			return newErrWithDiagnostics("you must set a destination for a releases install", "destination")
+		}
+
 		if prod == "vault" {
 			ed, ok := s.Release.Edition.Get()
 			if !ok {
@@ -513,6 +500,16 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 		_, err := url.Parse(u)
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "invalid configuration", "artifactory URL is invalid", "artifactory", "url")
+		}
+
+		if remoteflight.PackageInstallInstallerForFile(u) == remoteflight.PackageInstallInstallerZip {
+			// A destination is only required for zip bundles because other
+			// package types do not need to persist, as the package manager
+			// will install them.
+			_, ok := s.Destination.Get()
+			if !ok {
+				return newErrWithDiagnostics("you must set a destination for an artifactory install of a zip bundle", "destination")
+			}
 		}
 	}
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"

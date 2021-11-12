@@ -6,6 +6,10 @@ output "remote_exec_all_stderr" {
   value = enos_remote_exec.all.stderr
 }
 
-output "ssh" {
-  value = "ssh ubuntu@${aws_instance.target.public_ip}"
+output "ssh_ubuntu" {
+  value = "ssh ubuntu@${aws_instance.ubuntu.public_ip}"
+}
+
+output "ssh_rhel" {
+  value = "ssh ec2-user@${aws_instance.rhel.public_ip}"
 }

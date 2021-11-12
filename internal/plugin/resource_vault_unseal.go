@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight/vault"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"

@@ -33,7 +33,7 @@ type DownloadOpt func(*DownloadRequest) *DownloadRequest
 func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 	var err error
 	dr := &DownloadRequest{
-		FlightControlPath: DefaultPath,
+		FlightControlPath: DefaultFlightControlPath,
 		HTTPMethod:        "GET",
 		Timeout:           "5m",
 		Mode:              "0755",

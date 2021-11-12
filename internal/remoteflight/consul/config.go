@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )

@@ -19,14 +19,33 @@ type CopyFileRequest struct {
 	Destination string
 }
 
+// DeleteFileRequest deletes a file on the remote host
+type DeleteFileRequest struct {
+	Path string
+}
+
 // CopyFileRequestOpt is a functional option for file copy
 type CopyFileRequestOpt func(*CopyFileRequest) *CopyFileRequest
+
+// DeleteFileRequestOpt is a functional option for file copy
+type DeleteFileRequestOpt func(*DeleteFileRequest) *DeleteFileRequest
 
 // NewCopyFileRequest takes functional options and returns a new file copy
 func NewCopyFileRequest(opts ...CopyFileRequestOpt) *CopyFileRequest {
 	cf := &CopyFileRequest{
 		TmpDir: "/tmp",
 	}
+
+	for _, opt := range opts {
+		cf = opt(cf)
+	}
+
+	return cf
+}
+
+// NewDeleteFileRequest takes functional options and returns a new file copy
+func NewDeleteFileRequest(opts ...DeleteFileRequestOpt) *DeleteFileRequest {
+	cf := &DeleteFileRequest{}
 
 	for _, opt := range opts {
 		cf = opt(cf)
@@ -71,6 +90,14 @@ func WithCopyFileChown(chown string) CopyFileRequestOpt {
 func WithCopyFileDestination(destination string) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.Destination = destination
+		return cf
+	}
+}
+
+// WithDeleteFilePath sets which file to delete
+func WithDeleteFilePath(path string) DeleteFileRequestOpt {
+	return func(cf *DeleteFileRequest) *DeleteFileRequest {
+		cf.Path = path
 		return cf
 	}
 }
@@ -123,6 +150,20 @@ func CopyFile(ctx context.Context, ssh it.Transport, file *CopyFileRequest) erro
 	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "moving file to destination path")
+	}
+
+	return nil
+}
+
+// DeleteFile deletes a file on the remote host
+func DeleteFile(ctx context.Context, ssh it.Transport, req *DeleteFileRequest) error {
+	if req == nil {
+		return fmt.Errorf("no file delete request provided")
+	}
+
+	stderr, stdout, err := ssh.Run(ctx, command.New(fmt.Sprintf("sudo rm -r %s", req.Path)))
+	if err != nil {
+		return WrapErrorWith(err, stdout, stderr, "deleting file")
 	}
 
 	return nil

@@ -8,18 +8,18 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// CreateDirRequest creates a directory on remote host
-type CreateDirRequest struct {
+// CreateDirectoryRequest creates a directory on remote host
+type CreateDirectoryRequest struct {
 	DirName  string
 	DirOwner string
 }
 
-// CreateDirRequestOpt is a functional option for creating directory
-type CreateDirRequestOpt func(*CreateDirRequest) *CreateDirRequest
+// CreateDirectoryRequestOpt is a functional option for creating directory
+type CreateDirectoryRequestOpt func(*CreateDirectoryRequest) *CreateDirectoryRequest
 
-// NewCreateDirRequest takes functional options and returns a new directory
-func NewCreateDirRequest(opts ...CreateDirRequestOpt) *CreateDirRequest {
-	cdir := &CreateDirRequest{}
+// NewCreateDirectoryRequest takes functional options and returns a new directory
+func NewCreateDirectoryRequest(opts ...CreateDirectoryRequestOpt) *CreateDirectoryRequest {
+	cdir := &CreateDirectoryRequest{}
 
 	for _, opt := range opts {
 		cdir = opt(cdir)
@@ -28,23 +28,23 @@ func NewCreateDirRequest(opts ...CreateDirRequestOpt) *CreateDirRequest {
 }
 
 // WithDirName sets directory name
-func WithDirName(directory string) CreateDirRequestOpt {
-	return func(cdir *CreateDirRequest) *CreateDirRequest {
+func WithDirName(directory string) CreateDirectoryRequestOpt {
+	return func(cdir *CreateDirectoryRequest) *CreateDirectoryRequest {
 		cdir.DirName = directory
 		return cdir
 	}
 }
 
 // WithDirChown sets directory name
-func WithDirChown(owner string) CreateDirRequestOpt {
-	return func(cdir *CreateDirRequest) *CreateDirRequest {
+func WithDirChown(owner string) CreateDirectoryRequestOpt {
+	return func(cdir *CreateDirectoryRequest) *CreateDirectoryRequest {
 		cdir.DirOwner = owner
 		return cdir
 	}
 }
 
-// CreateDir creates the directory and sets owner permissions
-func CreateDir(ctx context.Context, ssh it.Transport, dir *CreateDirRequest) error {
+// CreateDirectory creates the directory and sets owner permissions
+func CreateDirectory(ctx context.Context, ssh it.Transport, dir *CreateDirectoryRequest) error {
 	if dir == nil {
 		return fmt.Errorf("no directory or owner provided")
 	}

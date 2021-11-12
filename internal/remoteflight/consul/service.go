@@ -3,7 +3,7 @@ package consul
 import (
 	"context"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
