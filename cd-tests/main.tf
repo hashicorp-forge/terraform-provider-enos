@@ -50,7 +50,7 @@ module "consul_cluster" {
     "Environment" : "ci"
   }
   ssh_aws_keypair = "enos-ci-ssh-keypair"
-  ubuntu_ami_id   = module.enos_infra.ubuntu_ami_id
+  ami_id          = module.enos_infra.ubuntu_ami_id
   vpc_id          = module.enos_infra.vpc_id
   kms_key_arn     = module.enos_infra.kms_key_arn
   consul_license  = "none"
@@ -71,7 +71,7 @@ module "vault_cluster" {
     "Environment" : "ci"
   }
   ssh_aws_keypair    = "enos-ci-ssh-keypair"
-  ubuntu_ami_id      = module.enos_infra.ubuntu_ami_id
+  ami_id             = module.enos_infra.ubuntu_ami_id
   vpc_id             = module.enos_infra.vpc_id
   kms_key_arn        = module.enos_infra.kms_key_arn
   consul_cluster_tag = module.consul_cluster.consul_cluster_tag
