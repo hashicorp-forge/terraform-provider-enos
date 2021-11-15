@@ -30,7 +30,10 @@ func TargetPlatform(ctx context.Context, ssh transport.Transport) (string, error
 
 	r, err := retry.NewRetrier(
 		retry.WithMaxRetries(3),
-		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		// Interval is increased exponentially on a base unit of 2 seconds, because retrying on
+		// the basis of IntervalFibonacci(time.Second) proved to not always be sufficient time
+		// for uname to provide a response.
+		retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
 		retry.WithRetrierFunc(getPlatform),
 	)
 	if err != nil {
@@ -62,7 +65,10 @@ func TargetArchitecture(ctx context.Context, ssh transport.Transport) (string, e
 
 	r, err := retry.NewRetrier(
 		retry.WithMaxRetries(3),
-		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		// Interval is increased exponentially on a base unit of 2 seconds, because retrying on
+		// the basis of IntervalFibonacci(time.Second) proved to not always be sufficient time
+		// for uname to provide a response.
+		retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
 		retry.WithRetrierFunc(getArchitecture),
 	)
 	if err != nil {
