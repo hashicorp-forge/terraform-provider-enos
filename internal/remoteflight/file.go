@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/random"
+	"github.com/hashicorp/enos-provider/internal/retry"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
@@ -104,7 +106,7 @@ func WithDeleteFilePath(path string) DeleteFileRequestOpt {
 
 // CopyFile copies a file to the remote host. It first copies a file to a temporary
 // directory, sets permissions, then copies to the destination directory as
-// a superuser.
+// a superuser — retrying these operations if necessary.
 func CopyFile(ctx context.Context, ssh it.Transport, file *CopyFileRequest) error {
 	if file == nil {
 		return fmt.Errorf("no file copy request provided")
@@ -119,51 +121,89 @@ func CopyFile(ctx context.Context, ssh it.Transport, file *CopyFileRequest) erro
 		random.ID(),
 	))
 
-	var err error
-	var stdout string
-	var stderr string
+	fileOperations := func(ctx context.Context) (interface{}, error) {
+		var err error
+		var stdout string
+		var stderr string
+		var res interface{}
 
-	err = ssh.Copy(ctx, file.Content, tmpPath)
-	if err != nil {
-		return fmt.Errorf("copying file to target host: %w", err)
-	}
-
-	if file.Chmod != "" {
-		stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chmod %s %s", file.Chmod, tmpPath)))
+		err = ssh.Copy(ctx, file.Content, tmpPath)
 		if err != nil {
-			return WrapErrorWith(err, stdout, stderr, "changing file permissions")
+			return res, fmt.Errorf("copying file to target host: %w", err)
 		}
-	}
 
-	if file.Chown != "" {
-		stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chown %s %s", file.Chown, tmpPath)))
+		if file.Chmod != "" {
+			stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chmod %s %s", file.Chmod, tmpPath)))
+			if err != nil {
+				return res, WrapErrorWith(err, stdout, stderr, "changing file permissions")
+			}
+		}
+
+		if file.Chown != "" {
+			stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chown %s %s", file.Chown, tmpPath)))
+			if err != nil {
+				return res, WrapErrorWith(err, stdout, stderr, "changing file ownership")
+			}
+		}
+
+		stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, filepath.Dir(file.Destination))))
 		if err != nil {
-			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
+			return res, WrapErrorWith(err, stdout, stderr, "creating file's directory on target host")
 		}
+
+		stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)))
+		if err != nil {
+			return res, WrapErrorWith(err, stdout, stderr, "moving file to destination path")
+		}
+
+		return res, err
 	}
 
-	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, filepath.Dir(file.Destination))))
+	r, err := retry.NewRetrier(
+		retry.WithMaxRetries(3),
+		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		retry.WithRetrierFunc(fileOperations),
+	)
 	if err != nil {
-		return WrapErrorWith(err, stdout, stderr, "creating file's directory on target host")
+		return err
 	}
 
-	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)))
+	_, err = r.Run(ctx)
 	if err != nil {
-		return WrapErrorWith(err, stdout, stderr, "moving file to destination path")
+		return err
 	}
 
 	return nil
 }
 
-// DeleteFile deletes a file on the remote host
+// DeleteFile deletes a file on the remote host, retrying if necessary
 func DeleteFile(ctx context.Context, ssh it.Transport, req *DeleteFileRequest) error {
 	if req == nil {
 		return fmt.Errorf("no file delete request provided")
 	}
 
-	stderr, stdout, err := ssh.Run(ctx, command.New(fmt.Sprintf("sudo rm -r %s", req.Path)))
+	rmFile := func(ctx context.Context) (interface{}, error) {
+		var res interface{}
+		stderr, stdout, err := ssh.Run(ctx, command.New(fmt.Sprintf("sudo rm -r %s", req.Path)))
+		if err != nil {
+			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
+		}
+
+		return res, err
+	}
+
+	r, err := retry.NewRetrier(
+		retry.WithMaxRetries(3),
+		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		retry.WithRetrierFunc(rmFile),
+	)
 	if err != nil {
-		return WrapErrorWith(err, stdout, stderr, "deleting file")
+		return err
+	}
+
+	_, err = r.Run(ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil

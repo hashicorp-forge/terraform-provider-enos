@@ -29,7 +29,7 @@ func TargetPlatform(ctx context.Context, ssh transport.Transport) (string, error
 	}
 
 	r, err := retry.NewRetrier(
-		retry.WithMaxRetries(5),
+		retry.WithMaxRetries(3),
 		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
 		retry.WithRetrierFunc(getPlatform),
 	)
@@ -61,7 +61,7 @@ func TargetArchitecture(ctx context.Context, ssh transport.Transport) (string, e
 	}
 
 	r, err := retry.NewRetrier(
-		retry.WithMaxRetries(5),
+		retry.WithMaxRetries(3),
 		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
 		retry.WithRetrierFunc(getArchitecture),
 	)

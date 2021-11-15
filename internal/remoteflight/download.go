@@ -3,7 +3,9 @@ package remoteflight
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/enos-provider/internal/retry"
 	"github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
@@ -134,7 +136,7 @@ func WithDownloadRequestReplace(replace bool) DownloadOpt {
 	}
 }
 
-// Download downloads a file on a remote machine with enos-flight-control
+// Download downloads a file on a remote machine with enos-flight-control, retrying if necessary
 func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
 	res := &DownloadResponse{}
 
@@ -162,9 +164,28 @@ func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest)
 		cmd = fmt.Sprintf("%s --auth-user '%s' --auth-password '%s'", cmd, dr.AuthUser, dr.AuthPassword)
 	}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+	runCmd := func(ctx context.Context) (interface{}, error) {
+		var resp interface{}
+		stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+		if err != nil {
+			return resp, WrapErrorWith(err, stdout, stderr)
+		}
+
+		return resp, err
+	}
+
+	r, err := retry.NewRetrier(
+		retry.WithMaxRetries(3),
+		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		retry.WithRetrierFunc(runCmd),
+	)
 	if err != nil {
-		return res, WrapErrorWith(err, stdout, stderr)
+		return res, err
+	}
+
+	_, err = r.Run(ctx)
+	if err != nil {
+		return res, err
 	}
 
 	return res, nil
