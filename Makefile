@@ -53,6 +53,7 @@ flight-control: flight-control-build flight-control-pack
 flight-control-build:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_darwin_amd64 ./command/enos-flight-control
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${GLOBAL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_amd64 ./command/enos-flight-control
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${GLOBAL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_arm64 ./command/enos-flight-control
 
 flight-control-pack:
 ifndef HASUPX

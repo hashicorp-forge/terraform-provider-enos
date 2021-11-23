@@ -12,7 +12,7 @@ var Binaries embed.FS
 
 var binaryRegex = regexp.MustCompile(`enos-flight-control_(?P<platform>\w*)_(?P<arch>\w*)$`)
 
-// SupportedTargets are the suppport platform and architecture combinations that
+// SupportedTargets are the supported platform and architecture combinations that
 // have been embedded.
 func SupportedTargets() (map[string][]string, error) {
 	targets := map[string][]string{}

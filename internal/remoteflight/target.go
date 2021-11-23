@@ -91,6 +91,8 @@ func formatArch(arch string) string {
 	switch arch {
 	case "x86_64":
 		return "amd64"
+	case "aarch64":
+		return "arm64"
 	default:
 		return arch
 	}

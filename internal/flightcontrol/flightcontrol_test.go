@@ -12,63 +12,63 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 	t.Parallel()
 
 	for _, test := range []struct {
-		Platform      string
-		Archictecture string
-		Supported     bool
+		Platform     string
+		Architecture string
+		Supported    bool
 	}{
 		{
-			Platform:      "darwin",
-			Archictecture: "amd64",
-			Supported:     true,
+			Platform:     "darwin",
+			Architecture: "amd64",
+			Supported:    true,
 		},
 		{
-			Platform:      "linux",
-			Archictecture: "amd64",
-			Supported:     true,
+			Platform:     "linux",
+			Architecture: "amd64",
+			Supported:    true,
 		},
 		{
-			Platform:      "linux",
-			Archictecture: "386",
-			Supported:     false,
+			Platform:     "linux",
+			Architecture: "386",
+			Supported:    false,
 		},
 		{
-			Platform:      "linux",
-			Archictecture: "arm",
-			Supported:     false,
+			Platform:     "linux",
+			Architecture: "arm",
+			Supported:    false,
 		},
 		{
-			Platform:      "linux",
-			Archictecture: "arm64",
-			Supported:     false,
+			Platform:     "linux",
+			Architecture: "arm64",
+			Supported:    true,
 		},
 		{
-			Platform:      "freebsd",
-			Archictecture: "386",
-			Supported:     false,
+			Platform:     "freebsd",
+			Architecture: "386",
+			Supported:    false,
 		},
 		{
-			Platform:      "freebsd",
-			Archictecture: "arm",
-			Supported:     false,
+			Platform:     "freebsd",
+			Architecture: "arm",
+			Supported:    false,
 		},
 		{
-			Platform:      "freebsd",
-			Archictecture: "arm64",
-			Supported:     false,
+			Platform:     "freebsd",
+			Architecture: "arm64",
+			Supported:    false,
 		},
 		{
-			Platform:      "windows",
-			Archictecture: "amd64",
-			Supported:     false,
+			Platform:     "windows",
+			Architecture: "amd64",
+			Supported:    false,
 		},
 		{
-			Platform:      "windows",
-			Archictecture: "386",
-			Supported:     false,
+			Platform:     "windows",
+			Architecture: "386",
+			Supported:    false,
 		},
 	} {
-		t.Run(fmt.Sprintf("%s_%s", test.Platform, test.Archictecture), func(t *testing.T) {
-			supported, err := SupportedTarget(test.Platform, test.Archictecture)
+		t.Run(fmt.Sprintf("%s_%s", test.Platform, test.Architecture), func(t *testing.T) {
+			supported, err := SupportedTarget(test.Platform, test.Architecture)
 			assert.Equal(t, test.Supported, supported)
 			require.NoError(t, err)
 		})
@@ -80,6 +80,6 @@ func TestSupportedTargets(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, map[string][]string{
 		"darwin": {"amd64"},
-		"linux":  {"amd64"},
+		"linux":  {"amd64", "arm64"},
 	}, targets)
 }
