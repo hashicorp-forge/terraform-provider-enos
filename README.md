@@ -4,6 +4,7 @@
 A terraform provider for quality infrastructure
 
 - [Example](#example)
+- [Supported Platforms](#supported-platforms)
 - [Installing the provider](#installing-the-provider)
   - [Network mirror](#network-mirror)
   - [Build from source](#build-from-source)
@@ -39,6 +40,17 @@ A terraform provider for quality infrastructure
 # Example
 
 You can find an example of how to use the enos provider in the [examples/core](https://github.com/hashicorp/enos-provider/blob/main/examples/core/) section of the repository.
+
+# Supported Platforms
+
+The following table show the version compatability for different platform and architectures.
+
+| Tool/Feature            | Platforms     | Architecture | Version  | 
+|-------------------------|---------------|--------------|----------|
+| enos terraform provider | linux, darwin | amd64        | all      |
+| enos terraform provider | linux, darwin | arm64        | <=0.1.13 |
+| flight-control          | linux, darwin | amd64        | all      |
+| flight-control          | linux         | arm64        | <=0.1.13 |
 
 # Installing the provider
 
