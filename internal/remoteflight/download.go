@@ -23,6 +23,7 @@ type DownloadRequest struct {
 	AuthPassword      string
 	Sudo              bool
 	Replace           bool
+	RetryOpts         []retry.RetrierOpt
 }
 
 // DownloadResponse is a flight control download response
@@ -41,6 +42,10 @@ func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 		Mode:              "0755",
 		Sudo:              false,
 		Replace:           false,
+		RetryOpts: []retry.RetrierOpt{
+			retry.WithMaxRetries(3),
+			retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+		},
 	}
 
 	for _, opt := range opts {
@@ -136,6 +141,14 @@ func WithDownloadRequestReplace(replace bool) DownloadOpt {
 	}
 }
 
+// WithDownloadRequestRetryOptions sets retry options for dowload operation
+func WithDownloadRequestRetryOptions(opts ...retry.RetrierOpt) DownloadOpt {
+	return func(dr *DownloadRequest) *DownloadRequest {
+		dr.RetryOpts = opts
+		return dr
+	}
+}
+
 // Download downloads a file on a remote machine with enos-flight-control, retrying if necessary
 func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
 	res := &DownloadResponse{}
@@ -174,11 +187,8 @@ func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest)
 		return resp, err
 	}
 
-	r, err := retry.NewRetrier(
-		retry.WithMaxRetries(3),
-		retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
-		retry.WithRetrierFunc(runCmd),
-	)
+	opts := append(dr.RetryOpts, retry.WithRetrierFunc(runCmd))
+	r, err := retry.NewRetrier(opts...)
 	if err != nil {
 		return res, err
 	}
