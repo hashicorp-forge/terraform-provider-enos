@@ -29,7 +29,7 @@ provider "enos" {
 
 module "enos_infra" {
   source = "app.terraform.io/hashicorp-qti/aws-infra/enos"
-  verion = ">= 0.1.0"
+  version = ">= 0.1.0"
 
   project_name = "qti-enos-provider"
   environment  = "ci"
