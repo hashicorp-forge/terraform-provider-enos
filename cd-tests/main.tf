@@ -29,6 +29,7 @@ provider "enos" {
 
 module "enos_infra" {
   source = "app.terraform.io/hashicorp-qti/aws-infra/enos"
+  verion = ">= 0.1.0"
 
   project_name = "qti-enos-provider"
   environment  = "ci"
@@ -36,6 +37,7 @@ module "enos_infra" {
     "Project Name" : "qti-enos-provider",
     "Environment" : "ci"
   }
+  ami_architectures = ["amd64"]
 }
 
 module "consul_cluster" {
@@ -50,7 +52,7 @@ module "consul_cluster" {
     "Environment" : "ci"
   }
   ssh_aws_keypair = "enos-ci-ssh-keypair"
-  ami_id          = module.enos_infra.ubuntu_ami_id
+  ami_id          = module.enos_infra.ami_ids["ubuntu"]["amd64"]
   vpc_id          = module.enos_infra.vpc_id
   kms_key_arn     = module.enos_infra.kms_key_arn
   consul_license  = "none"
@@ -71,7 +73,7 @@ module "vault_cluster" {
     "Environment" : "ci"
   }
   ssh_aws_keypair    = "enos-ci-ssh-keypair"
-  ami_id             = module.enos_infra.ubuntu_ami_id
+  ami_id             = module.enos_infra.ami_ids["ubuntu"]["amd64"]
   vpc_id             = module.enos_infra.vpc_id
   kms_key_arn        = module.enos_infra.kms_key_arn
   consul_cluster_tag = module.consul_cluster.consul_cluster_tag
