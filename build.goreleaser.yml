@@ -17,14 +17,16 @@ builds:
       - -gcflags="all=-N -l"
     ldflags:
       - -X main.GitCommit={{ .Commit }}
-      - -extldflags=-static -s -w
+      - -extldflags=-static
+      - -s
+      - -w
     env:
       - CGO_ENABLED=0
     hooks:
       post:
         - 'mkdir -p ./internal/flightcontrol/binaries'
         - 'cp {{ .Path }} ./internal/flightcontrol/binaries/{{ .Name }}'
-        - 'upx --ultra-brute ./internal/flightcontrol/binaries/{{ .Name }}'
+        - 'upx -q -9 ./internal/flightcontrol/binaries/{{ .Name }}'
     binary: 'enos-flight-control_{{ .Target }}'
 
   - main: ./command/plugin
