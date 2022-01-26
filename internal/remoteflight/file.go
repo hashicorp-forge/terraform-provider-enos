@@ -192,7 +192,7 @@ func CopyFile(ctx context.Context, ssh it.Transport, file *CopyFileRequest) erro
 		return err
 	}
 
-	_, err = r.Run(ctx)
+	_, err = retry.Retry(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ func DeleteFile(ctx context.Context, ssh it.Transport, req *DeleteFileRequest) e
 		return err
 	}
 
-	_, err = r.Run(ctx)
+	_, err = retry.Retry(ctx, r)
 	if err != nil {
 		return err
 	}

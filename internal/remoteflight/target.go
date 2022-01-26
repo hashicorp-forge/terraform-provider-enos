@@ -40,7 +40,7 @@ func TargetPlatform(ctx context.Context, ssh transport.Transport) (string, error
 		return "", err
 	}
 
-	platform, err := r.Run(ctx)
+	platform, err := retry.Retry(ctx, r)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +75,7 @@ func TargetArchitecture(ctx context.Context, ssh transport.Transport) (string, e
 		return "", err
 	}
 
-	arch, err := r.Run(ctx)
+	arch, err := retry.Retry(ctx, r)
 	if err != nil {
 		return "", err
 	}

@@ -193,7 +193,7 @@ func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest)
 		return res, err
 	}
 
-	_, err = r.Run(ctx)
+	_, err = retry.Retry(ctx, r)
 	if err != nil {
 		return res, err
 	}
