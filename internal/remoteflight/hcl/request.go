@@ -1,89 +1,17 @@
-package consul
+package hcl
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"text/template"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// HCLConfig is a struct that represents a basic version of the Consul config.
-type HCLConfig struct {
-	Datacenter      string
-	DataDir         string
-	RetryJoin       []string
-	Server          bool
-	BootstrapExpect int
-	LogFile         string
-	LogLevel        string
-}
-
-// HCLBlock is a nested block in the consul config
-type HCLBlock struct {
-	Label string
-	Attrs HCLBlockAttrs
-}
-
-// HCLBlockAttrs are block attributes
-type HCLBlockAttrs map[string]interface{}
-
-// HCLConfigTemplate the the default configuration template
-var HCLConfigTemplate = template.Must(template.New("consul").Parse(`{{if .Datacenter -}}
-datacenter = "{{.Datacenter}}"
-{{end -}}
-
-{{if .DataDir -}}
-data_dir = "{{.DataDir}}"
-{{end -}}
-
-{{if .RetryJoin -}}
-retry_join = [{{range .RetryJoin -}}
-  "{{.}}",
-{{end}}]
-{{end -}}
-
-{{if .Server -}}
-server = {{.Server}}
-{{end -}}
-
-{{if .BootstrapExpect -}}
-bootstrap_expect = {{.BootstrapExpect}}
-{{end -}}
-
-{{if .LogFile -}}
-log_file = "{{.LogFile}}"
-{{end -}}
-
-{{if .LogLevel -}}
-log_level = "{{.LogLevel}}"
-{{end -}}
-`))
-
-// HCLable is an interface for a type that can be converted into a consul config
-type HCLable interface {
-	ToHCL() (string, error)
-}
-
-var _ HCLable = (*HCLConfig)(nil)
-
-// ToHCL converts a HCLConfig to the textual representation
-func (s *HCLConfig) ToHCL() (string, error) {
-	buf := bytes.Buffer{}
-	err := HCLConfigTemplate.Execute(&buf, s)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-// CreateHCLConfigFileRequest is a consul HCL config create request
+// CreateHCLConfigFileRequest is an HCL config create request
 type CreateHCLConfigFileRequest struct {
-	HCLConfig HCLable
+	HCLConfig *Builder
 	FilePath  string
 	Chmod     string
 	Chown     string
@@ -93,7 +21,7 @@ type CreateHCLConfigFileRequest struct {
 type CreateHCLConfigFileOpt func(*CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest
 
 // NewCreateHCLConfigFileRequest takes functional options and returns a new
-// Consul config file request
+// config file request
 func NewCreateHCLConfigFileRequest(opts ...CreateHCLConfigFileOpt) *CreateHCLConfigFileRequest {
 	c := &CreateHCLConfigFileRequest{}
 
@@ -112,8 +40,8 @@ func WithHCLConfigFilePath(path string) CreateHCLConfigFileOpt {
 	}
 }
 
-// WithHCLConfig sets the config file to use
-func WithHCLConfig(unit HCLable) CreateHCLConfigFileOpt {
+// WithHCLConfigFile sets the config file to use
+func WithHCLConfigFile(unit *Builder) CreateHCLConfigFileOpt {
 	return func(u *CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest {
 		u.HCLConfig = unit
 		return u
@@ -139,9 +67,9 @@ func WithHCLConfigChown(chown string) CreateHCLConfigFileOpt {
 // CreateHCLConfigFile takes a context, transport, and create request and
 // creates the config file.
 func CreateHCLConfigFile(ctx context.Context, ssh it.Transport, req *CreateHCLConfigFileRequest) error {
-	hcl, err := req.HCLConfig.ToHCL()
+	hcl, err := req.HCLConfig.BuildHCL()
 	if err != nil {
-		return fmt.Errorf("marshaling configuration to HCL: %w", err)
+		return err
 	}
 
 	if req.FilePath == "" {

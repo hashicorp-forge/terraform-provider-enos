@@ -21,6 +21,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 		config = {
 			api_addr = "{{.Config.APIAddr.Value}}"
 			cluster_addr = "{{.Config.ClusterAddr.Value}}"
+			cluster_name = "{{.Config.ClusterName.Value}}"
 			listener = {
 				type = "{{.Config.Listener.Type.Value}}"
 				attributes = {
@@ -103,6 +104,7 @@ EOF
 	vaultStart.ConfigDir.Set("/etc/vault.d")
 	vaultStart.Config.APIAddr.Set("http://127.0.0.1:8200")
 	vaultStart.Config.ClusterAddr.Set("http://127.0.0.1:8201")
+	vaultStart.Config.ClusterName.Set("avaultcluster")
 	vaultStart.Config.Listener.Type.Set("tcp")
 	vaultStart.Config.Listener.Attrs.Set(map[string]interface{}{
 		"address":     "0.0.0.0:8200",
@@ -134,6 +136,7 @@ EOF
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config_dir", regexp.MustCompile(`^/etc/vault.d$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.api_addr", regexp.MustCompile(`^http://127.0.0.1:8200$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.cluster_addr", regexp.MustCompile(`^http://127.0.0.1:8201$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.cluster_name", regexp.MustCompile(`^avaultcluster$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.type", regexp.MustCompile(`^tcp$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.address", regexp.MustCompile(`^0.0.0.0:8200$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.tls_disable", regexp.MustCompile(`^true$`)),

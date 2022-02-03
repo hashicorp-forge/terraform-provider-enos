@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -9,13 +10,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
+
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+)
+
+const (
+	defaultRaftDataDir = "/opt/raft/data"
+	raftStorageType    = "raft"
 )
 
 type vaultStart struct {
@@ -39,6 +47,7 @@ type vaultStartStateV1 struct {
 }
 
 type vaultConfig struct {
+	ClusterName *tfString
 	APIAddr     *tfString
 	ClusterAddr *tfString
 	Listener    *vaultConfigBlock
@@ -66,6 +75,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		ID:      newTfString(),
 		BinPath: newTfString(),
 		Config: &vaultConfig{
+			ClusterName: newTfString(),
 			APIAddr:     newTfString(),
 			ClusterAddr: newTfString(),
 			Listener:    newVaultConfigBlock(),
@@ -427,12 +437,14 @@ func (c *vaultConfig) Terraform5Type() tftypes.Type {
 			"storage":      c.Storage.Terraform5Type(),
 			"seal":         c.Seal.Terraform5Type(),
 			"ui":           c.UI.TFType(),
+			"cluster_name": c.ClusterName.TFType(),
 		},
 	}
 }
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
+		"cluster_name": c.ClusterName.TFValue(),
 		"api_addr":     c.APIAddr.TFValue(),
 		"cluster_addr": c.ClusterAddr.TFValue(),
 		"listener":     c.Listener.Terraform5Value(),
@@ -445,6 +457,7 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 // FromTerraform5Value unmarshals the value to the struct
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
+		"cluster_name": c.ClusterName,
 		"api_addr":     c.APIAddr,
 		"cluster_addr": c.ClusterAddr,
 		"ui":           c.UI,
@@ -481,56 +494,50 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 }
 
 // ToHCLConfig returns the vault config in the remoteflight HCLConfig format
-func (c *vaultConfig) ToHCLConfig() *vault.HCLConfig {
-	hclConfig := &vault.HCLConfig{}
+func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
+	hclBuilder := hcl.NewBuilder()
 
 	if apiAddr, ok := c.APIAddr.Get(); ok {
-		hclConfig.APIAddr = apiAddr
+		hclBuilder.AppendAttribute("api_addr", apiAddr)
 	}
 
 	if clusterAddr, ok := c.ClusterAddr.Get(); ok {
-		hclConfig.ClusterAddr = clusterAddr
+		hclBuilder.AppendAttribute("cluster_addr", clusterAddr)
 	}
 
-	if listenerType, ok := c.Listener.Type.Get(); ok {
-		hclConfig.Listener = &vault.HCLBlock{
-			Label: listenerType,
-		}
-
-		attrs, ok := c.Listener.Attrs.GetObject()
-		if ok {
-			hclConfig.Listener.Attrs = attrs
-		}
+	if ui, ok := c.UI.Get(); ok {
+		hclBuilder.AppendAttribute("ui", ui)
 	}
 
-	if sealType, ok := c.Seal.Type.Get(); ok {
-		hclConfig.Seal = &vault.HCLBlock{
-			Label: sealType,
-		}
-
-		attrs, ok := c.Seal.Attrs.GetObject()
-		if ok {
-			hclConfig.Seal.Attrs = attrs
+	if label, ok := c.Listener.Type.Get(); ok {
+		if attrs, ok := c.Listener.Attrs.GetObject(); ok {
+			hclBuilder.AppendBlock("listener", []string{label}).AppendAttributes(attrs)
 		}
 	}
 
-	if storageType, ok := c.Storage.Type.Get(); ok {
-		hclConfig.Storage = &vault.HCLBlock{
-			Label: storageType,
-		}
-
-		attrs, ok := c.Storage.Attrs.GetObject()
-		if ok {
-			hclConfig.Storage.Attrs = attrs
+	if label, ok := c.Seal.Type.Get(); ok {
+		if attrs, ok := c.Seal.Attrs.GetObject(); ok {
+			hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
 		}
 	}
 
-	ui, ok := c.UI.Get()
-	if ok {
-		hclConfig.UI = ui
-	}
+	if storageLabel, ok := c.Storage.Type.Get(); ok {
+		if attrs, ok := c.Storage.Attrs.GetObject(); ok {
+			storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel}).AppendAttributes(attrs)
 
-	return hclConfig
+			if storageLabel == raftStorageType {
+				storageBlock.AppendAttribute("path", defaultRaftDataDir)
+				clusterName, ok := c.ClusterName.Get()
+				if !ok {
+					return nil, errors.New("ClusterName not found in Vault config")
+				}
+				storageBlock.AppendBlock("retry_join", []string{}).
+					AppendAttribute("auto_join", fmt.Sprintf("provider=aws tag_key=Type tag_value=%s", clusterName)).
+					AppendAttribute("auto_join_scheme", "http")
+			}
+		}
+	}
+	return hclBuilder, nil
 }
 
 func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) error {
@@ -592,11 +599,15 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	}
 
 	// Create the vault HCL configuration file
-	err = vault.CreateHCLConfigFile(ctx, ssh, vault.NewCreateHCLConfigFileRequest(
-		vault.WithHCLConfigFilePath(configFilePath),
-		vault.WithHCLConfigChmod("640"),
-		vault.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-		vault.WithHCLConfigFile(s.Config.ToHCLConfig()),
+	config, err := s.Config.ToHCLConfig()
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "vault configuration", "failed to create the vault HCL configuration")
+	}
+	err = hcl.CreateHCLConfigFile(ctx, ssh, hcl.NewCreateHCLConfigFileRequest(
+		hcl.WithHCLConfigFilePath(configFilePath),
+		hcl.WithHCLConfigChmod("640"),
+		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
+		hcl.WithHCLConfigFile(config),
 	))
 
 	if err != nil {
@@ -662,6 +673,16 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the vault systemd unit")
+		}
+	}
+
+	if storageType, ok := s.Config.Storage.Type.Get(); ok && storageType == raftStorageType {
+		err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
+			remoteflight.WithDirName(defaultRaftDataDir),
+			remoteflight.WithDirChown(vaultUsername),
+		))
+		if err != nil {
+			return wrapErrWithDiagnostics(err, "raft data directory", "failed to change ownership on data directory")
 		}
 	}
 

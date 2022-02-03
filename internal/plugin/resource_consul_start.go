@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/consul"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -446,39 +447,38 @@ func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
 }
 
 // ToHCLConfig returns the consul config in the remoteflight HCLConfig format
-func (c *consulConfig) ToHCLConfig() *consul.HCLConfig {
-	hclConfig := &consul.HCLConfig{}
+func (c *consulConfig) ToHCLConfig() *hcl.Builder {
+	hlcBuilder := hcl.NewBuilder()
 
 	if dataCenter, ok := c.Datacenter.Get(); ok {
-		hclConfig.Datacenter = dataCenter
+		hlcBuilder.AppendAttribute("datacenter", dataCenter)
 	}
 
 	if dataDir, ok := c.DataDir.Get(); ok {
-		hclConfig.DataDir = dataDir
+		hlcBuilder.AppendAttribute("data_dir", dataDir)
 	}
 
 	if retryJoin, ok := c.RetryJoin.GetStrings(); ok {
-		hclConfig.RetryJoin = retryJoin
+		hlcBuilder.AppendAttribute("retry_join", retryJoin)
 	}
 
-	server, ok := c.Server.Get()
-	if ok {
-		hclConfig.Server = server
+	if server, ok := c.Server.Get(); ok {
+		hlcBuilder.AppendAttribute("server", server)
 	}
 
 	if bootstrapExpect, ok := c.BootstrapExpect.Get(); ok {
-		hclConfig.BootstrapExpect = bootstrapExpect
+		hlcBuilder.AppendAttribute("bootstrap_expect", int64(bootstrapExpect))
 	}
 
-	if LogFile, ok := c.LogFile.Get(); ok {
-		hclConfig.LogFile = LogFile
+	if logFile, ok := c.LogFile.Get(); ok {
+		hlcBuilder.AppendAttribute("log_file", logFile)
 	}
 
 	if logLevel, ok := c.LogLevel.Get(); ok {
-		hclConfig.LogLevel = logLevel
+		hlcBuilder.AppendAttribute("log_level", logLevel)
 	}
 
-	return hclConfig
+	return hlcBuilder
 }
 
 func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) error {
@@ -579,12 +579,14 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 		return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the consul systemd unit")
 	}
 
+	config := s.Config.ToHCLConfig()
+
 	// Create the consul HCL configuration file
-	err = consul.CreateHCLConfigFile(ctx, ssh, consul.NewCreateHCLConfigFileRequest(
-		consul.WithHCLConfigFilePath(configFilePath),
-		consul.WithHCLConfigChmod("644"),
-		consul.WithHCLConfigChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
-		consul.WithHCLConfig(s.Config.ToHCLConfig()),
+	err = hcl.CreateHCLConfigFile(ctx, ssh, hcl.NewCreateHCLConfigFileRequest(
+		hcl.WithHCLConfigFilePath(configFilePath),
+		hcl.WithHCLConfigChmod("644"),
+		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
+		hcl.WithHCLConfigFile(config),
 	))
 
 	if err != nil {
