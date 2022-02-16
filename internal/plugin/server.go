@@ -24,6 +24,8 @@ func Server() tfprotov6.ProviderServer {
 			rr.RegisterResource(newVaultInit()),
 			rr.RegisterResource(newVaultUnseal()),
 			rr.RegisterResource(newConsulStart()),
+			rr.RegisterResource(newBoundaryStart()),
+			rr.RegisterResource(newBoundaryInit()),
 		)),
 	)
 }
