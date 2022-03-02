@@ -246,7 +246,8 @@ func (s *remoteExecStateV1) Schema() *tfprotov6.Schema {
 					Type: tftypes.Map{
 						ElementType: tftypes.String,
 					},
-					Optional: true,
+					Optional:  true,
+					Sensitive: true,
 				},
 				{
 					Name: "inline",

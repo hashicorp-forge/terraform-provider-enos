@@ -28,14 +28,15 @@ type localExec struct {
 var _ resourcerouter.Resource = (*localExec)(nil)
 
 type localExecStateV1 struct {
-	ID      *tfString
-	Env     *tfStringMap
-	Content *tfString
-	Inline  *tfStringSlice
-	Scripts *tfStringSlice
-	Sum     *tfString
-	Stderr  *tfString
-	Stdout  *tfString
+	ID         *tfString
+	Env        *tfStringMap
+	InheritEnv *tfBool
+	Content    *tfString
+	Inline     *tfStringSlice
+	Scripts    *tfStringSlice
+	Sum        *tfString
+	Stderr     *tfString
+	Stdout     *tfString
 }
 
 var _ State = (*localExecStateV1)(nil)
@@ -49,14 +50,15 @@ func newLocalExec() *localExec {
 
 func newLocalExecStateV1() *localExecStateV1 {
 	return &localExecStateV1{
-		ID:      newTfString(),
-		Env:     newTfStringMap(),
-		Content: newTfString(),
-		Inline:  newTfStringSlice(),
-		Scripts: newTfStringSlice(),
-		Sum:     newTfString(),
-		Stderr:  newTfString(),
-		Stdout:  newTfString(),
+		ID:         newTfString(),
+		Env:        newTfStringMap(),
+		InheritEnv: newTfBool(),
+		Content:    newTfString(),
+		Inline:     newTfStringSlice(),
+		Scripts:    newTfStringSlice(),
+		Sum:        newTfString(),
+		Stderr:     newTfString(),
+		Stdout:     newTfString(),
 	}
 }
 
@@ -381,6 +383,12 @@ func (s *localExecStateV1) Schema() *tfprotov6.Schema {
 					Type: tftypes.Map{
 						ElementType: tftypes.String,
 					},
+					Optional:  true,
+					Sensitive: true,
+				},
+				{
+					Name:     "inherit_environment",
+					Type:     tftypes.Bool,
 					Optional: true,
 				},
 				{
@@ -573,6 +581,10 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 	cmd := exec.CommandContext(ctx, "bash", destination.Name())
 
 	if env, ok := state.Env.GetStrings(); ok {
+		// env inheritance is on by default, hence the env should be inherited if the InheritEnv value is unknown
+		if inherit, ok := state.InheritEnv.Get(); !ok || (ok && inherit) {
+			cmd.Env = os.Environ()
+		}
 		for k, v := range env {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 		}
@@ -645,14 +657,15 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *localExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"id":          s.ID,
-		"content":     s.Content,
-		"sum":         s.Sum,
-		"stdout":      s.Stdout,
-		"stderr":      s.Stderr,
-		"environment": s.Env,
-		"inline":      s.Inline,
-		"scripts":     s.Scripts,
+		"id":                  s.ID,
+		"content":             s.Content,
+		"sum":                 s.Sum,
+		"stdout":              s.Stdout,
+		"stderr":              s.Stderr,
+		"environment":         s.Env,
+		"inherit_environment": s.InheritEnv,
+		"inline":              s.Inline,
+		"scripts":             s.Scripts,
 	})
 	if err != nil {
 		return err
@@ -664,28 +677,30 @@ func (s *localExecStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *localExecStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":          s.ID.TFType(),
-		"sum":         s.Sum.TFType(),
-		"stdout":      s.Stdout.TFType(),
-		"stderr":      s.Stderr.TFType(),
-		"environment": s.Env.TFType(),
-		"inline":      s.Inline.TFType(),
-		"scripts":     s.Scripts.TFType(),
-		"content":     s.Content.TFType(),
+		"id":                  s.ID.TFType(),
+		"sum":                 s.Sum.TFType(),
+		"stdout":              s.Stdout.TFType(),
+		"stderr":              s.Stderr.TFType(),
+		"environment":         s.Env.TFType(),
+		"inherit_environment": s.InheritEnv.TFType(),
+		"inline":              s.Inline.TFType(),
+		"scripts":             s.Scripts.TFType(),
+		"content":             s.Content.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *localExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":          s.ID.TFValue(),
-		"sum":         s.Sum.TFValue(),
-		"stdout":      s.Stdout.TFValue(),
-		"stderr":      s.Stderr.TFValue(),
-		"content":     s.Content.TFValue(),
-		"inline":      s.Inline.TFValue(),
-		"scripts":     s.Scripts.TFValue(),
-		"environment": s.Env.TFValue(),
+		"id":                  s.ID.TFValue(),
+		"sum":                 s.Sum.TFValue(),
+		"stdout":              s.Stdout.TFValue(),
+		"stderr":              s.Stderr.TFValue(),
+		"content":             s.Content.TFValue(),
+		"inline":              s.Inline.TFValue(),
+		"scripts":             s.Scripts.TFValue(),
+		"environment":         s.Env.TFValue(),
+		"inherit_environment": s.InheritEnv.TFValue(),
 	})
 }
 
