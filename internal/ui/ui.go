@@ -10,6 +10,7 @@ import (
 type UI interface {
 	Stdout() Output
 	Stderr() Output
+	CombinedOutput() string
 	Write(stdout, stderr string) error
 	Append(stdout, stderr string) error
 }
@@ -20,17 +21,20 @@ type Output interface {
 }
 
 func NewBuffered() *Buffered {
+	combined := &bytes.Buffer{}
 	return &Buffered{
-		stdout: NewBufferedOut(),
-		stderr: NewBufferedOut(),
+		stdout:   NewBufferedOut(combined),
+		stderr:   NewBufferedOut(combined),
+		combined: combined,
 	}
 }
 
 var _ UI = (*Buffered)(nil)
 
 type Buffered struct {
-	stdout *BufferedOut
-	stderr *BufferedOut
+	stdout   *BufferedOut
+	stderr   *BufferedOut
+	combined *bytes.Buffer
 }
 
 func (b *Buffered) Stdout() Output {
@@ -39,6 +43,10 @@ func (b *Buffered) Stdout() Output {
 
 func (b *Buffered) Stderr() Output {
 	return b.stderr
+}
+
+func (b *Buffered) CombinedOutput() string {
+	return b.combined.String()
 }
 
 func (b *Buffered) Write(stdout, stderr string) error {
@@ -77,16 +85,20 @@ func (b *Buffered) Append(stdout, stderr string) error {
 	return merr.ErrorOrNil()
 }
 
-func NewBufferedOut() *BufferedOut {
+func NewBufferedOut(combined *bytes.Buffer) *BufferedOut {
+	buf := &bytes.Buffer{}
+	writer := io.MultiWriter(buf, combined)
 	return &BufferedOut{
-		buf: &bytes.Buffer{},
+		buf:    buf,
+		writer: writer,
 	}
 }
 
 var _ Output = (*BufferedOut)(nil)
 
 type BufferedOut struct {
-	buf *bytes.Buffer
+	buf    *bytes.Buffer
+	writer io.Writer
 }
 
 func (b *BufferedOut) Read(p []byte) (int, error) {
@@ -97,7 +109,7 @@ func (b *BufferedOut) Read(p []byte) (int, error) {
 }
 
 func (b *BufferedOut) Write(p []byte) (int, error) {
-	return b.buf.Write(p)
+	return b.writer.Write(p)
 }
 
 // Append is like write but adds a newline to the previous line
@@ -107,13 +119,13 @@ func (b *BufferedOut) Append(p []byte) (int, error) {
 	}
 
 	if b.buf.Len() > 0 {
-		i, err := b.buf.Write([]byte("\n"))
+		i, err := b.writer.Write([]byte("\n"))
 		if err != nil {
 			return i, err
 		}
 	}
 
-	return b.buf.Write(p)
+	return b.writer.Write(p)
 }
 
 func (b *BufferedOut) String() string {

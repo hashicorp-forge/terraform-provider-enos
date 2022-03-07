@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/enos-provider/internal/ui"
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -551,15 +550,12 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 // copyAndRun takes an io.Reader and a pattern, creates an empty file (named according to pattern),
 // copies the contents from the io.Reader to the empty file, makes that file executable,
 // executes that file against bash, and then returns the output and any errors that were returned.
-func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, state *localExecStateV1) (err error) {
+func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, state *localExecStateV1) error {
 	select {
 	case <-ctx.Done():
-		err = wrapErrWithDiagnostics(ctx.Err(), "timed out", "while executing commands")
-		return err
+		return wrapErrWithDiagnostics(ctx.Err(), "timed out", "while executing commands")
 	default: // continues on because we haven't timed out
 	}
-
-	merr := &multierror.Error{}
 
 	destination, err := os.CreateTemp("", "localExec-*")
 	if err != nil {
@@ -579,6 +575,8 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 	}
 
 	cmd := exec.CommandContext(ctx, "bash", destination.Name())
+	cmd.Stdout = ui.Stdout()
+	cmd.Stderr = ui.Stderr()
 
 	if env, ok := state.Env.GetStrings(); ok {
 		// env inheritance is on by default, hence the env should be inherited if the InheritEnv value is unknown
@@ -590,31 +588,9 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 		}
 	}
 
-	stdoutP, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	stderrP, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	// we'll collect errors that can occur throughout the execution of the command
-	// and return them all at once if we found an issue
-	merr = multierror.Append(merr, cmd.Start())
-
-	stdoutBuffer, err := io.ReadAll(stdoutP)
-	merr = multierror.Append(merr, err, ui.Append(string(stdoutBuffer), ""))
-
-	stderrBuffer, err := io.ReadAll(stderrP)
-	merr = multierror.Append(merr, err, ui.Append("", string(stderrBuffer)))
-
-	merr = multierror.Append(merr, cmd.Wait())
-
-	if merr.ErrorOrNil() != nil {
+	if err := cmd.Run(); err != nil {
 		return wrapErrWithDiagnostics(
-			merr.ErrorOrNil(), "command failed", fmt.Sprintf("executing script: %s", merr.Error()),
+			err, "command failed", fmt.Sprintf("executing script: %s\n\n%s", err, ui.CombinedOutput()),
 		)
 	}
 
