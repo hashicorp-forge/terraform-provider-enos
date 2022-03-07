@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // InitRequest is the init request
@@ -228,6 +229,8 @@ func (r *InitRequest) String() string {
 func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
 
+	tflog.Debug(ctx, fmt.Sprintf("Running Vault Init command: %s", req.String()))
+
 	stdout, stderr, err := ssh.Run(ctx, command.New(
 		req.String(),
 		command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
@@ -241,6 +244,9 @@ func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitRespons
 	}
 
 	err = json.Unmarshal([]byte(stdout), &res)
+
+	tflog.Debug(ctx, fmt.Sprintf("Vault Init command Response: %#v", res))
+
 	if err != nil {
 		return res, err
 	}

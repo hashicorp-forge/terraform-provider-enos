@@ -181,6 +181,8 @@ func (r *vaultInit) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanR
 		proposedState.UnsealThreshold.Unknown = true
 		proposedState.RecoveryKeysB64.Unknown = true
 		proposedState.RecoveryKeysHex.Unknown = true
+		proposedState.RecoveryKeysShares.Unknown = true
+		proposedState.RecoveryKeysThreshold.Unknown = true
 		proposedState.RootToken.Unknown = true
 	}
 
@@ -500,14 +502,14 @@ func (s *vaultInitStateV1) Init(ctx context.Context, ssh it.Transport) error {
 	s.UnsealKeysB64.SetStrings(res.UnsealKeysB64)
 	s.UnsealKeysHex.SetStrings(res.UnsealKeysHex)
 	shares, err := res.UnsealShares.Int64()
-	if err != nil {
+	if err == nil {
 		s.UnsealShares.Set(int(shares))
 	} else {
 		s.UnsealShares.Null = true
 		s.UnsealShares.Unknown = false
 	}
 	thresh, err := res.UnsealThreshold.Int64()
-	if err != nil {
+	if err == nil {
 		s.UnsealThreshold.Set(int(thresh))
 	} else {
 		s.UnsealThreshold.Null = true
@@ -516,14 +518,14 @@ func (s *vaultInitStateV1) Init(ctx context.Context, ssh it.Transport) error {
 	s.RecoveryKeysB64.SetStrings(res.RecoveryKeysB64)
 	s.RecoveryKeysHex.SetStrings(res.RecoveryKeysHex)
 	shares, err = res.RecoveryKeysShares.Int64()
-	if err != nil {
+	if err == nil {
 		s.RecoveryKeysShares.Set(int(shares))
 	} else {
 		s.RecoveryKeysShares.Null = true
 		s.RecoveryKeysShares.Unknown = false
 	}
 	thresh, err = res.RecoveryKeysThreshold.Int64()
-	if err != nil {
+	if err == nil {
 		s.RecoveryKeysThreshold.Set(int(thresh))
 	} else {
 		s.RecoveryKeysThreshold.Null = true
