@@ -81,5 +81,8 @@ test-race-detector:
 lint:
 	golangci-lint run -v
 
+fmt:
+	gofumpt -w -l .
+
 clean:
 	rm -rf dist bin .terraform*

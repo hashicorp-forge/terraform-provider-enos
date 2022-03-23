@@ -1,6 +1,6 @@
 module github.com/hashicorp/enos-provider
 
-go 1.17
+go 1.18
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
@@ -12,6 +12,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform-plugin-go v0.7.0
+	github.com/hashicorp/terraform-plugin-log v0.2.1
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.8.0
 	github.com/mitchellh/cli v1.1.2
 	github.com/spf13/cobra v1.1.3
@@ -22,7 +23,6 @@ require (
 )
 
 require (
-	github.com/hashicorp/terraform-plugin-log v0.2.1 // indirect
 	github.com/hashicorp/terraform-registry-address v0.0.0-20210412075316-9b2996cce896 // indirect
 	github.com/hashicorp/terraform-svchost v0.0.0-20200729002733-f050f53b9734 // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
