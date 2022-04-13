@@ -434,7 +434,7 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 	}
 
 	// We're probably overthinking this but this is a sha256 sum of the
-	// aggregate of the environment variables, inline commands, and scripts.
+	// aggregate of the inline commands, the rendered content, and scripts.
 	ag := strings.Builder{}
 
 	if cont, ok := state.Content.Get(); ok {
@@ -451,10 +451,9 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 		ag.WriteString(sha)
 	}
 
-	env, _ := state.Env.GetStrings()
 	if inline, ok := state.Inline.GetStrings(); ok {
 		for _, cmd := range inline {
-			ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(env))))
+			ag.WriteString(command.SHA256(command.New(cmd)))
 		}
 	}
 

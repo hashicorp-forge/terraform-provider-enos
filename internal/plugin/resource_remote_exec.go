@@ -294,7 +294,7 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 	}
 
 	// We're probably overthinking this but this is a sha256 sum of the
-	// aggregate of the environment variables, inline commands, and scripts.
+	// aggregate of the inline commands, the rendered content, and scripts.
 	ag := strings.Builder{}
 
 	if cont, ok := state.Content.Get(); ok {
@@ -312,9 +312,8 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 	}
 
 	if inline, ok := state.Inline.GetStrings(); ok {
-		env, _ := state.Env.GetStrings()
 		for _, cmd := range inline {
-			ag.WriteString(command.SHA256(command.New(cmd, command.WithEnvVars(env))))
+			ag.WriteString(command.SHA256(command.New(cmd)))
 		}
 	}
 
