@@ -37,7 +37,7 @@ install: release
 ifeq ($(CI), true)
 	for os_arch in $$(ls -la ./dist | grep ${BINARY} | cut -f 2-3 -d '_') ; do \
 		mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch ; \
-		cp ./dist/${BINARY}_$$os_arch/${BINARY}_${VERSION} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/${BINARY} ; \
+		cp ./dist/${BINARY}_$$os_arch*/${BINARY}_${VERSION} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/$$os_arch/${BINARY} ; \
 	done
 endif
 

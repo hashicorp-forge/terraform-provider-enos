@@ -1,4 +1,5 @@
 ---
+project_name: enos-provider
 before:
   hooks:
     - 'apk add upx'
@@ -15,6 +16,7 @@ builds:
       - -trimpath
       - -tags=osusergo,netgo
       - -gcflags="all=-N -l"
+      - -buildvcs=false
     ldflags:
       - -X main.GitCommit={{ .Commit }}
       - -extldflags=-static
@@ -41,6 +43,7 @@ builds:
       - -trimpath
       - -tags=osusergo,netgo
       - -gcflags="all=-N -l"
+      - -buildvcs=false
     ldflags:
       - -X main.GitCommit={{ .Commit }}
       - -extldflags=-static
