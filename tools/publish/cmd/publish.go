@@ -7,8 +7,7 @@ import (
 
 func main() {
 	rootCmd := newRootCommand()
-	rootCmd.AddCommand(newPopulateCommand())
-	rootCmd.AddCommand(newPromoteCommand())
+	rootCmd.AddCommand(newS3Cmd())
 
 	err := rootCmd.Execute()
 	if err != nil {

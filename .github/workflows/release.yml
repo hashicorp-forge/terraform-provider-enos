@@ -38,4 +38,4 @@ jobs:
       - name: Build and Install Artifacts
         run: CI='true' make
       - name: Publish to S3 bucket
-        run: go run ./tools/mirror/cmd populate --dist ./dist --bucket enos-provider-current
+        run: go run ./tools/publish/cmd s3 upload --dist ./dist --bucket enos-provider-current

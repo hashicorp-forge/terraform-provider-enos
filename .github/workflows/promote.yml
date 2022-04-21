@@ -111,5 +111,4 @@ jobs:
           role-skip-session-tagging: true
           role-duration-seconds: 3600
       - name: Promote to enos-provider-stable S3 bucket
-        # TODO: Add support to populate-mirror tool for promoting artifact to stable bucket
-        run: go run ./tools/mirror/cmd promote --version $ENOS_VERSION --src-bucket enos-provider-current --dest-bucket enos-provider-stable
+        run: go run ./tools/publish/cmd s3 copy --version $ENOS_VERSION --src-bucket enos-provider-current --dest-bucket enos-provider-stable

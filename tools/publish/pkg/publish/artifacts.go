@@ -1,4 +1,4 @@
-package mirror
+package publish
 
 import (
 	"archive/zip"

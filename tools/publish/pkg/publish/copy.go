@@ -1,4 +1,4 @@
-package mirror
+package publish
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// PromoteReq to be copied
-type PromoteReq struct {
+// CopyReq to be copied
+type CopyReq struct {
 	Version          string
 	SrcBucketName    string
 	DestBucketName   string
@@ -23,8 +23,8 @@ type PromoteReq struct {
 	log              zapcore.Level
 }
 
-// Promote will promote the artifact from source to destination S3 bucket
-func Promote(ctx context.Context, req *PromoteReq) error {
+// Copy will copy the artifact from source to destination S3 bucket
+func Copy(ctx context.Context, req *CopyReq) error {
 	// Make sure the source and destination buckets exist
 	_, err := req.SrcS3Client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(req.SrcBucketName),
@@ -41,7 +41,7 @@ func Promote(ctx context.Context, req *PromoteReq) error {
 	}
 
 	// Initialize our source mirror and verify that the it has the version that
-	// we want to promote
+	// we want to copy
 	srcMirror := NewLocal(req.SrcProviderName)
 	err = srcMirror.Initialize()
 	if err != nil {
@@ -91,7 +91,7 @@ func Promote(ctx context.Context, req *PromoteReq) error {
 		return err
 	}
 	if ok {
-		return fmt.Errorf("version already promoted")
+		return fmt.Errorf("version already copyed")
 	}
 
 	// Copy artifacts from the source S3 mirror to destination S3 mirror
