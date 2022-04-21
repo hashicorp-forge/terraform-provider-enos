@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -124,7 +125,6 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 		"provider-name", l.providerName,
 	)
 
-	dirReg := regexp.MustCompile(l.providerName + `_(?P<platform>\w*)_(?P<arch>\w*)$`)
 	binReg := regexp.MustCompile(l.providerName + `_(?P<version>.*)$`)
 	binPath, err = filepath.Abs(binPath)
 	if err != nil {
@@ -143,13 +143,19 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 		}
 
 		l.log.Debugw("checking directory", "directory", info.Name())
-		matches := dirReg.FindStringSubmatch(info.Name())
-		if len(matches) != 3 {
+
+		parts := strings.Split(info.Name(), "_")
+		if len(parts) < 3 {
 			return nil
 		}
 
-		platform := matches[1]
-		arch := matches[2]
+		if parts[0] != l.providerName {
+			return nil
+		}
+
+		platform := parts[1]
+		arch := parts[2]
+		// parts[3] might be the GOAMD64 version but we don't need it
 		version := ""
 
 		// Look in the release dir for a binary and get the version from its name
@@ -168,7 +174,7 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 				return err
 			}
 
-			matches = binReg.FindStringSubmatch(info.Name())
+			matches := binReg.FindStringSubmatch(info.Name())
 			if len(matches) != 2 {
 				continue
 			}
