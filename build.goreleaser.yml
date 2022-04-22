@@ -29,7 +29,7 @@ builds:
         - 'mkdir -p ./internal/flightcontrol/binaries'
         - 'cp {{ .Path }} ./internal/flightcontrol/binaries/{{ .Name }}'
         - 'upx -q -9 ./internal/flightcontrol/binaries/{{ .Name }}'
-    binary: 'enos-flight-control_{{ .Target }}'
+    binary: 'enos-flight-control_{{ .Os }}_{{ .Arch }}'
 
   - main: ./command/plugin
     id: terraform-provider-enos
