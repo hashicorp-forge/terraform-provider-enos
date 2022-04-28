@@ -8,7 +8,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 type Client struct {
@@ -65,13 +68,20 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 		return res, fmt.Errorf("generating search url: %w", err)
 	}
 
-	buf := bytes.Buffer{}
-	err = req.QueryTemplate.Execute(&buf, req)
+	buf := &bytes.Buffer{}
+	err = req.QueryTemplate.Execute(buf, req)
 	if err != nil {
 		return res, fmt.Errorf("generating AQL query template: %w", err)
 	}
 
-	areq, err := http.NewRequestWithContext(ctx, "POST", search.String(), &buf)
+	query := buf.String()
+
+	tflog.Info(ctx, "searching for artifactory item", map[string]interface{}{
+		"url":   search.String,
+		"query": query,
+	})
+
+	areq, err := http.NewRequestWithContext(ctx, "POST", search.String(), strings.NewReader(query))
 	if err != nil {
 		return res, fmt.Errorf("generating artifactory search request: %w", err)
 	}
@@ -96,6 +106,10 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 	err = json.Unmarshal(body, &res)
 	if err != nil {
 		return res, fmt.Errorf("marshaling artifactory search query response: %w", err)
+	}
+
+	if len(res.Results) == 0 {
+		return nil, fmt.Errorf("no artifactory item found for host: [%s] with query:\n%s", c.Host, query)
 	}
 
 	return res, nil
