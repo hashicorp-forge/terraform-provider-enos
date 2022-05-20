@@ -151,7 +151,7 @@ func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitRespons
 
 	err = json.Unmarshal([]byte(stdout), &res)
 	if err != nil {
-		return res, fmt.Errorf("failed to unmarshal json: %s", err)
+		return res, fmt.Errorf("failed to unmarshal json: %s, stdout: %q", err, stdout)
 	}
 
 	return res, nil
