@@ -34,3 +34,5 @@ internal/flightcontrol/binaries/*
 
 # mirror
 mirror/*.tfvars
+
+.idea

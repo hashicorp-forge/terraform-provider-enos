@@ -336,6 +336,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transpo
 		configName = name
 	}
 
+	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below
 	configFilePath := filepath.Join(configPath, configName)
 
 	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
@@ -355,6 +356,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transpo
 			unitName = unit
 		}
 
+		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 		unit := remoteflight.SystemdUnit{
 			"Unit": {
 				"Description":           "HashiCorp Boundary",

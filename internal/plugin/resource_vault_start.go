@@ -622,6 +622,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 			unitName = unit
 		}
 
+		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 		unit := remoteflight.SystemdUnit{
 			"Unit": {
 				"Description":           "HashiCorp Vault - A tool for managing secrets",

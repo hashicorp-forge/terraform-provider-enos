@@ -516,6 +516,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 		unitName = unit
 	}
 
+	//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 	unit := remoteflight.SystemdUnit{
 		"Unit": {
 			"Description":           "HashiCorp Consul - A service mesh solution",
