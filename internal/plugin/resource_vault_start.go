@@ -124,10 +124,10 @@ func (r *vaultStart) GetProviderConfig() (*config, error) {
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *vaultStart) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+func (r *vaultStart) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := newVaultStartStateV1()
 
-	return transportUtil.ValidateResourceConfig(ctx, newState, req)
+	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -142,18 +142,18 @@ func (r *vaultStart) ValidateResourceConfig(ctx context.Context, req *tfprotov6.
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (r *vaultStart) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+func (r *vaultStart) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newVaultStartStateV1()
 
-	return transportUtil.UpgradeResourceState(ctx, newState, req)
+	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+func (r *vaultStart) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := newVaultStartStateV1()
 
-	return transportUtil.ReadResource(ctx, newState, req)
+	transportUtil.ReadResource(ctx, newState, req, res)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -165,21 +165,21 @@ func (r *vaultStart) ReadResource(ctx context.Context, req *tfprotov6.ReadResour
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (r *vaultStart) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+func (r *vaultStart) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := newVaultStartStateV1()
 
-	return transportUtil.ImportResourceState(ctx, newState, req)
+	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
+func (r *vaultStart) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
 	priorState := newVaultStartStateV1()
 	proposedState := newVaultStartStateV1()
 
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req)
-	if err != nil {
-		return res, err
+	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// When we're planning we need to determine if we've already applied before
@@ -192,34 +192,36 @@ func (r *vaultStart) PlanResourceChange(ctx context.Context, req *tfprotov6.Plan
 		proposedState.Status.Unknown = true
 	}
 
-	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
-
-	return res, err
+	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+func (r *vaultStart) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	priorState := newVaultStartStateV1()
 	plannedState := newVaultStartStateV1()
 
-	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
-	if err != nil {
-		return res, err
+	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
 	if _, ok := plannedState.BinPath.Get(); !ok {
 		// Delete the resource
-		res.NewState, err = marshalDelete(plannedState)
-
-		return res, err
+		newState, err := marshalDelete(plannedState)
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		} else {
+			res.NewState = newState
+		}
+		return
 	}
 
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
-	if err != nil {
-		return res, err
+	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	plannedState.ID.Set("static")
@@ -227,7 +229,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov6.App
 	ssh, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 	defer ssh.Close() //nolint: staticcheck
 
@@ -236,20 +238,18 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req *tfprotov6.App
 		err = plannedState.startVault(ctx, ssh)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startVault(ctx, ssh)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
-			return res, err
+			return
 		}
 	}
 
-	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
-
-	return res, err
+	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.

@@ -60,15 +60,11 @@ func (d *environment) SetProviderConfig(meta tftypes.Value) error {
 
 // ValidateDataResourceConfig is the request Terraform sends when it wants to
 // validate the data source's configuration.
-func (d *environment) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
-	res := &tfprotov6.ValidateDataResourceConfigResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (d *environment) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
@@ -79,21 +75,15 @@ func (d *environment) ValidateDataResourceConfig(ctx context.Context, req *tfpro
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 	}
-
-	return res, err
 }
 
 // ReadDataSource is the request Terraform sends when it wants to get the latest
 // state for the data source.
-func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest) (*tfprotov6.ReadDataSourceResponse, error) {
-	res := &tfprotov6.ReadDataSourceResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
@@ -103,7 +93,7 @@ func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDat
 	err := unmarshal(newState, req.Config)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 	newState.ID.Set("static")
 
@@ -113,17 +103,14 @@ func (d *environment) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDat
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
 			err, "ip address", "failed to resolve public IP address",
 		)))
-		return res, err
+		return
 	}
 	newState.PublicIPAddress.Set(ip.String())
 
 	res.State, err = marshal(newState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
-
-	return res, nil
 }
 
 // Schema is the file states Terraform schema.

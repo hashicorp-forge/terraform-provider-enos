@@ -85,42 +85,31 @@ func (l *localExec) GetProviderConfig() (*config, error) {
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (l *localExec) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+func (l *localExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := newLocalExecStateV1()
-
-	res := &tfprotov6.ValidateResourceConfigResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
 	err := unmarshal(newState, req.Config)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
-
-	return res, err
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+func (l *localExec) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newLocalExecStateV1()
-
-	res := &tfprotov6.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
@@ -136,7 +125,7 @@ func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.Upg
 				"upgrade error",
 				"unable to map version 1 to the current state",
 			)))
-			return res, err
+			return
 		}
 
 		// 2. Since we're on version one we can pass the same values in without
@@ -145,76 +134,68 @@ func (l *localExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.Upg
 		// 3. Upgrade the current state with the new values, or in this case,
 		// the raw values.
 		res.UpgradedState, err = upgradeState(newState, rawStateValues)
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		}
 
-		return res, err
+		return
 	default:
 		err := newErrWithDiagnostics(
 			"Unexpected state version",
 			"The provider doesn't know how to upgrade from the current state version",
 		)
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (l *localExec) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+func (l *localExec) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := newLocalExecStateV1()
-
-	res := &tfprotov6.ReadResourceResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
 	err := unmarshal(newState, req.CurrentState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	res.NewState, err = marshal(newState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
-
-	return res, err
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
+func (l *localExec) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
 	priorState := newLocalExecStateV1()
 	proposedState := newLocalExecStateV1()
-
-	res := &tfprotov6.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
 	err := unmarshal(priorState, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	err = unmarshal(proposedState, req.ProposedNewState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	// Calculate the sum if we already know all of our attributes.
@@ -223,7 +204,7 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanR
 		if err != nil {
 			err = wrapErrWithDiagnostics(err, "invalid configuration", "unable to read all scripts", "scripts")
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		proposedState.Sum.Set(sha256)
 	} else if _, ok := proposedState.Sum.Get(); !ok {
@@ -258,52 +239,49 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanR
 	res.PlannedState, err = marshal(proposedState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
-
-	return res, err
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+func (l *localExec) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	priorState := newLocalExecStateV1()
 	plannedState := newLocalExecStateV1()
-
-	res := &tfprotov6.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
 	err := unmarshal(plannedState, req.PlannedState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	err = unmarshal(priorState, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	if plannedState.shouldDelete() {
 		// Delete the resource
 		res.NewState, err = marshalDelete(plannedState)
-		return res, err
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		}
+		return
 	}
 	plannedState.ID.Set("static")
 
 	err = plannedState.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	// If our priorState Sum is blank then we're creating the resource. If
@@ -318,47 +296,37 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.Appl
 		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 	}
 
 	res.NewState, err = marshal(plannedState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
-
-	return res, err
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-func (l *localExec) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+func (l *localExec) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := newLocalExecStateV1()
-
-	res := &tfprotov6.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov6.ImportedResource{},
-		Diagnostics:       []*tfprotov6.Diagnostic{},
-	}
 
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
 	importState, err := marshal(newState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 	res.ImportedResources = append(res.ImportedResources, &tfprotov6.ImportedResource{
 		TypeName: req.TypeName,
 		State:    importState,
 	})
-
-	return res, err
 }
 
 // Schema is the file states Terraform schema.

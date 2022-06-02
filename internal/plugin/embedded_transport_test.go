@@ -103,7 +103,7 @@ func TestProviderEmbeddedTransportMergeInto(t *testing.T) {
 		}
 
 		// Merge our resource overrides into our transport
-		require.NoError(t, test.transport.MergeInto(transport))
+		test.transport.MergeInto(transport)
 
 		// Validate that all of the overrides and the defaults from the provider are correct
 		assert.Equal(t, test.values["user"], transport.SSH.User.TFValue())

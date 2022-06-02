@@ -9,6 +9,7 @@ import (
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -346,8 +347,8 @@ func (em *embeddedTransportV1) FromEnvironment() {
 	}
 }
 
-// MergeInto merges the embeddedTranspor into another instance.
-func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) error {
+// MergeInto merges the embeddedTransport into another instance.
+func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) {
 	defaults.mu.Lock()
 	defer defaults.mu.Unlock()
 	em.mu.Lock()
@@ -376,8 +377,6 @@ func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) error {
 	for key, val := range em.SSH.Values {
 		defaults.SSH.Values[key] = val
 	}
-
-	return nil
 }
 
 // ToPrivate returns the embeddedTransportV1's private state

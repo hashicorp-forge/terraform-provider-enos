@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/server"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )

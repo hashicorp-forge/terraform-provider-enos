@@ -85,38 +85,37 @@ func (r *remoteExec) GetProviderConfig() (*config, error) {
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *remoteExec) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+func (r *remoteExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := newRemoteExecStateV1()
 
-	return transportUtil.ValidateResourceConfig(ctx, newState, req)
+	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (r *remoteExec) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+func (r *remoteExec) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newRemoteExecStateV1()
 
-	return transportUtil.UpgradeResourceState(ctx, newState, req)
+	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *remoteExec) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+func (r *remoteExec) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := newRemoteExecStateV1()
 
-	return transportUtil.ReadResource(ctx, newState, req)
+	transportUtil.ReadResource(ctx, newState, req, res)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
+func (r *remoteExec) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
 	priorState := newRemoteExecStateV1()
 	proposedState := newRemoteExecStateV1()
 
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// Since content is optional we need to make sure we only update the sum
@@ -126,7 +125,7 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov6.Plan
 		if err != nil {
 			err = wrapErrWithDiagnostics(err, "invalid configuration", "unable to read all scripts", "scripts")
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		proposedState.Sum.Set(sha256)
 	} else if _, ok := proposedState.Sum.Get(); !ok {
@@ -158,35 +157,35 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req *tfprotov6.Plan
 		}
 	}
 
-	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
-	if err != nil {
-		return res, err
-	}
-
-	return res, err
+	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+func (r *remoteExec) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	priorState := newRemoteExecStateV1()
 	plannedState := newRemoteExecStateV1()
 
-	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
-	if err != nil {
-		return res, err
+	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	if plannedState.shouldDelete() {
 		// Delete the resource
-		res.NewState, err = marshalDelete(plannedState)
-		return res, err
+		newState, err := marshalDelete(plannedState)
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		} else {
+			res.NewState = newState
+		}
+		return
 	}
 	plannedState.ID.Set("static")
 
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
-	if err != nil {
-		return res, err
+	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// If our priorState Sum is blank then we're creating the resource. If
@@ -199,7 +198,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.App
 		ssh, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		defer ssh.Close() //nolint: staticcheck
 
@@ -208,21 +207,19 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req *tfprotov6.App
 		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 	}
 
-	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
-
-	return res, err
+	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
-func (r *remoteExec) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+func (r *remoteExec) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := newRemoteExecStateV1()
 
-	return transportUtil.ImportResourceState(ctx, newState, req)
+	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
 
 // Schema is the file states Terraform schema.

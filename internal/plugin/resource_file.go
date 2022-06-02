@@ -79,26 +79,26 @@ func (f *file) GetProviderConfig() (*config, error) {
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (f *file) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+func (f *file) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := newFileState()
 
-	return transportUtil.ValidateResourceConfig(ctx, newState, req)
+	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
-func (f *file) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+func (f *file) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newFileState()
 
-	return transportUtil.UpgradeResourceState(ctx, newState, req)
+	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (f *file) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+func (f *file) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := newFileState()
 
-	return transportUtil.ReadResource(ctx, newState, req)
+	transportUtil.ReadResource(ctx, newState, req, res)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -110,21 +110,21 @@ func (f *file) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequ
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (f *file) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+func (f *file) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := newFileState()
 
-	return transportUtil.ImportResourceState(ctx, newState, req)
+	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
+func (f *file) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
 	priorState := newFileState()
 	proposedState := newFileState()
 
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, f, req)
-	if err != nil {
-		return res, err
+	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, f, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// ensure that computed attributes are unknown if we don't have a value
@@ -142,7 +142,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResour
 		src, srcType, err := proposedState.openSourceOrContent()
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		defer src.Close() // nolint: staticcheck
 
@@ -153,46 +153,49 @@ func (f *file) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResour
 				"invalid configuration", "unable to obtain file SHA256 sum", srcType,
 			)
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		proposedState.Sum.Set(sum)
 	}
 
-	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
-
-	return res, err
+	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+func (f *file) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	priorState := newFileState()
 	plannedState := newFileState()
 
-	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
-	if err != nil {
-		return res, err
+	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// If our prior state has an ID but our planned does not we're deleting.
 	_, okprior := priorState.ID.Get()
 	_, okplan := plannedState.ID.Get()
 	if okprior && !okplan {
-		res.NewState, err = marshalDelete(plannedState)
-		return res, err
+		newState, err := marshalDelete(plannedState)
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		} else {
+			res.NewState = newState
+		}
+		return
 	}
 
 	plannedState.ID.Set("static")
 
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, f)
-	if err != nil {
-		return res, err
+	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, f, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	src, _, err := plannedState.openSourceOrContent()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 	defer src.Close() //nolint: staticcheck
 
@@ -202,7 +205,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyReso
 		ssh, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 		defer ssh.Close() //nolint: staticcheck
 
@@ -224,12 +227,11 @@ func (f *file) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyReso
 		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(opts...))
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return res, err
+			return
 		}
 	}
 
-	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
-	return res, err
+	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.

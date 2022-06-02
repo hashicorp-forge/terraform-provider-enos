@@ -30,9 +30,15 @@ func newErrSetProviderConfig(err error) error {
 	return &errSetProviderConfig{err: err}
 }
 
+// DataSourceServerAdapter Adapter for a tfprotov6.DataSourceServer removing the error return type from all methods.
+type DataSourceServerAdapter interface {
+	ValidateDataResourceConfig(context.Context, tfprotov6.ValidateDataResourceConfigRequest, *tfprotov6.ValidateDataResourceConfigResponse)
+	ReadDataSource(context.Context, tfprotov6.ReadDataSourceRequest, *tfprotov6.ReadDataSourceResponse)
+}
+
 // DataSource is the DataSource
 type DataSource interface {
-	tfprotov6.DataSourceServer
+	DataSourceServerAdapter
 	Name() string
 	Schema() *tfprotov6.Schema
 	SetProviderConfig(tftypes.Value) error
@@ -48,6 +54,9 @@ type Router struct {
 
 // ValidateDataResourceConfig validates the data sources config
 func (r Router) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest, meta tftypes.Value) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
+	res := &tfprotov6.ValidateDataResourceConfigResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
 	ds, ok := r.dataSources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedDataSource(req.TypeName)
@@ -58,11 +67,16 @@ func (r Router) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.V
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return ds.ValidateDataResourceConfig(ctx, req)
+	ds.ValidateDataResourceConfig(ctx, *req, res)
+	return res, nil
 }
 
 // ReadDataSource refreshes the data sources state
 func (r Router) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest, meta tftypes.Value) (*tfprotov6.ReadDataSourceResponse, error) {
+	res := &tfprotov6.ReadDataSourceResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+
 	ds, ok := r.dataSources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedDataSource(req.TypeName)
@@ -73,7 +87,8 @@ func (r Router) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourc
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return ds.ReadDataSource(ctx, req)
+	ds.ReadDataSource(ctx, *req, res)
+	return res, nil
 }
 
 // New takes zero or more functional options and return a new DataSource router

@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -26,6 +27,15 @@ func (e errWithDiagnostics) Error() string {
 
 func (e errWithDiagnostics) Unwrap() error {
 	return e.Err
+}
+
+func hasErrors(diags []*tfprotov6.Diagnostic) bool {
+	for i := range diags {
+		if diags[i].Severity == tfprotov6.DiagnosticSeverityError {
+			return true
+		}
+	}
+	return false
 }
 
 func newErrWithDiagnostics(summary string, detail string, attributes ...string) error {
@@ -80,4 +90,12 @@ func errToDiagnostic(err error) *tfprotov6.Diagnostic {
 	}
 
 	return diag
+}
+
+func ctxToDiagnostic(ctx context.Context) *tfprotov6.Diagnostic {
+	return &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Error",
+		Detail:   fmt.Sprintf("context canceled: %s", ctx.Err()),
+	}
 }

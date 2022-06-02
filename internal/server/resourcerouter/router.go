@@ -30,9 +30,19 @@ func newErrSetProviderConfig(err error) error {
 	return &errSetProviderConfig{err: err}
 }
 
+// ResourceServerAdapter Adapter for a tfprotov6.ResourceServer removing the error return type from all methods.
+type ResourceServerAdapter interface {
+	ValidateResourceConfig(context.Context, tfprotov6.ValidateResourceConfigRequest, *tfprotov6.ValidateResourceConfigResponse)
+	UpgradeResourceState(context.Context, tfprotov6.UpgradeResourceStateRequest, *tfprotov6.UpgradeResourceStateResponse)
+	ReadResource(context.Context, tfprotov6.ReadResourceRequest, *tfprotov6.ReadResourceResponse)
+	PlanResourceChange(context.Context, tfprotov6.PlanResourceChangeRequest, *tfprotov6.PlanResourceChangeResponse)
+	ApplyResourceChange(context.Context, tfprotov6.ApplyResourceChangeRequest, *tfprotov6.ApplyResourceChangeResponse)
+	ImportResourceState(context.Context, tfprotov6.ImportResourceStateRequest, *tfprotov6.ImportResourceStateResponse)
+}
+
 // Resource represents a Terraform resource
 type Resource interface {
-	tfprotov6.ResourceServer
+	ResourceServerAdapter
 	Name() string
 	Schema() *tfprotov6.Schema
 	SetProviderConfig(tftypes.Value) error
@@ -74,92 +84,121 @@ type Router struct {
 
 // ValidateResourceConfig validates the resource's config
 func (r Router) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest, providerConfig tftypes.Value) (*tfprotov6.ValidateResourceConfigResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.ValidateResourceConfigResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
-
-	return res.ValidateResourceConfig(ctx, req)
+	resource.ValidateResourceConfig(ctx, *req, res)
+	return res, nil
 }
 
 // UpgradeResourceState upgrades the state when migrating from an old version to a new version
 func (r Router) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest, providerConfig tftypes.Value) (*tfprotov6.UpgradeResourceStateResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.UpgradeResourceStateResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return res.UpgradeResourceState(ctx, req)
+	resource.UpgradeResourceState(ctx, *req, res)
+	return res, nil
 }
 
 // ReadResource refreshes the resource's state
 func (r Router) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest, providerConfig tftypes.Value) (*tfprotov6.ReadResourceResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.ReadResourceResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return res.ReadResource(ctx, req)
+	resource.ReadResource(ctx, *req, res)
+	return res, nil
 }
 
 // PlanResourceChange proposes a new resource state
 func (r Router) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.PlanResourceChangeResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.PlanResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return res.PlanResourceChange(ctx, req)
+	resource.PlanResourceChange(ctx, *req, res)
+	return res, nil
 }
 
 // ApplyResourceChange applies the newly planned resource state
 func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.ApplyResourceChangeResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.ApplyResourceChangeResponse{
+		Diagnostics: []*tfprotov6.Diagnostic{},
+	}
+
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return res.ApplyResourceChange(ctx, req)
+	resource.ApplyResourceChange(ctx, *req, res)
+	return res, nil
 }
 
 // ImportResourceState fetches the resource from an ID and adds it to the state
 func (r Router) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest, providerConfig tftypes.Value) (*tfprotov6.ImportResourceStateResponse, error) {
-	res, ok := r.resources[req.TypeName]
+	res := &tfprotov6.ImportResourceStateResponse{
+		ImportedResources: []*tfprotov6.ImportedResource{},
+		Diagnostics:       []*tfprotov6.Diagnostic{},
+	}
+
+	resource, ok := r.resources[req.TypeName]
 	if !ok {
 		return nil, errUnsupportedResource(req.TypeName)
 	}
 
-	err := res.SetProviderConfig(providerConfig)
+	err := resource.SetProviderConfig(providerConfig)
 	if err != nil {
 		return nil, newErrSetProviderConfig(err)
 	}
 
-	return res.ImportResourceState(ctx, req)
+	resource.ImportResourceState(ctx, *req, res)
+	return res, nil
 }
 
 // Schemas returns the data router schemas

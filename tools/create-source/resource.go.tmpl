@@ -61,13 +61,13 @@ func (r *{{.Struct}}) GetProviderConfig() (*config, error) {
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (r *{{.Struct}}) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
+func (r *{{.Struct}}) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil simply ensures that the state can successfully
 	// unmarshal and remarshal. If you need to perform more validation than
 	// write a custom validation function.
-	return transportUtil.ValidateResourceConfig(ctx, newState, req)
+	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -82,24 +82,24 @@ func (r *{{.Struct}}) ValidateResourceConfig(ctx context.Context, req *tfprotov6
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (r *{{.Struct}}) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
+func (r *{{.Struct}}) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil currently supports a single version of the
 	// the schema. If you're updating you'll need to write your own upgrade
 	// function.
-	return transportUtil.UpgradeResourceState(ctx, newState, req)
+	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (r *{{.Struct}}) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
+func (r *{{.Struct}}) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := new{{.StateCap}}()
 
 	// TODO: the transportUtil only marshals and unmarshals to add default
 	// fields. If you need to do more than that you'll need to write a custom
 	// read function.
-	return transportUtil.ReadResource(ctx, newState, req)
+	transportUtil.ReadResource(ctx, newState, req, res)
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -111,17 +111,17 @@ func (r *{{.Struct}}) ReadResource(ctx context.Context, req *tfprotov6.ReadResou
 // Until then this will simply be a no-op. If/When we implement that behavior
 // we could probably create use an identier that combines the source and
 // destination to import a file.
-func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
+func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := new{{.StateCap}}()
 
 	// TODO: We don't support importing resources but we still need to implement
 	// the method. The helper function does that for you.
-	return transportUtil.ImportResourceState(ctx, newState, req)
+	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
+func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
 	priorState := new{{.StateCap}}()
 	proposedState := new{{.StateCap}}()
 
@@ -133,9 +133,9 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov6.Pla
 	// and private data loaded, as well as a response with an errors encountered
 	// represented as diagnostics. Most of the time you will not need to write
 	// your own version of this, but beware.
-	res, transport, err := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req)
-	if err != nil {
-		return res, err
+	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// TODO: Update the proposedState if necessary. Make sure nothing in the proposed
@@ -150,23 +150,21 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req *tfprotov6.Pla
 	// you need to marshal the transport, transport private, and proposed state,
 	// into the the planned state and return a response. This function does just
 	// that.
-	err = transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
-
-	return res, err
+	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
+func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	priorState := new{{.StateCap}}()
 	plannedState := new{{.StateCap}}()
 
 	// TODO: When applying you need to compare the prior state with the newly
 	// planned state. To do so you need to unmarshal them into a valid
 	// state representation. This function does that.
-	res, err := transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req)
-	if err != nil {
-		return res, err
+	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// TODO: Delete
@@ -174,10 +172,14 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov6.Ap
 	// should delete the resource.
 	/*
 		if _, ok := plannedState.Something.Get(); !ok {
-			// Delete the resource
-			res.NewState, err = marshalDelete(plannedState)
-
-			return res, err
+            // Delete the resource
+            newState, err := marshalDelete(plannedState)
+            if err != nil {
+                res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+            } else {
+                res.NewState = newState
+            }
+            return
 		}
 	*/
 
@@ -186,9 +188,9 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov6.Ap
 	// transport, transport private, and provider transport configuration. This
 	/// function does that for you. In the event of an error it returns a response
 	// that has the Diagnostics added for you.
-	transport, err := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, res, plannedState, r)
-	if err != nil {
-		return res, err
+	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
+	if hasErrors(res.Diagnostics) {
+		return
 	}
 
 	// TODO: Get the planned state's ID
@@ -215,9 +217,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req *tfprotov6.Ap
 	// TODO: After you've performed your work you'll need to save marshal you
 	// plannedState and transport configuration and return a response. This
 	// function does that for you.
-	err = transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
-
-	return res, err
+	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.

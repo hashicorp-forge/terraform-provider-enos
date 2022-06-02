@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
@@ -12,27 +13,19 @@ var transportUtil = &transportResourceUtil{}
 // when building a plugin resource that uses an embedded transport.
 type transportResourceUtil struct{}
 
-// ValidateResourceTypeConfig is the request Terraform sends when it wants to
+// ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state StateWithTransport, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
-	res := &tfprotov6.ValidateResourceConfigResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state StateWithTransport, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
-	err := unmarshal(state, req.Config)
-	if err != nil {
+	if err := unmarshal(state, req.Config); err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
-
-	return res, err
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -47,15 +40,11 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state StateWithTransport, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
-	res := &tfprotov6.UpgradeResourceStateResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state StateWithTransport, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
@@ -66,12 +55,12 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 		// current state type.
 		rawStateValues, err := req.RawState.Unmarshal(state.Terraform5Type())
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-				err,
-				"upgrade error",
-				"unable to map version 1 to the current state",
-			)))
-			return res, err
+			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+				Severity: tfprotov6.DiagnosticSeverityError,
+				Summary:  "upgrade error",
+				Detail:   "unable to map version 1 to the current state",
+			})
+			return
 		}
 
 		// 2. Since we're on version one we can pass the same values in without
@@ -80,261 +69,267 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 		// 3. Upgrade the current state with the new values, or in this case,
 		// the raw values.
 		res.UpgradedState, err = upgradeState(state, rawStateValues)
-
-		return res, err
+		if err != nil {
+			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		}
 	default:
-		err := newErrWithDiagnostics(
-			"Unexpected state version",
-			"The provider doesn't know how to upgrade from the current state version",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		// TODO: shouldn't this raise an error?
 	}
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
-	res := &tfprotov6.ReadResourceResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
 	err := unmarshal(state, req.CurrentState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	err = state.EmbeddedTransport().FromPrivate(req.Private)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Read Resource Error",
+			Detail:   fmt.Sprintf("Failed unmarshal embedded transport due to: %s", err.Error()),
+		})
+		return
 	}
 
 	res.NewState, err = marshal(state)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	res.Private, err = state.EmbeddedTransport().ToPrivate()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Read Resource Error",
+			Detail:   fmt.Sprintf("Failed marshal embedded transport due to: %s", err.Error()),
+		})
 	}
-
-	return res, err
 }
 
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
 // a request into prior and proposed states, builds a transport client,
 // verifies it, and returns the new transport.
-func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, *embeddedTransportV1, error) {
-	res := &tfprotov6.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
+func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) *embeddedTransportV1 {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, nil, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return nil
 	default:
 	}
 
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, nil, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
 	transport, err := providerConfig.Transport.Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, nil, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("Failed to get provider transport config, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
 	err = unmarshal(prior, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		return nil
 	}
 
 	priorTransport := prior.EmbeddedTransport()
 	err = priorTransport.FromPrivate(req.PriorPrivate)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("Failed unmarshal prior transport, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
 	err = unmarshal(proposed, req.ProposedNewState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
+		return nil
 	}
 
 	// Use any provider configuration
 	proposedTransport := proposed.EmbeddedTransport()
-	err = proposedTransport.MergeInto(transport)
-	if err != nil {
-		err = wrapErrWithDiagnostics(err,
-			"invalid configuration", "failed to merge resource and provider transport configuration", "transport", "ssh",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, transport, err
-	}
+	proposedTransport.MergeInto(transport)
 
 	res.RequiresReplace = transportReplacedAttributePaths(priorTransport, proposedTransport)
 
-	return res, transport, err
+	return transport
 }
 
 // PlanMarshalPlannedState marshals a proposed state and transport into a plan response
-func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov6.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) error {
+func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov6.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) {
 	var err error
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
 	res.PlannedState, err = marshal(proposed)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return err
+		return
 	}
 
 	res.PlannedPrivate, err = transport.ToPrivate()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("failed to marshal transport, due to: %s", err),
+		})
 	}
-
-	return nil
 }
 
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior StateWithTransport, planned StateWithTransport, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
-	res := &tfprotov6.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior StateWithTransport, planned StateWithTransport, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
 	err := unmarshal(planned, req.PlannedState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	transport := planned.EmbeddedTransport()
 	err = transport.FromPrivate(req.PlannedPrivate)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("Failed unmarshal prior transport, due to: %s", err.Error()),
+		})
+		return
 	}
 
 	err = unmarshal(prior, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
 	}
-
-	return res, nil
 }
 
-// ApplyValidatePlannedAndBuildClient takes the planned state and provider transport,
+// ApplyValidatePlannedAndBuildTransport takes the planned state and provider transport,
 // validates them, and returns a new SSH transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, resource ResourceWithProviderConfig) (*embeddedTransportV1, error) {
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, resource ResourceWithProviderConfig, res *tfprotov6.ApplyResourceChangeResponse) *embeddedTransportV1 {
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return nil, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Apply Error",
+			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
 	// Always work with a copy of the provider config so that we don't race
 	// for the pointer.
 	providerConfig, err = providerConfig.Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return nil, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Apply Error",
+			Detail:   fmt.Sprintf("Failed to copy provider config, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
 	transport := providerConfig.Transport
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return transport, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return nil
 	default:
 	}
 
 	etP := planned.EmbeddedTransport()
 	et, err := etP.Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return transport, err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Apply Error",
+			Detail:   fmt.Sprintf("Failed to copy embedded transport, due to: %s", err.Error()),
+		})
+		return nil
 	}
 
-	err = et.MergeInto(transport)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return transport, err
-	}
+	et.MergeInto(transport)
 
 	err = transport.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return transport, err
+		return nil
 	}
 
 	err = planned.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return transport, err
+		return nil
 	}
 
-	return transport, nil
+	return transport
 }
 
 // ApplyMarshalNewState takes the planned state and transport and marshal it
 // into the new state
-func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) error {
+func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) {
 	var err error
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
 	res.NewState, err = marshal(planned)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return err
+		return
 	}
 
 	res.Private, err = transport.ToPrivate()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return err
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("failed to marshal transport, due to: %s", err),
+		})
 	}
-
-	return nil
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -342,28 +337,22 @@ func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *t
 //
 // Importing a enos resources doesn't make a lot of sense but we have to support the
 // function regardless.
-func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state StateWithTransport, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
-	res := &tfprotov6.ImportResourceStateResponse{
-		ImportedResources: []*tfprotov6.ImportedResource{},
-		Diagnostics:       []*tfprotov6.Diagnostic{},
-	}
-
+func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state StateWithTransport, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
 	default:
 	}
 
 	importState, err := marshal(state)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
+
 	res.ImportedResources = append(res.ImportedResources, &tfprotov6.ImportedResource{
 		TypeName: req.TypeName,
 		State:    importState,
 	})
-
-	return res, err
 }

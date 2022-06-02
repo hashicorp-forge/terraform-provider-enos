@@ -76,15 +76,11 @@ func (d *artifactoryItem) SetProviderConfig(meta tftypes.Value) error {
 
 // ValidateDataResourceConfig is the request Terraform sends when it wants to
 // validate the data source's configuration.
-func (d *artifactoryItem) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
-	res := &tfprotov6.ValidateDataResourceConfigResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (d *artifactoryItem) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
@@ -95,21 +91,15 @@ func (d *artifactoryItem) ValidateDataResourceConfig(ctx context.Context, req *t
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 	}
-
-	return res, err
 }
 
 // ReadDataSource is the request Terraform sends when it wants to get the latest
 // state for the data source.
-func (d *artifactoryItem) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest) (*tfprotov6.ReadDataSourceResponse, error) {
-	res := &tfprotov6.ReadDataSourceResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
+func (d *artifactoryItem) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return res, ctx.Err()
+		return
 	default:
 	}
 
@@ -119,7 +109,7 @@ func (d *artifactoryItem) ReadDataSource(ctx context.Context, req *tfprotov6.Rea
 	err := unmarshal(newState, req.Config)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	newState.ID.Set("static")
@@ -127,16 +117,14 @@ func (d *artifactoryItem) ReadDataSource(ctx context.Context, req *tfprotov6.Rea
 	err = newState.Search(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
 
 	res.State, err = marshal(newState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		return
 	}
-
-	return res, nil
 }
 
 // Schema is the file states Terraform schema.

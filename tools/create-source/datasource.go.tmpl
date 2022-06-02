@@ -46,7 +46,7 @@ func (d *{{.Struct}}) SetProviderConfig(meta tftypes.Value) error {
 
 // ValidateDataResourceConfig is the request Terraform sends when it wants to
 // validate the data source's configuration.
-func (d *boundaryData) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
+func (d *boundaryData) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, *tfprotov6.ValidateDataResourceConfigResponse) {
 	res := &tfprotov6.ValidateDataResourceConfigResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
@@ -71,7 +71,7 @@ func (d *boundaryData) ValidateDataResourceConfig(ctx context.Context, req *tfpr
 
 // ReadDataSource is the request Terraform sends when it wants to get the latest
 // state for the data source.
-func (d *{{.Struct}}) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest) (*tfprotov6.ReadDataSourceResponse, error) {
+func (d *{{.Struct}}) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, *tfprotov6.ReadDataSourceResponse) {
 	res := &tfprotov6.ReadDataSourceResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
 	}
