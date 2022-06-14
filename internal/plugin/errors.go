@@ -66,16 +66,38 @@ func errToDiagnostic(err error) *tfprotov6.Diagnostic {
 	}
 
 	appendErrToDiag := func(diag *tfprotov6.Diagnostic, err error) {
+		if err == nil {
+			return
+		}
+
 		var diagErr errWithDiagnostics
 		if errors.As(err, &diagErr) {
-			diag.Summary = diagErr.summary
-			diag.Detail = diagErr.detail
+			if diag.Summary != "" && diagErr.summary != "" {
+				diag.Summary = fmt.Sprintf("%s: %s", diag.Summary, diagErr.summary)
+			} else if diagErr.summary != "" {
+				diag.Summary = diagErr.summary
+			}
+
+			if diag.Detail != "" && diagErr.detail != "" {
+				diag.Detail = fmt.Sprintf("%s: %s", diag.Detail, diagErr.detail)
+			} else if diagErr.detail != "" {
+				diag.Detail = diagErr.detail
+			}
+
 			if len(diagErr.attributes) > 0 {
 				steps := []tftypes.AttributePathStep{}
 				for _, attr := range diagErr.attributes {
 					steps = append(steps, tftypes.AttributeName(attr))
 				}
 				diag.Attribute = tftypes.NewAttributePathWithSteps(steps)
+			}
+		} else {
+			// We don't have an error with diagnostics. The best we can do
+			// is update the diagnostic detail with information from our error
+			if diag.Detail != "" {
+				diag.Detail = fmt.Sprintf("%s: %s", diag.Detail, err.Error())
+			} else {
+				diag.Detail = err.Error()
 			}
 		}
 	}

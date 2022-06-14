@@ -60,7 +60,7 @@ ifndef HASUPX
 	$(error "upx is required to pack enos-flight-control - get it via `brew install upx`")
 endif
 	pushd ./internal/flightcontrol/binaries || exit 1; \
-	upx --ultra-brute *; \
+	upx -q -9 *; \
 	popd || exit 1 \
 
 test:
