@@ -15,8 +15,10 @@ type CopyReq struct {
 	SrcBucketName    string
 	DestBucketName   string
 	SrcProviderName  string
+	SrcBinaryName    string
 	SrcProviderID    string
 	DestProviderName string
+	DestBinaryName   string
 	DestProviderID   string
 	SrcS3Client      *s3.Client
 	DestS3Client     *s3.Client
@@ -42,7 +44,7 @@ func Copy(ctx context.Context, req *CopyReq) error {
 
 	// Initialize our source mirror and verify that the it has the version that
 	// we want to copy
-	srcMirror := NewLocal(req.SrcProviderName)
+	srcMirror := NewLocal(req.SrcProviderName, req.SrcBinaryName)
 	err = srcMirror.Initialize()
 	if err != nil {
 		return err
@@ -69,7 +71,7 @@ func Copy(ctx context.Context, req *CopyReq) error {
 
 	// Initialize our destination mirror and make sure it doesn't already have
 	// the version
-	destMirror := NewLocal(req.DestProviderName)
+	destMirror := NewLocal(req.DestProviderName, req.DestBinaryName)
 	err = destMirror.Initialize()
 	if err != nil {
 		return err

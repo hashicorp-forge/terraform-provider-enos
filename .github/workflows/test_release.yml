@@ -5,7 +5,7 @@ on:
   # Allow this pipeline to be triggered manually from GH Actions menu
   workflow_dispatch:
   # This workflow runs only when Enos-Provider is successfully
-  # released to Current bucket
+  # released to Current S3 bucket
   workflow_run:
     workflows: ["Release"]
     types: [completed]

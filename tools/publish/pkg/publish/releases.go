@@ -24,8 +24,9 @@ type Release struct {
 
 // Archive is a zip archive of a binary
 type Archive struct {
-	Hashes []string `json:"hashes"` // the hash of the zip file
-	URL    string   `json:"url"`    // path to the zipfile relative to root
+	Hashes    []string `json:"hashes"` // the hash of the zip file
+	URL       string   `json:"url"`    // path to the zipfile relative to root
+	SHA256Sum string   // The s3 mirror doesn't need this so there's no JSON tag
 }
 
 // AddArchive takes a platform, arch and archive and adds it to the releases

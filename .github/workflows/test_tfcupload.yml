@@ -1,0 +1,89 @@
+---
+name: Test TFC Upload
+
+on:
+  # Allow this pipeline to be triggered manually from GH Actions menu
+  workflow_dispatch:
+  # This workflow runs only when Enos-Provider is successfully
+  # uploaded to TFC private registry
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  test-tfc-upload:
+    name: "Install and Test Uploaded Artifact"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}   # checkout the correct branch name
+          fetch-depth: 0                # fetch the whole repo history
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::147451547303:role/github_actions-Enos-Provider
+          role-skip-session-tagging: true
+          role-duration-seconds: 3600
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          # the terraform wrapper will break terraform execution in enos because
+          # it changes the output to text when we expect it to be JSON.
+          terraform_wrapper: false
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - name: Setup Enos
+        uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token:
+            ${{ secrets.J_GH_TOKEN }}
+      - name: Setup Vault Enterprise License
+        id: license
+        run: echo "${{ secrets.VAULT_LICENSE }}" > ./enoscli-tests/vault.hclic
+      - name: Setup Enos SSH Keys
+        id: sshkey
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./enoscli-tests/enos-ci-ssh-keypair.pem
+          chmod 600 ./enoscli-tests/enos-ci-ssh-keypair.pem
+      - name: Configure TFC token in Enos
+        run: |
+          export TFC_API_TOKEN="${{ secrets.TF_API_TOKEN }}"
+          sed "s/TFC_API_TOKEN/$TFC_API_TOKEN/g" enos.hcl > enos.hcl.upt
+          mv enos.hcl.upt enos.hcl
+        working-directory: ./enoscli-tests
+      - name: "Update Provider Version"
+        run: |
+          export ENOS_VERSION=$(cat ../VERSION)
+          sed "s/ENOS_VER/$ENOS_VERSION/g" enos.hcl > enos.hcl.upt
+          mv enos.hcl.upt enos.hcl
+        working-directory: ./enoscli-tests
+      - name: "Update Provider Version Backend module"
+        run: |
+          export ENOS_VERSION=$(cat ../VERSION)
+          sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
+          mv main.tf.upt main.tf
+        working-directory: ./enoscli-tests/modules/backend_consul
+      - name: "Update Provider Version Vault module"
+        run: |
+          export ENOS_VERSION=$(cat ../VERSION)
+          sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
+          mv main.tf.upt main.tf
+        working-directory: ./enoscli-tests/modules/vault_cluster
+      - name: "Enos Version"
+        run: enos version
+      - name: "Run Enos Scenario List"
+        id: enoslist
+        run: enos scenario list
+        working-directory: ./enoscli-tests
+      - name: "Run Enos Scenario Run with Consul backend"
+        id: enosrun
+        run: enos scenario run vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
+        working-directory: ./enoscli-tests

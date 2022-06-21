@@ -3,10 +3,12 @@ package publish
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sync"
@@ -16,6 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"go.uber.org/zap"
 	"golang.org/x/mod/sumdb/dirhash"
+
+	"github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
 // NewArtifacts takes the name of the terraform provider and returns a new
@@ -27,6 +31,7 @@ func NewArtifacts(name string) *Artifacts {
 		releases:     map[string]*Release{},
 		mu:           sync.Mutex{},
 		log:          zap.NewExample().Sugar(),
+		tfcMetadata:  map[string][]*TFCRelease{},
 	}
 }
 
@@ -34,10 +39,20 @@ func NewArtifacts(name string) *Artifacts {
 type Artifacts struct {
 	providerName string
 	idx          *Index
-	releases     map[string]*Release // platform_arch
+	releases     map[string]*Release // version -> release
 	mu           sync.Mutex
 	log          *zap.SugaredLogger
 	dir          string
+	tfcMetadata  map[string][]*TFCRelease // version -> []TFCRelease
+}
+
+// TFCRelease is a collection of TFC release zip binary, platform, architecture,
+// and sha256sum
+type TFCRelease struct {
+	Platform    string
+	Arch        string
+	ZipFilePath string
+	SHA256Sum   string
 }
 
 // CreateZipArchive takes a source binary and a destination path and creates
@@ -92,6 +107,21 @@ func (a *Artifacts) HashZipArchive(path string) (string, error) {
 	return dirhash.HashZip(path, dirhash.Hash1)
 }
 
+// SHA256Sum returns the SHA256 sum of a file for a given path
+func (a *Artifacts) SHA256Sum(path string) (string, error) {
+	f, err := file.Open(path)
+	if err != nil {
+		return "", err
+	}
+
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", sha256.Sum256(bytes)), nil
+}
+
 // AddBinary takes version, platform, arch, and path of a binary and adds it to
 // the mirror. It does this by creating a zip archive of the binary, hashing it
 // and adding it to the artifacts collection.
@@ -109,14 +139,41 @@ func (a *Artifacts) AddBinary(version, platform, arch, binaryPath string) error 
 		return err
 	}
 
+	sha256, err := a.SHA256Sum(zipFilePath)
+	if err != nil {
+		return err
+	}
+
 	archive := &Archive{
 		URL:    zipFileName,
 		Hashes: []string{hash},
 	}
 
+	release := &TFCRelease{
+		Platform:    platform,
+		Arch:        arch,
+		ZipFilePath: zipFilePath,
+		SHA256Sum:   sha256,
+	}
+
 	a.Insert(version, platform, arch, archive)
+	a.InsertTFCRelease(version, release)
 
 	return nil
+}
+
+// InsertTFCRelease takes a version, and release and inserts it into the
+// tfcMetadata
+func (a *Artifacts) InsertTFCRelease(version string, release *TFCRelease) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	_, ok := a.tfcMetadata[version]
+	if !ok {
+		a.tfcMetadata[version] = []*TFCRelease{}
+	}
+
+	a.tfcMetadata[version] = append(a.tfcMetadata[version], release)
 }
 
 // Insert takes a version, platform, arch, and archive and inserts it into the
@@ -166,6 +223,100 @@ func (a *Artifacts) WriteMetadata() error {
 	}
 
 	return nil
+}
+
+// WriteSHA256SUMS writes the release SHA256SUMS file as required by the TFC
+func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, sign bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Infow(
+		"writing SHA256SUMS file",
+		"GPG signing", sign,
+		"identity name", identityName,
+		"artifacts dir", a.dir,
+	)
+
+	for version, releases := range a.tfcMetadata {
+		shaPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS", version))
+
+		shaFile, err := os.OpenFile(shaPath, os.O_RDWR|os.O_CREATE, 0o755)
+		if err != nil {
+			return err
+		}
+		defer shaFile.Close()
+
+		for _, release := range releases {
+			a.log.Infow(
+				"add zip SHA256 to SHASUMS file",
+				"file", shaPath,
+				"zip", filepath.Base(release.ZipFilePath),
+			)
+			_, err := fmt.Fprintf(shaFile, "%s %s\n", release.SHA256Sum, filepath.Base(release.ZipFilePath))
+			if err != nil {
+				return err
+			}
+		}
+
+		if !sign {
+			continue
+		}
+
+		sigPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS.sig", version))
+		err = a.WriteDetachedSignature(ctx, shaPath, sigPath, identityName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// WriteDetachedSignature takes a context, source file path, outfile path, and the GPG entity name and
+// writes a signed version of the source file to the outfile.
+func (a *Artifacts) WriteDetachedSignature(ctx context.Context, source, out, name string) error {
+	a.log.Infow(
+		"writing detached signature",
+		"source_file", source,
+		"out_file", out,
+		"ident_name", name,
+	)
+	return exec.CommandContext(ctx, "gpg", "--detach-sign", "--local-user", name, source).Run()
+}
+
+// PublishToTFC publishes the artifact version to TFC org
+func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Infow(
+		"publishing to TFC private provider",
+	)
+
+	tfcclient, err := NewTFCClient(WithTFCToken(tfcreq.TFCToken), WithTFCOrg(tfcreq.TFCOrg), WithTFCLog(a.log))
+	if err != nil {
+		return err
+	}
+
+	err = tfcclient.FindOrCreateProvider(ctx, tfcreq.TFCOrg, tfcreq.ProviderName)
+	if err != nil {
+		return err
+	}
+
+	for version, releases := range a.tfcMetadata {
+		providerVersion := version
+		sha256sumsPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS", providerVersion))
+
+		err = tfcclient.FindOrCreateVersion(ctx, tfcreq.TFCOrg, tfcreq.ProviderName, providerVersion, tfcreq.GPGKeyID, sha256sumsPath)
+		if err != nil {
+			return err
+		}
+		err = tfcclient.FindOrCreatePlatform(ctx, tfcreq.TFCOrg, tfcreq.ProviderName, providerVersion, releases)
+		if err != nil {
+			return err
+		}
+	}
+	return err
 }
 
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads

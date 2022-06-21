@@ -3,10 +3,10 @@ package publish
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -16,18 +16,43 @@ import (
 )
 
 // NewLocal takes a terraform provider name and returns a new local mirror
-func NewLocal(name string) *Local {
-	return &Local{
+func NewLocal(name string, binname string, opts ...NewLocalOpt) *Local {
+	l := &Local{
 		providerName: name,
+		binaryName:   binname,
 		mu:           sync.Mutex{},
-		artifacts:    NewArtifacts(name),
+		artifacts:    NewArtifacts(binname),
 		log:          zap.NewExample().Sugar(),
+	}
+
+	for _, opt := range opts {
+		l = opt(l)
+	}
+
+	if l.binaryRename == "" {
+		l.artifacts = NewArtifacts(binname)
+	}
+
+	return l
+}
+
+// NewLocalOpt accepts optional arguments for Local
+type NewLocalOpt func(*Local) *Local
+
+// WithLocalBinaryRename renames the binary during creation
+func WithLocalBinaryRename(name string) NewLocalOpt {
+	return func(l *Local) *Local {
+		l.binaryRename = name
+		l.artifacts = NewArtifacts(name)
+		return l
 	}
 }
 
 // Local is a local provider artifact mirror
 type Local struct {
 	providerName string
+	binaryName   string
+	binaryRename string
 	artifacts    *Artifacts
 	mu           sync.Mutex
 	log          *zap.SugaredLogger
@@ -89,8 +114,8 @@ func (l *Local) HasVersion(ctx context.Context, version string) (bool, error) {
 
 // CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies release artifacts from source bucket
 // to the destination bucket.
-func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, providerName string, providerID string, version string) error {
-	return l.artifacts.CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx, srcBucketName, destS3Client, destBucketName, providerName, providerID, version)
+func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, binaryName string, providerID string, version string) error {
+	return l.artifacts.CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx, srcBucketName, destS3Client, destBucketName, binaryName, providerID, version)
 }
 
 // AddReleaseVersionToIndex adds a version to the release index
@@ -112,6 +137,21 @@ func (l *Local) WriteMetadata() error {
 	return l.artifacts.WriteMetadata()
 }
 
+// WriteSHA256Sums writes a detached signature of the source file to the outfile
+func (l *Local) WriteSHA256Sums(ctx context.Context, name string, sign bool) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.artifacts.WriteSHA256SUMS(ctx, name, sign)
+}
+
+// PublishToTFC publishes artifact version to TFC org
+func (l *Local) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.artifacts.PublishToTFC(ctx, tfcreq)
+}
+
 // AddGoreleaserBinariesFrom takes a directory path to the goreleaser builds,
 // walks it, finds any providers binaries, creates an archive of them and
 // adds them to the artifacts and index.
@@ -122,10 +162,10 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 	var err error
 	l.log.Infow("scanning for binaries",
 		"path", binPath,
-		"provider-name", l.providerName,
+		"provider-binary-name", l.binaryName,
+		"provider-binary-rename", l.binaryRename,
 	)
 
-	binReg := regexp.MustCompile(l.providerName + `_(?P<version>.*)$`)
 	binPath, err = filepath.Abs(binPath)
 	if err != nil {
 		return err
@@ -149,7 +189,7 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 			return nil
 		}
 
-		if parts[0] != l.providerName {
+		if parts[0] != l.binaryName {
 			return nil
 		}
 
@@ -164,6 +204,17 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 			return err
 		}
 
+		var renameTempDir string
+		if l.binaryRename != "" {
+			var err error
+			renameTempDir, err = os.MkdirTemp("", "rename-temp-dir")
+			if err != nil {
+				return err
+			}
+
+			defer os.RemoveAll(renameTempDir)
+		}
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
@@ -174,14 +225,40 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 				return err
 			}
 
-			matches := binReg.FindStringSubmatch(info.Name())
-			if len(matches) != 2 {
+			parts = strings.Split(info.Name(), "_")
+			if len(parts) != 2 {
 				continue
 			}
+			version = parts[1]
+			releasePath := filepath.Join(path, entry.Name())
+			if l.binaryRename != "" {
+				parts[0] = l.binaryRename
+				newPath := filepath.Join(renameTempDir, strings.Join(parts, "_"))
+				newFile, err := os.Create(newPath)
+				if err != nil {
+					return err
+				}
 
-			version = matches[1]
+				err = os.Chmod(newFile.Name(), 0o755)
+				if err != nil {
+					return err
+				}
 
-			return l.artifacts.AddBinary(version, platform, arch, filepath.Join(path, entry.Name()))
+				sourceFile, err := os.Open(releasePath)
+				if err != nil {
+					return err
+				}
+
+				// Copying the files to another directory to preserve the source dist directory
+				_, err = io.Copy(newFile, sourceFile)
+				if err != nil {
+					return err
+				}
+
+				releasePath = newPath
+			}
+
+			return l.artifacts.AddBinary(version, platform, arch, releasePath)
 		}
 
 		return nil

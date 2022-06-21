@@ -34,7 +34,7 @@ func TestHandleGo118AMD64VersionZipName(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	mirror := NewLocal("terraform-provider-enos")
+	mirror := NewLocal("enos", "terraform-provider-enos")
 	err = mirror.Initialize()
 	require.NoError(t, err)
 

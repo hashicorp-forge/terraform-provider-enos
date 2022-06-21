@@ -39,3 +39,17 @@ jobs:
         run: CI='true' make
       - name: Publish to S3 bucket
         run: go run ./tools/publish/cmd s3 upload --dist ./dist --bucket enos-provider-current
+      - name: Upload to TFC private registry
+        id: tfcupload
+        run: |
+          sudo apt-get update
+          sudo apt-get install expect
+          export GPG_TTY=$(tty)
+          echo "${{ secrets.GPG_PRIV_SIGNING_KEY }}" | gpg --batch --import
+          echo "${{ secrets.GPG_PUB_SIGNING_KEY }}" | gpg --import
+          expect -c 'spawn gpg --edit-key 5D67D7B072C16294 trust quit; send "5\ry\r"; expect eof'
+          gpg --list-signatures
+          go run ./tools/publish/cmd tfc upload --rename-binary "terraform-provider-enosdev" --provider-name "enosdev" --token "$TFC_TOKEN"
+        env:
+          TFC_TOKEN: ${{ secrets.TFC_TOKEN }}
+          GPG_TTY: $(tty)

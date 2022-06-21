@@ -21,7 +21,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:              "publish [COMMANDS]",
 		TraverseChildren: true,
-		Short:            "A tool to upload and copy binaries to a remote S3 mirror used to install private Terraform provider",
+		Short:            "A tool to upload and copy binaries to a remote S3 mirror and TFC organization used to install private Terraform provider",
 		Long:             `publish is a CLI tool intended to take the output of goreleaser and upload it to a remote mirror in S3 or copy created artifact to another S3 mirror, that Terraform can use to install the provider. This allows us to distribute the provider using an S3 network mirror.`,
 	}
 
