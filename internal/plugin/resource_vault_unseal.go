@@ -169,22 +169,22 @@ func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
-		err = plannedState.Unseal(ctx, ssh)
+		err = plannedState.Unseal(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
-		err = plannedState.Unseal(ctx, ssh)
+		err = plannedState.Unseal(ctx, client)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
@@ -302,9 +302,9 @@ func (s *vaultUnsealStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-func (s *vaultUnsealStateV1) Unseal(ctx context.Context, ssh it.Transport) error {
+func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) error {
 	req := s.buildUnsealRequest()
-	err := vault.Unseal(ctx, ssh, req)
+	err := vault.Unseal(ctx, client, req)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "unseal", "failed to unseal")
 	}

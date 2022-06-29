@@ -44,7 +44,7 @@ func WithDirChown(owner string) CreateDirectoryRequestOpt {
 }
 
 // CreateDirectory creates the directory and sets owner permissions
-func CreateDirectory(ctx context.Context, ssh it.Transport, dir *CreateDirectoryRequest) error {
+func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirectoryRequest) error {
 	if dir == nil {
 		return fmt.Errorf("no directory or owner provided")
 	}
@@ -57,13 +57,13 @@ func CreateDirectory(ctx context.Context, ssh it.Transport, dir *CreateDirectory
 	var stdout string
 	var stderr string
 
-	stdout, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, dir.DirName)))
+	stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, dir.DirName)))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "creating directory on target host")
 	}
 
 	if dir.DirOwner != "" {
-		stderr, stdout, err = ssh.Run(ctx, command.New(fmt.Sprintf("sudo chown -R %s %s", dir.DirOwner, dir.DirName)))
+		stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("sudo chown -R %s %s", dir.DirOwner, dir.DirName)))
 		if err != nil {
 			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
 		}

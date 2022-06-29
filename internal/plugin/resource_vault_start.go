@@ -226,22 +226,22 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req tfprotov6.Appl
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
-		err = plannedState.startVault(ctx, ssh)
+		err = plannedState.startVault(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
-		err = plannedState.startVault(ctx, ssh)
+		err = plannedState.startVault(ctx, client)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
@@ -321,6 +321,10 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
+	}
+
+	if err := checkK8STransportNotConfigured(s, "enos_vault_start"); err != nil {
+		return err
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {

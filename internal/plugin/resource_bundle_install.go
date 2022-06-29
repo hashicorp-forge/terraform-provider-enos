@@ -185,15 +185,15 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	if !priorState.equaltTo(plannedState) {
-		err = plannedState.Install(ctx, ssh)
+		err = plannedState.Install(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
@@ -230,7 +230,7 @@ func (s *bundleInstallStateV1) packageGetter() (*remoteflight.PackageInstallGett
 
 // Install takes a context and transport and installs the artifact on the remote
 // host. Any errors that may be encountered are returned.
-func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) error {
+func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport) error {
 	opts := []remoteflight.PackageInstallRequestOpt{}
 
 	// Determine where we're going to get the package
@@ -291,12 +291,12 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) er
 			)
 		}
 
-		platform, err := remoteflight.TargetPlatform(ctx, ssh)
+		platform, err := remoteflight.TargetPlatform(ctx, client)
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "transport", "determining target host platform", "transport")
 		}
 
-		arch, err := remoteflight.TargetArchitecture(ctx, ssh)
+		arch, err := remoteflight.TargetArchitecture(ctx, client)
 		if err != nil {
 			return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
 		}
@@ -380,7 +380,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, ssh it.Transport) er
 		return remoteflight.ErrPackageInstallGetterUnknown
 	}
 
-	_, err = remoteflight.PackageInstall(ctx, ssh, remoteflight.NewPackageInstallRequest(opts...))
+	_, err = remoteflight.PackageInstall(ctx, client, remoteflight.NewPackageInstallRequest(opts...))
 	return err
 }
 
@@ -430,6 +430,10 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
+	}
+
+	if err := checkK8STransportNotConfigured(s, "enos_bundle_install"); err != nil {
+		return err
 	}
 
 	// Make sure that only one install source is configured

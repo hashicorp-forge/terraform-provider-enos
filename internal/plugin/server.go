@@ -11,21 +11,29 @@ import (
 func Server() tfprotov6.ProviderServer {
 	return server.New(
 		server.RegisterProvider(newProvider()),
-		server.RegisterDataRouter(dr.New(
-			dr.RegisterDataSource(newEnvironment()),
-			dr.RegisterDataSource(newArtifactoryItem()),
-		)),
-		server.RegisterResourceRouter(rr.New(
-			rr.RegisterResource(newFile()),
-			rr.RegisterResource(newLocalExec()),
-			rr.RegisterResource(newRemoteExec()),
-			rr.RegisterResource(newBundleInstall()),
-			rr.RegisterResource(newVaultStart()),
-			rr.RegisterResource(newVaultInit()),
-			rr.RegisterResource(newVaultUnseal()),
-			rr.RegisterResource(newConsulStart()),
-			rr.RegisterResource(newBoundaryStart()),
-			rr.RegisterResource(newBoundaryInit()),
-		)),
+		WithDefaultDataRouter(),
+		WithDefaultResourceRouter(),
 	)
+}
+
+func WithDefaultResourceRouter() func(server.Server) server.Server {
+	return server.RegisterResourceRouter(rr.New(
+		rr.RegisterResource(newFile()),
+		rr.RegisterResource(newLocalExec()),
+		rr.RegisterResource(newRemoteExec()),
+		rr.RegisterResource(newBundleInstall()),
+		rr.RegisterResource(newVaultStart()),
+		rr.RegisterResource(newVaultInit()),
+		rr.RegisterResource(newVaultUnseal()),
+		rr.RegisterResource(newConsulStart()),
+		rr.RegisterResource(newBoundaryStart()),
+		rr.RegisterResource(newBoundaryInit()),
+	))
+}
+
+func WithDefaultDataRouter() func(server.Server) server.Server {
+	return server.RegisterDataRouter(dr.New(
+		dr.RegisterDataSource(newEnvironment()),
+		dr.RegisterDataSource(newArtifactoryItem()),
+	))
 }

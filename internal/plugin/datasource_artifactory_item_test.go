@@ -71,7 +71,7 @@ output "url" {
 	require.NoError(t, cfg.Execute(&buf, state))
 
 	resource.ParallelTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: testProviders,
+		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			{
 				Config: buf.String(),

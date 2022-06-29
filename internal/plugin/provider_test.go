@@ -5,15 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
-
-var testProviders = map[string]func() (tfprotov6.ProviderServer, error){
-	"enos": func() (tfprotov6.ProviderServer, error) {
-		return Server(), nil
-	},
-}
 
 func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	provider := newProvider()

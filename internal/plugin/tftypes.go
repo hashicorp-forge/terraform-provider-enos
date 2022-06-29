@@ -14,6 +14,10 @@ var (
 	unknownDSTVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
 )
 
+// marshal converts a Serializable state value into a DynamicValue suitable for transporting over the
+// wire in response to the various Terraform callbacks, i.e. PlanResourceChange or ApplyResourceChange
+// The generated value must have the structure as the value receeved in the request from Terraform,
+// otherwise Terraform will blow up with an error.
 func marshal(state Serializable) (*tfprotov6.DynamicValue, error) {
 	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
 	if err != nil {
@@ -46,6 +50,7 @@ func unmarshal(state Serializable, dyn *tfprotov6.DynamicValue) error {
 	return nil
 }
 
+// marshalDelete creates a nil Terraform DynamicValue, that indicates that the resource has been deleted.
 func marshalDelete(state Serializable) (*tfprotov6.DynamicValue, error) {
 	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), tftypes.NewValue(state.Terraform5Type(), nil))
 	if err != nil {

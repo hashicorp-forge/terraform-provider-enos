@@ -97,7 +97,7 @@ EOF
 				step.ExpectNonEmptyPlan = true
 			}
 			resource.ParallelTest(t, resource.TestCase{
-				ProtoV6ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders(t),
 				Steps:                    []resource.TestStep{step},
 			})
 		})
@@ -129,7 +129,7 @@ EOF
 		}
 
 		resource.ParallelTest(t, resource.TestCase{
-			ProtoV6ProviderFactories: testProviders,
+			ProtoV6ProviderFactories: testProviders(t),
 			Steps:                    steps,
 		})
 	})

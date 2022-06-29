@@ -106,9 +106,6 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProvid
 		return res, err
 	}
 
-	// Pull in any environment config
-	p.config.Transport.FromEnvironment()
-
 	return res, nil
 }
 

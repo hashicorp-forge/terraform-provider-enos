@@ -316,27 +316,27 @@ func packageInstallZipInstall(ctx context.Context, ssh it.Transport, req *Packag
 	return DeleteFile(ctx, ssh, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
-func packageInstallDEBInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallDEBInstall(ctx context.Context, client it.Transport, req *PackageInstallRequest) error {
 	cmd := fmt.Sprintf("sudo dpkg --install %s", req.TempArtifactPath)
-	stderr, stdout, err := ssh.Run(ctx, command.New(cmd))
+	stderr, stdout, err := client.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing debian package")
 	}
 
-	return DeleteFile(ctx, ssh, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
+	return DeleteFile(ctx, client, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
-func packageInstallRPMInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallRPMInstall(ctx context.Context, client it.Transport, req *PackageInstallRequest) error {
 	// NOTE: I don't like force here but it's the only way to make rpm
 	// reinstall on update without lots of special logic. Eventually we could
 	// get much more clever here to handle upgrade, reinstall, etc.
 	cmd := fmt.Sprintf("sudo rpm -U --force %s", req.TempArtifactPath)
-	stderr, stdout, err := ssh.Run(ctx, command.New(cmd))
+	stderr, stdout, err := client.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing rpm package")
 	}
 
-	return DeleteFile(ctx, ssh, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
+	return DeleteFile(ctx, client, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
 func packageInstallYumInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {

@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/ssh"
-
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -20,49 +17,44 @@ import (
 type embeddedTransportV1 struct {
 	mu  sync.Mutex
 	SSH *embeddedTransportSSHv1 `json:"ssh"`
+	K8S *embeddedTransportK8Sv1 `json:"k8s"`
 }
 
-type embeddedTransportSSHv1 struct {
-	User           *tfString
-	Host           *tfString
-	PrivateKey     *tfString
-	PrivateKeyPath *tfString
-	Passphrase     *tfString
-	PassphrasePath *tfString
+// transportState interface defining the api of a transport
+type transportState interface {
+	Serializable
 
-	// We have two requirements for the embedded transport: users are able to
-	// specify any combination of configuration keys and their associated values,
-	// and those values are exportable as an object so that we can easily pass
-	// the entire transport output around. To enable the dynamic input and object
-	// output we use a DynamicPseudoType for the transport schema instead of
-	// concrete nested schemas. This gives us the input and output features we
-	// need but also requires us to dynamically generate the object schema
-	// depeding on the user input.
-	//
-	// To generate that schema, we need to keep track of the raw values that are
-	// passed over the wire from the user configuration. We'll set these Values
-	// when we're unmarshaled and use them later when constructing our marshal
-	// schema.
-	Values map[string]tftypes.Value
-}
+	// ApplyDefaults sets values from the provided defaults if they have not already been configured.
+	ApplyDefaults(defaults map[string]TFType) error
 
-// embeddedTransportPrivate is out private state
-type embeddedTransportPrivate struct {
-	Host string `json:"host,omitempty"`
+	// CopyValues create a copy of the Values map for this transport
+	CopyValues() map[string]tftypes.Value
+
+	// Attributes returns all the attributes of the transport state. This includes those that where
+	// configured by the user (via terraform configuration) and those that received their values
+	// via defaults
+	Attributes() map[string]TFType
+
+	// Validate checks that the configuration is valid for this transport
+	Validate(ctx context.Context) error
+
+	// Client builds a client for this transport
+	Client(ctx context.Context) (it.Transport, error)
+
+	// GetAttributesForReplace gets the attributes that if changed should trigger a replace of the resource
+	GetAttributesForReplace() []string
+
+	// IsConfigured returns true if the transport has been configured, false otherwise. A configured
+	// transport is one that has a value for any of its attributes. The attribute value can come either
+	// from the resources terraform configuration or from provider defaults.
+	IsConfigured() bool
 }
 
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
-		mu: sync.Mutex{},
-		SSH: &embeddedTransportSSHv1{
-			User:           newTfString(),
-			Host:           newTfString(),
-			PrivateKey:     newTfString(),
-			PrivateKeyPath: newTfString(),
-			Passphrase:     newTfString(),
-			PassphrasePath: newTfString(),
-			Values:         map[string]tftypes.Value{},
-		},
+		mu:  sync.Mutex{},
+		SSH: newEmbeddedTransportSSH(),
+		K8S: newEmbeddedTransportK8Sv1(),
 	}
 }
 
@@ -73,16 +65,6 @@ func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov6.SchemaAttri
 		Name:     "transport",
 		Type:     em.Terraform5Type(),
 		Optional: true, // We'll handle our own schema validation
-	}
-}
-
-// SchemaAttributeOut is our transport schema output object. The transport data
-// source can use this to output the user configuration as an object.
-func (em *embeddedTransportV1) SchemaAttributeOut() *tfprotov6.SchemaAttribute {
-	return &tfprotov6.SchemaAttribute{
-		Name:     "out",
-		Type:     em.Terraform5Type(),
-		Computed: true,
 	}
 }
 
@@ -97,41 +79,14 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 		return err
 	}
 
-	if !vals["ssh"].IsKnown() || vals["ssh"].IsNull() {
-		return nil
-	}
-
-	em.SSH.Values, err = mapAttributesTo(vals["ssh"], map[string]interface{}{
-		"user":             em.SSH.User,
-		"host":             em.SSH.Host,
-		"private_key":      em.SSH.PrivateKey,
-		"private_key_path": em.SSH.PrivateKeyPath,
-		"passphrase":       em.SSH.Passphrase,
-		"passphrase_path":  em.SSH.PassphrasePath,
-	})
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
-			"unable to marshal transport SSH values", "transport", "ssh",
-		)
-	}
-
-	// Because the SSH type is a dynamic psuedo type we have to manually ensure
-	// that the user hasn't set any unknown attributes.
-	knownSSHAttr := func(attr string) error {
-		for known := range em.defaultSSHTypes() {
-			if attr == known {
-				return nil
-			}
+	if ssh, ok := vals["ssh"]; ok && ssh.IsKnown() {
+		if err := em.SSH.FromTerraform5Value(vals["ssh"]); err != nil {
+			return err
 		}
-
-		return newErrWithDiagnostics("Unsupported argument",
-			fmt.Sprintf(`An argument named "%s" is not expected here.`, attr), "transport", "ssh", attr,
-		)
 	}
 
-	for sshAttr := range em.SSH.Values {
-		err := knownSSHAttr(sshAttr)
-		if err != nil {
+	if k8s, ok := vals["kubernetes"]; ok && k8s.IsKnown() {
+		if err := em.K8S.FromTerraform5Value(vals["kubernetes"]); err != nil {
 			return err
 		}
 	}
@@ -141,76 +96,37 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 
 // Terraform5Type is the tftypes.Type
 func (em *embeddedTransportV1) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"ssh": tftypes.DynamicPseudoType,
-		},
-	}
+	return tftypes.DynamicPseudoType
 }
 
-// Terraform5Type is the tftypes.Value
+// Terraform5Value generates a tftypes.Value. This must return a value that is structurally the same as
+// the value unmarshalled via FromTerraform5Value. Do not try to add or remove attributes, Terraform
+// does not like that.
 func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
-	if len(em.SSH.Values) == 0 {
+	values := map[string]tftypes.Value{}
+	attributeTypes := map[string]tftypes.Type{}
+
+	if em.SSH.IsConfigured() {
+		value := em.SSH.Terraform5Value()
+		values["ssh"] = value
+		attributeTypes["ssh"] = value.Type()
+	}
+
+	if em.K8S.IsConfigured() {
+		value := em.K8S.Terraform5Value()
+		values["kubernetes"] = value
+		attributeTypes["kubernetes"] = value.Type()
+	}
+
+	if len(values) == 0 {
 		return tftypes.NewValue(em.Terraform5Type(), nil)
 	}
 
-	return tftypes.NewValue(em.Terraform5Type(), map[string]tftypes.Value{
-		"ssh": em.Terraform5ValueSSH(),
-	})
+	return tftypes.NewValue(tftypes.Object{AttributeTypes: attributeTypes}, values)
 }
 
-// Terraform5TypeSSH is the dynamically generated SSH tftypes.Type. It must
-// always match the schema that is passed in as user configuration.
-func (em *embeddedTransportV1) Terraform5TypeSSH() tftypes.Type {
-	newTypes := map[string]tftypes.Type{}
-	defaultTypes := em.defaultSSHTypes()
-	for name := range em.SSH.Values {
-		newTypes[name] = defaultTypes[name]
-	}
-
-	return tftypes.Object{AttributeTypes: newTypes}
-}
-
-// Terraform5ValueSSH is the dynamically generated SSH tftypes.Value. It must
-// always match the schema that is passed in as user configuration.
-func (em *embeddedTransportV1) Terraform5ValueSSH() tftypes.Value {
-	newValues := map[string]tftypes.Value{}
-	defaultValues := em.defaultSSHValues()
-	for name, val := range em.SSH.Values {
-		setVal, ok := defaultValues[name]
-		if ok {
-			newValues[name] = setVal
-			continue
-		}
-
-		newValues[name] = val
-	}
-
-	return tftypes.NewValue(em.Terraform5TypeSSH(), newValues)
-}
-
-func (em *embeddedTransportV1) defaultSSHTypes() map[string]tftypes.Type {
-	return map[string]tftypes.Type{
-		"user":             em.SSH.User.TFType(),
-		"host":             em.SSH.Host.TFType(),
-		"private_key":      em.SSH.PrivateKey.TFType(),
-		"private_key_path": em.SSH.PrivateKeyPath.TFType(),
-		"passphrase":       em.SSH.Passphrase.TFType(),
-		"passphrase_path":  em.SSH.Passphrase.TFType(),
-	}
-}
-
-func (em *embeddedTransportV1) defaultSSHValues() map[string]tftypes.Value {
-	return map[string]tftypes.Value{
-		"user":             em.SSH.User.TFValue(),
-		"host":             em.SSH.Host.TFValue(),
-		"private_key":      em.SSH.PrivateKey.TFValue(),
-		"private_key_path": em.SSH.PrivateKeyPath.TFValue(),
-		"passphrase":       em.SSH.Passphrase.TFValue(),
-		"passphrase_path":  em.SSH.PassphrasePath.TFValue(),
-	}
-}
-
+// Copy makes an identical copy of the transport. The copy will not share any of the data structures
+// of this transport and is safe to modify.
 func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
@@ -227,11 +143,46 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 		return newCopy, err
 	}
 
-	for k, v := range em.SSH.Values {
-		newCopy.SSH.Values[k] = v
+	if em.SSH.IsConfigured() {
+		newCopy.SSH.Values = em.SSH.CopyValues()
+	}
+
+	if em.K8S.IsConfigured() {
+		newCopy.K8S.Values = em.K8S.CopyValues()
 	}
 
 	return newCopy, nil
+}
+
+// CopyValues returns only the values that have received their configuration from the
+// terraform configuration for that resoruce. The configured attributes do not include the attributes
+// that may have been received as default values via ApplyDefaults. To get all the attribute values
+// including those recieved via defaults use the Attributes method instead.
+func (em *embeddedTransportV1) CopyValues() map[string]map[string]tftypes.Value {
+	configuredAttributes := map[string]map[string]tftypes.Value{}
+	if em.SSH.IsConfigured() {
+		configuredAttributes["ssh"] = em.SSH.CopyValues()
+	}
+	if em.K8S.IsConfigured() {
+		configuredAttributes["kubernetes"] = em.K8S.CopyValues()
+	}
+
+	return configuredAttributes
+}
+
+// Attributes returns all the attributes of the transport state. This includes those that where
+// configured by the user (via terraform configuration) and those that received their values
+// via defaults
+func (em *embeddedTransportV1) Attributes() map[string]map[string]TFType {
+	attributes := map[string]map[string]TFType{}
+	if em.SSH.IsConfigured() {
+		attributes["ssh"] = em.SSH.Attributes()
+	}
+	if em.K8S.IsConfigured() {
+		attributes["kubernetes"] = em.K8S.Attributes()
+	}
+
+	return attributes
 }
 
 // Validate validates that transport can use the given configuration as a
@@ -244,191 +195,220 @@ func (em *embeddedTransportV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	// Assume SSH since it's the only allowed transport
-	if _, ok := em.SSH.User.Get(); !ok {
-		return newErrWithDiagnostics("Invalid configuration", "you must provide the transport SSH user", "ssh", "user")
-	}
-
-	if _, ok := em.SSH.Host.Get(); !ok {
-		return newErrWithDiagnostics("Invalid configuration", "you must provide the transport SSH host", "ssh", "host")
-	}
-
-	privateKey, okpk := em.SSH.PrivateKey.Get()
-	privakteKeyPath, okpkp := em.SSH.PrivateKeyPath.Get()
-	if !okpk && !okpkp {
-		return newErrWithDiagnostics("Invalid configuration", "you must provide either the private_key or private_key_path", "ssh", "private_key")
-	}
-
-	// Create a new SSH client with out options. This doesn't initialize a new
-	// session but it will attempt to read and parse any keys or passphrases.
-	sshOpts := []ssh.Opt{
-		ssh.WithContext(ctx),
-		ssh.WithUser(em.SSH.User.Value()),
-		ssh.WithHost(em.SSH.Host.Value()),
-	}
-
-	if okpk {
-		sshOpts = append(sshOpts, ssh.WithKey(privateKey))
-	}
-
-	if okpkp {
-		sshOpts = append(sshOpts, ssh.WithKeyPath(privakteKeyPath))
-	}
-
-	if pass, ok := em.SSH.Passphrase.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithPassphrase(pass))
-	}
-
-	if path, ok := em.SSH.PassphrasePath.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithPassphrasePath(path))
-	}
-
-	_, err := ssh.New(sshOpts...)
+	transport, err := em.GetConfiguredTransport()
 	if err != nil {
-		return wrapErrWithDiagnostics(err,
-			"Invalid configuration",
-			"Unable to create SSH client from transport configuration",
-			"transport", "ssh",
-		)
+		return err
 	}
 
-	return nil
+	return transport.Validate(ctx)
 }
 
 // Client returns a Transport client that be used to perform actions against
 // the target that has been configured.
 func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error) {
-	sshOpts := []ssh.Opt{
-		ssh.WithContext(ctx),
-		ssh.WithUser(em.SSH.User.Value()),
-		ssh.WithHost(em.SSH.Host.Value()),
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
-	if key, ok := em.SSH.PrivateKey.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithKey(key))
+	transport, err := em.GetConfiguredTransport()
+	if err != nil {
+		return nil, err
 	}
-
-	if keyPath, ok := em.SSH.PrivateKeyPath.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithKeyPath(keyPath))
-	}
-
-	if pass, ok := em.SSH.Passphrase.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithPassphrase(pass))
-	}
-
-	if passPath, ok := em.SSH.PassphrasePath.Get(); ok {
-		sshOpts = append(sshOpts, ssh.WithPassphrasePath(passPath))
-	}
-
-	return ssh.New(sshOpts...)
+	return transport.Client(ctx)
 }
 
-func (em *embeddedTransportV1) FromEnvironment() {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	for _, key := range []struct {
-		name string
-		env  string
-		dst  *tfString
-	}{
-		{"user", "ENOS_TRANSPORT_USER", em.SSH.User},
-		{"host", "ENOS_TRANSPORT_HOST", em.SSH.Host},
-		{"private_key", "ENOS_TRANSPORT_PRIVATE_KEY", em.SSH.PrivateKey},
-		{"private_key_path", "ENOS_TRANSPORT_PRIVATE_KEY_PATH", em.SSH.PrivateKeyPath},
-		{"passphrase", "ENOS_TRANSPORT_PASSPHRASE", em.SSH.Passphrase},
-		{"passphrase_path", "ENOS_TRANSPORT_PASSPHRASE_PATH", em.SSH.PassphrasePath},
-	} {
-		val, ok := os.LookupEnv(key.env)
-		if ok {
-			key.dst.Set(val)
-			em.SSH.Values[key.name] = key.dst.TFValue()
-		}
-	}
-}
-
-// MergeInto merges the embeddedTransport into another instance.
-func (em *embeddedTransportV1) MergeInto(defaults *embeddedTransportV1) {
+// ApplyDefaults given the provided 'defaults' transport, update this transport by setting values into
+// this transport that have not already been set. For example:
+//
+// this config     = { ssh: { host: "10.0.4.34" }}
+// defaults config = { ssh: { host: "10.0.4.10", user: "ubuntu", private_key_path: "/some/path/key.pem" }, kubernetes: { context_name: "yoyo" }}
+// after apply     = { ssh: { host: "10.0.4.34", user: "ubuntu", private_key_path: "/some/path/key.pem" }}}
+//
+// NOTES:
+// 1. Configuration is ignored for transports that are not configured. In the example you can see that
+// the Kubernetes configuration was ignored since this transport did not have any Kubernetes transport
+// configuration.
+// 2. Configuration is ignored if this transport has a value already for that attribute. In this example
+// the transport already had a value for ssh.host, therefore the provided ssh.host from the defatults
+// is ignored.
+func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) error {
 	defaults.mu.Lock()
 	defer defaults.mu.Unlock()
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
-	startingVals := defaults.SSH.Values
-
-	for _, attr := range []struct {
-		over *tfString
-		into *tfString
-	}{
-		{em.SSH.User, defaults.SSH.User},
-		{em.SSH.Host, defaults.SSH.Host},
-		{em.SSH.PrivateKey, defaults.SSH.PrivateKey},
-		{em.SSH.PrivateKeyPath, defaults.SSH.PrivateKeyPath},
-		{em.SSH.Passphrase, defaults.SSH.Passphrase},
-		{em.SSH.PassphrasePath, defaults.SSH.PassphrasePath},
-	} {
-		over, ok := attr.over.Get()
-		if ok {
-			attr.into.Set(over)
+	switch {
+	case em.SSH.IsConfigured():
+		if err := em.SSH.ApplyDefaults(defaults.SSH.Attributes()); err != nil {
+			return err
+		}
+	case em.K8S.IsConfigured():
+		if err := em.K8S.ApplyDefaults(defaults.K8S.Attributes()); err != nil {
+			return err
+		}
+	// the default case here is the case where the resource does not define a transport block and
+	// should therefore receive its transport configuration entirely from the enos provider configuration.
+	// In this case it is not valid that the enos provider transport is configured with more than one
+	// transport since it would not be possible to know which transport client to build when applying
+	// the resource.
+	default:
+		switch {
+		case defaults.SSH.IsConfigured() && !defaults.K8S.IsConfigured():
+			if err := em.SSH.ApplyDefaults(defaults.SSH.Attributes()); err != nil {
+				return err
+			}
+		case !defaults.SSH.IsConfigured() && defaults.K8S.IsConfigured():
+			if err := em.K8S.ApplyDefaults(defaults.K8S.Attributes()); err != nil {
+				return err
+			}
+		case defaults.SSH.IsConfigured() && defaults.K8S.IsConfigured():
+			return newErrWithDiagnostics("Invalid Transport Configuration", "Only one transport can be configured, both 'ssh' and 'kubernetes' where configured")
+		default:
+			return newErrWithDiagnostics("Invalid Transport Configuration", "No transport configured, one of 'ssh' or 'kubernetes' must be configured")
 		}
 	}
-
-	defaults.SSH.Values = startingVals
-	for key, val := range em.SSH.Values {
-		defaults.SSH.Values[key] = val
-	}
-}
-
-// ToPrivate returns the embeddedTransportV1's private state
-func (em *embeddedTransportV1) ToPrivate() ([]byte, error) {
-	// We keep the host in private state because we need it to determine if
-	// the resource has changed. As we allow users to specify _all_ transport
-	// level configuration at the provider level, we cannot rely on saving it
-	// in the normal transport schema.
-	p := &embeddedTransportPrivate{
-		Host: em.SSH.Host.Value(),
-	}
-
-	return json.Marshal(p)
-}
-
-// FromPrivate loads the private state into the embeddedTransport
-func (em *embeddedTransportV1) FromPrivate(in []byte) error {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	if len(in) == 0 {
-		return nil
-	}
-
-	p := &embeddedTransportPrivate{}
-	err := json.Unmarshal(in, p)
-	if err != nil {
-		return err
-	}
-
-	em.SSH.Host.Set(p.Host)
 
 	return nil
 }
 
-func transportReplacedAttributePaths(prior, proposed *embeddedTransportV1) []*tftypes.AttributePath {
-	attrs := []*tftypes.AttributePath{}
-	if priorHost, ok := prior.SSH.Host.Get(); ok {
-		if proposedHost, ok := proposed.SSH.Host.Get(); ok {
-			if priorHost != proposedHost {
-				attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
-					tftypes.AttributeName("transport"),
-					tftypes.AttributeName("ssh"),
-					tftypes.AttributeName("host"),
-				}))
+// GetConfiguredTransport Gets the configured transport for this embedded transport. There should be
+// only one configured transport for a resource. If there are none configured or both configured calling
+// this method will return an error.
+func (em *embeddedTransportV1) GetConfiguredTransport() (transportState, error) {
+	sshIsConfigured := em.SSH.IsConfigured()
+	k8sIsConfigured := em.K8S.IsConfigured()
+
+	switch {
+	case sshIsConfigured && k8sIsConfigured:
+		return nil, newErrWithDiagnostics("Invalid configuration", "Only one transport can be configured, both 'ssh' and 'kubernetes' where configured")
+	case sshIsConfigured:
+		return em.SSH, nil
+	case k8sIsConfigured:
+		return em.K8S, nil
+	default:
+		return nil, newErrWithDiagnostics(
+			"Invalid Transport Configuration",
+			"No transport configured, one of 'ssh' or 'kubernetes' must be configured")
+	}
+}
+
+func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Value, transportType string) error {
+	// Because the transport type is a dynamic psuedo type we have to manually ensure
+	// that the user hasn't set any unknown attributes.
+	isKnownAttribute := func(attr string) error {
+		for _, known := range knownAttributes {
+			if attr == known {
+				return nil
 			}
 		}
+
+		return newErrWithDiagnostics("Unsupported argument",
+			fmt.Sprintf(`An argument named "%s" is not expected here.`, attr), "transport", transportType, attr,
+		)
+	}
+
+	for attribute := range values {
+		err := isKnownAttribute(attribute)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embeddedTransportV1) []*tftypes.AttributePath {
+	attrs := []*tftypes.AttributePath{}
+
+	if em.SSH.IsConfigured() && proposed.SSH.IsConfigured() {
+		attrs = addAttributesForReplace(em.SSH, proposed.SSH, attrs, "ssh")
+	}
+
+	if em.K8S.IsConfigured() && proposed.K8S.IsConfigured() {
+		attrs = addAttributesForReplace(em.K8S, proposed.K8S, attrs, "kubernetes")
 	}
 
 	if len(attrs) > 0 {
 		return attrs
 	}
 
+	return nil
+}
+
+func addAttributesForReplace(priorState transportState, proposedState transportState, attrs []*tftypes.AttributePath, transportName string) []*tftypes.AttributePath {
+	for _, attribute := range priorState.GetAttributesForReplace() {
+		proposedValue := proposedState.Attributes()[attribute].TFValue()
+		currentValue := priorState.Attributes()[attribute].TFValue()
+		if !proposedValue.Equal(currentValue) {
+			attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
+				tftypes.AttributeName("transport"),
+				tftypes.AttributeName(transportName),
+				tftypes.AttributeName(attribute),
+			}))
+		}
+	}
+	return attrs
+}
+
+func copyValues(values map[string]tftypes.Value) map[string]tftypes.Value {
+	newVals := map[string]tftypes.Value{}
+	for key, value := range values {
+		newVals[key] = value
+	}
+	return newVals
+}
+
+func terraform5Type(values map[string]tftypes.Value) tftypes.Type {
+	types := map[string]tftypes.Type{}
+	for name, val := range values {
+		types[name] = val.Type()
+	}
+
+	return tftypes.Object{AttributeTypes: types}
+}
+
+func terraform5Value(values map[string]tftypes.Value) tftypes.Value {
+	return tftypes.NewValue(terraform5Type(values), values)
+}
+
+func applyDefaults(defaults map[string]TFType, attributes map[string]TFType) error {
+	for name, defaultValue := range defaults {
+		if attribute, ok := attributes[name]; ok {
+			attributeHasValue := !attribute.TFValue().IsNull() && attribute.TFValue().IsKnown()
+			defaultHasValue := defaultValue.TFValue().IsKnown() && !defaultValue.TFValue().IsNull()
+			if !attributeHasValue && defaultHasValue {
+				if err := attribute.FromTFValue(defaultValue.TFValue()); err != nil {
+					return fmt.Errorf("failed to apply default to attribute: %s", name)
+				}
+			}
+		} else {
+			return fmt.Errorf("failed to apply default to attribute: [%s], since it is missing", name)
+		}
+	}
+	return nil
+}
+
+// isTransportConfigured checks if the provided transport is configured. A transport is considered
+// configured, if at least one of its attributes has a value. It is not sufficient to just check if
+// the length of the Values array is > 0 since that only means that the transport received some of
+// its configuration from the resources transport stanza. In some cases a transport can be entirely
+// configured via the default transport defined in the provider's transport stanza. In this case the
+// attributes will have values, and the Values array will be empty.
+func isTransportConfigured(state transportState) bool {
+	for _, attribute := range state.Attributes() {
+		if !attribute.TFValue().IsNull() {
+			return true
+		}
+	}
+	return false
+}
+
+// checkK8STransportNotConfigured verifies that the Kubernetes transport is not configured. An error
+// is returned if the K8S transport is configured.
+func checkK8STransportNotConfigured(state StateWithTransport, resourceName string) error {
+	if state.EmbeddedTransport().K8S.IsConfigured() {
+		return newErrWithDiagnostics("invalid configuration", fmt.Sprintf("the '%s' resource does not support the 'kubernetes' transport", resourceName))
+	}
 	return nil
 }

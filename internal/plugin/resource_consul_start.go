@@ -199,22 +199,22 @@ func (r *consulStart) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
-		err = plannedState.startConsul(ctx, ssh)
+		err = plannedState.startConsul(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
-		err = plannedState.startConsul(ctx, ssh)
+		err = plannedState.startConsul(ctx, client)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
@@ -331,6 +331,10 @@ func (s *consulStartStateV1) Validate(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
+	}
+
+	if err := checkK8STransportNotConfigured(s, "enos_consul_start"); err != nil {
+		return err
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {
@@ -482,7 +486,7 @@ func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	return hlcBuilder
 }
 
-func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) error {
+func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transport) error {
 	var err error
 
 	// Ensure that the consul user is created
@@ -501,7 +505,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 		dataDir = ddir
 	}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
 		remoteflight.WithUserName(consulUsername),
 		remoteflight.WithUserHomeDir(dataDir),
 		remoteflight.WithUserShell("/bin/false"),
@@ -545,7 +549,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 
 	if license, ok := s.License.Get(); ok {
 		licensePath := filepath.Join(configDir, "consul.lic")
-		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
+		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("644"),
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
@@ -557,7 +561,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 		}
 
 		// Validate the Consul license file
-		err = consul.ValidateConsulLicense(ctx, ssh, consul.NewValidateFileRequest(
+		err = consul.ValidateConsulLicense(ctx, client, consul.NewValidateFileRequest(
 			consul.WithValidateConfigBinPath(s.BinPath.Value()),
 			consul.WithValidateFilePath(licensePath),
 		))
@@ -570,7 +574,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	}
 
 	// Write the systemd unit
-	err = remoteflight.CreateSystemdUnitFile(ctx, ssh, remoteflight.NewCreateSystemdUnitFileRequest(
+	err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
 		remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
 		remoteflight.WithSystemdUnitChmod("644"),
 		remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
@@ -584,7 +588,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	config := s.Config.ToHCLConfig()
 
 	// Create the consul HCL configuration file
-	err = hcl.CreateHCLConfigFile(ctx, ssh, hcl.NewCreateHCLConfigFileRequest(
+	err = hcl.CreateHCLConfigFile(ctx, client, hcl.NewCreateHCLConfigFileRequest(
 		hcl.WithHCLConfigFilePath(configFilePath),
 		hcl.WithHCLConfigChmod("644"),
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
@@ -599,7 +603,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	defer cancel()
 
 	// Create the consul data directory
-	err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
+	err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(dataDir),
 		remoteflight.WithDirChown(consulUsername),
 	))
@@ -608,7 +612,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	}
 
 	// Create the consul config directory
-	err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
+	err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(configDir),
 		remoteflight.WithDirChown(consulUsername),
 	))
@@ -617,7 +621,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	}
 
 	// Validate the Consul config file
-	err = consul.ValidateConsulConfig(ctx, ssh, consul.NewValidateFileRequest(
+	err = consul.ValidateConsulConfig(ctx, client, consul.NewValidateFileRequest(
 		consul.WithValidateConfigBinPath(s.BinPath.Value()),
 		consul.WithValidateFilePath(configFilePath),
 	))
@@ -626,7 +630,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, ssh it.Transport) 
 	}
 
 	// Restart the service and wait for it to be running
-	err = consul.Restart(timeoutCtx, ssh, consul.NewStatusRequest(
+	err = consul.Restart(timeoutCtx, client, consul.NewStatusRequest(
 		consul.WithStatusRequestBinPath(s.BinPath.Value()),
 	))
 	if err != nil {

@@ -149,27 +149,37 @@ the root of the repository.
 
 # Provider Configuration
 
-Currently you can provide transport level configuration at the provider level
-and it will be inherited in all resource transport. If you define the same configuration
-key on both levels, the resources definition will win. You may also configure
-the provider level transport options in the HCL terraform file or via environment
-variables. If provider configuration is defined at both levels the environment
-will win.
+The enos provider can execute commands on remote hosts using a transport. Currently, the 
+provider supports two transports, `SSH` and `Kubernetes`. The `SSH` transport is suitable for executing
+commands that would normally have been done via `SSH`, and the `Kubernetes` transport can be used
+where the command would have been executed via `kubectl exec`. 
 
-Configuration precendence: Resource HCL > Provider Environment > Provider HCL
+Currently, you can provide transport configuration at the provider level,
+and it will be inherited by all resources with transport configuration. If you define the same configuration
+key on both levels, the resource's definition will win. You may also configure
+the provider level transport options in the HCL terraform file.
 
-The following configuration parameters are supported at the provider level:
+Configuration precedence: Resource HCL > Provider HCL.
 
-|ssh transport key|environment variable|
-|-|-|
-|user|ENOS_TRANSPORT_USER|
-|host|ENOS_TRANSPORT_HOST|
-|private_key|ENOS_TRANSPORT_PRIVATE_KEY|
-|private_key_path|ENOS_TRANSPORT_PRIVATE_KEY_PATH|
-|passphrase|ENOS_TRANSPORT_PASSPHRASE|
-|passphrase_path|ENOS_TRANSPORT_PASSPHRASE_PATH|
+A resource can only configure one transport, attempting to configure more than one will result 
+in a Validation error. The provider however, can configure more than one transport. This is due 
+to the fact that the provider level transport configuration is never used to make remote calls, but 
+rather is only used to provide default values for resources that require a transport. When the default
+values from the provider are applied to a resource, only the default values for the transport that
+the resource has configured will be applied.
 
-While `passphrase` and `private_key` are supported, it suggested to use the
+## SSH Transport Configuration
+
+|ssh transport key|description|type|required|
+|-|-|-|-|
+|user|the ssh user to use|string|yes|
+|host|the remote host to access|string|yes|
+|private_key|the private key as a string|string|no|
+|private_key_path|the path to a private key file|string|no, but if provided overrides the `private_key` value (if configured)|
+|passphrase|a passphrase if the private key requires one|string|no|
+|passphrase_path|a path to a file with the passphrase for the private key|string|no, but if provided overrides the `passphrase` value (if configured)|
+
+While `passphrase` and `private_key` are supported, it is suggested to use the
 `passphrase_path` and `private_key_path` options instead, as the raw values
 will be stored in Terraform state.
 
@@ -185,6 +195,39 @@ provider "enos" {
   }
 }
 ```
+
+The `transport` stanza for a provider or a resource has the same syntax.
+
+## Kubernetes Transport Configuration
+
+The `Kubernetes` transport can be used to execute remote commands on a container running in a `Pod`.
+
+The following is the supported configuration
+
+|kubernetes transport key|description|type|required|
+|-|-|-|-|
+|kubeconfig|base64 encoded kubeconfig|string|yes|
+|context_name|the name of the kube context to access|string|yes|
+|namespace|the namespace of pod to access|string|no, defaults to the `default` namespace|
+|pod|the name of the pod to access|string|yes|
+|container|the name of the container to access|string|no, defaults to the default container for the pod|
+
+Example configuration
+```hcl
+provider "enos" {
+  transport = {
+    kubernetes = {
+      kubeconfig   = "ubuntu"
+      context_name = "test-cluster"
+      namespace    = "vault"
+      pod          = "vault-0"
+      container    = "vault"
+    }
+  }
+}
+```
+
+The `transport` stanza for a provider or a resource has the same syntax.
 
 # Data Sources
 

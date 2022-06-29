@@ -240,22 +240,22 @@ func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Ap
 	plannedID := "static"
 	plannedState.ID.Set(plannedID)
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
-		err = plannedState.Init(ctx, ssh)
+		err = plannedState.Init(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
-		err = plannedState.Init(ctx, ssh)
+		err = plannedState.Init(ctx, client)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
@@ -600,14 +600,14 @@ func (s *boundaryInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 }
 
 // Init initializes a Boundary cluster
-func (s *boundaryInitStateV1) Init(ctx context.Context, ssh it.Transport) error {
+func (s *boundaryInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
 	err := req.Validate()
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "init", "could not validate config")
 	}
 
-	res, err := boundary.Init(ctx, ssh, req)
+	res, err := boundary.Init(ctx, client, req)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "init", "failed to init")
 	}

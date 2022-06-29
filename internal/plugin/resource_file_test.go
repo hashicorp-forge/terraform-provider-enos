@@ -22,10 +22,12 @@ type testAccResourceTemplate struct {
 }
 
 type testAccResourceTransportTemplate struct {
-	name      string
-	state     State
-	check     resource.TestCheckFunc
-	transport *embeddedTransportV1
+	name             string
+	state            State
+	check            resource.TestCheckFunc
+	transport        *embeddedTransportV1
+	resourceTemplate *template.Template
+	transportUsed    string
 }
 
 // TestAccResourceFileResourceTransport tests both the basic enos_file resource interface
@@ -48,7 +50,7 @@ EOF
 		destination = "{{.Dst.Value}}"
 	}`))
 
-	resourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
+	sshResourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
 		{{if .Src.Value}}
 		source = "{{.Src.Value}}"
 		{{end}}
@@ -87,6 +89,36 @@ EOF
 		}
 	}`))
 
+	k8sResourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
+		{{if .Src.Value}}
+		source = "{{.Src.Value}}"
+		{{end}}
+
+		{{if .Content.Value}}
+		content = <<EOF
+{{.Content.Value}}"
+EOF
+		{{end}}
+
+		destination = "{{.Dst.Value}}"
+
+		transport = {
+			kubernetes = {
+				kubeconfig_path = "{{.Transport.K8S.KubeConfigPath.Value}}"
+				context_name    = "{{.Transport.K8S.ContextName.Value}}"
+				pod             = "{{.Transport.K8S.Pod.Value}}"
+
+				{{if .Transport.K8S.Namespace.Value}}
+				namespace = "{{.Transport.K8S.Namespace.Value}}"
+				{{end}}
+
+				{{if .Transport.K8S.Container.Value}}
+				container = "{{.Transport.K8S.Container.Value}}"
+				{{end}}
+			}
+		}
+	}`))
+
 	cases := []testAccResourceTransportTemplate{}
 
 	keyNoPass := newFileState()
@@ -99,7 +131,7 @@ EOF
 	require.NoError(t, err)
 	keyNoPass.Transport.SSH.PrivateKey.Set(privateKey)
 	cases = append(cases, testAccResourceTransportTemplate{
-		"private key value with no passphrase",
+		"[ssh] private key value with no passphrase",
 		keyNoPass,
 		resource.ComposeTestCheckFunc(
 			resource.TestMatchResourceAttr("enos_file.foo", "id", regexp.MustCompile(`^static$`)),
@@ -109,6 +141,8 @@ EOF
 			resource.TestMatchResourceAttr("enos_file.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),
 		keyNoPass.Transport,
+		sshResourceTransport,
+		"ssh",
 	})
 
 	keyPathNoPass := newFileState()
@@ -119,10 +153,12 @@ EOF
 	keyPathNoPass.Transport.SSH.Host.Set("localhost")
 	keyPathNoPass.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh.pem")
 	cases = append(cases, testAccResourceTransportTemplate{
-		"private key from a file path with no passphrase",
+		"[ssh] private key from a file path with no passphrase",
 		keyPathNoPass,
 		resource.ComposeTestCheckFunc(),
 		keyPathNoPass.Transport,
+		sshResourceTransport,
+		"ssh",
 	})
 
 	keyPass := newFileState()
@@ -136,10 +172,12 @@ EOF
 	require.NoError(t, err)
 	keyPass.Transport.SSH.Passphrase.Set(passphrase)
 	cases = append(cases, testAccResourceTransportTemplate{
-		"private key value with passphrase value",
+		"[ssh] private key value with passphrase value",
 		keyPass,
 		resource.ComposeTestCheckFunc(),
 		keyPass.Transport,
+		sshResourceTransport,
+		"ssh",
 	})
 
 	keyPassPath := newFileState()
@@ -151,10 +189,12 @@ EOF
 	keyPassPath.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	keyPassPath.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
 	cases = append(cases, testAccResourceTransportTemplate{
-		"private key value with passphrase from file path",
+		"[ssh] private key value with passphrase from file path",
 		keyPassPath,
 		resource.ComposeTestCheckFunc(),
 		keyPassPath.Transport,
+		sshResourceTransport,
+		"ssh",
 	})
 
 	content := newFileState()
@@ -166,20 +206,38 @@ EOF
 	content.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	content.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
 	cases = append(cases, testAccResourceTransportTemplate{
-		"with string content instead of source file",
+		"[ssh] with string content instead of source file",
 		content,
 		resource.ComposeTestCheckFunc(),
 		content.Transport,
+		sshResourceTransport,
+		"ssh",
+	})
+
+	content = newFileState()
+	content.ID.Set("foo")
+	content.Content.Set("hello world")
+	content.Dst.Set("/tmp/dst")
+	content.Transport.K8S.KubeConfigPath.Set("../fixtures/kubeconfig")
+	content.Transport.K8S.ContextName.Set("kind-kind")
+	content.Transport.K8S.Pod.Set("some-pod")
+	cases = append(cases, testAccResourceTransportTemplate{
+		"[kubernetes] with string content instead of source file",
+		content,
+		resource.ComposeTestCheckFunc(),
+		content.Transport,
+		k8sResourceTransport,
+		"k8s",
 	})
 
 	for _, test := range cases {
 		// Run them with resource defined transport config
 		t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
-			unsetEnosEnv(t)
+			unsetAllEnosEnv(t)
 			defer resetEnv(t)
 
 			buf := bytes.Buffer{}
-			err := resourceTransport.Execute(&buf, test.state)
+			err := sshResourceTransport.Execute(&buf, test.state)
 			if err != nil {
 				t.Fatalf("error executing test template: %s", err.Error())
 			}
@@ -192,15 +250,22 @@ EOF
 			}
 
 			resource.ParallelTest(t, resource.TestCase{
-				ProtoV6ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders(t),
 				Steps:                    []resource.TestStep{step},
 			})
 		})
 
 		// Run them with provider config passed through the environment
 		t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
-			unsetEnosEnv(t)
-			setEnosEnv(t, test.transport)
+			unsetAllEnosEnv(t)
+			switch test.transportUsed {
+			case "ssh":
+				setEnosSSHEnv(t, test.transport)
+			case "k8s":
+				setEnosK8SEnv(t, test.transport)
+			default:
+				t.Errorf("unknown transport type: %s", test.transportUsed)
+			}
 			defer resetEnv(t)
 
 			buf := bytes.Buffer{}
@@ -217,7 +282,7 @@ EOF
 			}
 
 			resource.Test(t, resource.TestCase{
-				ProtoV6ProviderFactories: testProviders,
+				ProtoV6ProviderFactories: testProviders(t),
 				Steps:                    []resource.TestStep{step},
 			})
 		})
@@ -240,10 +305,12 @@ EOF
 		realTestSrc.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
 		realTestSrc.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
 		cases = append(cases, testAccResourceTransportTemplate{
-			"real test source file",
+			"[ssh] real test source file",
 			realTestSrc,
 			resource.ComposeTestCheckFunc(),
 			realTestSrc.Transport,
+			sshResourceTransport,
+			"ssh",
 		})
 
 		realTestContent := newFileState()
@@ -255,21 +322,23 @@ EOF
 		realTestContent.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
 		realTestContent.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
 		cases = append(cases, testAccResourceTransportTemplate{
-			"real test content",
+			"[ssh] real test content",
 			realTestContent,
 			resource.ComposeTestCheckFunc(),
 			realTestContent.Transport,
+			sshResourceTransport,
+			"ssh",
 		})
 
 		for _, test := range cases {
 			// Run them with resource defined transport config
-			t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
-				defer resetEnv(t)
+			t.Run(fmt.Sprintf("resource transport %s", test.name), func(tt *testing.T) {
+				defer resetEnv(tt)
 
 				buf := bytes.Buffer{}
-				err := resourceTransport.Execute(&buf, test.state)
+				err := test.resourceTemplate.Execute(&buf, test.state)
 				if err != nil {
-					t.Fatalf("error executing test template: %s", err.Error())
+					tt.Fatalf("error executing test template: %s", err.Error())
 				}
 
 				step := resource.TestStep{
@@ -279,20 +348,22 @@ EOF
 					ExpectNonEmptyPlan: false,
 				}
 
-				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testProviders,
+				resource.Test(tt, resource.TestCase{
+					ProtoV6ProviderFactories: testProviders(tt),
 					Steps:                    []resource.TestStep{step},
 				})
 			})
 
 			// Run them with provider config passed through the environment
-			t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
-				resetEnv(t)
+			t.Run(fmt.Sprintf("provider transport %s", test.name), func(tt *testing.T) {
+				resetEnv(tt)
+				unsetK8SEnv(tt) // for now we don't support real k8s based tests
+				defer resetEnv(tt)
 
 				buf := bytes.Buffer{}
 				err := providerTransport.Execute(&buf, test.state)
 				if err != nil {
-					t.Fatalf("error executing test template: %s", err.Error())
+					tt.Fatalf("error executing test template: %s", err.Error())
 				}
 
 				step := resource.TestStep{
@@ -302,8 +373,8 @@ EOF
 					ExpectNonEmptyPlan: false,
 				}
 
-				resource.Test(t, resource.TestCase{
-					ProtoV6ProviderFactories: testProviders,
+				resource.Test(tt, resource.TestCase{
+					ProtoV6ProviderFactories: testProviders(tt),
 					Steps:                    []resource.TestStep{step},
 				})
 			})
@@ -315,7 +386,9 @@ EOF
 // handle invalid attributes in the transport configuration. Since it's a dynamic
 // psuedo type we cannot rely on Terraform's built-in validation.
 func TestResourceFileTransportInvalidAttributes(t *testing.T) {
-	cfg := `resource enos_file "bad_ssh" {
+	t.Parallel()
+
+	sshCfg := `resource enos_file "bad_ssh" {
 	destination = "/tmp/dst"
 	content = "content"
 
@@ -328,17 +401,46 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 		}
 	}
 }`
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testProviders,
-		Steps: []resource.TestStep{
-			{
-				Config:             cfg,
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-				ExpectError:        regexp.MustCompile(`not_an_arg`),
-			},
-		},
-	})
+
+	k8sCfg := `resource enos_file "bad_ssh" {
+	destination = "/tmp/dst"
+	content = "content"
+
+	transport = {
+		kubernetes = {
+            kubeconfig_path = "/some/path/config"
+            context_name = "some context"
+            namespace = "default"
+            pod = "nginx-0"
+            container = "proxy"
+			not_an_arg = "boom"
+		}
+	}
+}`
+
+	for _, test := range []struct {
+		name       string
+		cfg        string
+		errorRegEx *regexp.Regexp
+	}{
+		{"ssh_transport", sshCfg, regexp.MustCompile(`not_an_arg`)},
+		{"k8s_transsport", k8sCfg, regexp.MustCompile(`not_an_arg`)},
+	} {
+		t.Run(test.name, func(tt *testing.T) {
+			resource.Test(tt, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(tt),
+				Steps: []resource.TestStep{
+					{
+						Config:             test.cfg,
+						PlanOnly:           true,
+						ExpectNonEmptyPlan: false,
+						ExpectError:        test.errorRegEx,
+					},
+				},
+			})
+		})
+	}
+
 }
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
@@ -348,6 +450,13 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 		{"host", "localhost", state.Transport.SSH.Host},
 		{"private_key", "PRIVATE KEY", state.Transport.SSH.PrivateKey},
 		{"private_key_path", "/path/to/key.pem", state.Transport.SSH.PrivateKeyPath},
+	})
+	state.Transport.K8S.Values = testMapPropertiesToStruct([]testProperty{
+		{"kubeconfig_path", "/path/to/kubeconfig", state.Transport.K8S.KubeConfigPath},
+		{"context_name", "some context", state.Transport.K8S.ContextName},
+		{"namespace", "default", state.Transport.K8S.Namespace},
+		{"pod", "nginx-0", state.Transport.K8S.Pod},
+		{"container", "proxy", state.Transport.K8S.Container},
 	})
 	testMapPropertiesToStruct([]testProperty{
 		{"id", "foo", state.ID},
@@ -369,6 +478,11 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, state.Transport.SSH.Host, newState.Transport.SSH.Host)
 	assert.Equal(t, state.Transport.SSH.PrivateKey, newState.Transport.SSH.PrivateKey)
 	assert.Equal(t, state.Transport.SSH.PrivateKeyPath, newState.Transport.SSH.PrivateKeyPath)
+	assert.Equal(t, state.Transport.K8S.KubeConfigPath, newState.Transport.K8S.KubeConfigPath)
+	assert.Equal(t, state.Transport.K8S.ContextName, newState.Transport.K8S.ContextName)
+	assert.Equal(t, state.Transport.K8S.Namespace, newState.Transport.K8S.Namespace)
+	assert.Equal(t, state.Transport.K8S.Pod, newState.Transport.K8S.Pod)
+	assert.Equal(t, state.Transport.K8S.Container, newState.Transport.K8S.Container)
 }
 
 func TestSetProviderConfig(t *testing.T) {
@@ -382,6 +496,13 @@ func TestSetProviderConfig(t *testing.T) {
 		{"private_key", "PRIVATE KEY", tr.SSH.PrivateKey},
 		{"private_key_path", "/path/to/key.pem", tr.SSH.PrivateKeyPath},
 	})
+	tr.K8S.Values = testMapPropertiesToStruct([]testProperty{
+		{"kubeconfig_path", "/path/to/kubeconfig", tr.K8S.KubeConfigPath},
+		{"context_name", "some context", tr.K8S.ContextName},
+		{"namespace", "default", tr.K8S.Namespace},
+		{"pod", "nginx-0", tr.K8S.Pod},
+		{"container", "proxy", tr.K8S.Container},
+	})
 
 	require.NoError(t, p.Transport.FromTerraform5Value(tr.Terraform5Value()))
 	require.NoError(t, f.SetProviderConfig(p.Terraform5Value()))
@@ -390,4 +511,9 @@ func TestSetProviderConfig(t *testing.T) {
 	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host.Value())
 	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey.Value())
 	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath.Value())
+	assert.Equal(t, "/path/to/kubeconfig", f.providerConfig.Transport.K8S.KubeConfigPath.Value())
+	assert.Equal(t, "some context", f.providerConfig.Transport.K8S.ContextName.Value())
+	assert.Equal(t, "default", f.providerConfig.Transport.K8S.Namespace.Value())
+	assert.Equal(t, "nginx-0", f.providerConfig.Transport.K8S.Pod.Value())
+	assert.Equal(t, "proxy", f.providerConfig.Transport.K8S.Container.Value())
 }

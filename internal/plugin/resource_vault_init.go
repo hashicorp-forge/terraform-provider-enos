@@ -218,15 +218,15 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Apply
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	if !reflect.DeepEqual(priorState, plannedState) {
-		err = plannedState.Init(ctx, ssh)
+		err = plannedState.Init(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
@@ -486,14 +486,14 @@ func (s *vaultInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 }
 
 // Init initializes a vault cluster
-func (s *vaultInitStateV1) Init(ctx context.Context, ssh it.Transport) error {
+func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
 	err := req.Validate()
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "init request", "validating vault init request")
 	}
 
-	res, err := vault.Init(ctx, ssh, req)
+	res, err := vault.Init(ctx, client, req)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault init", "initializing vault cluster")
 	}

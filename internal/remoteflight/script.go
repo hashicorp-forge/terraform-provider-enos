@@ -114,12 +114,12 @@ func WithRunScriptDestination(destination string) RunScriptRequestOpt {
 }
 
 // RunScript copies the script to the remote host, executes it, and cleans it up.
-func RunScript(ctx context.Context, ssh it.Transport, req *RunScriptRequest) (*RunScriptResponse, error) {
+func RunScript(ctx context.Context, client it.Transport, req *RunScriptRequest) (*RunScriptResponse, error) {
 	merr := &multierror.Error{}
 	res := &RunScriptResponse{}
 	ui := ui.NewBuffered()
 
-	err := CopyFile(ctx, ssh, req.CopyFileRequest)
+	err := CopyFile(ctx, client, req.CopyFileRequest)
 	if err != nil {
 		return res, err
 	}
@@ -128,7 +128,7 @@ func RunScript(ctx context.Context, ssh it.Transport, req *RunScriptRequest) (*R
 	if req.Sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
-	stdout, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
+	stdout, stderr, err := client.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
 	merr = multierror.Append(merr, err)
 	merr = multierror.Append(merr, ui.Append(stdout, stderr))
 	res.Stderr = ui.Stderr().String()
@@ -141,7 +141,7 @@ func RunScript(ctx context.Context, ssh it.Transport, req *RunScriptRequest) (*R
 		return res, nil
 	}
 
-	stdout, stderr, err = ssh.Run(
+	stdout, stderr, err = client.Run(
 		ctx, command.New(fmt.Sprintf("rm -f %s", req.CopyFileRequest.Destination), command.WithEnvVars(req.Env)),
 	)
 	merr = multierror.Append(merr, err)

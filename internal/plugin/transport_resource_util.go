@@ -93,23 +93,12 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWit
 		return
 	}
 
-	err = state.EmbeddedTransport().FromPrivate(req.Private)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Read Resource Error",
-			Detail:   fmt.Sprintf("Failed unmarshal embedded transport due to: %s", err.Error()),
-		})
-		return
-	}
-
 	res.NewState, err = marshal(state)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
 
-	res.Private, err = state.EmbeddedTransport().ToPrivate()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -140,30 +129,9 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 		return nil
 	}
 
-	transport, err := providerConfig.Transport.Copy()
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("Failed to get provider transport config, due to: %s", err.Error()),
-		})
-		return nil
-	}
-
 	err = unmarshal(prior, req.PriorState)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return nil
-	}
-
-	priorTransport := prior.EmbeddedTransport()
-	err = priorTransport.FromPrivate(req.PriorPrivate)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("Failed unmarshal prior transport, due to: %s", err.Error()),
-		})
 		return nil
 	}
 
@@ -173,13 +141,24 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 		return nil
 	}
 
-	// Use any provider configuration
-	proposedTransport := proposed.EmbeddedTransport()
-	proposedTransport.MergeInto(transport)
+	proposedTransport, err := proposed.EmbeddedTransport().Copy()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Plan Error",
+			Detail:   fmt.Sprintf("Failed to get proposed transport config, due to: %s", err.Error()),
+		})
+		return nil
+	}
+	err = proposedTransport.ApplyDefaults(providerConfig.Transport)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return nil
+	}
 
-	res.RequiresReplace = transportReplacedAttributePaths(priorTransport, proposedTransport)
+	res.RequiresReplace = prior.EmbeddedTransport().transportReplacedAttributePaths(proposedTransport)
 
-	return transport
+	return proposedTransport
 }
 
 // PlanMarshalPlannedState marshals a proposed state and transport into a plan response
@@ -197,15 +176,6 @@ func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
-	}
-
-	res.PlannedPrivate, err = transport.ToPrivate()
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("failed to marshal transport, due to: %s", err),
-		})
 	}
 }
 
@@ -225,8 +195,6 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 		return
 	}
 
-	transport := planned.EmbeddedTransport()
-	err = transport.FromPrivate(req.PlannedPrivate)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -243,7 +211,7 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior S
 }
 
 // ApplyValidatePlannedAndBuildTransport takes the planned state and provider transport,
-// validates them, and returns a new SSH transport client.
+// validates them, and returns a new embedded transport that can be used to create a transport client.
 func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, resource ResourceWithProviderConfig, res *tfprotov6.ApplyResourceChangeResponse) *embeddedTransportV1 {
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
@@ -267,8 +235,6 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 		return nil
 	}
 
-	transport := providerConfig.Transport
-
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -287,9 +253,13 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 		return nil
 	}
 
-	et.MergeInto(transport)
+	err = et.ApplyDefaults(providerConfig.Transport)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		return nil
+	}
 
-	err = transport.Validate(ctx)
+	err = et.Validate(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return nil
@@ -301,7 +271,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 		return nil
 	}
 
-	return transport
+	return et
 }
 
 // ApplyMarshalNewState takes the planned state and transport and marshal it
@@ -320,15 +290,6 @@ func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *t
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
-	}
-
-	res.Private, err = transport.ToPrivate()
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("failed to marshal transport, due to: %s", err),
-		})
 	}
 }
 

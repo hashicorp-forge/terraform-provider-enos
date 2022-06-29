@@ -311,15 +311,15 @@ func (c *SystemctlCommandReq) String() (string, error) {
 }
 
 // RunSystemctlCommand runs a systemctl command request
-func RunSystemctlCommand(ctx context.Context, ssh it.Transport, req *SystemctlCommandReq) (*SystemctlCommandRes, error) {
-	//_, stderr, err := ssh.Run(ctx, command.New("sudo systemctl --now enable vault"))
+func RunSystemctlCommand(ctx context.Context, client it.Transport, req *SystemctlCommandReq) (*SystemctlCommandRes, error) {
+	//_, stderr, err := client.Run(ctx, command.New("sudo systemctl --now enable vault"))
 	res := &SystemctlCommandRes{}
 	cmd, err := req.String()
 	if err != nil {
 		return res, err
 	}
 
-	res.Stdout, res.Stderr, err = ssh.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
+	res.Stdout, res.Stderr, err = client.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
 	if err != nil {
 		var exitError *xssh.ExitError
 		if errors.As(err, &exitError) {

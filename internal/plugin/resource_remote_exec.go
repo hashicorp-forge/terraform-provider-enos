@@ -195,14 +195,14 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req tfprotov6.Appl
 	plannedSum, plsumok := plannedState.Sum.Get()
 
 	if !pok || !prsumok || !plsumok || (priorSum != plannedSum) {
-		ssh, err := transport.Client(ctx)
+		client, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
-		defer ssh.Close() //nolint: staticcheck
+		defer client.Close() //nolint: staticcheck
 
-		ui, err := r.ExecuteCommands(ctx, plannedState, ssh)
+		ui, err := r.ExecuteCommands(ctx, plannedState, client)
 		plannedState.Stdout.Set(ui.Stdout().String())
 		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
@@ -349,7 +349,7 @@ func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (stri
 
 // ExecuteCommands executes any commands or scripts and returns the STDOUT, STDERR,
 // and any errors encountered.
-func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, ssh it.Transport) (ui.UI, error) {
+func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, client it.Transport) (ui.UI, error) {
 	var err error
 	merr := &multierror.Error{}
 	ui := ui.NewBuffered()
@@ -365,7 +365,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 			default:
 			}
 
-			stdout, stderr, err := ssh.Run(ctx, command.New(cmd, command.WithEnvVars(env)))
+			stdout, stderr, err := client.Run(ctx, command.New(cmd, command.WithEnvVars(env)))
 			merr = multierror.Append(merr, err)
 			merr = multierror.Append(merr, ui.Append(stdout, stderr))
 			if err := merr.ErrorOrNil(); err != nil {
@@ -386,7 +386,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 			}
 			defer script.Close() // nolint: staticcheck
 
-			err = r.copyAndRun(ctx, ui, ssh, script, "script", env)
+			err = r.copyAndRun(ctx, ui, client, script, "script", env)
 			if err != nil {
 				return ui, err
 			}
@@ -397,7 +397,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		content := tfile.NewReader(cont)
 		defer content.Close()
 
-		err = r.copyAndRun(ctx, ui, ssh, content, "content", env)
+		err = r.copyAndRun(ctx, ui, client, content, "content", env)
 		if err != nil {
 			return ui, err
 		}
@@ -406,10 +406,10 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 	return ui, nil
 }
 
-// copyAndRun copies the copyable source to the target using the SSH transport,
+// copyAndRun copies the copyable source to the target using the configured transport,
 // sets the environment variables and executes the content of the source.
 // It returns STDOUT, STDERR, and any errors encountered.
-func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, ssh it.Transport, src it.Copyable, srcType string, env map[string]string) error {
+func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transport, src it.Copyable, srcType string, env map[string]string) error {
 	select {
 	case <-ctx.Done():
 		return wrapErrWithDiagnostics(
@@ -437,7 +437,7 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, ssh it.Transport,
 	// TODO: Eventually we'll probably have to support /tmp being mounted
 	// with no exec. In those cases we'll have to make this configurable
 	// or find another strategy for executing scripts.
-	res, err := remoteflight.RunScript(ctx, ssh, remoteflight.NewRunScriptRequest(
+	res, err := remoteflight.RunScript(ctx, client, remoteflight.NewRunScriptRequest(
 		remoteflight.WithRunScriptContent(src),
 		remoteflight.WithRunScriptDestination(fmt.Sprintf("/tmp/%s.sh", sha)),
 		remoteflight.WithRunScriptEnv(env),

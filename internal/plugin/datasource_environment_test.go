@@ -41,7 +41,7 @@ func TestAccDataSourceEnvironment(t *testing.T) {
 	cfg := `data "enos_environment" "localhost" { }`
 
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testProviders,
+		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			{
 				Config: cfg,

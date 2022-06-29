@@ -49,7 +49,7 @@ func WithInstallFlightControlRequestPath(path string) InstallFlightControlOpt {
 
 // InstallFlightControl installs the enos-flight-control binary on a remote host in an
 // idempotent fashion.
-func InstallFlightControl(ctx context.Context, ssh transport.Transport, ir *InstallFlightControlRequest) (*InstallFlightControlResponse, error) {
+func InstallFlightControl(ctx context.Context, client transport.Transport, ir *InstallFlightControlRequest) (*InstallFlightControlResponse, error) {
 	res := &InstallFlightControlResponse{}
 
 	select {
@@ -60,12 +60,12 @@ func InstallFlightControl(ctx context.Context, ssh transport.Transport, ir *Inst
 
 	// Get the platform and architecture of the remote machine so that we can
 	// make sure it's a supported target and so we can install the correct binary.
-	platform, err := TargetPlatform(ctx, ssh)
+	platform, err := TargetPlatform(ctx, client)
 	if err != nil {
 		return res, fmt.Errorf("determining target host platform: %w", err)
 	}
 
-	arch, err := TargetArchitecture(ctx, ssh)
+	arch, err := TargetArchitecture(ctx, client)
 	if err != nil {
 		return res, fmt.Errorf("determining target host architecture: %w", err)
 	}
@@ -85,13 +85,13 @@ func InstallFlightControl(ctx context.Context, ssh transport.Transport, ir *Inst
 	}
 
 	// Check to see if we've already installed the binary
-	_, _, err = ssh.Run(ctx, command.New(fmt.Sprintf(`test -f '%s'`, ir.Path)))
+	_, _, err = client.Run(ctx, command.New(fmt.Sprintf(`test -f '%s'`, ir.Path)))
 	if err == nil {
 		// Something is installed in the path but we might need to update it.
 		// We'll compare the SHA256 of the file installed with the version that
 		// we intend to install. We use openssl to get the digest since we're
 		// connecting with SSH and can reasonably assume that it's there.
-		digestOut, _, err := ssh.Run(ctx, command.New(fmt.Sprintf(`openssl dgst -sha256 '%s'`, ir.Path)))
+		digestOut, _, err := client.Run(ctx, command.New(fmt.Sprintf(`openssl dgst -sha256 '%s'`, ir.Path)))
 		if err == nil {
 			// Parse the SHA256 out of the command response
 			// It looks something like "SHA256(enos-flight-control)= f43e9bc8c8f60bd067bafc5d59167184b14bd5dd57a17248e8a09e32bb42f515"
@@ -105,7 +105,7 @@ func InstallFlightControl(ctx context.Context, ssh transport.Transport, ir *Inst
 	}
 
 	// Install the binary
-	err = CopyFile(ctx, ssh, NewCopyFileRequest(
+	err = CopyFile(ctx, client, NewCopyFileRequest(
 		WithCopyFileContent(tfile.NewReader(string(flightControl))),
 		WithCopyFileDestination(ir.Path),
 		WithCopyFileChmod("+x"),

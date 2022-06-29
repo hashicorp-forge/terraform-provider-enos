@@ -150,7 +150,7 @@ func WithDownloadRequestRetryOptions(opts ...retry.RetrierOpt) DownloadOpt {
 }
 
 // Download downloads a file on a remote machine with enos-flight-control, retrying if necessary
-func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
+func Download(ctx context.Context, client transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
 	res := &DownloadResponse{}
 
 	select {
@@ -179,7 +179,7 @@ func Download(ctx context.Context, ssh transport.Transport, dr *DownloadRequest)
 
 	runCmd := func(ctx context.Context) (interface{}, error) {
 		var resp interface{}
-		stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+		stdout, stderr, err := client.Run(ctx, command.New(cmd))
 		if err != nil {
 			return resp, WrapErrorWith(err, stdout, stderr)
 		}

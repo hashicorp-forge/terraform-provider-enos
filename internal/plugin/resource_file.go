@@ -202,12 +202,12 @@ func (f *file) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResou
 	// If we're missing a prior ID we haven't created it yet. If the prior and
 	// planned sum don't match then we're updating.
 	if !okprior || !priorState.Sum.Eq(plannedState.Sum) {
-		ssh, err := transport.Client(ctx)
+		client, err := transport.Client(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
-		defer ssh.Close() //nolint: staticcheck
+		defer client.Close() //nolint: staticcheck
 
 		// Get our copy args
 		opts := []remoteflight.CopyFileRequestOpt{
@@ -224,7 +224,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResou
 			opts = append(opts, remoteflight.WithCopyFileChmod(chown))
 		}
 
-		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(opts...))
+		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(opts...))
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return

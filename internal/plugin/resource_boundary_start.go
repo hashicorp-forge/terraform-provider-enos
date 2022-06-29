@@ -161,22 +161,22 @@ func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 
 	plannedState.ID.Set("static")
 
-	ssh, err := transport.Client(ctx)
+	client, err := transport.Client(ctx)
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		return
 	}
-	defer ssh.Close() //nolint: staticcheck
+	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
-		err = plannedState.startBoundary(ctx, ssh)
+		err = plannedState.startBoundary(ctx, client)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
-		err = plannedState.startBoundary(ctx, ssh)
+		err = plannedState.startBoundary(ctx, client)
 
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
@@ -248,6 +248,10 @@ func (s *boundaryStartStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
+	if err := checkK8STransportNotConfigured(s, "enos_boundary_start"); err != nil {
+		return err
+	}
+
 	if _, ok := s.BinPath.Get(); !ok {
 		return newErrWithDiagnostics("invalid configuration", "you must provide the boundary binary path", "attribute")
 	}
@@ -317,7 +321,7 @@ func (s *boundaryStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transport) error {
+func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Transport) error {
 	var err error
 
 	// defaults
@@ -339,7 +343,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transpo
 	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below
 	configFilePath := filepath.Join(configPath, configName)
 
-	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
 		remoteflight.WithUserName(boundaryUser),
 		remoteflight.WithUserHomeDir(configPath),
 		remoteflight.WithUserShell("/bin/false"),
@@ -398,7 +402,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transpo
 		}
 
 		// Write the systemd unit
-		err = remoteflight.CreateSystemdUnitFile(ctx, ssh, remoteflight.NewCreateSystemdUnitFileRequest(
+		err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
 			remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
 			remoteflight.WithSystemdUnitChmod("640"),
 			remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
@@ -410,13 +414,13 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, ssh it.Transpo
 		}
 	}
 
-	err = boundary.Restart(ctx, ssh)
+	err = boundary.Restart(ctx, client)
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "boundary service", "failed to start the boundary service")
 	}
 
 	// set unknown values
-	code, err := boundary.Status(ctx, ssh, "boundary")
+	code, err := boundary.Status(ctx, client, "boundary")
 	s.Status.Set(int(code))
 
 	return err
