@@ -769,6 +769,23 @@ resource "enos_vault_unseal" "vault" {
 }
 ```
 
+## Kubernetes
+### enos_kind_cluster
+An `enos_kind_cluster` can be used to create a kind cluster locally. See https://kind.sigs.k8s.io/
+
+The following describes the `enos_kind_cluster` schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. Will be equal to the name of the cluster|
+|name|The name of the kind cluster to create|
+|kubeconfig_path|Optional, path to use for the kubeconfig file that is either created or updated|
+|base64_kubeconfig|Base64 encoded kubeconfig for connecting to the kind cluster|
+|client_certificate|TLS client cert for connecting to the cluster|
+|client_key|TLS client key for connecting to the cluster|
+|cluster_ca_certificate|TLS client ca certificate for connecting to the cluster|
+|endpoint|url for connecting to the admin endpoint of the cluster|
+
 # Flight control
 Enos works by executing remote commands on a target machine via an SSH transport
 session. It's resonably safe to assume that the remote target will provide some

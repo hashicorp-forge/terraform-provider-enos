@@ -19,6 +19,7 @@ func Server() tfprotov6.ProviderServer {
 func WithDefaultResourceRouter() func(server.Server) server.Server {
 	return server.RegisterResourceRouter(rr.New(
 		rr.RegisterResource(newFile()),
+		rr.RegisterResource(newLocalKindCluster()),
 		rr.RegisterResource(newLocalExec()),
 		rr.RegisterResource(newRemoteExec()),
 		rr.RegisterResource(newBundleInstall()),

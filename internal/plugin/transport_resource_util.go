@@ -15,7 +15,7 @@ type transportResourceUtil struct{}
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state StateWithTransport, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
+func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state Serializable, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -40,7 +40,7 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 //   3. Upgrade the existing state with the new values and return the marshaled
 //    version of the current upgraded state.
 //
-func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state StateWithTransport, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
+func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state Serializable, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -298,7 +298,7 @@ func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *t
 //
 // Importing a enos resources doesn't make a lot of sense but we have to support the
 // function regardless.
-func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state StateWithTransport, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
+func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state Serializable, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
