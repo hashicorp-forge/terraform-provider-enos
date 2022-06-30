@@ -458,6 +458,7 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 
 	return nil
 }
+
 func (s *localKindClusterStateV1) createKindCluster(ctx context.Context) error {
 	select {
 	case <-ctx.Done():

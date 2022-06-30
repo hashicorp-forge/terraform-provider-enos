@@ -36,5 +36,6 @@ func WithDefaultDataRouter() func(server.Server) server.Server {
 	return server.RegisterDataRouter(dr.New(
 		dr.RegisterDataSource(newEnvironment()),
 		dr.RegisterDataSource(newArtifactoryItem()),
+		dr.RegisterDataSource(newKubernetesPods()),
 	))
 }

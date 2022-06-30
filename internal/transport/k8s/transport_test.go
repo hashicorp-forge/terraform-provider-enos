@@ -250,12 +250,12 @@ func createTransportOrSkipTest(t *testing.T) it.Transport {
 	t.Helper()
 	opts := TransportOpts{}
 
-	kubeconfigPath, ok := os.LookupEnv("ENOS_KUBECONFIG_PATH")
+	kubeConfig, ok := os.LookupEnv("ENOS_KUBECONFIG")
 	if !ok {
-		t.Skip("Skipping test, since \"ENOS_KUBECONFIG_PATH\" env var not specified")
+		t.Skip("Skipping test, since \"ENOS_KUBECONFIG\" env var not specified")
 		return nil
 	}
-	opts.KubeConfigPath = kubeconfigPath
+	opts.KubeConfig = kubeConfig
 
 	contextName, ok := os.LookupEnv("ENOS_K8S_CONTEXT_NAME")
 	if !ok {

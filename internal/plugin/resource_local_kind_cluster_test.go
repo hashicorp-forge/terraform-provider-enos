@@ -99,7 +99,6 @@ func TestResourceKindClusterInvalidAttributes(t *testing.T) {
 }
 
 func TestClusterBuild(t *testing.T) {
-
 	if _, accOk := os.LookupEnv("TF_ACC"); !accOk {
 		t.Skip("Skipping test 'TestClusterBuild', because 'TF_ACC' not set")
 	}

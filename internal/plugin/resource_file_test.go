@@ -8,10 +8,10 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
 type testAccResourceTemplate struct {
@@ -104,9 +104,9 @@ EOF
 
 		transport = {
 			kubernetes = {
-				kubeconfig_path = "{{.Transport.K8S.KubeConfigPath.Value}}"
-				context_name    = "{{.Transport.K8S.ContextName.Value}}"
-				pod             = "{{.Transport.K8S.Pod.Value}}"
+				kubeconfig   = "{{.Transport.K8S.KubeConfig.Value}}"
+				context_name = "{{.Transport.K8S.ContextName.Value}}"
+				pod          = "{{.Transport.K8S.Pod.Value}}"
 
 				{{if .Transport.K8S.Namespace.Value}}
 				namespace = "{{.Transport.K8S.Namespace.Value}}"
@@ -218,7 +218,7 @@ EOF
 	content.ID.Set("foo")
 	content.Content.Set("hello world")
 	content.Dst.Set("/tmp/dst")
-	content.Transport.K8S.KubeConfigPath.Set("../fixtures/kubeconfig")
+	content.Transport.K8S.KubeConfig.Set("../fixtures/kubeconfig")
 	content.Transport.K8S.ContextName.Set("kind-kind")
 	content.Transport.K8S.Pod.Set("some-pod")
 	cases = append(cases, testAccResourceTransportTemplate{
@@ -408,7 +408,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 
 	transport = {
 		kubernetes = {
-            kubeconfig_path = "/some/path/config"
+            kubeconfig   = "some kubeconfig"
             context_name = "some context"
             namespace = "default"
             pod = "nginx-0"
@@ -440,7 +440,6 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 			})
 		})
 	}
-
 }
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
@@ -452,7 +451,7 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 		{"private_key_path", "/path/to/key.pem", state.Transport.SSH.PrivateKeyPath},
 	})
 	state.Transport.K8S.Values = testMapPropertiesToStruct([]testProperty{
-		{"kubeconfig_path", "/path/to/kubeconfig", state.Transport.K8S.KubeConfigPath},
+		{"kubeconfig", "some kubeconfig", state.Transport.K8S.KubeConfig},
 		{"context_name", "some context", state.Transport.K8S.ContextName},
 		{"namespace", "default", state.Transport.K8S.Namespace},
 		{"pod", "nginx-0", state.Transport.K8S.Pod},
@@ -478,7 +477,7 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, state.Transport.SSH.Host, newState.Transport.SSH.Host)
 	assert.Equal(t, state.Transport.SSH.PrivateKey, newState.Transport.SSH.PrivateKey)
 	assert.Equal(t, state.Transport.SSH.PrivateKeyPath, newState.Transport.SSH.PrivateKeyPath)
-	assert.Equal(t, state.Transport.K8S.KubeConfigPath, newState.Transport.K8S.KubeConfigPath)
+	assert.Equal(t, state.Transport.K8S.KubeConfig, newState.Transport.K8S.KubeConfig)
 	assert.Equal(t, state.Transport.K8S.ContextName, newState.Transport.K8S.ContextName)
 	assert.Equal(t, state.Transport.K8S.Namespace, newState.Transport.K8S.Namespace)
 	assert.Equal(t, state.Transport.K8S.Pod, newState.Transport.K8S.Pod)
@@ -497,7 +496,7 @@ func TestSetProviderConfig(t *testing.T) {
 		{"private_key_path", "/path/to/key.pem", tr.SSH.PrivateKeyPath},
 	})
 	tr.K8S.Values = testMapPropertiesToStruct([]testProperty{
-		{"kubeconfig_path", "/path/to/kubeconfig", tr.K8S.KubeConfigPath},
+		{"kubeconfig", "some kubeconfig", tr.K8S.KubeConfig},
 		{"context_name", "some context", tr.K8S.ContextName},
 		{"namespace", "default", tr.K8S.Namespace},
 		{"pod", "nginx-0", tr.K8S.Pod},
@@ -511,7 +510,7 @@ func TestSetProviderConfig(t *testing.T) {
 	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host.Value())
 	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey.Value())
 	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath.Value())
-	assert.Equal(t, "/path/to/kubeconfig", f.providerConfig.Transport.K8S.KubeConfigPath.Value())
+	assert.Equal(t, "some kubeconfig", f.providerConfig.Transport.K8S.KubeConfig.Value())
 	assert.Equal(t, "some context", f.providerConfig.Transport.K8S.ContextName.Value())
 	assert.Equal(t, "default", f.providerConfig.Transport.K8S.Namespace.Value())
 	assert.Equal(t, "nginx-0", f.providerConfig.Transport.K8S.Pod.Value())

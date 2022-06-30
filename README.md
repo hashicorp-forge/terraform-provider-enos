@@ -17,6 +17,7 @@ A terraform provider for quality infrastructure
 - [Data Sources](#data-sources)
   - [enos_environment](#enos_environment)
   - [enos_artifactory_item](#enos_artifactory_item)
+  - [enos_kubernetes_pods](#enos_kubernetes_pods)
 - [Resources](#resources)
   - [Core](#core)
     - [enos_file](#enos_file)
@@ -326,6 +327,38 @@ resource "enos_remote_exec" "download_vault" {
   }
 }
 ```
+
+## enos_kubernetes_pods
+The `enos_kubernetes_pods` datasource can be used to query a kubernetes cluster for pods, using
+label and field selectors. Details on the syntax for label and field selectors can be seen here:
+https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/.
+The query will return a list of `PodInfo` objects, which has the following schema:
+
+```
+PodInfo{
+  Name      string
+  Namespace string
+}
+```
+**Important Note:**
+
+As this is a datasource it will be run during plan time, unless the datasource
+depends on information not available till apply. Therefore, if this datasource is used in a module
+where the kubernetes cluster is being created at the same time, you must make the datasource depend
+either directly or indirectly on the resources required for the cluster to be created and the app 
+to be deployed.
+
+The following is the schema for the `enos_kubernetes_pods` datasource:
+
+|key|description|
+|-|-|
+|id|The id of the datasource. It will match the provided context name|
+|kubeconfig|\[required\] - A base64 encoded kubeconfig string|
+|context_name|\[required\] - The cluster context to query. The context must be present in the provided kubeconfig|
+|namespace|\[optional\] - A namespace to limit the query. If not provided all namespaces will be queried|
+|label_selectors|\[optional\] - A list(string) of label selectors to use when querying the cluster for pods|
+|field_selectors|\[optional\] - A list(string) of field selectors to use when querying the cluster for pods|
+|pods|\[output\] - a list of kubernetes `PodInfo` object, see description above |
 
 # Resources
 

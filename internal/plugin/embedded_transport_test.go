@@ -22,11 +22,11 @@ var (
 		"passphrase_path":  "/path/to/passphrase.txt",
 	}
 	k8sConfig = configmap{
-		"kubeconfig_path": "/some/path/config",
-		"context_name":    "milky_way",
-		"namespace":       "space_the_final_frontier",
-		"pod":             "space_pod",
-		"container":       "space_capsule",
+		"kubeconfig":   "some kubeconfig",
+		"context_name": "milky_way",
+		"namespace":    "space_the_final_frontier",
+		"pod":          "space_pod",
+		"container":    "space_capsule",
 	}
 )
 
@@ -46,7 +46,7 @@ func TestEmbeddedTransportMarshalRoundTrip(t *testing.T) {
 	assert.Equal(t, transport.SSH.PrivateKeyPath, newTransport.SSH.PrivateKeyPath)
 	assert.Equal(t, transport.SSH.Passphrase, newTransport.SSH.Passphrase)
 	assert.Equal(t, transport.SSH.PassphrasePath, newTransport.SSH.PassphrasePath)
-	assert.Equal(t, transport.K8S.KubeConfigPath, newTransport.K8S.KubeConfigPath)
+	assert.Equal(t, transport.K8S.KubeConfig, newTransport.K8S.KubeConfig)
 	assert.Equal(t, transport.K8S.ContextName, newTransport.K8S.ContextName)
 	assert.Equal(t, transport.K8S.Namespace, newTransport.K8S.Namespace)
 	assert.Equal(t, transport.K8S.Pod, newTransport.K8S.Pod)
@@ -78,14 +78,14 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 		"passphrase_path":  nil,
 	})
 	partialK8STransport := transportconfig{}.
-		k8sValue("kubeconfig_path", "/some/path/kubeconfig").
+		k8sValue("kubeconfig", "some kubeconfig").
 		k8sValue("pod", "space_pod")
 
 	partialK8SConfiguredExpected := transportconfig{}.
-		k8sValue("kubeconfig_path", "/some/path/kubeconfig").
+		k8sValue("kubeconfig", "some kubeconfig").
 		k8sValue("pod", "space_pod")
 	partialK8SAttributesExpected := transportconfig{}.
-		k8sValue("kubeconfig_path", "/some/path/kubeconfig").
+		k8sValue("kubeconfig", "some kubeconfig").
 		k8sValue("context_name", nil).
 		k8sValue("namespace", nil).
 		k8sValue("pod", "space_pod").
@@ -180,11 +180,11 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 		sshValue("passphrase_path", "/path/to/another/passphrase.txt")
 
 	configK8S := transportconfig{}.k8s(configmap{
-		"kubeconfig_path": "/some/other/path/config",
-		"context_name":    "some-context",
+		"kubeconfig":   "some kubeconfig",
+		"context_name": "some-context",
 	})
 	expectedValuesK8S := transportconfig{}.k8s(k8sConfig).
-		k8sValue("kubeconfig_path", "/some/other/path/config").
+		k8sValue("kubeconfig", "some kubeconfig").
 		k8sValue("context_name", "some-context")
 
 	for _, test := range []struct {
@@ -231,11 +231,11 @@ func TestProviderEmbeddedTransportValidate(t *testing.T) {
 	})
 
 	config4 := transportconfig{}.k8s(configmap{
-		"kubeconfig_path": "/some/path/config",
-		"context_name":    "mexican-food",
-		"namespace":       "tacos",
-		"pod":             "hard-shell",
-		"container":       "cheese",
+		"kubeconfig":   "some kubeconfig",
+		"context_name": "mexican-food",
+		"namespace":    "tacos",
+		"pod":          "hard-shell",
+		"container":    "cheese",
 	})
 
 	for _, test := range []struct {
@@ -285,7 +285,7 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 			transportCopy.SSH.PrivateKeyPath.Set("copy-private-key-path")
 			transportCopy.SSH.Passphrase.Set("copy-passphrase")
 			transportCopy.SSH.PassphrasePath.Set("copy-passphrase-path")
-			transportCopy.K8S.KubeConfigPath.Set("copy-kubeconfig-path")
+			transportCopy.K8S.KubeConfig.Set("copy-kubeconfig-path")
 			transportCopy.K8S.ContextName.Set("copy-context-name")
 			transportCopy.K8S.Namespace.Set("copy-namespace")
 			transportCopy.K8S.Pod.Set("copy-pod")
@@ -313,7 +313,7 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 						case "k8s":
 							switch attr {
 							case "kubeconfig-path":
-								assert.Equal(tt, value, transport.K8S.KubeConfigPath.Val)
+								assert.Equal(tt, value, transport.K8S.KubeConfig.Val)
 							case "context-name":
 								assert.Equal(tt, value, transport.K8S.ContextName.Val)
 							case "namespace":
