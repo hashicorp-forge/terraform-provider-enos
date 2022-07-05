@@ -34,7 +34,7 @@ func news3UploadCmd() *cobra.Command {
 	uploadCmd.Flags().StringVar(&uploadCfg.distDir, "dist", "", "the output directory of goreleaser that build the artifacts")
 	uploadCmd.Flags().StringVar(&uploadCfg.bucketPath, "bucket", "", "the S3 bucket path")
 	uploadCmd.PersistentFlags().StringVar(&uploadCfg.providerName, "provider-name", "terraform-provider-enos", "the name of the provider")
-	uploadCmd.PersistentFlags().StringVar(&uploadCfg.providerName, "binary-name", "terraform-provider-enos", "the name of the provider binary")
+	uploadCmd.PersistentFlags().StringVar(&uploadCfg.binaryName, "binary-name", "terraform-provider-enos", "the name of the provider binary")
 	uploadCmd.PersistentFlags().StringVar(&uploadCfg.providerID, "provider-id", "hashicorp.com/qti/enos", "the name of the provider")
 
 	_ = uploadCmd.MarkFlagRequired("distDir")
