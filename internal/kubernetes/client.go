@@ -27,9 +27,8 @@ type Client struct {
 }
 
 type ClientCfg struct {
-	// base64 encoded kubeconfig
-	KubeConfig  string
-	ContextName string
+	KubeConfigBase64 string
+	ContextName      string
 }
 
 type ExecRequest struct {
@@ -102,7 +101,7 @@ func (e *ExecResponse) WaitForResults() (stdout string, stderr string, err error
 }
 
 func NewClient(cfg ClientCfg) (*Client, error) {
-	clientset, restConfig, err := createClientset(cfg.KubeConfig, cfg.ContextName)
+	clientset, restConfig, err := createClientset(cfg.KubeConfigBase64, cfg.ContextName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubernetes clientset, due to: %w", err)
 	}
@@ -198,8 +197,8 @@ func DecodeAndLoadKubeConfig(encodedKubeConfig string) (*clientcmdapi.Config, er
 
 // createClientset creates the clientset and rest config for the provided kubeconfig and context name.
 // The kubeconfig must be base64 encoded.
-func createClientset(encodedKubeConfig, contextName string) (*kubernetes.Clientset, *rest.Config, error) {
-	kubeConfig, err := DecodeAndLoadKubeConfig(encodedKubeConfig)
+func createClientset(kubeConfigBase64, contextName string) (*kubernetes.Clientset, *rest.Config, error) {
+	kubeConfig, err := DecodeAndLoadKubeConfig(kubeConfigBase64)
 	if err != nil {
 		return nil, nil, err
 	}

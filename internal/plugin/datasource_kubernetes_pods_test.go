@@ -37,8 +37,8 @@ func TestAccDataSourceKubernetesPods(t *testing.T) {
 	}
 
 	cfg := template.Must(template.New("enos_data_kubernetes_pods").Parse(`data "enos_kubernetes_pods" "bogus" {
-  kubeconfig   = "{{ .KubeConfig.Value }}"
-  context_name = "{{ .ContextName.Value }}"
+  kubeconfig_base64 = "{{ .KubeConfigBase64.Value }}"
+  context_name      = "{{ .ContextName.Value }}"
 }
 
 output "pods" {
@@ -62,22 +62,22 @@ output "pods" {
 	}
 
 	state1 := newKubernetesPodStateV1()
-	state1.KubeConfig.Set(kubeConfig)
+	state1.KubeConfigBase64.Set(kubeConfig)
 	state1.ContextName.Set("kind-bogus")
 	checkFunc1 := resource.ComposeTestCheckFunc(
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "id", regexp.MustCompile(`^static$`)),
-		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "kubeconfig", regexp.MustCompile(kubeConfig)),
+		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "kubeconfig_base64", regexp.MustCompile(kubeConfig)),
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "context_name", regexp.MustCompile(`^kind-bogus$`)),
 		resource.TestMatchOutput("pods", regexp.MustCompile(`.*pod1.*blablabla.*pod2.*yoyo.*`)),
 	)
 
 	state2 := newKubernetesPodStateV1()
-	state2.KubeConfig.Set(kubeConfig)
+	state2.KubeConfigBase64.Set(kubeConfig)
 	state2.ContextName.Set("kind-not-present-context")
 	notPresentError := regexp.MustCompile(`context: \[kind-not-present-context] not present`)
 
 	state3 := newKubernetesPodStateV1()
-	state3.KubeConfig.Set("balogna")
+	state3.KubeConfigBase64.Set("balogna")
 	state3.ContextName.Set("some-context")
 	invalidKubeConfigErr := regexp.MustCompile(`invalid kubeconfig`)
 

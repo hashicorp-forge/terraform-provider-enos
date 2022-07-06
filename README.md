@@ -207,7 +207,7 @@ The following is the supported configuration
 
 |kubernetes transport key|description|type|required|
 |-|-|-|-|
-|kubeconfig|base64 encoded kubeconfig|string|yes|
+|kubeconfig_base64|base64 encoded kubeconfig|string|yes|
 |context_name|the name of the kube context to access|string|yes|
 |namespace|the namespace of pod to access|string|no, defaults to the `default` namespace|
 |pod|the name of the pod to access|string|yes|
@@ -218,11 +218,11 @@ Example configuration
 provider "enos" {
   transport = {
     kubernetes = {
-      kubeconfig   = "ubuntu"
-      context_name = "test-cluster"
-      namespace    = "vault"
-      pod          = "vault-0"
-      container    = "vault"
+      kubeconfig_base64 = "5sMp1p9VyZoS4Ljyy62OJaEq3s7HAsFLfh2Ulx2hUXHzZNxrLJWyqWYxfvwr4t9cfNw"
+      context_name      = "test-cluster"
+      namespace         = "vault"
+      pod               = "vault-0"
+      container         = "vault"
     }
   }
 }
@@ -348,12 +348,62 @@ where the kubernetes cluster is being created at the same time, you must make th
 either directly or indirectly on the resources required for the cluster to be created and the app 
 to be deployed.
 
+Here's an example configuration (boilerplate excluded for `brevity`) that creates a kind clutser, 
+deploys a helm chart and queries for pods:
+
+```terraform
+resource "enos_local_kind_cluster" "test" {
+  name            = "test"
+  kubeconfig_path = "./kubeconfig"
+}
+
+resource "helm_release" "test" {
+  name  = "test"
+  chart = "${path.module}/helm/test"
+
+  namespace        = "test"
+  create_namespace = true
+
+  wait = true
+
+  depends_on = [enos_local_kind_cluster.test]
+}
+
+data "enos_kubernetes_pods" "test" {
+  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
+  context_name      = enos_local_kind_cluster.test.context_name
+  namespace         = helm_release.test.namespace
+  label_selectors = [
+    "app.kubernetes.io/instance=ci-test",
+    "app.kubernetes.io/name=ci-test"
+  ]
+}
+
+resource "enos_remote_exec" "create_file" {
+  inline = ["touch /tmp/some_file"]
+
+  transport = {
+    kubernetes = {
+      kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
+      context_name      = enos_local_kind_cluster.test.context_name
+      namespace         = try(data.enos_kubernetes_pods.test.pods[0].namespace, "")
+      pod               = try(data.enos_kubernetes_pods.test.pods[0].name, "")
+    }
+  }
+}
+```
+In this example, the datasource only runs at apply time due to these implicit dependencies:
+```terraform
+  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
+  context_name      = enos_local_kind_cluster.test.context_name
+```
+
 The following is the schema for the `enos_kubernetes_pods` datasource:
 
 |key|description|
 |-|-|
 |id|The id of the datasource. It will match the provided context name|
-|kubeconfig|\[required\] - A base64 encoded kubeconfig string|
+|kubeconfig_base64|\[required\] - A base64 encoded kubeconfig string|
 |context_name|\[required\] - The cluster context to query. The context must be present in the provided kubeconfig|
 |namespace|\[optional\] - A namespace to limit the query. If not provided all namespaces will be queried|
 |label_selectors|\[optional\] - A list(string) of label selectors to use when querying the cluster for pods|
@@ -813,7 +863,7 @@ The following describes the `enos_kind_cluster` schema:
 |id|The id of the resource. Will be equal to the name of the cluster|
 |name|The name of the kind cluster to create|
 |kubeconfig_path|Optional, path to use for the kubeconfig file that is either created or updated|
-|base64_kubeconfig|Base64 encoded kubeconfig for connecting to the kind cluster|
+|kubeconfig_base64|Base64 encoded kubeconfig for connecting to the kind cluster|
 |client_certificate|TLS client cert for connecting to the cluster|
 |client_key|TLS client key for connecting to the cluster|
 |cluster_ca_certificate|TLS client ca certificate for connecting to the cluster|

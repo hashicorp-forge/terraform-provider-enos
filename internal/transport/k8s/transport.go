@@ -21,20 +21,19 @@ type transport struct {
 
 // TransportOpts are the options required in order to create the k8s transport
 type TransportOpts struct {
-	// base64 encoded kubeconfig
-	KubeConfig  string
-	ContextName string
-	Namespace   string
-	Pod         string
-	Container   string
+	KubeConfigBase64 string
+	ContextName      string
+	Namespace        string
+	Pod              string
+	Container        string
 }
 
 var _ it.Transport = (*transport)(nil)
 
 func NewTransport(opts TransportOpts) (it.Transport, error) {
 	client, err := kubernetes.NewClient(kubernetes.ClientCfg{
-		KubeConfig:  opts.KubeConfig,
-		ContextName: opts.ContextName,
+		KubeConfigBase64: opts.KubeConfigBase64,
+		ContextName:      opts.ContextName,
 	})
 	if err != nil {
 		return nil, err

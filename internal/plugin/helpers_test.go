@@ -129,7 +129,7 @@ func setEnosK8SEnv(t *testing.T, et *embeddedTransportV1) {
 	t.Helper()
 
 	setEnvVars(t, map[string]*tfString{
-		"ENOS_KUBECONFIG":       et.K8S.KubeConfig,
+		"ENOS_KUBECONFIG":       et.K8S.KubeConfigBase64,
 		"ENOS_K8S_CONTEXT_NAME": et.K8S.ContextName,
 		"ENOS_K8S_NAMESPACE":    et.K8S.Namespace,
 		"ENOS_K8S_POD":          et.K8S.Pod,
@@ -173,7 +173,7 @@ func configureK8STransportFromEnvironment(em *embeddedTransportK8Sv1) {
 		env  string
 		dst  *tfString
 	}{
-		{"kubeconfig", "ENOS_KUBECONFIG", em.KubeConfig},
+		{"kubeconfig_base64", "ENOS_KUBECONFIG", em.KubeConfigBase64},
 		{"context_name", "ENOS_K8S_CONTEXT_NAME", em.ContextName},
 		{"namespace", "ENOS_K8S_NAMESPACE", em.Namespace},
 		{"pod", "ENOS_K8S_POD", em.Pod},

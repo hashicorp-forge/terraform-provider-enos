@@ -15,8 +15,8 @@ type podInfoGetter func(ctx context.Context, state kubernetesPodsStateV1) ([]kub
 
 var defaultPodInfoGetter podInfoGetter = func(ctx context.Context, state kubernetesPodsStateV1) ([]kubernetes.PodInfo, error) {
 	client, err := kubernetes.NewClient(kubernetes.ClientCfg{
-		KubeConfig:  state.KubeConfig.Value(),
-		ContextName: state.ContextName.Value(),
+		KubeConfigBase64: state.KubeConfigBase64.Value(),
+		ContextName:      state.ContextName.Value(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a Kubernetes Client, due to: %w", err)
@@ -42,13 +42,13 @@ type kubernetesPods struct {
 var _ datarouter.DataSource = (*kubernetesPods)(nil)
 
 type kubernetesPodsStateV1 struct {
-	ID             *tfString
-	KubeConfig     *tfString
-	ContextName    *tfString
-	Namespace      *tfString
-	LabelSelectors *tfStringSlice
-	FieldSelectors *tfStringSlice
-	Pods           *tfObjectSlice
+	ID               *tfString
+	KubeConfigBase64 *tfString
+	ContextName      *tfString
+	Namespace        *tfString
+	LabelSelectors   *tfStringSlice
+	FieldSelectors   *tfStringSlice
+	Pods             *tfObjectSlice
 }
 
 var _ State = (*kubernetesPodsStateV1)(nil)
@@ -68,13 +68,13 @@ func newKubernetesPodStateV1() *kubernetesPodsStateV1 {
 	}
 
 	return &kubernetesPodsStateV1{
-		ID:             newTfString(),
-		KubeConfig:     newTfString(),
-		ContextName:    newTfString(),
-		Namespace:      newTfString(),
-		LabelSelectors: newTfStringSlice(),
-		FieldSelectors: newTfStringSlice(),
-		Pods:           pods,
+		ID:               newTfString(),
+		KubeConfigBase64: newTfString(),
+		ContextName:      newTfString(),
+		Namespace:        newTfString(),
+		LabelSelectors:   newTfStringSlice(),
+		FieldSelectors:   newTfStringSlice(),
+		Pods:             pods,
 	}
 }
 
@@ -177,8 +177,8 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 					Computed: true,
 				},
 				{
-					Name:        "kubeconfig",
-					Description: "The kubeconfig for the cluster to connect to as a string",
+					Name:        "kubeconfig_base64",
+					Description: "The base64 encoded kubeconfig for the cluster to connect to as a string",
 					Type:        tftypes.String,
 					Required:    true,
 					Sensitive:   true,
@@ -226,11 +226,11 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	kubeconfig, ok := s.KubeConfig.Get()
+	kubeconfig, ok := s.KubeConfigBase64.Get()
 	if !ok {
 		// this should never happen, since 'kubeconfig' is a required field and Terraform would barf
 		// before passing the request to the provider
-		return newErrWithDiagnostics("Validation Exception", "cannot get pods without a 'kubeconfig'", "kubeconfig")
+		return newErrWithDiagnostics("Validation Exception", "cannot get pods without a 'kubeconfig_base64'", "kubeconfig_base64")
 	}
 
 	contextName, ok := s.ContextName.Get()
@@ -242,12 +242,12 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 
 	kubeConfig, err := kubernetes.DecodeAndLoadKubeConfig(kubeconfig)
 	if err != nil {
-		return newErrWithDiagnostics("Validation Exception", "invalid kubeconfig, kubeconfig should be a valid base64 encoded kubeconfig string", "kubeconfig")
+		return newErrWithDiagnostics("Validation Exception", "invalid kubeconfig, kubeconfig should be a valid base64 encoded kubeconfig string", "kubeconfig_base64")
 	}
 
 	// check if the context is exists in the provided kubeconfig
 	if _, ok := kubeConfig.Contexts[contextName]; !ok {
-		return newErrWithDiagnostics("Validation Exception", fmt.Sprintf("context: [%s] not present in the provided 'kubeconfig'", contextName), "context_name")
+		return newErrWithDiagnostics("Validation Exception", fmt.Sprintf("context: [%s] not present in the provided kubeconfig", contextName), "context_name")
 	}
 
 	return nil
@@ -256,13 +256,13 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"id":              s.ID,
-		"kubeconfig":      s.KubeConfig,
-		"context_name":    s.ContextName,
-		"namespace":       s.Namespace,
-		"label_selectors": s.LabelSelectors,
-		"field_selectors": s.FieldSelectors,
-		"pods":            s.Pods,
+		"id":                s.ID,
+		"kubeconfig_base64": s.KubeConfigBase64,
+		"context_name":      s.ContextName,
+		"namespace":         s.Namespace,
+		"label_selectors":   s.LabelSelectors,
+		"field_selectors":   s.FieldSelectors,
+		"pods":              s.Pods,
 	})
 
 	return err
@@ -272,25 +272,25 @@ func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 func (s *kubernetesPodsStateV1) Terraform5Type() tftypes.Type {
 	// TODO: Add each state attribute
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":              s.ID.TFType(),
-		"kubeconfig":      s.KubeConfig.TFType(),
-		"context_name":    s.ContextName.TFType(),
-		"namespace":       s.Namespace.TFType(),
-		"label_selectors": s.LabelSelectors.TFType(),
-		"field_selectors": s.FieldSelectors.TFType(),
-		"pods":            s.Pods.TFType(),
+		"id":                s.ID.TFType(),
+		"kubeconfig_base64": s.KubeConfigBase64.TFType(),
+		"context_name":      s.ContextName.TFType(),
+		"namespace":         s.Namespace.TFType(),
+		"label_selectors":   s.LabelSelectors.TFType(),
+		"field_selectors":   s.FieldSelectors.TFType(),
+		"pods":              s.Pods.TFType(),
 	}}
 }
 
 // Terraform5Type is the file state tftypes.Value.
 func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":              s.ID.TFValue(),
-		"kubeconfig":      s.KubeConfig.TFValue(),
-		"context_name":    s.ContextName.TFValue(),
-		"namespace":       s.Namespace.TFValue(),
-		"label_selectors": s.LabelSelectors.TFValue(),
-		"field_selectors": s.FieldSelectors.TFValue(),
-		"pods":            s.Pods.TFValue(),
+		"id":                s.ID.TFValue(),
+		"kubeconfig_base64": s.KubeConfigBase64.TFValue(),
+		"context_name":      s.ContextName.TFValue(),
+		"namespace":         s.Namespace.TFValue(),
+		"label_selectors":   s.LabelSelectors.TFValue(),
+		"field_selectors":   s.FieldSelectors.TFValue(),
+		"pods":              s.Pods.TFValue(),
 	})
 }

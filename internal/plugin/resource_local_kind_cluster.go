@@ -39,9 +39,8 @@ type localKindClusterStateV1 struct {
 	Name           *tfString
 	KubeConfigPath *tfString
 	// amount of time to wait for the control plane to be ready, defaults to '30s'
-	WaitTimeout *tfString
-	// base64 encoded kubeconfig
-	Base64KubeConfig     *tfString
+	WaitTimeout          *tfString
+	KubeConfigBase64     *tfString
 	ContextName          *tfString
 	ClientCertificate    *tfString
 	ClientKey            *tfString
@@ -64,7 +63,7 @@ func newLocalKindClusterStateV1() *localKindClusterStateV1 {
 		Name:                 newTfString(),
 		KubeConfigPath:       newTfString(),
 		WaitTimeout:          newTfString(),
-		Base64KubeConfig:     newTfString(),
+		KubeConfigBase64:     newTfString(),
 		ContextName:          newTfString(),
 		ClientCertificate:    newTfString(),
 		ClientKey:            newTfString(),
@@ -136,7 +135,7 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 
 	tflog.Info(ctx, "Reading Local Kind Cluster", map[string]interface{}{
 		"name":              newState.Name,
-		"base64_kubeconfig": newState.Base64KubeConfig,
+		"kubeconfig_base64": newState.KubeConfigBase64,
 	})
 
 	if err := newState.readLocalKindCluster(ctx); err != nil {
@@ -186,7 +185,7 @@ func (r *localKindCluster) PlanResourceChange(ctx context.Context, req tfprotov6
 
 	if _, ok := priorState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
-		proposedState.Base64KubeConfig.Unknown = true
+		proposedState.KubeConfigBase64.Unknown = true
 		proposedState.ContextName.Unknown = true
 		proposedState.ClientCertificate.Unknown = true
 		proposedState.ClientKey.Unknown = true
@@ -327,7 +326,7 @@ func (s *localKindClusterStateV1) Schema() *tfprotov6.Schema {
 					Optional:    true,
 				},
 				{
-					Name:        "base64_kubeconfig",
+					Name:        "kubeconfig_base64",
 					Description: "Base64 encoded kubeconfig for the cluster",
 					Type:        tftypes.String,
 					Computed:    true,
@@ -378,7 +377,7 @@ func (s *localKindClusterStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"name":                   s.Name,
 		"kubeconfig_path":        s.KubeConfigPath,
 		"wait_timeout":           s.WaitTimeout,
-		"base64_kubeconfig":      s.Base64KubeConfig,
+		"kubeconfig_base64":      s.KubeConfigBase64,
 		"context_name":           s.ContextName,
 		"client_certificate":     s.ClientCertificate,
 		"client_key":             s.ClientKey,
@@ -397,7 +396,7 @@ func (s *localKindClusterStateV1) Terraform5Type() tftypes.Type {
 		"name":                   s.Name.TFType(),
 		"kubeconfig_path":        s.KubeConfigPath.TFType(),
 		"wait_timeout":           s.WaitTimeout.TFType(),
-		"base64_kubeconfig":      s.Base64KubeConfig.TFType(),
+		"kubeconfig_base64":      s.KubeConfigBase64.TFType(),
 		"context_name":           s.ContextName.TFType(),
 		"client_certificate":     s.ClientCertificate.TFType(),
 		"client_key":             s.ClientKey.TFType(),
@@ -413,7 +412,7 @@ func (s *localKindClusterStateV1) Terraform5Value() tftypes.Value {
 		"name":                   s.Name.TFValue(),
 		"kubeconfig_path":        s.KubeConfigPath.TFValue(),
 		"wait_timeout":           s.WaitTimeout.TFValue(),
-		"base64_kubeconfig":      s.Base64KubeConfig.TFValue(),
+		"kubeconfig_base64":      s.KubeConfigBase64.TFValue(),
 		"context_name":           s.ContextName.TFValue(),
 		"client_certificate":     s.ClientCertificate.TFValue(),
 		"client_key":             s.ClientKey.TFValue(),
@@ -536,7 +535,7 @@ func (s *localKindClusterStateV1) readLocalKindCluster(ctx context.Context) erro
 			}
 
 			encodedKubeConfig := base64.StdEncoding.EncodeToString([]byte(kconfig))
-			s.Base64KubeConfig.Set(encodedKubeConfig)
+			s.KubeConfigBase64.Set(encodedKubeConfig)
 			s.ContextName.Set("kind-" + s.Name.Value())
 
 			config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kconfig))
@@ -554,7 +553,7 @@ func (s *localKindClusterStateV1) readLocalKindCluster(ctx context.Context) erro
 	}
 
 	// if we did not find a local kind cluster we need to set the state to unknown.
-	clearValues(s.ID, s.Name, s.KubeConfigPath, s.ContextName, s.Base64KubeConfig, s.ClusterCACertificate, s.ClientCertificate, s.ClientKey, s.Endpoint)
+	clearValues(s.ID, s.Name, s.KubeConfigPath, s.ContextName, s.KubeConfigBase64, s.ClusterCACertificate, s.ClientCertificate, s.ClientKey, s.Endpoint)
 
 	return nil
 }

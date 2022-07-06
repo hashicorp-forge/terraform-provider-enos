@@ -18,8 +18,8 @@ var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context
 		return nil, err
 	}
 
-	if kubeConfig, ok := state.KubeConfig.Get(); ok {
-		opts.KubeConfig = kubeConfig
+	if kubeConfig, ok := state.KubeConfigBase64.Get(); ok {
+		opts.KubeConfigBase64 = kubeConfig
 	}
 	if contextName, ok := state.ContextName.Get(); ok {
 		opts.ContextName = contextName
@@ -37,16 +37,16 @@ var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context
 	return k8s.NewTransport(opts)
 }
 
-var k8sAttributes = []string{"kubeconfig", "context_name", "namespace", "pod", "container"}
+var k8sAttributes = []string{"kubeconfig_base64", "context_name", "namespace", "pod", "container"}
 
 type embeddedTransportK8Sv1 struct {
 	k8sTransportBuilder k8sTransportBuilder // added in order to support testing
 
-	KubeConfig  *tfString
-	ContextName *tfString
-	Namespace   *tfString
-	Pod         *tfString
-	Container   *tfString
+	KubeConfigBase64 *tfString
+	ContextName      *tfString
+	Namespace        *tfString
+	Pod              *tfString
+	Container        *tfString
 
 	// Values required for the same reason as stated in the embeddedTransportSSHv1.Values field
 	Values map[string]tftypes.Value
@@ -57,7 +57,7 @@ var _ transportState = (*embeddedTransportK8Sv1)(nil)
 func newEmbeddedTransportK8Sv1() *embeddedTransportK8Sv1 {
 	return &embeddedTransportK8Sv1{
 		k8sTransportBuilder: defaultK8STransportBuilder,
-		KubeConfig:          newTfString(),
+		KubeConfigBase64:    newTfString(),
 		ContextName:         newTfString(),
 		Namespace:           newTfString(),
 		Pod:                 newTfString(),
@@ -90,11 +90,11 @@ func (em *embeddedTransportK8Sv1) IsConfigured() bool {
 
 func (em *embeddedTransportK8Sv1) FromTerraform5Value(val tftypes.Value) (err error) {
 	em.Values, err = mapAttributesTo(val, map[string]interface{}{
-		"kubeconfig":   em.KubeConfig,
-		"context_name": em.ContextName,
-		"namespace":    em.Namespace,
-		"pod":          em.Pod,
-		"container":    em.Container,
+		"kubeconfig_base64": em.KubeConfigBase64,
+		"context_name":      em.ContextName,
+		"namespace":         em.Namespace,
+		"pod":               em.Pod,
+		"container":         em.Container,
 	})
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
@@ -106,9 +106,9 @@ func (em *embeddedTransportK8Sv1) FromTerraform5Value(val tftypes.Value) (err er
 
 func (em *embeddedTransportK8Sv1) Validate(ctx context.Context) error {
 	for name, prop := range map[string]*tfString{
-		"kubeconfig":   em.KubeConfig,
-		"context_name": em.ContextName,
-		"pod":          em.Pod,
+		"kubeconfig_base64": em.KubeConfigBase64,
+		"context_name":      em.ContextName,
+		"pod":               em.Pod,
 	} {
 		if _, ok := prop.Get(); !ok {
 			return newErrWithDiagnostics("Invalid Transport Configuration", fmt.Sprintf("missing value for required attribute: %s", name), "transport", "kubernetes", name)
@@ -123,18 +123,18 @@ func (em *embeddedTransportK8Sv1) Client(ctx context.Context) (it.Transport, err
 
 func (em *embeddedTransportK8Sv1) Attributes() map[string]TFType {
 	return map[string]TFType{
-		"kubeconfig":   em.KubeConfig,
-		"context_name": em.ContextName,
-		"namespace":    em.Namespace,
-		"pod":          em.Pod,
-		"container":    em.Container,
+		"kubeconfig_base64": em.KubeConfigBase64,
+		"context_name":      em.ContextName,
+		"namespace":         em.Namespace,
+		"pod":               em.Pod,
+		"container":         em.Container,
 	}
 }
 
 func (em *embeddedTransportK8Sv1) GetAttributesForReplace() []string {
 	var attribsForReplace []string
-	if _, ok := em.Values["kubeconfig"]; ok {
-		attribsForReplace = append(attribsForReplace, "kubeconfig")
+	if _, ok := em.Values["kubeconfig_base64"]; ok {
+		attribsForReplace = append(attribsForReplace, "kubeconfig_base64")
 	}
 
 	if _, ok := em.Values["context_name"]; ok {
