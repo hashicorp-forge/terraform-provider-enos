@@ -12,6 +12,16 @@ FLIGHTCONTROL_LD_FLAGS=-ldflags="-extldflags=-static -s -w"
 CI?=false
 GO_RELEASER_DOCKER_TAG=latest
 HASUPX:= $(shell upx dot 2> /dev/null)
+TEST_BLD_DIR=./test-build
+ENOS_CLI_TEST_DIR=$(TEST_BLD_DIR)/enoscli-tests
+ENOS_RELEASE_NAME?=enos
+
+# Heavy sigh, sed uses slightly different syntax on linux than macos, here we setup the opts assuming
+# CI=true is linux and CI=false is macos
+SED_OPTS=-i ''
+ifeq ($(CI), true)
+SED_OPTS=-i -e
+endif
 
 default: install
 
@@ -77,6 +87,23 @@ test-acc:
 
 test-race-detector:
 	GORACE=log_path=/tmp/gorace.log TF_ACC=1 go test -race $(TEST) -v $(TESTARGS) -timeout 120m ./command/plugin
+
+# run the k8s enoscli tests for the stable release
+test-k8s:
+	rm -rf $(ENOS_CLI_TEST_DIR); mkdir -p $(ENOS_CLI_TEST_DIR); \
+	cp -r enoscli-tests $(TEST_BLD_DIR); \
+    LC_ALL=C grep -lr "TFC_API_TOKEN" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/TFC_API_TOKEN/$(TFC_API_TOKEN)/g" ; \
+    LC_ALL=C grep -lr "ENOS_RELEASE_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_RELEASE_NAME/$(ENOS_RELEASE_NAME)/g" ; \
+    enos scenario launch -d $(ENOS_CLI_TEST_DIR) kind_cluster; \
+    enos scenario output -d $(ENOS_CLI_TEST_DIR) kind_cluster; \
+    enos scenario destroy -d $(ENOS_CLI_TEST_DIR) kind_cluster
+
+# Sets the enos release name for testing the dev release
+set-dev-release-name:
+	export ENOS_RELEASE_NAME="enosdev"
+
+# run the k8s enoscli tests for the dev release
+test-k8s-dev: set-dev-release-name test-k8s
 
 lint:
 	golangci-lint run -v

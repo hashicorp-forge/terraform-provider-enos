@@ -36,3 +36,6 @@ internal/flightcontrol/binaries/*
 mirror/*.tfvars
 
 .idea
+
+# build dir for tests
+test-build
