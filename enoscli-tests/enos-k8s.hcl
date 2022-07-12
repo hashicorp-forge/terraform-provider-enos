@@ -58,6 +58,7 @@ scenario "kind_cluster" {
       client_key             = step.create_cluster.client_key
       cluster_ca_certificate = step.create_cluster.cluster_ca_certificate
       replica_count          = local.pod_replica_count
+      image                  = step.create_cluster.image
     }
   }
 

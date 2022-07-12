@@ -58,7 +58,7 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
 				Summary:  "upgrade error",
-				Detail:   "unable to map version 1 to the current state",
+				Detail:   fmt.Sprintf("unable to map version 1 to the current state, due to: %s", err.Error()),
 			})
 			return
 		}

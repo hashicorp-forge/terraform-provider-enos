@@ -33,6 +33,9 @@ A terraform provider for quality infrastructure
     - [enos_vault_start](#enos_vault_start)
     - [enos_vault_init](#enos_vault_init)
     - [enos_vault_unseal](#enos_vault_unseal)
+  - [Kubernetes](#kubernetes)
+    - [enos_local_kind_cluster](#enos_local_kind_cluster)
+    - [enos_kind_load_image](#enos_kind_load_image)
 - [Flight control](#flight-control)
   - [Commands](#commands)
     - [Download](#download)
@@ -853,10 +856,10 @@ resource "enos_vault_unseal" "vault" {
 ```
 
 ## Kubernetes
-### enos_kind_cluster
-An `enos_kind_cluster` can be used to create a kind cluster locally. See https://kind.sigs.k8s.io/
+### enos_local_kind_cluster
+An `enos_local_kind_cluster` can be used to create a kind cluster locally. See https://kind.sigs.k8s.io/
 
-The following describes the `enos_kind_cluster` schema:
+The following describes the `enos_local_kind_cluster` schema:
 
 |key|description|
 |-|-|
@@ -868,6 +871,33 @@ The following describes the `enos_kind_cluster` schema:
 |client_key|TLS client key for connecting to the cluster|
 |cluster_ca_certificate|TLS client ca certificate for connecting to the cluster|
 |endpoint|url for connecting to the admin endpoint of the cluster|
+
+### enos_kind_load_image
+An `enos_kind_load_image` resource can be used to load a local docker image into a kind cluster. This
+resource is equivalent to issuing the command:
+
+```shell
+kind load docker-image
+```
+See the kind docs [here](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)
+
+The following describes the `enos_kind_load_image` schema:
+
+|key|description|
+|-|-|
+|id|The id of the resource. Will be equal to the name of the \[cluster-image name\]|
+|cluster_name|The name of the cluster to load the image on|
+|image|The name of the image to load, i.e. \[vault\]|
+|tag|The tag of the image to load, i.e. \[1.10.0\]|
+|loaded_images|An object matching the LoadedImageResult struct described below. The nodes field refers to the
+kubernetes node names.|
+
+```go
+type LoadedImageResult struct {
+	Image string
+	Nodes []string
+}
+```
 
 # Flight control
 Enos works by executing remote commands on a target machine via an SSH transport

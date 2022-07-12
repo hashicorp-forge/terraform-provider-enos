@@ -2,17 +2,22 @@ package plugin
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"math/big"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"testing"
 	"text/template"
-	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/kind/pkg/cluster"
+
+	"github.com/hashicorp/enos-provider/internal/log"
+
+	"github.com/hashicorp/enos-provider/internal/kind"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
@@ -109,28 +114,29 @@ func TestClusterBuild(t *testing.T) {
 		t.Skip("Skipping test 'TestClusterBuild' since docker daemon not available")
 	}
 
-	kindClusterState := newLocalKindClusterStateV1()
+	client := kind.NewLocalClient(log.NewNoopLogger())
 
 	randomNum, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	require.NoError(t, err)
 	name := randomNum.String()
-	kindClusterState.Name.Set(name)
 
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Minute*3)
-	t.Cleanup(cancelFunc)
+	dir := t.TempDir()
+	kubeConfigPath := filepath.Join(dir, "kubeconfig")
 
-	err = kindClusterState.createKindCluster(ctx)
-	if err != nil {
-		t.Fatalf("error executing cluster build test during create: %s", err.Error())
-	}
+	info, err := client.CreateCluster(kind.CreateKindClusterRequest{Name: name, KubeConfigPath: kubeConfigPath})
+	require.NoError(t, err)
+	assert.NotNil(t, info)
+	assert.NotEmpty(t, info.KubeConfigBase64)
+	assert.Equal(t, "kind-"+name, info.ContextName)
+	assert.NotEmpty(t, info.ClientCertificate)
+	assert.NotEmpty(t, info.ClientKey)
+	assert.NotEmpty(t, info.ClusterCACertificate)
+	assert.NotEmpty(t, info.Endpoint)
 
-	err = kindClusterState.readLocalKindCluster(ctx)
-	if err != nil {
-		t.Fatalf("error executing cluster build test during read: %s", err.Error())
-	}
+	provider := cluster.NewProvider()
+	nodes, err := provider.ListNodes(name)
+	require.NoError(t, err)
+	assert.Len(t, nodes, 1)
 
-	err = kindClusterState.destroyLocalKindCluster(ctx)
-	if err != nil {
-		t.Fatalf("error executing cluster build test during destroy: %s", err.Error())
-	}
+	require.NoError(t, client.DeleteCluster(kind.DeleteKindClusterRequest{Name: name, KubeConfigPath: kubeConfigPath}))
 }

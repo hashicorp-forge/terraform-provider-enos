@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -20,6 +22,8 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 )
+
+const kubeConfigEnvVar = "KUBECONFIG"
 
 type Client struct {
 	clientset  *kubernetes.Clientset
@@ -233,4 +237,33 @@ func (c *Client) createExecutor(execRequest ExecRequest) (remotecommand.Executor
 		}, scheme.ParameterCodec)
 
 	return remotecommand.NewSPDYExecutor(c.restConfig, "POST", request.URL())
+}
+
+// GetKubeConfigPath given a kubeConfigPath that might be empty gets a kubeconfig path, by returning
+// the provided value if is not empty, or the value of the kubeConfigEnv if set, or the default
+// kubeconfig path in the users' home dir (~/.kube/config)
+func GetKubeConfigPath(kubeConfigPath string) (string, error) {
+	if kubeConfigPath != "" {
+		return kubeConfigPath, nil
+	}
+
+	kubeConfigEnv, ok := os.LookupEnv(kubeConfigEnvVar)
+	if ok {
+		list := filepath.SplitList(kubeConfigEnv)
+		length := len(list)
+
+		switch {
+		case length == 0:
+			return list[0], nil
+		case length > 1:
+			return "", fmt.Errorf("ambiguous kubeconfig path, using 'KUBECONFIG' env var value: [%s]", kubeConfigEnv)
+		}
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home dir, when looking for the kubeconfig, due to: %w", err)
+	}
+
+	return filepath.Join(homeDir, ".kube", "config"), nil
 }

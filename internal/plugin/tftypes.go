@@ -715,7 +715,7 @@ func (b *tfObject) TFValue() tftypes.Value {
 
 func (b *tfObject) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)):
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)), !val.IsKnown():
 		b.Unknown = true
 	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.DynamicPseudoType, nil)):
 		b.Null = true

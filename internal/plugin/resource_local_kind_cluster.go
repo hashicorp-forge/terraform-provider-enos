@@ -6,25 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
-	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cmd"
+
+	"github.com/hashicorp/enos-provider/internal/kind"
+	"github.com/hashicorp/enos-provider/internal/log"
+
+	"github.com/hashicorp/enos-provider/internal/kubernetes"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-)
-
-const (
-	kubeConfigEnvVar          = "KUBECONFIG"
-	defaultClusterWaitTimeout = "30s"
 )
 
 type localKindCluster struct {
@@ -228,18 +226,24 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 	isCreate := priorState.ID.Val == ""
 	isUpdate := !isDelete && !isCreate && reflect.DeepEqual(plannedState, priorState)
 
+	logger := log.NewLogger(ctx)
+
 	switch {
 	case isDelete:
-		tflog.Debug(ctx, "Destroying a local kind cluster", map[string]interface{}{
-			"name":            plannedState.Name.Val,
-			"kubeconfig_path": plannedState.KubeConfigPath.Val,
+		logger.Debug("Destroying a local kind cluster", map[string]interface{}{
+			"name":            priorState.Name.Val,
+			"kubeconfig_path": priorState.KubeConfigPath.Val,
 		})
 
 		if err := priorState.Validate(ctx); err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		}
 
-		if err := priorState.destroyLocalKindCluster(ctx); err != nil {
+		client := kind.NewLocalClient(logger)
+		if err := client.DeleteCluster(kind.DeleteKindClusterRequest{
+			Name:           priorState.Name.Value(),
+			KubeConfigPath: priorState.KubeConfigPath.Value(),
+		}); err != nil {
 			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
 				Summary:  "Failed to Destroy Kind Cluster",
@@ -253,7 +257,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		}
 	case isCreate:
-		tflog.Debug(ctx, "Create a local kind cluster", map[string]interface{}{
+		logger.Debug("Create a local kind cluster", map[string]interface{}{
 			"name":            plannedState.Name.Val,
 			"kubeconfig_path": plannedState.KubeConfigPath.Val,
 		})
@@ -261,16 +265,25 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 		if err := plannedState.Validate(ctx); err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 		}
+		client := kind.NewLocalClient(logger)
 
-		if err := plannedState.createKindCluster(ctx); err != nil {
+		info, err := client.CreateCluster(kind.CreateKindClusterRequest{
+			Name:           plannedState.Name.Value(),
+			KubeConfigPath: plannedState.KubeConfigPath.Value(),
+			WaitTimeout:    plannedState.WaitTimeout.Value(),
+		})
+		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
-		if err := plannedState.readLocalKindCluster(ctx); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-			return
-		}
+
 		plannedState.ID.Set(plannedState.Name.Val)
+		plannedState.KubeConfigBase64.Set(info.KubeConfigBase64)
+		plannedState.ContextName.Set(info.ContextName)
+		plannedState.ClientCertificate.Set(info.ClientCertificate)
+		plannedState.ClientKey.Set(info.ClientKey)
+		plannedState.ClusterCACertificate.Set(info.ClusterCACertificate)
+		plannedState.Endpoint.Set(info.Endpoint)
 
 		if res.NewState, err = marshal(plannedState); err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -430,7 +443,7 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	kubeConfigPath, err := getKubeConfigPath(s.KubeConfigPath.Value())
+	kubeConfigPath, err := kubernetes.GetKubeConfigPath(s.KubeConfigPath.Value())
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "Validation Failure", "Failed to get a valid kubeconfig path", "kubeconfig_path")
 	}
@@ -454,55 +467,6 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 			fmt.Sprintf("Failed to load existing kubeconfig file: [%s]", kubeConfigPath),
 			"kubeconfig_path")
 	}
-
-	return nil
-}
-
-func (s *localKindClusterStateV1) createKindCluster(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	// Set variables necessary for cluster creation
-	name, ok := s.Name.Get()
-	if !ok {
-		return fmt.Errorf("cannot create a cluster without cluster 'name'")
-	}
-
-	logFields := map[string]interface{}{"name": name}
-
-	var copts []cluster.CreateOption
-	kubeConfigPath, ok := s.KubeConfigPath.Get()
-	if ok {
-		path, err := getKubeConfigPath(kubeConfigPath)
-		if err != nil {
-			return fmt.Errorf("failed to get the kubeconfig path while creating a cluster, due to: %w", err)
-		}
-		copts = append(copts, cluster.CreateWithKubeconfigPath(path))
-		logFields["kubeconfig_path"] = path
-	}
-	waitTimeout, ok := s.WaitTimeout.Get()
-	if !ok {
-		waitTimeout = defaultClusterWaitTimeout
-	}
-
-	wait, err := time.ParseDuration(waitTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse 'wait_timeout': [%s], when creating cluster: [%s], due to: %w", waitTimeout, name, err)
-	}
-
-	copts = append(copts, cluster.CreateWithWaitForReady(wait))
-
-	tflog.Info(ctx, "Creating Local Kind Cluster", logFields)
-	provider := cluster.NewProvider(cluster.ProviderWithLogger(cmd.NewLogger()))
-
-	if err := provider.Create(name, copts...); err != nil {
-		return err
-	}
-
-	tflog.Info(ctx, "Local Kind Cluster Created", logFields)
 
 	return nil
 }
@@ -563,66 +527,4 @@ func clearValues(values ...*tfString) {
 		val.Set("")
 		val.Null = true
 	}
-}
-
-func (s *localKindClusterStateV1) destroyLocalKindCluster(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	name, ok := s.Name.Get()
-	if !ok {
-		return fmt.Errorf("cannot delete cluster without cluster 'name'")
-	}
-
-	kubeconfigPath, err := getKubeConfigPath(s.KubeConfigPath.Value())
-	if err != nil {
-		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
-	}
-
-	tflog.Info(ctx, "Destroying Local Kind Cluster", map[string]interface{}{
-		"name":            name,
-		"kubeconfig_path": kubeconfigPath,
-	})
-
-	provider := cluster.NewProvider(cluster.ProviderWithLogger(cmd.NewLogger()))
-
-	if err := provider.Delete(name, kubeconfigPath); err != nil {
-		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
-	}
-
-	tflog.Info(ctx, "Local Kind Cluster Destroyed", map[string]interface{}{
-		"name":            name,
-		"kubeconfig_path": kubeconfigPath,
-	})
-	return nil
-}
-
-// TODO: move this to the kubernetes package when merged.
-func getKubeConfigPath(kubeconfigPath string) (string, error) {
-	if kubeconfigPath != "" {
-		return kubeconfigPath, nil
-	}
-
-	kubeConfigEnv, ok := os.LookupEnv(kubeConfigEnvVar)
-	if ok {
-		list := filepath.SplitList(kubeConfigEnv)
-		length := len(list)
-
-		switch {
-		case length == 0:
-			return list[0], nil
-		case length > 1:
-			return "", fmt.Errorf("ambiguous kubeconfig path, using 'KUBECONFIG' env var value: [%s]", kubeConfigEnv)
-		}
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user home dir, when looking for the kubeconfig, due to: %w", err)
-	}
-
-	return filepath.Join(homeDir, ".kube", "config"), nil
 }
