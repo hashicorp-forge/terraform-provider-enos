@@ -13,9 +13,9 @@ on:
 
 jobs:
   test-tfc-upload:
-    name: "Install and Test Uploaded Artifact"
+    name: "Install and Test TFC Artifact"
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -44,7 +44,7 @@ jobs:
         uses: hashicorp/action-setup-enos@v1
         with:
           github-token:
-            ${{ secrets.J_GH_TOKEN }}
+            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - name: Setup Vault Enterprise License
         id: license
         run: echo "${{ secrets.VAULT_LICENSE }}" > ./enoscli-tests/vault.hclic
@@ -67,13 +67,13 @@ jobs:
         working-directory: ./enoscli-tests
       - name: "Update Provider Version Backend module"
         run: |
-          export ENOS_VERSION=$(cat ../VERSION)
+          export ENOS_VERSION=$(cat ../../../VERSION)
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/backend_consul
       - name: "Update Provider Version Vault module"
         run: |
-          export ENOS_VERSION=$(cat ../VERSION)
+          export ENOS_VERSION=$(cat ../../../VERSION)
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/vault_cluster

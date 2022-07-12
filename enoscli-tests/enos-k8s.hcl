@@ -34,7 +34,7 @@ scenario "kind_cluster" {
 
   providers = [provider.enos.k8s]
 
-  terraform = terraform.k8s
+  terraform     = terraform.k8s
   terraform_cli = terraform_cli.k8s
 
   locals {
@@ -53,11 +53,11 @@ scenario "kind_cluster" {
     module = module.helm_chart
 
     variables {
-      host = step.create_cluster.host
-      client_certificate = step.create_cluster.client_certificate
-      client_key = step.create_cluster.client_key
+      host                   = step.create_cluster.host
+      client_certificate     = step.create_cluster.client_certificate
+      client_key             = step.create_cluster.client_key
       cluster_ca_certificate = step.create_cluster.cluster_ca_certificate
-      replica_count = local.pod_replica_count
+      replica_count          = local.pod_replica_count
     }
   }
 
@@ -70,8 +70,8 @@ scenario "kind_cluster" {
 
     variables {
       kubeconfig_base64 = step.create_cluster.kubeconfig_base64
-      context_name = step.create_cluster.context_name
-      replica_count = local.pod_replica_count
+      context_name      = step.create_cluster.context_name
+      replica_count     = local.pod_replica_count
       pod_label_selectors = [
         "app.kubernetes.io/instance=ci-test",
         "app.kubernetes.io/name=ci-test"

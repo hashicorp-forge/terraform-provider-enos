@@ -14,14 +14,9 @@ terraform "default" {
   required_version = ">= 1.0.0"
 
   required_providers {
-    enosdev = {
+    enos = {
       source  = "app.terraform.io/hashicorp-qti/enosdev"
       version = "ENOS_VER"
-    }
-
-    enos = {
-      source  = "app.terraform.io/hashicorp-qti/enos"
-      version = "0.1.29"
     }
 
     aws = {
@@ -34,7 +29,7 @@ provider "aws" "east" {
   region = "us-east-1"
 }
 
-provider "enosdev" "ubuntu" {
+provider "enos" "ubuntu" {
   transport = {
     ssh = {
       user             = "ubuntu"
@@ -43,7 +38,7 @@ provider "enosdev" "ubuntu" {
   }
 }
 
-provider "enosdev" "rhel" {
+provider "enos" "rhel" {
   transport = {
     ssh = {
       user             = "ec2_user"
@@ -98,8 +93,8 @@ scenario "vault" {
 
   locals {
     enos_provider = {
-      rhel   = provider.enosdev.rhel
-      ubuntu = provider.enosdev.ubuntu
+      rhel   = provider.enos.rhel
+      ubuntu = provider.enos.ubuntu
     }
     enos_transport_user = {
       rhel   = "ec2-user"
@@ -112,14 +107,14 @@ scenario "vault" {
   terraform     = terraform.default
   providers = [
     provider.aws.east,
-    provider.enosdev.ubuntu,
-    provider.enosdev.rhel
+    provider.enos.ubuntu,
+    provider.enos.rhel
   ]
 
   step "infra" {
     module = module.enos_infra
     variables {
-      ami_architectures = [matrix.arch]
+      ami_architectures = ["amd64", "arm64"]
     }
   }
 
@@ -134,7 +129,7 @@ scenario "vault" {
     skip_step  = matrix.backend == "raft"
     depends_on = [step.infra]
     providers = {
-      enosdev = provider.enosdev.ubuntu
+      enos = provider.enos.ubuntu
     }
     module = "backend_consul"
     variables {
@@ -149,7 +144,7 @@ scenario "vault" {
     module     = module.vault_cluster
     depends_on = [step.backend]
     providers = {
-      enosdev = local.enos_provider[matrix.distro]
+      enos = local.enos_provider[matrix.distro]
     }
     variables {
       ami_id              = step.infra.ami_ids[matrix.distro][matrix.arch]
@@ -171,7 +166,7 @@ scenario "vault" {
     module     = module.vault_cluster
     depends_on = [step.infra]
     providers = {
-      enosdev = local.enos_provider[matrix.distro]
+      enos = local.enos_provider[matrix.distro]
     }
     variables {
       ami_id              = step.infra.ami_ids[matrix.distro][matrix.arch]
