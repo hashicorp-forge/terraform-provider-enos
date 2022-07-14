@@ -28,6 +28,16 @@ type TFCUploadReq struct {
 	TFCToken        string
 }
 
+// TFCDownloadReq is a collection of provider download request
+type TFCDownloadReq struct {
+	DownloadDir     string
+	ProviderVersion string
+	BinaryName      string
+	ProviderName    string
+	TFCOrg          string
+	TFCToken        string
+}
+
 // TFCClient is a collection of http client request params
 type TFCClient struct {
 	token   string
@@ -993,6 +1003,53 @@ func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadurl strin
 
 	if resp.StatusCode != http.StatusOK {
 		return newTFCAPIError("uploading file", withErrTFCAPIResponse(resp))
+	}
+	return nil
+}
+
+// downloadFile downloads a file to the URL
+func (c *TFCClient) downloadFile(ctx context.Context, downloaddir string, filename string, downloadurl string) error {
+	c.log.Infow(
+		"downloading file",
+		"download URL", downloadurl,
+		"download dir", downloaddir,
+	)
+
+	u, err := url.Parse(downloadurl)
+	if err != nil {
+		return err
+	}
+	getURL := u.String()
+
+	buf := bytes.Buffer{}
+	req, err := http.NewRequestWithContext(ctx, "GET", getURL, &buf)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return newTFCAPIError("downloading file", withErrTFCAPIResponse(resp))
+	}
+
+	filepath := filepath.Join(downloaddir, filename)
+
+	// Create the file
+	resfile, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer resfile.Close()
+
+	// Write the body to file
+	_, err = io.Copy(resfile, resp.Body)
+	if err != nil {
+		return err
 	}
 	return nil
 }

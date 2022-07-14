@@ -45,6 +45,8 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIV_SIGNING_KEY }}
           PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_TTY: $(tty)
+          SSH_AUTH_SOCK: "$(gpgconf --list-dirs agent-ssh-socket)"
       - name: Upload to TFC private registry
         id: tfcupload
         run: |

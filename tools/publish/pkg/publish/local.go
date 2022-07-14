@@ -152,6 +152,13 @@ func (l *Local) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) error {
 	return l.artifacts.PublishToTFC(ctx, tfcreq)
 }
 
+// DownloadFromTFC downloads the artifacts for a given version to a direcotry
+func (l *Local) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.artifacts.DownloadFromTFC(ctx, tfcreq)
+}
+
 // AddGoreleaserBinariesFrom takes a directory path to the goreleaser builds,
 // walks it, finds any providers binaries, creates an archive of them and
 // adds them to the artifacts and index.

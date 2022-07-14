@@ -11,7 +11,7 @@ func newTFCCmd() *cobra.Command {
 	}
 
 	tfcCmd.AddCommand(newTFCUploadCmd())
-	// TODO: tfcCmd.AddCommand(newTFCDownloadCmd())
+	tfcCmd.AddCommand(newTFCDownloadCmd())
 
 	return tfcCmd
 }

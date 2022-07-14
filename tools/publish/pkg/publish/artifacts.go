@@ -319,6 +319,58 @@ func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) erro
 	return err
 }
 
+// DownloadFromTFC downloads the artifacts for a given version to a direcotry
+func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Infow(
+		"Downloading from TFC private provider",
+	)
+
+	tfcclient, err := NewTFCClient(WithTFCToken(tfcreq.TFCToken), WithTFCOrg(tfcreq.TFCOrg), WithTFCLog(a.log))
+	if err != nil {
+		return err
+	}
+
+	platforms, err := tfcclient.FindProviderPlatform(ctx, tfcreq.TFCOrg, tfcreq.ProviderName, tfcreq.ProviderVersion)
+	if err != nil {
+		return fmt.Errorf("error finding provider platform %w", err)
+	}
+	if len(platforms) == 0 {
+		return fmt.Errorf("no data found for provider platform %w", err)
+	}
+
+	for i := range platforms {
+		filesha := platforms[i].SHAsum
+		filename := platforms[i].Filename
+		url := platforms[i].PlatformBinaryURL
+
+		if _, err := os.Stat(tfcreq.DownloadDir); os.IsNotExist(err) {
+			err := os.Mkdir(tfcreq.DownloadDir, 0o755)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = tfcclient.downloadFile(ctx, tfcreq.DownloadDir, filename, url)
+		if err != nil {
+			return err
+		}
+
+		downloadedfile := filepath.Join(tfcreq.DownloadDir, filename)
+		downloadedsha, err := a.SHA256Sum(downloadedfile)
+		if err != nil {
+			return err
+		}
+
+		if downloadedsha != filesha {
+			return fmt.Errorf("download failed: unxpected SHA 256 sum: expected (%s) received (%s)", filesha, downloadedsha)
+		}
+	}
+	return err
+}
+
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads
 // it. This way we can merge new builds with those in existing remote mirror.
 func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
