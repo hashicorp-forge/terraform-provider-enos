@@ -38,6 +38,21 @@ type TFCDownloadReq struct {
 	TFCToken        string
 }
 
+// TFCPromoteReq is a collection of provider promote request
+type TFCPromoteReq struct {
+	ProviderVersion  string
+	DownloadsDir     string
+	PromoteDir       string
+	SrcProviderName  string
+	DestProviderName string
+	SrcBinaryName    string
+	DestBinaryName   string
+	GPGKeyID         string
+	GPGIdentityName  string
+	TFCOrg           string
+	TFCToken         string
+}
+
 // TFCClient is a collection of http client request params
 type TFCClient struct {
 	token   string
@@ -967,11 +982,11 @@ func (c *TFCClient) CreateProviderPlatforms(
 }
 
 // uploadFile uploads a file to the URL
-func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadurl string) error {
+func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadURL string) error {
 	c.log.Infow(
 		"uploading file",
 		"file path", path,
-		"upload URL", uploadurl,
+		"upload URL", uploadURL,
 	)
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -984,7 +999,7 @@ func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadurl strin
 	}
 	defer f.Close()
 
-	u, err := url.Parse(uploadurl)
+	u, err := url.Parse(uploadURL)
 	if err != nil {
 		return err
 	}
@@ -1007,15 +1022,15 @@ func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadurl strin
 	return nil
 }
 
-// downloadFile downloads a file to the URL
-func (c *TFCClient) downloadFile(ctx context.Context, downloaddir string, filename string, downloadurl string) error {
+// downloadFile downloads a file from the URL
+func (c *TFCClient) downloadFile(ctx context.Context, downloadDir string, filename string, downloadURL string) error {
 	c.log.Infow(
 		"downloading file",
-		"download URL", downloadurl,
-		"download dir", downloaddir,
+		"download URL", downloadURL,
+		"download dir", downloadDir,
 	)
 
-	u, err := url.Parse(downloadurl)
+	u, err := url.Parse(downloadURL)
 	if err != nil {
 		return err
 	}
@@ -1037,17 +1052,17 @@ func (c *TFCClient) downloadFile(ctx context.Context, downloaddir string, filena
 		return newTFCAPIError("downloading file", withErrTFCAPIResponse(resp))
 	}
 
-	filepath := filepath.Join(downloaddir, filename)
+	filePath := filepath.Join(downloadDir, filename)
 
 	// Create the file
-	resfile, err := os.Create(filepath)
+	resFile, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
-	defer resfile.Close()
+	defer resFile.Close()
 
 	// Write the body to file
-	_, err = io.Copy(resfile, resp.Body)
+	_, err = io.Copy(resFile, resp.Body)
 	if err != nil {
 		return err
 	}

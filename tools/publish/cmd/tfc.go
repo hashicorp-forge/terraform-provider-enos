@@ -12,6 +12,7 @@ func newTFCCmd() *cobra.Command {
 
 	tfcCmd.AddCommand(newTFCUploadCmd())
 	tfcCmd.AddCommand(newTFCDownloadCmd())
+	tfcCmd.AddCommand(newTFCPromoteCmd())
 
 	return tfcCmd
 }

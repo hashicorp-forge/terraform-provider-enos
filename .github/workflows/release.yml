@@ -41,12 +41,11 @@ jobs:
         run: go run ./tools/publish/cmd s3 upload --dist ./dist --bucket enos-provider-current
       - name: Import GPG key
         id: import_gpg
-        uses: hashicorp/ghaction-import-gpg@v2.1.0
+        # switching to upstream action as suggested in https://github.com/hashicorp/ghaction-import-gpg/issues/11#issuecomment-1185107410
+        uses: crazy-max/ghaction-import-gpg@v5
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIV_SIGNING_KEY }}
           PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          GPG_TTY: $(tty)
-          SSH_AUTH_SOCK: "$(gpgconf --list-dirs agent-ssh-socket)"
       - name: Upload to TFC private registry
         id: tfcupload
         run: |

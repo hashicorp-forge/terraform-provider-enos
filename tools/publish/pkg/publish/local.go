@@ -159,6 +159,13 @@ func (l *Local) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) err
 	return l.artifacts.DownloadFromTFC(ctx, tfcreq)
 }
 
+// ExtractProviderBinaries extracts the artifacts to an output directory
+func (l *Local) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCPromoteReq) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.artifacts.ExtractProviderBinaries(ctx, tfcreq)
+}
+
 // AddGoreleaserBinariesFrom takes a directory path to the goreleaser builds,
 // walks it, finds any providers binaries, creates an archive of them and
 // adds them to the artifacts and index.

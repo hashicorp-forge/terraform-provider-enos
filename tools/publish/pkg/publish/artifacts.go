@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -319,7 +321,7 @@ func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) erro
 	return err
 }
 
-// DownloadFromTFC downloads the artifacts for a given version to a direcotry
+// DownloadFromTFC downloads the artifacts for a given version to a directory
 func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -329,6 +331,16 @@ func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq)
 	)
 
 	tfcclient, err := NewTFCClient(WithTFCToken(tfcreq.TFCToken), WithTFCOrg(tfcreq.TFCOrg), WithTFCLog(a.log))
+	if err != nil {
+		return err
+	}
+
+	// Empty the Downloads directory if it already exists
+	downloadir, err := filepath.Abs(tfcreq.DownloadDir)
+	if err != nil {
+		return err
+	}
+	os.RemoveAll(downloadir)
 	if err != nil {
 		return err
 	}
@@ -346,9 +358,13 @@ func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq)
 		filename := platforms[i].Filename
 		url := platforms[i].PlatformBinaryURL
 
-		if _, err := os.Stat(tfcreq.DownloadDir); os.IsNotExist(err) {
-			err := os.Mkdir(tfcreq.DownloadDir, 0o755)
-			if err != nil {
+		if _, err := os.Stat(tfcreq.DownloadDir); err != nil {
+			if os.IsNotExist(err) {
+				err := os.Mkdir(tfcreq.DownloadDir, 0o755)
+				if err != nil {
+					return err
+				}
+			} else {
 				return err
 			}
 		}
@@ -369,6 +385,116 @@ func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq)
 		}
 	}
 	return err
+}
+
+// ExtractProviderBinaries extracts the downloaded artifacts to an output directory
+func (a *Artifacts) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCPromoteReq) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Infow(
+		"extracting TFC private provider binaries",
+	)
+
+	archivePath, err := filepath.Abs(tfcreq.DownloadsDir)
+	if err != nil {
+		return err
+	}
+
+	promotePath, err := filepath.Abs(tfcreq.PromoteDir)
+	if err != nil {
+		return err
+	}
+
+	archivefiles, err := ioutil.ReadDir(archivePath)
+	if err != nil {
+		return err
+	}
+
+	// Empty the contents of promote direcotry if it exists
+	os.RemoveAll(promotePath)
+	if err != nil {
+		return err
+	}
+
+	// Read the zip files from source directory
+	for _, file := range archivefiles {
+		parts := strings.Split(file.Name(), "_")
+		if len(parts) != 4 {
+			return fmt.Errorf("source binaries unexpected format %s", file.Name())
+		}
+		binname := parts[0]
+		version := parts[1]
+		platform := parts[2]
+		arch := strings.Trim(parts[3], ".zip")
+
+		if parts[0] != tfcreq.SrcBinaryName {
+			return fmt.Errorf("source binaries expected name %s, but found %s ", tfcreq.SrcBinaryName, binname)
+		}
+
+		sourcefile := filepath.Join(tfcreq.DownloadsDir, file.Name())
+		sourcefilepath, err := filepath.Abs(sourcefile)
+		if err != nil {
+			return err
+		}
+
+		// Open the zip file
+		reader, err := zip.OpenReader(sourcefilepath)
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+
+		// Create the destination path to extract files
+		destFilename := fmt.Sprintf("%s_%s", binname, version)
+		destDir := filepath.Join(promotePath, fmt.Sprintf("%s_%s_%s", binname, platform, arch))
+		if _, err := os.Stat(destDir); err != nil {
+			if os.IsNotExist(err) {
+				err := os.MkdirAll(destDir, 0o755)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+		destFile := filepath.Join(destDir, destFilename)
+		destFilePath, err := filepath.Abs(destFile)
+		if err != nil {
+			return err
+		}
+
+		// Iterate over zip files inside the archive and unzip each of them
+		for _, f := range reader.File {
+			err := unzipArtifact(f, destFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to unzip archive file: [%s] to destination: [%s], due to: %w", f.Name, destFilePath, err)
+			}
+		}
+	}
+	return nil
+}
+
+// unzipArtifact unzips a source file to destination
+func unzipArtifact(f *zip.File, destination string) error {
+	// Create a destination file for unzipped content
+	destinationFile, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
+
+	// Unzip the content of a file and copy it to the destination file
+	zippedFile, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer zippedFile.Close()
+
+	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
+		return err
+	}
+	return nil
 }
 
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads

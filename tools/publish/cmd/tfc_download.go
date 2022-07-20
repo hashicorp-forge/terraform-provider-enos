@@ -18,7 +18,7 @@ func newTFCDownloadCmd() *cobra.Command {
 		Run:   runTFCDownloadCmd,
 	}
 
-	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.DownloadDir, "download-dir", "", "the directory where the artifacts are downloaded")
+	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.DownloadDir, "download-dir", "enos-downloads", "the directory where the artifacts are downloaded")
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.ProviderName, "provider-name", "enosdev", "the name of the provider")
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.ProviderVersion, "provider-version", "", "the version of the provider binaries")
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.BinaryName, "binary-name", "terraform-provider-enosdev", "the name of the provider binary")
