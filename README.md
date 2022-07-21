@@ -45,9 +45,13 @@ A terraform provider for quality infrastructure
     - [Validate](#validate)
     - [Release](#release)
     - [Test Current Release](#test-current-release)
+    - [Test TFC Upload](#test-tfc-upload)
+    - [Promote Enos Provider in TFC](#promote-enos-provider-in-tfc)
     - [Promote](#promote)
   - [Artifact publishing to `enos-provider-current` S3 bucket](#artifact-publishing-to-enos-provider-current-s3-bucket)
   - [Artifact publishing to `enos-provider-stable` S3 bucket](#artifact-publishing-to-enos-provider-stable-s3-bucket)
+  - [Artifact publishing to `enosdev` private provider registry in TFC](#artifact-publishing-to-enosdev-private-provider-registry-in-tfc)
+  - [Artifact publishing to `enos` private provider registry in TFC](#artifact-publishing-to-enos-private-provider-registry-in-tfc)
 
 # Example
 
@@ -959,23 +963,35 @@ This repo currently runs the following workflows:
 `Validate` workflow runs Go Lint, Build, Terraform, Unit, and Acceptance tests on each PR.
 
 ### Release
-`Release` workflow is run on merge to `main` when `VERSION` is updated. This workflow publishes the Enos-provider
-artifacts to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account.
+`Release` workflow is run on merge to `main` when `VERSION` is updated. This workflow publishes the Enos-provider artifacts to:
+  - `enos-provider-current` bucket in `quality_team_enos_ci` AWS account
+  - `enosdev` private provider registry in `hashicorp-qti` org in TFC
+
 You can also manually trigger the Release workflow from the GitHub Actions menu in this repo.
 
 ### Test Current Release
 `Test Current Release` workflow is run only on successful completion of `Release` workflow.  This workflow installs and
 tests the latest Enos-provider artifact published to `enos-provider-current` bucket.
 
+### Test TFC Upload
+`Test TFC Upload` workflow is run only on successful completion of `Release` workflow.  This workflow calls the reusable workflow `Test TFC Artifact` which installs and tests the latest Enos provider artifact installed from `enosdev` private provider registry of `hashicorp-qti` org in TFC.
+
 ### Promote
 `Promote` workflow can only be triggered manually from the GitHub Actions menu in this repo.  It requires the Provider
 version to be promoted as input. This workflow installs and tests the given provider version from `enos-provider-current`
 S3 bucket and publishes it to `enos-provider-stable` bucket after successful completion of the integration tests.
 
+### Promote Enos Provider in TFC
+`Promote Enos Provider in TFC` workflow can only be triggered manually from the GitHub Actions menu in this repo.  It requires the Provider version to be promoted as input. This workflow calls the reusable workflow `Test TFC Artifact` which installs and tests the given provider version from `enosdev` private provider registry of `hashicorp-qti` org and publishes it to `enos` private provider registry of `hashicorp-qti` org in Terraform Cloud. This workflow also tests the promoted artifact using the reusable workflow `Test TFC Artifact` by installing the promoted provider version from `enos` private provider registry of `hashicorp-qti` org in TFC.
+
+## Artifact publishing to `enosdev` private provider registry in TFC
+The Enos-provider artifacts are built and published to `enosdev` private provider registry of `hashicorp-qti` org in TFC by the `Release` workflow.  This workflow uses the `tfc upload` [command](./tools/publish/README.md#tfc-upload-command)
+
+## Artifact publishing to `enos` private provider registry in TFC
+The Enos-provider artifacts are published to `enos` private provider registry of `hashicorp-qti` org in TFC by the `Promote Enos Provider in TFC` workflow.  This workflow uses the `tfc promote` [command](./tools/publish/README.md#tfc-promote-command) which downloads, renames, and publishes the tested `enosdev` registry artifacts to `enos` private provider registry.
+
 ## Artifact publishing to `enos-provider-current` S3 bucket
-The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account
-by the `Release` workflow.
+The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account by the `Release` workflow.
 
 ## Artifact publishing to `enos-provider-stable` S3 bucket
-The Enos-provider artifacts are built and published to `enos-provider-stable` bucket in `quality_team_enos_ci` AWS account
-by the `Promote` workflow.
+The Enos-provider artifacts are built and published to `enos-provider-stable` bucket in `quality_team_enos_ci` AWS account by the `Promote` workflow.

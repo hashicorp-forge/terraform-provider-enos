@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -340,7 +339,7 @@ func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq)
 	if err != nil {
 		return err
 	}
-	os.RemoveAll(downloadir)
+	err = os.RemoveAll(downloadir)
 	if err != nil {
 		return err
 	}
@@ -406,13 +405,13 @@ func (a *Artifacts) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCProm
 		return err
 	}
 
-	archivefiles, err := ioutil.ReadDir(archivePath)
+	archivefiles, err := os.ReadDir(archivePath)
 	if err != nil {
 		return err
 	}
 
 	// Empty the contents of promote direcotry if it exists
-	os.RemoveAll(promotePath)
+	err = os.RemoveAll(promotePath)
 	if err != nil {
 		return err
 	}

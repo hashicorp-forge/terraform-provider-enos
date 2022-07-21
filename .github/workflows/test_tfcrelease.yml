@@ -1,0 +1,25 @@
+---
+name: Test TFC Upload
+
+on:
+  # Allow this pipeline to be triggered manually from GH Actions menu
+  workflow_dispatch:
+  # This workflow runs only when Enos-Provider is successfully
+  # uploaded to TFC private registry
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  call-test-tfcartifact:
+    name: "Install and Test TFC Artifact"
+    uses: ./.github/workflows/test_tfcartifact.yml
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    with:
+      enos_provider_name: enosdev
+      enos_provider_version: $(cat ./VERSION)
+    # Use the inherit keyword to pass all the calling workflow's secrets to the called workflow.
+    # This includes all secrets the calling workflow has access to, namely organization,
+    # repository, and environment secrets.
+    secrets: inherit

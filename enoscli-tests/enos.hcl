@@ -6,7 +6,7 @@ variable "tags" {
 
 terraform_cli "default" {
   credentials "app.terraform.io" {
-    token = "TFC_API_TOKEN"
+    token = var.tfc_api_token
   }
 }
 
@@ -15,8 +15,8 @@ terraform "default" {
 
   required_providers {
     enos = {
-      source  = "app.terraform.io/hashicorp-qti/enosdev"
-      version = "ENOS_VER"
+      source  = joinpath("app.terraform.io/hashicorp-qti", var.enos_provider_name)
+      version = var.enos_provider_version
     }
 
     aws = {

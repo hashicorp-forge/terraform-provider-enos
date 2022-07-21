@@ -1,21 +1,20 @@
 ---
-name: Test TFC Upload
+name: Test TFC Artifact
 
 on:
-  # Allow this pipeline to be triggered manually from GH Actions menu
-  workflow_dispatch:
-  # This workflow runs only when Enos-Provider is successfully
-  # uploaded to TFC private registry
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-    branches: [main]
+  workflow_call:
+    inputs:
+      enos-provider-name:
+        required: true
+        type: string
+      enos-provider-version:
+        required: true
+        type: string
 
 jobs:
-  test-tfc-upload:
+  test-tfc-artifact:
     name: "Install and Test TFC Artifact"
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -23,7 +22,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
-          fetch-depth: 0                # fetch the whole repo history
       - name: Configure AWS credentials from Test account
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -53,27 +51,27 @@ jobs:
         run: |
           echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./enoscli-tests/enos-ci-ssh-keypair.pem
           chmod 600 ./enoscli-tests/enos-ci-ssh-keypair.pem
-      - name: Configure TFC token in Enos
+      - name: "Update Provider Name for Backend module"
         run: |
-          export TFC_API_TOKEN="${{ secrets.TF_API_TOKEN }}"
-          sed "s/TFC_API_TOKEN/$TFC_API_TOKEN/g" enos.hcl > enos.hcl.upt
-          mv enos.hcl.upt enos.hcl
-        working-directory: ./enoscli-tests
-      - name: "Update Provider Version"
+          export ENOS_PROVIDER_NAME={{ inputs.enos_provider_name }}
+          sed "s/ENOS_PROVIDER_NAME/$ENOS_PROVIDER_NAME/g" main.tf > main.tf.upt
+          mv main.tf.upt main.tf
+        working-directory: cd ./enoscli-tests/modules/backend_consul
+      - name: "Update Provider Name for Vault module"
         run: |
-          export ENOS_VERSION=$(cat ../VERSION)
-          sed "s/ENOS_VER/$ENOS_VERSION/g" enos.hcl > enos.hcl.upt
-          mv enos.hcl.upt enos.hcl
-        working-directory: ./enoscli-tests
+          export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
+          sed "s/ENOS_PROVIDER_NAME/$ENOS_PROVIDER_NAME/g" main.tf > main.tf.upt
+          mv main.tf.upt main.tf
+        working-directory: ./enoscli-tests/modules/vault_cluster
       - name: "Update Provider Version Backend module"
         run: |
-          export ENOS_VERSION=$(cat ../../../VERSION)
+          export ENOS_VERSION={{ inputs.enos_provider_version }}
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/backend_consul
       - name: "Update Provider Version Vault module"
         run: |
-          export ENOS_VERSION=$(cat ../../../VERSION)
+          export ENOS_VERSION=${{ inputs.enos_provider_version }}
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/vault_cluster
@@ -85,5 +83,24 @@ jobs:
         working-directory: ./enoscli-tests
       - name: "Run Enos Scenario Run with Consul backend"
         id: enosrun
+        env:
+          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
+          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario run vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
         working-directory: ./enoscli-tests
+      - name: "Run Enos Scenario destroy"
+        id: enosdestroy
+        if: ${{ always() }}
+        env:
+          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
+          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
+        run: enos scenario destroy vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
+        working-directory: ./enoscli-tests
+      - name: K8S tests
+        id: enoscli-k8s
+        env:
+          TFC_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ENOS_RELEASE_NAME: ${{ inputs.enos_provider_name }}
+        run: make test-k8s
