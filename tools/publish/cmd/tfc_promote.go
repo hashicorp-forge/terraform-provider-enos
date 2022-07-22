@@ -27,7 +27,7 @@ func newTFCPromoteCmd() *cobra.Command {
 	tfcPromoteCmd.PersistentFlags().StringVar(&tfcPromoteCfg.GPGKeyID, "gpg-key-id", "5D67D7B072C16294", "the GPG Signing Key")
 	tfcPromoteCmd.PersistentFlags().StringVar(&tfcPromoteCfg.GPGIdentityName, "gpg-identity-name", "team-secure-quality@hashicorp.com", "the GPG identity name, should be an email address")
 	tfcPromoteCmd.PersistentFlags().StringVar(&tfcPromoteCfg.TFCOrg, "org", "hashicorp-qti", "the name of the TFC org")
-	tfcPromoteCmd.PersistentFlags().StringVar(&tfcPromoteCfg.TFCToken, "token", "", "the TFC token for the org")
+	tfcPromoteCmd.PersistentFlags().StringVar(&tfcPromoteCfg.TFCToken, "token", "", "the TFC token with publish permissions for the org")
 
 	_ = tfcPromoteCmd.MarkFlagRequired("provider-version")
 	_ = tfcPromoteCmd.MarkFlagRequired("downloads-dir")

@@ -12,13 +12,29 @@ on:
     branches: [main]
 
 jobs:
+  get-enos-version:
+    name: "Get Enos version"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      enos-version: ${{ steps.get-version.outputs.enos-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}   # checkout the correct branch name
+          fetch-depth: 0                # fetch the whole repo history
+      - name: Enos version
+        id: get-version
+        run: |
+          echo "::set-output name=enos-version::$(cat ./VERSION)"
   call-test-tfcartifact:
     name: "Install and Test TFC Artifact"
+    needs: get-enos-version
     uses: ./.github/workflows/test_tfcartifact.yml
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     with:
       enos_provider_name: enosdev
-      enos_provider_version: $(cat ./VERSION)
+      enos_provider_version: ${{ needs.get-enos-version.outputs.enos-version }}
     # Use the inherit keyword to pass all the calling workflow's secrets to the called workflow.
     # This includes all secrets the calling workflow has access to, namely organization,
     # repository, and environment secrets.

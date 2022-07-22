@@ -23,7 +23,7 @@ func newTFCDownloadCmd() *cobra.Command {
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.ProviderVersion, "provider-version", "", "the version of the provider binaries")
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.BinaryName, "binary-name", "terraform-provider-enosdev", "the name of the provider binary")
 	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.TFCOrg, "org", "hashicorp-qti", "the name of the TFC org")
-	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.TFCToken, "token", "", "the TFC token for the org")
+	tfcDownloadCmd.PersistentFlags().StringVar(&tfcDownloadCfg.TFCToken, "token", "", "the TFC token with publish permissions for the org")
 
 	_ = tfcDownloadCmd.MarkFlagRequired("download-dir")
 	_ = tfcDownloadCmd.MarkFlagRequired("provider-name")

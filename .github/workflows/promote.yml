@@ -88,7 +88,7 @@ jobs:
     name: "Enos - E2E tests"
     runs-on: ubuntu-latest
     env:
-      TFC_API_TOKEN: ${{ secrets.TFC_TOKEN }}
+      TFC_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
       ENOS_RELEASE_NAME: enosdev
     steps:
       - name: Checkout

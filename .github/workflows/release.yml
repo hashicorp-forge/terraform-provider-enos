@@ -50,6 +50,6 @@ jobs:
         id: tfcupload
         run: |
           gpg --list-signatures
-          go run ./tools/publish/cmd tfc upload --rename-binary "terraform-provider-enosdev" --provider-name "enosdev" --token "$TFC_TOKEN"
+          go run ./tools/publish/cmd tfc upload --rename-binary "terraform-provider-enosdev" --provider-name "enosdev" --token "$TFC_PUBLISH_TOKEN"
         env:
-          TFC_TOKEN: ${{ secrets.TFC_TOKEN }}
+          TFC_PUBLISH_TOKEN: ${{ secrets.TFC_PUBLISH_TOKEN }}

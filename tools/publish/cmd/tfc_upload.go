@@ -25,7 +25,7 @@ func newTFCUploadCmd() *cobra.Command {
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.GPGKeyID, "gpg-key-id", "5D67D7B072C16294", "the GPG Signing Key")
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.GPGIdentityName, "gpg-identity-name", "team-secure-quality@hashicorp.com", "the GPG identity name, should be an email address")
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.TFCOrg, "org", "hashicorp-qti", "the name of the TFC org")
-	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.TFCToken, "token", "", "the TFC token for the org")
+	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.TFCToken, "token", "", "the TFC token with publish permissions for the org")
 
 	_ = tfcUploadCmd.MarkFlagRequired("dist")
 	_ = tfcUploadCmd.MarkFlagRequired("provider-name")

@@ -49,9 +49,9 @@ jobs:
         id: tfcpromote
         run: |
           gpg --list-signatures
-          go run ./tools/publish/cmd tfc promote --provider-version $ENOS_VERSION --token $TFC_TOKEN
+          go run ./tools/publish/cmd tfc promote --provider-version $ENOS_VERSION --token $TFC_PUBLISH_TOKEN
         env:
-          TFC_TOKEN: ${{ secrets.TFC_TOKEN }}
+          TFC_PUBLISH_TOKEN: ${{ secrets.TFC_PUBLISH_TOKEN }}
           ENOS_VERSION: ${{ github.event.inputs.version }}
 
   call-test-promoted-tfcartifact:

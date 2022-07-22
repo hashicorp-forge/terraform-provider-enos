@@ -4,10 +4,10 @@ name: Test TFC Artifact
 on:
   workflow_call:
     inputs:
-      enos-provider-name:
+      enos_provider_name:
         required: true
         type: string
-      enos-provider-version:
+      enos_provider_version:
         required: true
         type: string
 
@@ -53,10 +53,10 @@ jobs:
           chmod 600 ./enoscli-tests/enos-ci-ssh-keypair.pem
       - name: "Update Provider Name for Backend module"
         run: |
-          export ENOS_PROVIDER_NAME={{ inputs.enos_provider_name }}
+          export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
           sed "s/ENOS_PROVIDER_NAME/$ENOS_PROVIDER_NAME/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
-        working-directory: cd ./enoscli-tests/modules/backend_consul
+        working-directory: ./enoscli-tests/modules/backend_consul
       - name: "Update Provider Name for Vault module"
         run: |
           export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
@@ -65,7 +65,7 @@ jobs:
         working-directory: ./enoscli-tests/modules/vault_cluster
       - name: "Update Provider Version Backend module"
         run: |
-          export ENOS_VERSION={{ inputs.enos_provider_version }}
+          export ENOS_VERSION=${{ inputs.enos_provider_version }}
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/backend_consul
@@ -79,6 +79,10 @@ jobs:
         run: enos version
       - name: "Run Enos Scenario List"
         id: enoslist
+        env:
+          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
+          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario list
         working-directory: ./enoscli-tests
       - name: "Run Enos Scenario Run with Consul backend"
@@ -101,6 +105,9 @@ jobs:
       - name: K8S tests
         id: enoscli-k8s
         env:
+          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
+          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
           TFC_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           ENOS_RELEASE_NAME: ${{ inputs.enos_provider_name }}
         run: make test-k8s
