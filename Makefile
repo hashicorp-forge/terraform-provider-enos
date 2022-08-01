@@ -10,7 +10,10 @@ GLOBAL_BUILD_TAGS=-tags osusergo,netgo
 GLOBAL_LD_FLAGS=-ldflags="-extldflags=-static"
 FLIGHTCONTROL_LD_FLAGS=-ldflags="-extldflags=-static -s -w"
 CI?=false
-GO_RELEASER_DOCKER_TAG=latest
+# Under no circumstances should you use a newer version.
+# https://github.com/goreleaser/goreleaser/pull/3213 broke our multiple build
+# logic, thus it creates binaries without flight-control embedded.
+GO_RELEASER_DOCKER_TAG=v1.9.2
 HASUPX:= $(shell upx dot 2> /dev/null)
 TEST_BLD_DIR=./test-build
 ENOS_CLI_TEST_DIR=$(TEST_BLD_DIR)/enoscli-tests
