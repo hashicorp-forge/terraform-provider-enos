@@ -100,6 +100,10 @@ jobs:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - name: K8S tests
         id: enoscli-k8s
+        env:
+          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+          TFC_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ENOS_RELEASE_NAME: enosdev
         run: make test-k8s-dev
 
   promote:
