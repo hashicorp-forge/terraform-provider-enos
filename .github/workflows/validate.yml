@@ -128,8 +128,8 @@ jobs:
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./ci-tests/enos-ci-ssh-keypair.pem
-          chmod 600 ./ci-tests/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./ci-tests/enos-ci-ssh-key.pem
+          chmod 600 ./ci-tests/enos-ci-ssh-key.pem
       - name: Terraform Init
         id: init
         run: terraform init -backend-config=backend.hcl
@@ -170,7 +170,7 @@ jobs:
       ARTIFACTORY_PRODUCT_VERSION: "1.7.0"
       ARTIFACTORY_REVISION: "f45845666b4e552bfc8ca775834a3ef6fc097fe0"
       ENOS_TRANSPORT_USER: "ubuntu"
-      ENOS_TRANSPORT_PRIVATE_KEY_PATH: "./enos-ci-ssh-keypair.pem"
+      ENOS_TRANSPORT_PRIVATE_KEY_PATH: "./enos-ci-ssh-key.pem"
     steps:
       - name: Configure AWS credentials from Test account
         uses: aws-actions/configure-aws-credentials@v1
@@ -186,10 +186,10 @@ jobs:
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./internal/plugin/enos-ci-ssh-keypair.pem
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./internal/transport/ssh/enos-ci-ssh-keypair.pem
-          chmod 600 ./internal/plugin/enos-ci-ssh-keypair.pem
-          chmod 600 ./internal/transport/ssh/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
+          chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
+          chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
@@ -233,8 +233,8 @@ jobs:
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./ci-tests/enos-ci-ssh-keypair.pem
-          chmod 600 ./ci-tests/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./ci-tests/enos-ci-ssh-key.pem
+          chmod 600 ./ci-tests/enos-ci-ssh-key.pem
       - name: Terraform Init
         id: init
         run: terraform init -backend-config=backend.hcl

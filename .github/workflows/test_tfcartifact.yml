@@ -49,8 +49,8 @@ jobs:
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./enoscli-tests/enos-ci-ssh-keypair.pem
-          chmod 600 ./enoscli-tests/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enoscli-tests/enos-ci-ssh-key.pem
+          chmod 600 ./enoscli-tests/enos-ci-ssh-key.pem
       - name: "Update Provider Name for Backend module"
         run: |
           export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}

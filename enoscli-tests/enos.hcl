@@ -33,7 +33,7 @@ provider "enos" "ubuntu" {
   transport = {
     ssh = {
       user             = "ubuntu"
-      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-keypair.pem"))
+      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-key.pem"))
     }
   }
 }
@@ -42,7 +42,7 @@ provider "enos" "rhel" {
   transport = {
     ssh = {
       user             = "ec2_user"
-      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-keypair.pem"))
+      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-key.pem"))
     }
   }
 }
@@ -65,7 +65,7 @@ module "backend_consul" {
   project_name    = "qti-enos-provider"
   environment     = "ci"
   common_tags     = var.tags
-  ssh_aws_keypair = "enos-ci-ssh-keypair"
+  ssh_aws_keypair = "enos-ci-ssh-key"
 
   consul_license = "none"
 }
@@ -76,7 +76,7 @@ module "vault_cluster" {
   project_name    = "qti-enos-provider"
   environment     = "ci"
   common_tags     = var.tags
-  ssh_aws_keypair = "enos-ci-ssh-keypair"
+  ssh_aws_keypair = "enos-ci-ssh-key"
 }
 
 module "license" {

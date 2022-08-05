@@ -22,7 +22,7 @@ provider "enos" {
   transport = {
     ssh = {
       user             = "ubuntu"
-      private_key_path = "./enos-ci-ssh-keypair.pem"
+      private_key_path = "./enos-ci-ssh-key.pem"
     }
   }
 }
@@ -51,7 +51,7 @@ module "consul_cluster" {
     "Project Name" : "qti-enos-provider",
     "Environment" : "ci"
   }
-  ssh_aws_keypair = "enos-ci-ssh-keypair"
+  ssh_aws_keypair = "enos-ci-ssh-key"
   ami_id          = module.enos_infra.ami_ids["ubuntu"]["amd64"]
   vpc_id          = module.enos_infra.vpc_id
   kms_key_arn     = module.enos_infra.kms_key_arn
@@ -72,7 +72,7 @@ module "vault_cluster" {
     "Project Name" : "qti-enos-provider",
     "Environment" : "ci"
   }
-  ssh_aws_keypair    = "enos-ci-ssh-keypair"
+  ssh_aws_keypair    = "enos-ci-ssh-key"
   ami_id             = module.enos_infra.ami_ids["ubuntu"]["amd64"]
   vpc_id             = module.enos_infra.vpc_id
   kms_key_arn        = module.enos_infra.kms_key_arn

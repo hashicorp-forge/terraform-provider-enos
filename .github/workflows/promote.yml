@@ -49,8 +49,8 @@ jobs:
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEYPAIR }}" > ./cd-tests/enos-ci-ssh-keypair.pem
-          chmod 600 ./cd-tests/enos-ci-ssh-keypair.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./cd-tests/enos-ci-ssh-key.pem
+          chmod 600 ./cd-tests/enos-ci-ssh-key.pem
       - name: "Update Provider Version"
         run: |
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt

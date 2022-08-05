@@ -27,7 +27,7 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "remotehost" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t3.micro"
-  key_name      = "enos-ci-ssh-keypair"
+  key_name      = "enos-ci-ssh-key"
 
   tags = {
     Name = "enos_provider_remote_host"
