@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/docker"
 	"github.com/hashicorp/enos-provider/internal/kind"
 	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
@@ -14,15 +16,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+type kindClientFactory func(logger log.Logger) kind.Client
+
+var defaultClientFactory = func(logger log.Logger) kind.Client { return kind.NewLocalClient(logger) }
+
 type localKindLoadImage struct {
 	providerConfig *config
 	mu             sync.Mutex
+	clientFactory  kindClientFactory
 }
 
 func newLocalKindLoadImage() *localKindLoadImage {
 	return &localKindLoadImage{
 		providerConfig: newProviderConfig(),
 		mu:             sync.Mutex{},
+		clientFactory:  defaultClientFactory,
 	}
 }
 
@@ -33,6 +41,7 @@ type localKindLoadImageStateV1 struct {
 	ClusterName  *tfString
 	Image        *tfString
 	Tag          *tfString
+	Archive      *tfString
 	LoadedImages *loadedImagesStateV1
 }
 
@@ -44,21 +53,24 @@ func newLocalKindLoadImageStateV1() *localKindLoadImageStateV1 {
 		ClusterName:  newTfString(),
 		Image:        newTfString(),
 		Tag:          newTfString(),
+		Archive:      newTfString(),
 		LoadedImages: newLoadedImagesStateV1(),
 	}
 }
 
 type loadedImagesStateV1 struct {
-	Image *tfString
-	Nodes *tfStringSlice
+	Repository *tfString
+	Tag        *tfString
+	Nodes      *tfStringSlice
 }
 
 var _ Serializable = (*loadedImagesStateV1)(nil)
 
 func newLoadedImagesStateV1() *loadedImagesStateV1 {
 	return &loadedImagesStateV1{
-		Image: newTfString(),
-		Nodes: newTfStringSlice(),
+		Repository: newTfString(),
+		Tag:        newTfString(),
+		Nodes:      newTfStringSlice(),
 	}
 }
 
@@ -85,7 +97,9 @@ func (k *localKindLoadImage) GetProviderConfig() (*config, error) {
 }
 
 func (k *localKindLoadImage) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
-	transportUtil.ValidateResourceConfig(ctx, newLocalKindLoadImageStateV1(), req, res)
+	state := newLocalKindLoadImageStateV1()
+
+	transportUtil.ValidateResourceConfig(ctx, state, req, res)
 }
 
 func (k *localKindLoadImage) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
@@ -93,6 +107,13 @@ func (k *localKindLoadImage) UpgradeResourceState(ctx context.Context, req tfpro
 }
 
 func (k *localKindLoadImage) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
+	select {
+	case <-ctx.Done():
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return
+	default:
+	}
+
 	newState := newLocalKindLoadImageStateV1()
 
 	err := unmarshal(newState, req.CurrentState)
@@ -136,7 +157,8 @@ func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req tfproto
 
 	if _, ok := priorState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
-		proposedState.LoadedImages.Image.Unknown = true
+		proposedState.LoadedImages.Repository.Unknown = true
+		proposedState.LoadedImages.Tag.Unknown = true
 		proposedState.LoadedImages.Nodes.Unknown = true
 	}
 
@@ -149,6 +171,9 @@ func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req tfproto
 		}),
 		tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
 			tftypes.AttributeName("tag"),
+		}),
+		tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
+			tftypes.AttributeName("archive"),
 		}),
 	}
 
@@ -173,8 +198,9 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 	logger := log.NewLogger(ctx).WithValues(map[string]interface{}{
 		"id":      plannedState.ID.Value(),
 		"cluster": plannedState.ClusterName.Value(),
-		"infos":   plannedState.Image.Value(),
+		"image":   plannedState.Image.Value(),
 		"tag":     plannedState.Tag.Value(),
+		"archive": plannedState.Archive.Value(),
 	})
 
 	err = unmarshal(priorState, req.PriorState)
@@ -191,21 +217,71 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 	case isCreate:
 		logger.Debug("Loading image into kind cluster")
 
-		client := kind.NewLocalClient(logger)
-		loadImageRequest := kind.LoadImageRequest{
-			ClusterName: plannedState.ClusterName.Value(),
-			ImageName:   plannedState.Image.Value(),
-			Tag:         plannedState.Tag.Value(),
-		}
-		infos, err := client.LoadImage(loadImageRequest)
-		if err != nil {
+		if err := plannedState.Validate(ctx); err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 			return
 		}
 
-		plannedState.ID.Set(plannedState.ClusterName.Value() + "-" + loadImageRequest.GetImageRef())
-		plannedState.LoadedImages.Image.Set(infos.Image)
-		plannedState.LoadedImages.Nodes.SetStrings(infos.Nodes)
+		client := k.clientFactory(logger)
+
+		var result kind.LoadedImageResult
+		isLoadImageArchive := !plannedState.Archive.Null
+
+		switch {
+		case isLoadImageArchive:
+			result, err = client.LoadImageArchive(kind.LoadImageArchiveRequest{
+				ClusterName:  plannedState.ClusterName.Value(),
+				ImageArchive: plannedState.Archive.Value(),
+			})
+			if err != nil {
+				res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+				return
+			}
+		default:
+			result, err = client.LoadImage(kind.LoadImageRequest{
+				ClusterName: plannedState.ClusterName.Value(),
+				ImageName:   plannedState.Image.Value(),
+				Tag:         plannedState.Tag.Value(),
+			})
+			if err != nil {
+				res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+				return
+			}
+		}
+
+		var loadedImage *docker.ImageRef
+		for _, info := range result.Images {
+			if info.Repository == plannedState.Image.Value() {
+				for _, tagInfo := range info.Tags {
+					if tagInfo.Tag == plannedState.Tag.Value() {
+						loadedImage = &docker.ImageRef{
+							Repository: info.Repository,
+							Tag:        tagInfo.Tag,
+						}
+						break
+					}
+				}
+			}
+		}
+
+		if loadedImage == nil {
+			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+				Severity: tfprotov6.DiagnosticSeverityError,
+				Summary:  "Image Load Failed",
+				Detail:   "None of the loaded images match the configured image",
+			})
+			tflog.Error(ctx, "None of the loaded images match the configured image", map[string]interface{}{
+				"image":         plannedState.Image.Value(),
+				"tag":           plannedState.Tag.Value(),
+				"loaded_images": fmt.Sprintf("%#v", result),
+			})
+			return
+		}
+
+		plannedState.ID.Set(plannedState.ClusterName.Value() + "-" + result.ID())
+		plannedState.LoadedImages.Repository.Set(loadedImage.Repository)
+		plannedState.LoadedImages.Tag.Set(loadedImage.Tag)
+		plannedState.LoadedImages.Nodes.SetStrings(result.Nodes)
 
 		if res.NewState, err = marshal(plannedState); err != nil {
 			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
@@ -264,8 +340,14 @@ func (k localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
 				{
 					Name:        "tag",
 					Type:        tftypes.String,
-					Description: "The tag of the docker image to load without the tag, i.e. vault",
+					Description: "The tag of the docker image to load, i.e. 1.10.0",
 					Required:    true,
+				},
+				{
+					Name:        "archive",
+					Type:        tftypes.String,
+					Description: "An archive file to load, i.e. vault-1.10.0.tar",
+					Optional:    true,
 				},
 				{
 					Name:        "loaded_images",
@@ -289,8 +371,9 @@ func (k localKindLoadImageStateV1) Validate(ctx context.Context) error {
 		"cluster_name": k.ClusterName,
 		"image":        k.Image,
 		"tag":          k.Tag,
+		"archive":      k.Archive,
 	} {
-		if val, ok := attrib.Get(); ok && len(val) == 0 {
+		if val, ok := attrib.Get(); ok && len(strings.TrimSpace(val)) == 0 {
 			return newErrWithDiagnostics("Invalid Configuration", fmt.Sprintf("'%s' attribute must contain a non-empty value", name), name)
 		}
 	}
@@ -304,6 +387,7 @@ func (k localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error 
 		"cluster_name":  k.ClusterName,
 		"image":         k.Image,
 		"tag":           k.Tag,
+		"archive":       k.Archive,
 		"loaded_images": k.LoadedImages,
 	})
 	if err != nil {
@@ -318,6 +402,7 @@ func (k localKindLoadImageStateV1) Terraform5Type() tftypes.Type {
 		"cluster_name":  k.ClusterName.TFType(),
 		"image":         k.Image.TFType(),
 		"tag":           k.Tag.TFType(),
+		"archive":       k.Archive.TFType(),
 		"loaded_images": k.LoadedImages.Terraform5Type(),
 	}}
 }
@@ -328,28 +413,32 @@ func (k localKindLoadImageStateV1) Terraform5Value() tftypes.Value {
 		"cluster_name":  k.ClusterName.TFValue(),
 		"image":         k.Image.TFValue(),
 		"tag":           k.Tag.TFValue(),
+		"archive":       k.Archive.TFValue(),
 		"loaded_images": k.LoadedImages.Terraform5Value(),
 	})
 }
 
 func (l *loadedImagesStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"image": l.Image.TFType(),
-		"nodes": l.Nodes.TFType(),
+		"repository": l.Repository.TFType(),
+		"tag":        l.Tag.TFType(),
+		"nodes":      l.Nodes.TFType(),
 	}}
 }
 
 func (l *loadedImagesStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(l.Terraform5Type(), map[string]tftypes.Value{
-		"image": l.Image.TFValue(),
-		"nodes": l.Nodes.TFValue(),
+		"repository": l.Repository.TFValue(),
+		"tag":        l.Tag.TFValue(),
+		"nodes":      l.Nodes.TFValue(),
 	})
 }
 
 func (l *loadedImagesStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"image": l.Image,
-		"nodes": l.Nodes,
+		"repository": l.Repository,
+		"tag":        l.Tag,
+		"nodes":      l.Nodes,
 	})
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "Error", "Failed to convert Terraform Value to loaded images state.", "loaded_images")

@@ -3,10 +3,12 @@ package kind
 import (
 	"encoding/base64"
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,10 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
 	"sigs.k8s.io/kind/pkg/cmd"
+
+	"github.com/hashicorp/enos-provider/internal/random"
+
+	"github.com/hashicorp/enos-provider/internal/docker"
 
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
 
@@ -28,11 +34,15 @@ var EmptyClusterInfo = ClusterInfo{}
 
 // Client a kind client for managing kind clusters
 type Client interface {
+	// CreateCluster creates a kind cluster and adds the context to the kubeconfig
 	CreateCluster(request CreateKindClusterRequest) (ClusterInfo, error)
+	// DeleteCluster deletes a kind cluster. This will stop the kind cluster and remove the context from
+	// the kubeconfig
 	DeleteCluster(request DeleteKindClusterRequest) error
+	// LoadImageArchive loads a docker image into a kind cluster from an archive file
 	LoadImageArchive(req LoadImageArchiveRequest) (LoadedImageResult, error)
+	// LoadImage loads a docker image into a kind cluster
 	LoadImage(req LoadImageRequest) (LoadedImageResult, error)
-	loadImageArchive(archive string, clusterName string) ([]string, error)
 }
 
 // localClient a kind client for managing local kind clusters
@@ -73,14 +83,29 @@ func (l LoadImageRequest) GetImageRef() string {
 
 // LoadedImageResult info about what cluster nodes an image was loaded on
 type LoadedImageResult struct {
-	// Image i.e. vault:1.10.0
-	Image string
-	// Nodes kind cluster control plane nodes where the image was loaded
+	// Images the images that were loaded. Each image is loaded on each node
+	Images []docker.ImageInfo
+	// Nodes kind cluster control plane nodes where the images were loaded
 	Nodes []string
 }
 
+// ID generates an id, by hashing the loaded image IDs, falls back to a random id if hashing fails
+func (l *LoadedImageResult) ID() string {
+	h := fnv.New32a()
+
+	for _, image := range l.Images {
+		for _, tag := range image.Tags {
+			if _, err := h.Write([]byte(tag.ID)); err != nil {
+				// This should never happen, but just in case
+				return random.ID()
+			}
+		}
+	}
+	return strconv.Itoa(int(h.Sum32()))
+}
+
 type LoadImageArchiveRequest struct {
-	LoadImageRequest
+	ClusterName  string
 	ImageArchive string
 }
 
@@ -184,24 +209,18 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 
 // LoadImageArchive Loads an image archive file into all nodes of a kind cluster as per the request
 func (c *localClient) LoadImageArchive(req LoadImageArchiveRequest) (LoadedImageResult, error) {
-	result := LoadedImageResult{Image: req.GetImageRef()}
-
-	nodes, err := c.loadImageArchive(req.ImageArchive, req.ClusterName)
-	if err != nil {
-		return result, fmt.Errorf("failed to load image archives due to: %w", err)
-	}
-	result.Nodes = nodes
-
-	return result, nil
+	return c.loadImageArchive(req.ImageArchive, req.ClusterName)
 }
 
 // LoadImage Loads an image into all nodes of a kind cluster as per the request
 func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error) {
-	dir, err := ioutil.TempDir(os.TempDir(), req.ClusterName)
-	result := LoadedImageResult{Image: req.GetImageRef()}
+	dir, err := ioutil.TempDir("", req.GetImageRef())
 	if err != nil {
-		return result, fmt.Errorf("failed to create temporary directory for image archive, due to: %w", err)
+		return LoadedImageResult{}, fmt.Errorf("failed to create temporary directory when saving the image to an archive, due to: %w", err)
 	}
+	defer func() {
+		os.RemoveAll(dir)
+	}()
 
 	imageName := req.ImageName
 	tag := req.Tag
@@ -209,45 +228,47 @@ func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 	imageTar := filepath.Join(dir, imageTarName)
 	image := req.GetImageRef()
 
+	// saved the docker image to a tar archive
 	commandArgs := append([]string{"save", "-o", imageTar}, image)
 	if err := exec.Command("docker", commandArgs...).Run(); err != nil {
-		return result, fmt.Errorf("failed to export image: [%s] to archive: [%s], due to: %w", imageName, imageTar, err)
+		return LoadedImageResult{}, fmt.Errorf("failed to export image: [%s] to archive: [%s], due to: %w", imageName, imageTar, err)
 	}
 
-	nodes, err := c.loadImageArchive(imageTar, req.ClusterName)
-	if err != nil {
-		return result, fmt.Errorf("failed to load images, due to: %w", err)
-	}
-	result.Nodes = nodes
-
-	return result, nil
+	return c.loadImageArchive(imageTar, req.ClusterName)
 }
 
 // loadImageArchive loads the provided image archive onto all nodes of the provided cluster
-func (c *localClient) loadImageArchive(archive string, clusterName string) ([]string, error) {
-	tarFile, err := os.Open(archive)
+func (c *localClient) loadImageArchive(archive string, clusterName string) (LoadedImageResult, error) {
+	result := LoadedImageResult{Nodes: []string{}}
+
+	infos, err := docker.GetImageInfos(archive)
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to open image archive: [%s], due to: %w", archive, err)
+		return result, fmt.Errorf("failed to get load image archive: [%s], due to: %w", archive, err)
 	}
-	defer tarFile.Close()
+	result.Images = infos
 
 	provider := cluster.NewProvider(cluster.ProviderWithLogger(cmd.NewLogger()))
 	nodes, err := provider.ListInternalNodes(clusterName)
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to list nodes for cluster: [%s], due to: %w", clusterName, err)
+		return result, fmt.Errorf("failed to list nodes for cluster: [%s], due to: %w", clusterName, err)
 	}
 
 	if len(nodes) == 0 {
-		return []string{}, fmt.Errorf("no nodes found for cluster: [%s]", clusterName)
+		return result, fmt.Errorf("no nodes found for cluster: [%s]", clusterName)
 	}
 
-	var loadedNodes []string
+	tarFile, err := os.Open(archive)
+	if err != nil {
+		return result, fmt.Errorf("failed to open image archive: [%s], due to: %w", archive, err)
+	}
+	defer tarFile.Close()
+
 	for _, node := range nodes {
 		if err := nodeutils.LoadImageArchive(node, tarFile); err != nil {
-			return loadedNodes, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
+			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
 		}
-		loadedNodes = append(loadedNodes, node.String())
+		result.Nodes = append(result.Nodes, node.String())
 	}
 
-	return loadedNodes, nil
+	return result, nil
 }

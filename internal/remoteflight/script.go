@@ -3,8 +3,10 @@ package remoteflight
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/random"
+	"github.com/hashicorp/enos-provider/internal/retry"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	"github.com/hashicorp/enos-provider/internal/ui"
@@ -37,6 +39,11 @@ func NewRunScriptRequest(opts ...RunScriptRequestOpt) *RunScriptRequest {
 		CopyFileRequest: &CopyFileRequest{
 			Destination: fmt.Sprintf("/tmp/remoteflight_run_script_%s", random.ID()),
 			TmpDir:      "/tmp",
+			// without this, the script will be run infinite times and block forever if it fails
+			RetryOpts: []retry.RetrierOpt{
+				retry.WithMaxRetries(3),
+				retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+			},
 		},
 	}
 

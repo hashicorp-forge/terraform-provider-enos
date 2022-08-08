@@ -49,7 +49,7 @@ func Stop(ctx context.Context, ssh it.Transport) error {
 
 // Restart restarts the vault service
 func Restart(ctx context.Context, ssh it.Transport, req *StatusRequest) error {
-	_, err := Status(ctx, ssh, req)
+	_, err := GetState(ctx, ssh, req)
 
 	// If it's already running smoothly stop it
 	if err == nil {

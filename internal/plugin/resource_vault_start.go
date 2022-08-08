@@ -544,7 +544,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	return hclBuilder, nil
 }
 
-func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) error {
+func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport) error {
 	var err error
 
 	// Set the status to unknown. After we start vault and wait for it to be running
@@ -567,7 +567,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	envFilePath := "/etc/vault.d/vault.env"
 	envFileContents := strings.Builder{}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, ssh, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
 		remoteflight.WithUserName(vaultUsername),
 		remoteflight.WithUserHomeDir(configDir),
 		remoteflight.WithUserShell("/bin/false"),
@@ -578,7 +578,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 
 	// Copy the license file if we have one
 	if license, ok := s.License.Get(); ok {
-		err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
+		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("640"),
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -592,7 +592,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 		envFileContents.WriteString(fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
 	}
 
-	err = remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(
+	err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
 		remoteflight.WithCopyFileDestination(envFilePath),
 		remoteflight.WithCopyFileChmod("644"),
 		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -607,7 +607,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault configuration", "failed to create the vault HCL configuration")
 	}
-	err = hcl.CreateHCLConfigFile(ctx, ssh, hcl.NewCreateHCLConfigFileRequest(
+	err = hcl.CreateHCLConfigFile(ctx, client, hcl.NewCreateHCLConfigFileRequest(
 		hcl.WithHCLConfigFilePath(configFilePath),
 		hcl.WithHCLConfigChmod("640"),
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -669,7 +669,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 		}
 
 		// Write the systemd unit
-		err = remoteflight.CreateSystemdUnitFile(ctx, ssh, remoteflight.NewCreateSystemdUnitFileRequest(
+		err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
 			remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
 			remoteflight.WithSystemdUnitChmod("640"),
 			remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -682,7 +682,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	}
 
 	if storageType, ok := s.Config.Storage.Type.Get(); ok && storageType == raftStorageType {
-		err = remoteflight.CreateDirectory(ctx, ssh, remoteflight.NewCreateDirectoryRequest(
+		err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
 			remoteflight.WithDirName(defaultRaftDataDir),
 			remoteflight.WithDirChown(vaultUsername),
 		))
@@ -695,7 +695,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 	defer cancel()
 
 	// Restart the service and wait for it to be running
-	err = vault.Restart(timeoutCtx, ssh, vault.NewStatusRequest(
+	err = vault.Restart(timeoutCtx, client, vault.NewStatusRequest(
 		vault.WithStatusRequestBinPath(s.BinPath.Value()),
 		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	))
@@ -703,19 +703,14 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, ssh it.Transport) er
 		return wrapErrWithDiagnostics(err, "vault service", "failed to start the vault service")
 	}
 
-	err = vault.WaitForStatus(timeoutCtx, ssh, vault.NewStatusRequest(
+	state, err := vault.WaitForState(timeoutCtx, client, vault.NewStatusRequest(
 		vault.WithStatusRequestBinPath(s.BinPath.Value()),
 		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
-	), vault.StatusInitializedUnsealed, vault.StatusSealed)
+	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault service", "waiting for vault service")
 	}
-
-	code, err := vault.Status(timeoutCtx, ssh, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath.Value()),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
-	))
-	s.Status.Set(int(code))
+	s.Status.Set(int(state.SealStatus))
 
 	return err
 }

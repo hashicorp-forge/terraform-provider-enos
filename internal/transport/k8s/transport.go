@@ -64,7 +64,7 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 
 	stdInReader, stdInWriter := io.Pipe()
 
-	writeErr := make(chan error, 1)
+	writeErrC := make(chan error, 1)
 
 	writeInput := func() {
 		defer stdInWriter.Close()
@@ -77,13 +77,13 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 			Size: src.Size(),
 		})
 		if err != nil {
-			writeErr <- err
+			writeErrC <- err
 			return
 		}
 
 		_, err = io.Copy(writer, src)
 		defer writer.Close()
-		writeErr <- err
+		writeErrC <- err
 	}
 
 	go writeInput()
@@ -98,18 +98,29 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 
 	_, stderr, execErr := response.WaitForResults()
 
+	// merr is used to capture the write error and the stderr
 	merr := &multierror.Error{}
 
-	if err := <-writeErr; err != nil {
+	if err := <-writeErrC; err != nil {
 		merr = multierror.Append(merr, err)
-	}
-
-	if execErr != nil {
-		merr = multierror.Append(merr, execErr)
 	}
 
 	if len(stderr) > 0 {
 		merr = multierror.Append(merr, fmt.Errorf("failed to copy to dst: [%s], due to: [%s]", dst, stderr))
+	}
+
+	if execErr != nil {
+		switch e := execErr.(type) {
+		case *it.ExecError:
+			e.Append(merr)
+			return e
+		default:
+			// in the case that the exec error is not a transport.ExecError we create a new multierror
+			// here and append the exec error first then the other errors.
+			allErrors := &multierror.Error{}
+			allErrors = multierror.Append(allErrors, execErr, merr)
+			return allErrors.ErrorOrNil()
+		}
 	}
 
 	return merr.ErrorOrNil()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
@@ -491,6 +492,19 @@ func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error 
 	err := req.Validate()
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "init request", "validating vault init request")
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+
+	// Added resiliency, since it not necessarily the case that the start resource was executed before this.
+	// The start resource does this wait as well, at the end of the start execution.
+	_, err = vault.WaitForState(timeoutCtx, client, vault.NewStatusRequest(
+		vault.WithStatusRequestBinPath(s.BinPath.Value()),
+		vault.WithStatusRequestVaultAddr(s.VaultAddr.Value()),
+	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
+	if err != nil {
+		return wrapErrWithDiagnostics(err, "vault service", "waiting for vault service")
 	}
 
 	res, err := vault.Init(ctx, client, req)

@@ -70,5 +70,5 @@ output "cluster_ca_certificate" {
 }
 
 output "image" {
-  value = enos_kind_load_image.bananas.loaded_images.image
+  value = enos_local_kind_load_image.bananas.loaded_images.image
 }

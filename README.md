@@ -893,13 +893,30 @@ The following describes the `enos_kind_load_image` schema:
 |cluster_name|The name of the cluster to load the image on|
 |image|The name of the image to load, i.e. \[vault\]|
 |tag|The tag of the image to load, i.e. \[1.10.0\]|
+|archive|An archive file to load, i.e. vault-1.10.0.tar|
 |loaded_images|An object matching the LoadedImageResult struct described below. The nodes field refers to the
 kubernetes node names.|
 
 ```go
+// LoadedImageResult info about what cluster nodes an image was loaded on
 type LoadedImageResult struct {
-	Image string
-	Nodes []string
+  // Images the images that were loaded. Each image is loaded on each node
+  Images []docker.ImageInfo
+  // Nodes kind cluster control plane nodes where the images were loaded
+  Nodes []string
+}
+
+// ImageInfo information about a docker image
+type ImageInfo struct {
+  Repository string
+  Tags       []TagInfo
+}
+
+// TagInfo information about an image tag
+type TagInfo struct {
+  Tag string
+  // ID docker image ID
+  ID string
 }
 ```
 

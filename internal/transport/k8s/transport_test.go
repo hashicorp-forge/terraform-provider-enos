@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -24,11 +26,12 @@ func Test_transport_Run(t *testing.T) {
 		command it.Command
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantStdout string
-		wantStderr string
-		wantErrs   []string
+		name         string
+		args         args
+		wantStdout   string
+		wantStderr   string
+		wantErrs     []string
+		wantExitCode int
 	}{
 		{
 			name: "no_error",
@@ -43,9 +46,10 @@ func Test_transport_Run(t *testing.T) {
 			args: args{
 				command: command.New("echo \"exit 1\" > /tmp/run_exit_1; chmod +x /tmp/run_exit_1; /tmp/run_exit_1"),
 			},
-			wantStderr: "",
-			wantStdout: "",
-			wantErrs:   []string{"command terminated with exit code 1"},
+			wantStderr:   "",
+			wantStdout:   "",
+			wantErrs:     []string{"command terminated with exit code 1"},
+			wantExitCode: 1,
 		},
 		{
 			name: "error_stderr",
@@ -62,6 +66,12 @@ func Test_transport_Run(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			gotStdout, gotStderr, err := transport.Run(ctx, tt.args.command)
 			cancel()
+			if tt.wantExitCode != 0 {
+				var exitErr *it.ExecError
+				require.True(t1, errors.As(err, &exitErr))
+				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				err = exitErr.Unwrap()
+			}
 			if merr, ok := err.(*multierror.Error); ok {
 				gotErrors := merr.WrappedErrors()
 				if len(gotErrors) != len(tt.wantErrs) {
@@ -94,9 +104,10 @@ func Test_transport_Copy(t *testing.T) {
 		dst      string
 	}
 	tests := []struct {
-		name     string
-		args     args
-		wantErrs []string
+		name         string
+		args         args
+		wantErrs     []string
+		wantExitCode int
 	}{
 		{
 			name: "no_error",
@@ -114,10 +125,11 @@ func Test_transport_Copy(t *testing.T) {
 				dst:      "/tmp/file.txt",
 			},
 			wantErrs: []string{
-				"failed to read data",
 				"command terminated with exit code 1",
+				"failed to read data",
 				"failed to copy to dst: [/tmp/file.txt], due to: [tar: short read]",
 			},
+			wantExitCode: 1,
 		},
 		{
 			name: "bad_destination",
@@ -126,13 +138,20 @@ func Test_transport_Copy(t *testing.T) {
 				copyable: file.NewReader("This is some content\x00"),
 				dst:      "/etc",
 			},
-			wantErrs: []string{"command terminated with exit code 1", "failed to copy to dst: [/etc], due to: [tar: can't remove old file etc: Permission denied]"},
+			wantErrs:     []string{"command terminated with exit code 1", "failed to copy to dst: [/etc], due to: [tar: can't remove old file etc: Permission denied]"},
+			wantExitCode: 1,
 		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t1 *testing.T) {
 			err := transport.Copy(tt.args.ctx, tt.args.copyable, tt.args.dst)
+			if tt.wantExitCode != 0 {
+				var exitErr *it.ExecError
+				require.True(t1, errors.As(err, &exitErr))
+				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				err = exitErr.Unwrap()
+			}
 			if merr, ok := err.(*multierror.Error); ok {
 				gotErrors := merr.WrappedErrors()
 				if len(gotErrors) != len(tt.wantErrs) {
@@ -158,11 +177,12 @@ func Test_transport_Stream(t *testing.T) {
 		command it.Command
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantStdout string
-		wantStderr string
-		wantErr    string
+		name         string
+		args         args
+		wantStdout   string
+		wantStderr   string
+		wantErr      string
+		wantExitCode int
 	}{
 		{
 			name: "no_error",
@@ -179,9 +199,10 @@ func Test_transport_Stream(t *testing.T) {
 				ctx:     context.TODO(),
 				command: command.New("echo \"exit 1\" > /tmp/stream_exit_1; chmod +x /tmp/stream_exit_1; /tmp/stream_exit_1"),
 			},
-			wantStderr: "",
-			wantStdout: "",
-			wantErr:    "command terminated with exit code 1",
+			wantStderr:   "",
+			wantStdout:   "",
+			wantErr:      "command terminated with exit code 1",
+			wantExitCode: 1,
 		},
 		{
 			name: "error_stderr",
@@ -235,6 +256,13 @@ func Test_transport_Stream(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotStdErr, tt.wantStderr) {
 				t1.Errorf("Stream() gotStderr = %v, want %v", gotStdErr, tt.wantStderr)
+			}
+
+			if tt.wantExitCode != 0 {
+				var exitErr *it.ExecError
+				require.True(t1, errors.As(err, &exitErr))
+				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				err = exitErr.Unwrap()
 			}
 			if (err != nil && err.Error() != tt.wantErr) || (err != nil && tt.wantErr == "") {
 				t1.Errorf("Stream() error = %v, wantErr %v", err, tt.wantErr)

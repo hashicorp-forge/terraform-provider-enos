@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	xssh "golang.org/x/crypto/ssh"
-
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -321,9 +319,9 @@ func RunSystemctlCommand(ctx context.Context, client it.Transport, req *Systemct
 
 	res.Stdout, res.Stderr, err = client.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
 	if err != nil {
-		var exitError *xssh.ExitError
+		var exitError *it.ExecError
 		if errors.As(err, &exitError) {
-			res.Status = exitError.Waitmsg.ExitStatus()
+			res.Status = exitError.ExitCode()
 		}
 	}
 

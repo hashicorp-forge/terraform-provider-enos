@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	xssh "golang.org/x/crypto/ssh"
-
 	"github.com/hashicorp/enos-provider/internal/retry"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
@@ -62,9 +60,9 @@ func Status(ctx context.Context, ssh it.Transport, unitName string) (StatusCode,
 
 	// otherwise, set status to Unknown by default and extract the code from xssh
 	statusCode := StatusUnknown
-	var exitError *xssh.ExitError
+	var exitError *it.ExecError
 	if errors.As(err, &exitError) {
-		statusCode = StatusCode(exitError.Waitmsg.ExitStatus())
+		statusCode = StatusCode(exitError.ExitCode())
 	}
 	return statusCode, nil
 }

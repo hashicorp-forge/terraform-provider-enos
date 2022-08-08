@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -194,7 +195,7 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 	waitForCommandToFinish := func() {
 		err = session.Wait()
 		if err != nil {
-			errC <- err
+			errC <- handleExecErr(err)
 			return
 		}
 
@@ -278,12 +279,25 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout io.Reade
 
 	waitForCommandToFinish := func() {
 		defer disconnect()
-		errC <- session.Wait()
+		execErr := session.Wait()
+
+		errC <- handleExecErr(execErr)
 	}
 
 	go waitForCommandToFinish()
 
 	return stdout, stderr, errC
+}
+
+// handleExecErr checks if the error is an xssh.ExitError and if so transforms it into a transport.ExecErr
+func handleExecErr(execErr error) error {
+	if execErr != nil {
+		var e *xssh.ExitError
+		if errors.As(execErr, &e) {
+			execErr = it.NewExecError(execErr, e.ExitStatus())
+		}
+	}
+	return execErr
 }
 
 // Run runs the command and returns STDOUT, STDERR and and the first error encountered

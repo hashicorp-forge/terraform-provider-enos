@@ -10,6 +10,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/hashicorp/enos-provider/internal/server/datarouter"
+	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+
 	"github.com/hashicorp/enos-provider/internal/server"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
@@ -208,21 +211,35 @@ func configureSSHTransportFromEnvironment(em *embeddedTransportSSHv1) {
 	}
 }
 
+// providerOverrides can be used to provide an alternate datasource or resource to override the defaults.
+type providerOverrides struct {
+	datasources []datarouter.DataSource
+	resources   []resourcerouter.Resource
+}
+
 // Creates a ProtoV6ProviderFactories that wraps that can be used to create a ProviderServer that has
-// transport configuration injected from the environment.
-func testProviders(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
+// transport configuration injected from the environment. The providers argument is variadic only to make it
+// optional, passing more than on overrides provider is not necessary.
+func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func() (tfprotov6.ProviderServer, error) {
 	t.Helper()
 
 	provider := newProvider()
 	configureK8STransportFromEnvironment(provider.config.Transport.K8S)
 	configureSSHTransportFromEnvironment(provider.config.Transport.SSH)
 
+	var datasourceOverrides []datarouter.DataSource
+	var resourceOverrides []resourcerouter.Resource
+	for _, override := range overrides {
+		datasourceOverrides = append(datasourceOverrides, override.datasources...)
+		resourceOverrides = append(resourceOverrides, override.resources...)
+	}
+
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"enos": func() (tfprotov6.ProviderServer, error) {
 			return server.New(
 				server.RegisterProvider(provider),
-				WithDefaultDataRouter(),
-				WithDefaultResourceRouter(),
+				WithDefaultDataRouter(datasourceOverrides...),
+				WithDefaultResourceRouter(resourceOverrides...),
 			), nil
 		},
 	}

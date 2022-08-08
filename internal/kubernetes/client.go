@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/util/exec"
+
+	it "github.com/hashicorp/enos-provider/internal/transport"
 
 	"github.com/hashicorp/go-multierror"
 )
@@ -66,8 +70,6 @@ func (e *ExecResponse) WaitForResults() (stdout string, stderr string, err error
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
-	err = &multierror.Error{}
-
 	captureOutput := func(writer io.StringWriter, reader io.Reader, errC chan error, stream string) {
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
@@ -88,18 +90,33 @@ func (e *ExecResponse) WaitForResults() (stdout string, stderr string, err error
 	go captureOutput(stderrBuf, e.Stderr, streamWriteErrC, "stderr")
 
 	execErr := <-e.ExecErr
-	if execErr != nil {
-		err = multierror.Append(err, execErr)
-	}
 
 	wg.Wait()
 	close(streamWriteErrC)
+
+	writeErrs := &multierror.Error{}
 	for streamErr := range streamWriteErrC {
-		err = multierror.Append(err, streamErr)
+		writeErrs = multierror.Append(writeErrs, streamErr)
 	}
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
+
+	if execErr != nil {
+		switch e := execErr.(type) {
+		case *it.ExecError:
+			e.Append(writeErrs)
+			err = e
+		default:
+			// in the case that the exec error is not a transport.ExecError we create a new multierror
+			// here and append the exec error first then the other errors.
+			allErrors := &multierror.Error{}
+			allErrors = multierror.Append(allErrors, execErr, writeErrs)
+			err = allErrors.ErrorOrNil()
+		}
+	} else {
+		err = writeErrs.ErrorOrNil()
+	}
 
 	return stdout, stderr, err
 }
@@ -147,11 +164,18 @@ func (c *Client) Exec(ctx context.Context, request ExecRequest) *ExecResponse {
 
 	stream := func(stdout, stderr io.Writer) {
 		defer completeExec()
-		response.ExecErr <- executor.Stream(remotecommand.StreamOptions{
+		execErr := executor.Stream(remotecommand.StreamOptions{
 			Stdout: stdout,
 			Stderr: stderr,
 			Stdin:  request.StdIn,
 		})
+		if execErr != nil {
+			var e exec.CodeExitError
+			if errors.As(execErr, &e) {
+				execErr = it.NewExecError(execErr, e.ExitStatus())
+			}
+		}
+		response.ExecErr <- execErr
 	}
 
 	go stream(stdOutWriter, stdErrWriter)

@@ -6,7 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	it "github.com/hashicorp/enos-provider/internal/transport"
 
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	"github.com/hashicorp/enos-provider/internal/transport/file"
@@ -72,6 +75,21 @@ func TestSSH(t *testing.T) {
 		require.Error(t, err)
 
 		require.NoError(t, c.Close())
+	})
+
+	t.Run("run_exit_1", func(tt *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		defer cancel()
+
+		_, _, err := c.Run(ctx, command.New("printf 'exit 1' > /tmp/run; chmod +x /tmp/run; /tmp/run"))
+		var exitErr *it.ExecError
+		assert.ErrorAs(tt, err, &exitErr)
+		assert.Equal(tt, 1, exitErr.ExitCode())
+
+		_, _, err = c.Run(ctx, command.New("rm /tmp/run"))
+		require.NoError(tt, err)
+
+		require.NoError(tt, c.Close())
 	})
 
 	t.Run("nohup", func(t *testing.T) {

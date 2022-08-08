@@ -370,7 +370,9 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 			merr = multierror.Append(merr, ui.Append(stdout, stderr))
 			if err := merr.ErrorOrNil(); err != nil {
 				return ui, wrapErrWithDiagnostics(
-					err, "command failed", fmt.Sprintf("running inline command failed: %s", err.Error()),
+					err,
+					"command failed",
+					addOutputIfExists(ui, fmt.Sprintf("running inline command failed: %s", err.Error())),
 				)
 			}
 		}
@@ -447,7 +449,11 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transpo
 	merr = multierror.Append(merr, ui.Append(res.Stdout, res.Stderr))
 
 	if merr.ErrorOrNil() != nil {
-		return wrapErrWithDiagnostics(merr.ErrorOrNil(), "command failed", merr.Error())
+		return wrapErrWithDiagnostics(
+			merr.ErrorOrNil(),
+			"command failed",
+			addOutputIfExists(ui, merr.Error()),
+		)
 	}
 
 	return nil
@@ -582,4 +588,12 @@ func (s *remoteExecStateV1) hasUnknownAttributes() bool {
 	}
 
 	return false
+}
+
+func addOutputIfExists(ui ui.UI, details string) string {
+	output := ui.CombinedOutput()
+	if len(output) > 0 {
+		details = fmt.Sprintf("%s\n\noutput:\n%s", details, output)
+	}
+	return details
 }
