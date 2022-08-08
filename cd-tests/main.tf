@@ -41,7 +41,7 @@ module "enos_infra" {
 }
 
 module "consul_cluster" {
-  source = "app.terraform.io/hashicorp-qti/aws-consul/enos"
+  source = "./modules/consul-cluster"
 
   depends_on = [module.enos_infra]
 
@@ -59,7 +59,7 @@ module "consul_cluster" {
 }
 
 module "vault_cluster" {
-  source = "app.terraform.io/hashicorp-qti/aws-vault/enos"
+  source = "./modules/vault-cluster"
 
   depends_on = [
     module.enos_infra,
