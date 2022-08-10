@@ -30,14 +30,14 @@ jobs:
     env:
       ENOS_VERSION: ${{ github.event.inputs.version }}
     steps:
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: go.mod
       - name: Checkout
         uses: actions/checkout@v2
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
       - name: Import GPG key
         id: import_gpg
         # switching to upstream action as suggested in https://github.com/hashicorp/ghaction-import-gpg/issues/11#issuecomment-1185107410
