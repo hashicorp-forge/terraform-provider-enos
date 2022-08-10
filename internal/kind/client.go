@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"hash/fnv"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -214,7 +213,7 @@ func (c *localClient) LoadImageArchive(req LoadImageArchiveRequest) (LoadedImage
 
 // LoadImage Loads an image into all nodes of a kind cluster as per the request
 func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error) {
-	dir, err := ioutil.TempDir("", req.GetImageRef())
+	dir, err := os.MkdirTemp("", req.GetImageRef())
 	if err != nil {
 		return LoadedImageResult{}, fmt.Errorf("failed to create temporary directory when saving the image to an archive, due to: %w", err)
 	}
@@ -238,7 +237,7 @@ func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 }
 
 // loadImageArchive loads the provided image archive onto all nodes of the provided cluster
-func (c *localClient) loadImageArchive(archive string, clusterName string) (LoadedImageResult, error) {
+func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImageResult, error) {
 	result := LoadedImageResult{Nodes: []string{}}
 
 	infos, err := docker.GetImageInfos(archive)

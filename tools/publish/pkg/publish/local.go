@@ -16,7 +16,7 @@ import (
 )
 
 // NewLocal takes a terraform provider name and returns a new local mirror
-func NewLocal(name string, binname string, opts ...NewLocalOpt) *Local {
+func NewLocal(name, binname string, opts ...NewLocalOpt) *Local {
 	l := &Local{
 		providerName: name,
 		binaryName:   binname,
@@ -103,7 +103,7 @@ func (l *Local) SetLogLevel(level zapcore.Level) error {
 }
 
 // LoadRemoteIndex fetches a remote index and loads it
-func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
+func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	return l.artifacts.LoadRemoteIndex(ctx, s3Client, bucket, providerID)
 }
 
@@ -114,7 +114,7 @@ func (l *Local) HasVersion(ctx context.Context, version string) (bool, error) {
 
 // CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies release artifacts from source bucket
 // to the destination bucket.
-func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, binaryName string, providerID string, version string) error {
+func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName, binaryName, providerID, version string) error {
 	return l.artifacts.CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx, srcBucketName, destS3Client, destBucketName, binaryName, providerID, version)
 }
 
@@ -125,7 +125,7 @@ func (l *Local) AddReleaseVersionToIndex(ctx context.Context, version string) {
 
 // PublishToRemoteBucket publishes the local mirror artifacts into the remote
 // bucket.
-func (l *Local) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
+func (l *Local) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	return l.artifacts.PublishToRemoteBucket(ctx, s3Client, bucket, providerID)
 }
 

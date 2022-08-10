@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -31,7 +32,10 @@ type vaultStart struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*vaultStart)(nil)
+var (
+	_                 resourcerouter.Resource = (*vaultStart)(nil)
+	impliedTypeRegexp                         = regexp.MustCompile(`\d*?\[\"(\w*)\",.*]`)
+)
 
 type vaultStartStateV1 struct {
 	ID              *tfString
@@ -57,8 +61,12 @@ type vaultConfig struct {
 }
 
 type vaultConfigBlock struct {
-	Type  *tfString
-	Attrs *tfObject
+	AttributePaths []string // the attribute path to the vault config block
+	Type           *tfString
+	Attrs          *tfObject
+	AttrsValues    map[string]tftypes.Value
+	AttrsRaw       tftypes.Value
+	Unknown        bool
 }
 
 var _ State = (*vaultStartStateV1)(nil)
@@ -78,9 +86,9 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 			ClusterName: newTfString(),
 			APIAddr:     newTfString(),
 			ClusterAddr: newTfString(),
-			Listener:    newVaultConfigBlock(),
-			Seal:        newVaultConfigBlock(),
-			Storage:     newVaultConfigBlock(),
+			Listener:    newVaultConfigBlock("config", "listener"),
+			Seal:        newVaultConfigBlock("config", "seal"),
+			Storage:     newVaultConfigBlock("config", "storage"),
 			UI:          newTfBool(),
 		},
 		ConfigDir:       newTfString(),
@@ -93,10 +101,13 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 	}
 }
 
-func newVaultConfigBlock() *vaultConfigBlock {
+func newVaultConfigBlock(attributePaths ...string) *vaultConfigBlock {
 	return &vaultConfigBlock{
-		Type:  newTfString(),
-		Attrs: newTfObject(),
+		AttributePaths: attributePaths,
+		Attrs:          newTfObject(),
+		AttrsValues:    map[string]tftypes.Value{},
+		Type:           newTfString(),
+		Unknown:        false,
 	}
 }
 
@@ -135,13 +146,12 @@ func (r *vaultStart) ValidateResourceConfig(ctx context.Context, req tfprotov6.V
 //
 // Upgrading the resource state generally goes as follows:
 //
-//   1. Unmarshal the RawState to the corresponding tftypes.Value that matches
+//  1. Unmarshal the RawState to the corresponding tftypes.Value that matches
 //     schema version of the state we're upgrading from.
-//   2. Create a new tftypes.Value for the current state and migrate the old
-//    values to the new values.
-//   3. Upgrade the existing state with the new values and return the marshaled
-//    version of the current upgraded state.
-//
+//  2. Create a new tftypes.Value for the current state and migrate the old
+//     values to the new values.
+//  3. Upgrade the existing state with the new values and return the marshaled
+//     version of the current upgraded state.
 func (r *vaultStart) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newVaultStartStateV1()
 
@@ -406,29 +416,116 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 
 // FromTerraform5Value unmarshals the value to the struct
 func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
-	_, err := mapAttributesTo(val, map[string]interface{}{
-		"type":       s.Type,
-		"attributes": s.Attrs,
-	})
+	if val.IsNull() {
+		return newErrWithDiagnostics("missing required attribute", "the attribute must be set", s.AttributePaths...)
+	}
+
+	if !val.IsKnown() {
+		s.Unknown = true
+
+		return nil
+	}
+
+	vals := map[string]tftypes.Value{}
+	err := val.As(&vals)
+	if err != nil {
+		return err
+	}
+
+	// Since attributes is a dynamic pseudo type we have to decode it only
+	// if it's known.
+	for k, v := range vals {
+		switch k {
+		case "type":
+			err = s.Type.FromTFValue(v)
+			if err != nil {
+				return err
+			}
+		case "attributes":
+			if v.IsNull() || !v.IsKnown() {
+				// We can't unmarshal null or known things
+				continue
+			}
+			s.AttrsRaw = v
+			err = v.As(&s.AttrsValues)
+			if err != nil {
+				return err
+			}
+			err = s.Attrs.FromTFValue(v)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported attribute in vault config block: %s", k)
+		}
+	}
 
 	return err
 }
 
 // Terraform5Type is the tftypes.Type
 func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"type":       s.Type.TFType(),
-			"attributes": tftypes.DynamicPseudoType,
-		},
-	}
+	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+		"type":       s.Type.TFType(),
+		"attributes": tftypes.DynamicPseudoType,
+	}}
 }
 
 // Terraform5Type is the tftypes.Value
 func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
-	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
+	if s.Unknown {
+		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
+	}
+
+	// Sit down, grab a beverage, lets tell a story. What we have here is dynamic
+	// value being passed in from Terraform that should be a map or object. When
+	// we send the value back over the wire to Terraform we have to give it the
+	// same value type that it thinks the dynamic type is. There's just one problem:
+	// at the time of writing the tftypes library does not expose this information.
+	// If you try and determine the type of a DynamicPseudoType it is nil. That
+	// means we have to somehow determine what Terraform _thinks_ the type is without
+	// that information being available. The only place I could find this information
+	// is by taking the raw tftypes.Value and marshaling it to the wire format
+	// to inspect the hidden type information Terraform sent over the wire.
+	//
+	// This is terrible but had to be done until better support for DynamicPseudoType's
+	// as input schema is added to terraform-plugin-go. We also panic a bunch in
+	// here as we have to maintain the State interface which assumes that we
+	// can return the value of the schema without possible errors.
+
+	var attrsVal tftypes.Value
+
+	if s.AttrsRaw.Type() == nil {
+		attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+	} else {
+		// MarshalMsgPack is deprecated but it's by far the easiest way to inspect
+		// the serialized value of the raw attribute.
+		// nolint staticcheck
+		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
+		if err != nil {
+			panic(fmt.Sprintf("unable to marshal the vault config block to the wire format: %s", err.Error()))
+		}
+		matches := impliedTypeRegexp.FindStringSubmatch(string(msgpackBytes))
+		if len(matches) > 1 {
+			switch matches[1] {
+			case "map":
+				var elemType tftypes.Type
+				for _, attr := range s.AttrsValues {
+					elemType = attr.Type()
+					break
+				}
+				attrsVal = tftypes.NewValue(tftypes.Map{ElementType: elemType}, s.AttrsValues)
+			case "object":
+				attrsVal = terraform5Value(s.AttrsValues)
+			default:
+				panic(fmt.Sprintf("%s is not a support dynamic type for the vault config block", matches[1]))
+			}
+		}
+	}
+
+	return terraform5Value(map[string]tftypes.Value{
 		"type":       s.Type.TFValue(),
-		"attributes": s.Attrs.TFValue(),
+		"attributes": attrsVal,
 	})
 }
 
@@ -519,7 +616,8 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 		}
 	}
 
-	if label, ok := c.Seal.Type.Get(); ok {
+	// Ignore shamir because it doesn't actually have a config stanza
+	if label, ok := c.Seal.Type.Get(); ok && label != "shamir" {
 		if attrs, ok := c.Seal.Attrs.GetObject(); ok {
 			hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
 		}

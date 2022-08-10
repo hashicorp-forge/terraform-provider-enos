@@ -128,7 +128,7 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 
 // Run runs the provided command on a remote Pod as specified th in the transport config. Run blocks
 // until the command execution has completed.
-func (t transport) Run(ctx context.Context, cmd it.Command) (stdout string, stderr string, err error) {
+func (t transport) Run(ctx context.Context, cmd it.Command) (stdout, stderr string, err error) {
 	response := t.client.Exec(ctx, kubernetes.ExecRequest{
 		Command:   cmd.Cmd(),
 		Namespace: t.namespace,
@@ -141,7 +141,7 @@ func (t transport) Run(ctx context.Context, cmd it.Command) (stdout string, stde
 
 // Stream runs the provided command on a remote Pod and streams the results. Stream does not block and
 // is done when the error channel has either an error or nil.
-func (t transport) Stream(ctx context.Context, command it.Command) (stdout io.Reader, stderr io.Reader, errC chan error) {
+func (t transport) Stream(ctx context.Context, command it.Command) (stdout, stderr io.Reader, errC chan error) {
 	response := t.client.Exec(ctx, kubernetes.ExecRequest{
 		Command:   command.Cmd(),
 		Namespace: t.namespace,

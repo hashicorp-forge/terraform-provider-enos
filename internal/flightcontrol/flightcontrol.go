@@ -7,6 +7,7 @@ import (
 )
 
 // Binaries are the embedded enos-flight-control binaries
+//
 //go:embed binaries/*
 var Binaries embed.FS
 

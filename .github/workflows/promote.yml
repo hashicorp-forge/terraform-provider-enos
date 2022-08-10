@@ -33,9 +33,9 @@ jobs:
           role-skip-session-tagging: true
           role-duration-seconds: 3600
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: '^1.18.0'
+          go-version-file: go.mod
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
@@ -93,9 +93,9 @@ jobs:
       ENOS_VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: '^1.18.0'
+          go-version-file: go.mod
       - name: Checkout
         uses: actions/checkout@v2
         with:

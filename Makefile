@@ -86,7 +86,7 @@ test-tf: install
 	terraform -chdir=examples/core validate
 
 test-acc:
-	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 12m
 
 test-race-detector:
 	GORACE=log_path=/tmp/gorace.log TF_ACC=1 go test -race $(TEST) -v $(TESTARGS) -timeout 120m ./command/plugin
@@ -109,7 +109,7 @@ set-dev-release-name:
 test-k8s-dev: set-dev-release-name test-k8s
 
 lint:
-	golangci-lint run -v
+	golangci-lint run -v -c .golangci.yml
 
 fmt:
 	gofumpt -w -l .

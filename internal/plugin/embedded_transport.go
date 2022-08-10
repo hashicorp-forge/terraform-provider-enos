@@ -336,7 +336,7 @@ func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embedde
 	return nil
 }
 
-func addAttributesForReplace(priorState transportState, proposedState transportState, attrs []*tftypes.AttributePath, transportName string) []*tftypes.AttributePath {
+func addAttributesForReplace(priorState, proposedState transportState, attrs []*tftypes.AttributePath, transportName string) []*tftypes.AttributePath {
 	for _, attribute := range priorState.GetAttributesForReplace() {
 		proposedValue := proposedState.Attributes()[attribute].TFValue()
 		currentValue := priorState.Attributes()[attribute].TFValue()
@@ -372,7 +372,7 @@ func terraform5Value(values map[string]tftypes.Value) tftypes.Value {
 	return tftypes.NewValue(terraform5Type(values), values)
 }
 
-func applyDefaults(defaults map[string]TFType, attributes map[string]TFType) error {
+func applyDefaults(defaults, attributes map[string]TFType) error {
 	for name, defaultValue := range defaults {
 		if attribute, ok := attributes[name]; ok {
 			attributeHasValue := !attribute.TFValue().IsNull() && attribute.TFValue().IsKnown()

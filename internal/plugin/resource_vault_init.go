@@ -122,13 +122,12 @@ func (r *vaultInit) ValidateResourceConfig(ctx context.Context, req tfprotov6.Va
 //
 // Upgrading the resource state generally goes as follows:
 //
-//   1. Unmarshal the RawState to the corresponding tftypes.Value that matches
+//  1. Unmarshal the RawState to the corresponding tftypes.Value that matches
 //     schema version of the state we're upgrading from.
-//   2. Create a new tftypes.Value for the current state and migrate the old
-//    values to the new values.
-//   3. Upgrade the existing state with the new values and return the marshaled
-//    version of the current upgraded state.
-//
+//  2. Create a new tftypes.Value for the current state and migrate the old
+//     values to the new values.
+//  3. Upgrade the existing state with the new values and return the marshaled
+//     version of the current upgraded state.
 func (r *vaultInit) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newVaultInitStateV1()
 

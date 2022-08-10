@@ -38,7 +38,7 @@ func hasErrors(diags []*tfprotov6.Diagnostic) bool {
 	return false
 }
 
-func newErrWithDiagnostics(summary string, detail string, attributes ...string) error {
+func newErrWithDiagnostics(summary, detail string, attributes ...string) error {
 	return errWithDiagnostics{
 		summary:    summary,
 		detail:     detail,
@@ -46,7 +46,7 @@ func newErrWithDiagnostics(summary string, detail string, attributes ...string) 
 	}
 }
 
-func wrapErrWithDiagnostics(err error, summary string, detail string, attributes ...string) error {
+func wrapErrWithDiagnostics(err error, summary, detail string, attributes ...string) error {
 	return errWithDiagnostics{
 		summary:    summary,
 		detail:     detail,

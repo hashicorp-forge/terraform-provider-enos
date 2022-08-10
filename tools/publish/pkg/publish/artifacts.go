@@ -498,7 +498,7 @@ func unzipArtifact(f *zip.File, destination string) error {
 
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads
 // it. This way we can merge new builds with those in existing remote mirror.
-func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
+func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -537,7 +537,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 // LoadRemoteReleaseMetedataForVersion fetches the version.json for a given
 // release from the remote bucket and loads it. We need this information to
 // known what and where release artifacts for the release are.
-func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3Client *s3.Client, bucket string, providerID string, version string) error {
+func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3Client *s3.Client, bucket, providerID, version string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -595,7 +595,7 @@ func (a *Artifacts) HasVersion(ctx context.Context, version string) (bool, error
 
 // CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies artifacts from
 // a remote s3 mirror to another remote mirror
-func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName string, providerName string, providerID string, version string) error {
+func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName, providerName, providerID, version string) error {
 	a.log.Infow("copying release artifacts between remote buckets", "source bucket", srcBucketName, "destination bucket", destBucketName)
 
 	err := a.LoadRemoteReleaseMetedataForVersion(ctx, destS3Client, srcBucketName, providerID, version)
@@ -642,7 +642,7 @@ func (a *Artifacts) AddReleaseVersionToIndex(version string) {
 
 // PublishToRemoteBucket publishes the artifacts in the local mirror to the
 // the remote S3 Bucket.
-func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, bucket string, providerID string) error {
+func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 

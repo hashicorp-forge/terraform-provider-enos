@@ -10,8 +10,8 @@ import (
 // Transport is a generic transport interface
 type Transport interface {
 	Copy(context.Context, Copyable, string) error
-	Run(context.Context, Command) (stdout string, stderr string, err error)
-	Stream(context.Context, Command) (stdout io.Reader, stderr io.Reader, errC chan error)
+	Run(context.Context, Command) (stdout, stderr string, err error)
+	Stream(context.Context, Command) (stdout, stderr io.Reader, errC chan error)
 	io.Closer
 }
 

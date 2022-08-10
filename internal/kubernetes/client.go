@@ -66,7 +66,7 @@ type PodInfo struct {
 
 // WaitForResults waits for the execution to finish and returns the stdout, stderr and the execution error
 // if there is any.
-func (e *ExecResponse) WaitForResults() (stdout string, stderr string, err error) {
+func (e *ExecResponse) WaitForResults() (stdout, stderr string, err error) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 

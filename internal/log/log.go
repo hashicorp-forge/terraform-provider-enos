@@ -28,13 +28,13 @@ type logger struct {
 }
 
 func (l *logger) With(key string, value interface{}) Logger {
-	l.ctx = tfsdklog.With(l.ctx, key, value)
+	l.ctx = tfsdklog.SetField(l.ctx, key, value)
 	return l
 }
 
 func (l *logger) WithValues(values map[string]interface{}) Logger {
 	for key, value := range values {
-		l.ctx = tfsdklog.With(l.ctx, key, value)
+		l.ctx = tfsdklog.SetField(l.ctx, key, value)
 	}
 	return l
 }

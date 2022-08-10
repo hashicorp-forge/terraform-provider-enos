@@ -224,7 +224,7 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 
 // Stream runs the given command and returns readers for STDOUT and STDERR and
 // a err channel where any encountered errors are streamed.
-func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout io.Reader, stderr io.Reader, errC chan error) {
+func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout, stderr io.Reader, errC chan error) {
 	var err error
 	errC = make(chan error, 3)
 

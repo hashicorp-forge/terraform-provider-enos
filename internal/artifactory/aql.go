@@ -10,18 +10,17 @@ import (
 // is dealing with trailing commas. The rendered query will look something like
 // the following:
 //
-//  items.find({
-//    "repo": { "$match": "hashicorp-packagespec-buildcache-local*" },
-//    "path": { "$match": "cache-v1/vault-enterprise/*" },
-//    "name": { "$match": "*.zip" },
-//    "@EDITION": { "$match": "ent" },
-//    "@GOARCH": { "$match": "amd64" },
-//    "@GOOS": { "$match": "linux" },
-//    "@artifactType": { "$match": "package" },
-//    "@productRevision": { "$match": "f45845666b4e552bfc8ca775834a3ef6fc097fe0" },
-//    "@productVersion": { "$match": "1.7.0" }
-//  }) .include("*", "property.*") .sort({"$desc": ["modified"]}) .limit(1)
-//
+//	items.find({
+//	  "repo": { "$match": "hashicorp-packagespec-buildcache-local*" },
+//	  "path": { "$match": "cache-v1/vault-enterprise/*" },
+//	  "name": { "$match": "*.zip" },
+//	  "@EDITION": { "$match": "ent" },
+//	  "@GOARCH": { "$match": "amd64" },
+//	  "@GOOS": { "$match": "linux" },
+//	  "@artifactType": { "$match": "package" },
+//	  "@productRevision": { "$match": "f45845666b4e552bfc8ca775834a3ef6fc097fe0" },
+//	  "@productVersion": { "$match": "1.7.0" }
+//	}) .include("*", "property.*") .sort({"$desc": ["modified"]}) .limit(1)
 var AQLQueryTemplate = template.Must(template.New("aql_query").Parse(`items.find({
   {{ if .Repo -}}
   "repo": { "$match": "{{ .Repo }}" }{{ if or .Path .Name .Properties -}},{{ end }}

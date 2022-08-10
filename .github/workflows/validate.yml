@@ -16,7 +16,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.18.1'
+          go-version-file: go.mod
       - name: golangci-lint
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -57,11 +57,11 @@ jobs:
     name: "Unit Tests and Formatting"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '^1.18.0'
       - name: Checkout
         uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
       - name: Build assets
         run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
       - name: Test code
@@ -81,9 +81,9 @@ jobs:
         uses: actions/checkout@v2
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '^1.18.0'
+          go-version-file: go.mod
       - name: "Build code & Test core example"
         # build the provider, install as terraform plugin, and validate example
         # terraform that utilizes the provider.
@@ -191,9 +191,9 @@ jobs:
           chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
           chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: '^1.16.3'
+          go-version-file: go.mod
       - name: Build assets
         run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
       # Download host-ip.txt created in Setup Remotehost

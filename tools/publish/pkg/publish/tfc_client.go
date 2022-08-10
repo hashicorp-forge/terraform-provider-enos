@@ -483,7 +483,7 @@ func (c *TFCClient) DoRequest(ctx context.Context, tfcReq *TFCRequest) (*http.Re
 }
 
 // FindOrCreateProvider - FindProvider - CreateProvider
-func (c *TFCClient) FindOrCreateProvider(ctx context.Context, namespace string, providerName string) error {
+func (c *TFCClient) FindOrCreateProvider(ctx context.Context, namespace, providerName string) error {
 	_, err := c.FindPrivateProvider(ctx, namespace, providerName)
 	tfcErr := &errTFCAPI{}
 	if errors.As(err, &tfcErr) {
@@ -982,7 +982,7 @@ func (c *TFCClient) CreateProviderPlatforms(
 }
 
 // uploadFile uploads a file to the URL
-func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadURL string) error {
+func (c *TFCClient) uploadFile(ctx context.Context, path, uploadURL string) error {
 	c.log.Infow(
 		"uploading file",
 		"file path", path,
@@ -1023,7 +1023,7 @@ func (c *TFCClient) uploadFile(ctx context.Context, path string, uploadURL strin
 }
 
 // downloadFile downloads a file from the URL
-func (c *TFCClient) downloadFile(ctx context.Context, downloadDir string, filename string, downloadURL string) error {
+func (c *TFCClient) downloadFile(ctx context.Context, downloadDir, filename, downloadURL string) error {
 	c.log.Infow(
 		"downloading file",
 		"download URL", downloadURL,

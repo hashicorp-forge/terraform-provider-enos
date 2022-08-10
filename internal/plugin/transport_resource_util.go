@@ -33,13 +33,12 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 //
 // Upgrading the resource state generally goes as follows:
 //
-//   1. Unmarshal the RawState to the corresponding tftypes.Value that matches
+//  1. Unmarshal the RawState to the corresponding tftypes.Value that matches
 //     schema version of the state we're upgrading from.
-//   2. Create a new tftypes.Value for the current state and migrate the old
-//    values to the new values.
-//   3. Upgrade the existing state with the new values and return the marshaled
-//    version of the current upgraded state.
-//
+//  2. Create a new tftypes.Value for the current state and migrate the old
+//     values to the new values.
+//  3. Upgrade the existing state with the new values and return the marshaled
+//     version of the current upgraded state.
 func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state Serializable, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	select {
 	case <-ctx.Done():
@@ -111,7 +110,7 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWit
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
 // a request into prior and proposed states, builds a transport client,
 // verifies it, and returns the new transport.
-func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior StateWithTransport, proposed StateWithTransport, resource ResourceWithProviderConfig, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) *embeddedTransportV1 {
+func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior, proposed StateWithTransport, resource ResourceWithProviderConfig, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) *embeddedTransportV1 {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -181,7 +180,7 @@ func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res
 
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior StateWithTransport, planned StateWithTransport, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, planned StateWithTransport, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
