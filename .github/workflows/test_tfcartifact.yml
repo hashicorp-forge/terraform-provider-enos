@@ -51,6 +51,10 @@ jobs:
         run: |
           echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enoscli-tests/enos-ci-ssh-key.pem
           chmod 600 ./enoscli-tests/enos-ci-ssh-key.pem
+      - name: "Cleanup Enos tmp directories"
+        continue-on-error: true
+        if: ${{ always() }}
+        run: rm -rf /tmp/enos*
       - name: "Update Provider Name for Backend module"
         run: |
           export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
