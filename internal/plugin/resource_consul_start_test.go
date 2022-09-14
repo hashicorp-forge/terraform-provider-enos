@@ -19,7 +19,6 @@ func TestAccResourceConsulStart(t *testing.T) {
 		{{end}}
 
 		config = {
-			bind_addr = "{{.Config.BindAddr.Value}}"
 			datacenter = "{{.Config.Datacenter.Value}}"
 			data_dir = "{{.Config.DataDir.Value}}"
 			retry_join = [{{range .Config.RetryJoin.Value -}}
@@ -89,7 +88,6 @@ EOF
 	consulStart.ID.Set("foo")
 	consulStart.BinPath.Set("/opt/consul/bin/consul")
 	consulStart.ConfigDir.Set("/etc/consul.d")
-	consulStart.Config.BindAddr.Set("127.0.0.1")
 	consulStart.Config.Datacenter.Set("dc1")
 	consulStart.Config.DataDir.Set("/opt/consul/data")
 	consulStart.Config.RetryJoin.SetStrings([]string{"provider=aws tag_key=Type tag_value=dc1"})
@@ -112,7 +110,6 @@ EOF
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "id", regexp.MustCompile(`^foo$`)),
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "bin_path", regexp.MustCompile(`^/opt/consul/bin/consul$`)),
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "config_dir", regexp.MustCompile(`^/etc/consul.d$`)),
-			resource.TestMatchResourceAttr("enos_consul_start.foo", "config.bind_addr", regexp.MustCompile(`127.0.0.1$`)),
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "config.datacenter", regexp.MustCompile(`dc1$`)),
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "config.data_dir", regexp.MustCompile(`^/opt/consul/data$`)),
 			resource.TestMatchResourceAttr("enos_consul_start.foo", "config.retry_join", regexp.MustCompile(`^provider^$`)),
