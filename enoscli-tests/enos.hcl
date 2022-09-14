@@ -33,7 +33,7 @@ provider "enos" "ubuntu" {
   transport = {
     ssh = {
       user             = "ubuntu"
-      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-key.pem"))
+      private_key_path = abspath(joinpath(path.root, "./support/enos-ci-ssh-key.pem"))
     }
   }
 }
@@ -42,7 +42,7 @@ provider "enos" "rhel" {
   transport = {
     ssh = {
       user             = "ec2_user"
-      private_key_path = abspath(joinpath(path.root, "./enos-ci-ssh-key.pem"))
+      private_key_path = abspath(joinpath(path.root, "./support/enos-ci-ssh-key.pem"))
     }
   }
 }
@@ -121,7 +121,7 @@ scenario "vault" {
   step "license" {
     module = module.license
     variables {
-      file_name = abspath(joinpath(path.root, "./vault.hclic"))
+      file_name = abspath(joinpath(path.root, "./support/vault.hclic"))
     }
   }
 

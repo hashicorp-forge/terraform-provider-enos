@@ -45,12 +45,14 @@ jobs:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - name: Setup Vault Enterprise License
         id: license
-        run: echo "${{ secrets.VAULT_LICENSE }}" > ./enoscli-tests/vault.hclic
+        run: |
+          mkdir -p ./enoscli-tests/support
+          echo "${{ secrets.VAULT_LICENSE }}" > ./enoscli-tests/support/vault.hclic
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enoscli-tests/enos-ci-ssh-key.pem
-          chmod 600 ./enoscli-tests/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enoscli-tests/support/enos-ci-ssh-key.pem
+          chmod 600 ./enoscli-tests/support/enos-ci-ssh-key.pem
       - name: "Cleanup Enos tmp directories"
         continue-on-error: true
         if: ${{ always() }}
@@ -106,6 +108,12 @@ jobs:
           ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario destroy vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
         working-directory: ./enoscli-tests
+      - name: Cleanup Enos runtime directories
+        if: ${{ always() }}
+        run: |
+          rm -rf /tmp/enos*
+          rm -rf ./enoscli-tests/support
+          rm -rf ./enoscli-tests/.enos
       - name: K8S tests
         id: enoscli-k8s
         env:
