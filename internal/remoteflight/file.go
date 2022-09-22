@@ -160,25 +160,25 @@ func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) e
 		}
 
 		if file.Chmod != "" {
-			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("sudo chmod %s %s", file.Chmod, tmpPath)))
+			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chmod %[1]s %[2]s || sudo chmod %[1]s %[2]s", file.Chmod, tmpPath)))
 			if err != nil {
 				return res, WrapErrorWith(err, stdout, stderr, "changing file permissions")
 			}
 		}
 
 		if file.Chown != "" {
-			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("sudo chown %s %s", file.Chown, tmpPath)))
+			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chown %[1]s %[2]s || sudo chown %[1]s %[2]s", file.Chown, tmpPath)))
 			if err != nil {
 				return res, WrapErrorWith(err, stdout, stderr, "changing file ownership")
 			}
 		}
 
-		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, filepath.Dir(file.Destination))))
+		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%[1]s' || sudo mkdir -p '%[1]s'`, filepath.Dir(file.Destination))))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "creating file's directory on target host")
 		}
 
-		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)))
+		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mv %[1]s %[2]s || sudo mv %[1]s %[2]s`, tmpPath, file.Destination)))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "moving file to destination path")
 		}
@@ -208,7 +208,7 @@ func DeleteFile(ctx context.Context, client it.Transport, req *DeleteFileRequest
 
 	rmFile := func(ctx context.Context) (interface{}, error) {
 		var res interface{}
-		stderr, stdout, err := client.Run(ctx, command.New(fmt.Sprintf("sudo rm -r %s", req.Path)))
+		stderr, stdout, err := client.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
 		}

@@ -1,23 +1,123 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
+	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
+type TransportType uint
+
+const (
+	UNKNOWN TransportType = iota
+	SSH
+	K8S
+	NOMAD
+)
+
+func (t TransportType) String() string {
+	switch t {
+	case SSH:
+		return "ssh"
+	case K8S:
+		return "kubernetes"
+	case NOMAD:
+		return "nomad"
+	}
+	return "unknown"
+}
+
+func (t TransportType) createTransport() (transportState, error) {
+	switch t {
+	case SSH:
+		return newEmbeddedTransportSSH(), nil
+	case K8S:
+		return newEmbeddedTransportK8Sv1(), nil
+	case NOMAD:
+		return newEmbeddedTransportNomadv1(), nil
+	}
+	return nil, fmt.Errorf("failed to create transport for unknown transport type: %s", t.String())
+}
+
+func (t TransportType) isKnown() bool {
+	switch t {
+	case SSH, K8S, NOMAD:
+		return true
+	}
+	return false
+}
+
+func transportTypeFrom(typeString string) TransportType {
+	switch typeString {
+	case "ssh":
+		return SSH
+	case "kubernetes":
+		return K8S
+	case "nomad":
+		return NOMAD
+	}
+	return UNKNOWN
+}
+
+var TransportTypes = []TransportType{SSH, K8S, NOMAD}
+
+type Transports map[TransportType]transportState
+
+func (t Transports) types() []TransportType {
+	var types []TransportType
+
+	for tType := range t {
+		types = append(types, tType)
+	}
+
+	return types
+}
+
+// getConfiguredTransport gets the configured transport if there is only one configured. If there
+// is more than one configured transport or none the second parameter will be false and an error
+// is returned. The error is returned in addition to the bool value since it will contain the
+// appropriate error message.
+func (t Transports) getConfiguredTransport() (transportState, bool, error) {
+	var transport transportState
+	for _, trans := range t {
+		if transport != nil {
+			return nil, false, newErrWithDiagnostics(
+				"Invalid Transport Configuration",
+				fmt.Sprintf("Only one transport can be configured, %v were configured", t.types()),
+			)
+		}
+		transport = trans
+	}
+
+	if transport == nil {
+		return nil, false, newErrWithDiagnostics(
+			"Invalid Transport Configuration",
+			fmt.Sprintf("No transport configured, one of %v must be configured", TransportTypes),
+		)
+	}
+
+	return transport, true, nil
+}
+
+var transportTmpl = template.Must(template.New("transport").Parse(`
+transport = {
+  {{range $config := .}}
+  {{$config}}
+  {{end}} 
+}`))
+
 // embeddedTransportV1 represents the embedded transport state for all
 // resources and data source. It is intended to be used as ouput from the
 // transport data source and used as the transport input for all resources.
 type embeddedTransportV1 struct {
-	mu  sync.Mutex
-	SSH *embeddedTransportSSHv1 `json:"ssh"`
-	K8S *embeddedTransportK8Sv1 `json:"k8s"`
+	mu         sync.Mutex
+	transports Transports
 }
 
 // transportState interface defining the api of a transport
@@ -48,14 +148,65 @@ type transportState interface {
 	// transport is one that has a value for any of its attributes. The attribute value can come either
 	// from the resources terraform configuration or from provider defaults.
 	IsConfigured() bool
+
+	Type() TransportType
+
+	// render renders the transport state to HCL
+	render() (string, error)
 }
 
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
-		mu:  sync.Mutex{},
-		SSH: newEmbeddedTransportSSH(),
-		K8S: newEmbeddedTransportK8Sv1(),
+		mu:         sync.Mutex{},
+		transports: map[TransportType]transportState{},
 	}
+}
+
+func (em *embeddedTransportV1) SSH() (*embeddedTransportSSHv1, bool) {
+	transport, ok := em.transports[SSH]
+	if !ok {
+		return nil, false
+	}
+	ssh, ok := transport.(*embeddedTransportSSHv1)
+	if !ok {
+		return nil, false
+	}
+	return ssh, true
+}
+
+func (em *embeddedTransportV1) K8S() (*embeddedTransportK8Sv1, bool) {
+	transport, ok := em.transports[K8S]
+	if !ok {
+		return nil, false
+	}
+	k8s, ok := transport.(*embeddedTransportK8Sv1)
+	if !ok {
+		return nil, false
+	}
+	return k8s, true
+}
+
+func (em *embeddedTransportV1) Nomad() (*embeddedTransportNomadv1, bool) {
+	transport, ok := em.transports[NOMAD]
+	if !ok {
+		return nil, false
+	}
+	nomad, ok := transport.(*embeddedTransportNomadv1)
+	if !ok {
+		return nil, false
+	}
+	return nomad, true
+}
+
+func (em *embeddedTransportV1) SetTransportState(states ...transportState) error {
+	for _, state := range states {
+		transportType := state.Type()
+		if transportType == UNKNOWN {
+			return fmt.Errorf("failed to set transport state for unknown transport type: ")
+		}
+		em.transports[transportType] = state
+	}
+	return nil
 }
 
 // SchemaAttributeTransport is our transport schema configuration attribute.
@@ -79,15 +230,20 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 		return err
 	}
 
-	if ssh, ok := vals["ssh"]; ok && ssh.IsKnown() {
-		if err := em.SSH.FromTerraform5Value(vals["ssh"]); err != nil {
-			return err
+	for key, val := range vals {
+		tType := transportTypeFrom(key)
+		if !tType.isKnown() {
+			return fmt.Errorf("failed to unmarshall unknown transport config: %s", key)
 		}
-	}
-
-	if k8s, ok := vals["kubernetes"]; ok && k8s.IsKnown() {
-		if err := em.K8S.FromTerraform5Value(vals["kubernetes"]); err != nil {
-			return err
+		if val.IsKnown() {
+			transport, err := tType.createTransport()
+			if err != nil {
+				return err
+			}
+			if err := transport.FromTerraform5Value(val); err != nil {
+				return err
+			}
+			em.transports[tType] = transport
 		}
 	}
 
@@ -106,16 +262,12 @@ func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
 	values := map[string]tftypes.Value{}
 	attributeTypes := map[string]tftypes.Type{}
 
-	if em.SSH.IsConfigured() {
-		value := em.SSH.Terraform5Value()
-		values["ssh"] = value
-		attributeTypes["ssh"] = value.Type()
-	}
-
-	if em.K8S.IsConfigured() {
-		value := em.K8S.Terraform5Value()
-		values["kubernetes"] = value
-		attributeTypes["kubernetes"] = value.Type()
+	for tType, transport := range em.transports {
+		if transport.IsConfigured() {
+			value := transport.Terraform5Value()
+			values[tType.String()] = value
+			attributeTypes[tType.String()] = value.Type()
+		}
 	}
 
 	if len(values) == 0 {
@@ -133,22 +285,8 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 
 	newCopy := newEmbeddedTransport()
 
-	self, err := json.Marshal(em)
-	if err != nil {
-		return newCopy, err
-	}
-
-	err = json.Unmarshal(self, newCopy)
-	if err != nil {
-		return newCopy, err
-	}
-
-	if em.SSH.IsConfigured() {
-		newCopy.SSH.Values = em.SSH.CopyValues()
-	}
-
-	if em.K8S.IsConfigured() {
-		newCopy.K8S.Values = em.K8S.CopyValues()
+	if err := newCopy.FromTerraform5Value(em.Terraform5Value()); err != nil {
+		return nil, err
 	}
 
 	return newCopy, nil
@@ -158,13 +296,11 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 // terraform configuration for that resoruce. The configured attributes do not include the attributes
 // that may have been received as default values via ApplyDefaults. To get all the attribute values
 // including those recieved via defaults use the Attributes method instead.
-func (em *embeddedTransportV1) CopyValues() map[string]map[string]tftypes.Value {
-	configuredAttributes := map[string]map[string]tftypes.Value{}
-	if em.SSH.IsConfigured() {
-		configuredAttributes["ssh"] = em.SSH.CopyValues()
-	}
-	if em.K8S.IsConfigured() {
-		configuredAttributes["kubernetes"] = em.K8S.CopyValues()
+func (em *embeddedTransportV1) CopyValues() map[TransportType]map[string]tftypes.Value {
+	configuredAttributes := map[TransportType]map[string]tftypes.Value{}
+
+	for tType, transport := range em.transports {
+		configuredAttributes[tType] = transport.CopyValues()
 	}
 
 	return configuredAttributes
@@ -173,13 +309,11 @@ func (em *embeddedTransportV1) CopyValues() map[string]map[string]tftypes.Value 
 // Attributes returns all the attributes of the transport state. This includes those that where
 // configured by the user (via terraform configuration) and those that received their values
 // via defaults
-func (em *embeddedTransportV1) Attributes() map[string]map[string]TFType {
-	attributes := map[string]map[string]TFType{}
-	if em.SSH.IsConfigured() {
-		attributes["ssh"] = em.SSH.Attributes()
-	}
-	if em.K8S.IsConfigured() {
-		attributes["kubernetes"] = em.K8S.Attributes()
+func (em *embeddedTransportV1) Attributes() map[TransportType]map[string]TFType {
+	attributes := map[TransportType]map[string]TFType{}
+
+	for tType, transport := range em.transports {
+		attributes[tType] = transport.Attributes()
 	}
 
 	return attributes
@@ -239,59 +373,58 @@ func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) erro
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
+	configuredCount := len(em.transports)
 	switch {
-	case em.SSH.IsConfigured():
-		if err := em.SSH.ApplyDefaults(defaults.SSH.Attributes()); err != nil {
+	case configuredCount == 1:
+		if configured, configuredOk, _ := em.transports.getConfiguredTransport(); configuredOk {
+			if defaultsTransport, defaultsOk := defaults.transports[configured.Type()]; defaultsOk {
+				if err := configured.ApplyDefaults(defaultsTransport.Attributes()); err != nil {
+					return err
+				}
+			}
+		}
+
+	// If this embedded transport configuration does not define a transport block, then it should
+	// receive its transport configuration entirely from the enos provider configuration.
+	// In this case the transport defaults cannot be configured with more than one  transport since
+	// it would not be possible to know which transport client to build when applying the resource.
+	case configuredCount == 0:
+		defaultsTransport, err := defaults.GetConfiguredTransport()
+		if err != nil {
 			return err
 		}
-	case em.K8S.IsConfigured():
-		if err := em.K8S.ApplyDefaults(defaults.K8S.Attributes()); err != nil {
+
+		transport, err := defaultsTransport.Type().createTransport()
+		if err != nil {
 			return err
 		}
-	// the default case here is the case where the resource does not define a transport block and
-	// should therefore receive its transport configuration entirely from the enos provider configuration.
-	// In this case it is not valid that the enos provider transport is configured with more than one
-	// transport since it would not be possible to know which transport client to build when applying
-	// the resource.
-	default:
-		switch {
-		case defaults.SSH.IsConfigured() && !defaults.K8S.IsConfigured():
-			if err := em.SSH.ApplyDefaults(defaults.SSH.Attributes()); err != nil {
-				return err
-			}
-		case !defaults.SSH.IsConfigured() && defaults.K8S.IsConfigured():
-			if err := em.K8S.ApplyDefaults(defaults.K8S.Attributes()); err != nil {
-				return err
-			}
-		case defaults.SSH.IsConfigured() && defaults.K8S.IsConfigured():
-			return newErrWithDiagnostics("Invalid Transport Configuration", "Only one transport can be configured, both 'ssh' and 'kubernetes' where configured")
-		default:
-			return newErrWithDiagnostics("Invalid Transport Configuration", "No transport configured, one of 'ssh' or 'kubernetes' must be configured")
+		if err := transport.ApplyDefaults(defaultsTransport.Attributes()); err != nil {
+			return err
 		}
+		if err := em.SetTransportState(transport); err != nil {
+			return err
+		}
+
+	case configuredCount > 1:
+		return newErrWithDiagnostics(
+			"Invalid Transport Configuration",
+			fmt.Sprintf("Only one transport can be configured, %v were configured", em.transports.types()),
+		)
 	}
 
 	return nil
 }
 
 // GetConfiguredTransport Gets the configured transport for this embedded transport. There should be
-// only one configured transport for a resource. If there are none configured or both configured calling
-// this method will return an error.
+// only one configured transport for a resource. If there are none configured or more than one configured
+// calling this method will return an error.
 func (em *embeddedTransportV1) GetConfiguredTransport() (transportState, error) {
-	sshIsConfigured := em.SSH.IsConfigured()
-	k8sIsConfigured := em.K8S.IsConfigured()
-
-	switch {
-	case sshIsConfigured && k8sIsConfigured:
-		return nil, newErrWithDiagnostics("Invalid configuration", "Only one transport can be configured, both 'ssh' and 'kubernetes' where configured")
-	case sshIsConfigured:
-		return em.SSH, nil
-	case k8sIsConfigured:
-		return em.K8S, nil
-	default:
-		return nil, newErrWithDiagnostics(
-			"Invalid Transport Configuration",
-			"No transport configured, one of 'ssh' or 'kubernetes' must be configured")
+	transport, _, err := em.transports.getConfiguredTransport()
+	if err != nil {
+		return nil, err
 	}
+
+	return transport, nil
 }
 
 func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Value, transportType string) error {
@@ -319,14 +452,13 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 }
 
 func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embeddedTransportV1) []*tftypes.AttributePath {
-	attrs := []*tftypes.AttributePath{}
+	var attrs []*tftypes.AttributePath
 
-	if em.SSH.IsConfigured() && proposed.SSH.IsConfigured() {
-		attrs = addAttributesForReplace(em.SSH, proposed.SSH, attrs, "ssh")
-	}
-
-	if em.K8S.IsConfigured() && proposed.K8S.IsConfigured() {
-		attrs = addAttributesForReplace(em.K8S, proposed.K8S, attrs, "kubernetes")
+	for tType, transport := range em.transports {
+		proposedTransport := proposed.transports[tType]
+		if transport.IsConfigured() && proposedTransport.IsConfigured() {
+			addAttributesForReplace(transport, proposedTransport, attrs, tType.String())
+		}
 	}
 
 	if len(attrs) > 0 {
@@ -407,8 +539,30 @@ func isTransportConfigured(state transportState) bool {
 // checkK8STransportNotConfigured verifies that the Kubernetes transport is not configured. An error
 // is returned if the K8S transport is configured.
 func checkK8STransportNotConfigured(state StateWithTransport, resourceName string) error {
-	if state.EmbeddedTransport().K8S.IsConfigured() {
+	if _, ok := state.EmbeddedTransport().transports[K8S]; ok {
 		return newErrWithDiagnostics("invalid configuration", fmt.Sprintf("the '%s' resource does not support the 'kubernetes' transport", resourceName))
 	}
 	return nil
+}
+
+func (em *embeddedTransportV1) render() (string, error) {
+	if len(em.transports) == 0 {
+		return "", nil
+	}
+
+	var cfgs []string
+	for _, state := range em.transports {
+		cfg, err := state.render()
+		if err != nil {
+			return "", err
+		}
+		cfgs = append(cfgs, cfg)
+	}
+
+	buf := bytes.Buffer{}
+	if err := transportTmpl.Execute(&buf, cfgs); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -13,7 +14,9 @@ import (
 
 // TestAccResourceVaultInit tests the vault_init resource
 func TestAccResourceVaultInit(t *testing.T) {
-	cfg := template.Must(template.New("enos_vault_init").Parse(`resource "enos_vault_init" "{{.ID.Value}}" {
+	cfg := template.Must(template.New("enos_vault_init").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_vault_init" "{{.ID.Value}}" {
 		{{if .BinPath.Value}}
 		bin_path = "{{.BinPath.Value}}"
 		{{end}}
@@ -62,35 +65,7 @@ func TestAccResourceVaultInit(t *testing.T) {
 		stored_shares = {{.StoredShares.Value}}
 		{{end}}
 
-		transport = {
-			ssh = {
-				{{if .Transport.SSH.User.Value}}
-				user = "{{.Transport.SSH.User.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Host.Value}}
-				host = "{{.Transport.SSH.Host.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKey.Value}}
-				private_key = <<EOF
-{{.Transport.SSH.PrivateKey.Value}}
-EOF
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKeyPath.Value}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Passphrase.Value}}
-				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PassphrasePath.Value}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
-				{{end}}
-			}
-		}
+		{{ renderTransport .Transport }}
 	}`))
 
 	cases := []testAccResourceTemplate{}
@@ -109,11 +84,13 @@ EOF
 	vaultInit.ConsulAuto.Set(true)
 	vaultInit.ConsulService.Set("vault")
 	vaultInit.StoredShares.Set(7)
-	vaultInit.Transport.SSH.User.Set("ubuntu")
-	vaultInit.Transport.SSH.Host.Set("localhost")
+	ssh := newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	vaultInit.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, vaultInit.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		vaultInit,

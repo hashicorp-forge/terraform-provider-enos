@@ -237,6 +237,35 @@ provider "enos" {
 
 The `transport` stanza for a provider or a resource has the same syntax.
 
+## Nomad Transport Configuration
+
+The `Nomad` transport can be used to execute remote commands on a container running in a `Task`.
+
+The following is the supported configuration
+
+|nomad transport key|description|type|required|
+|-|-|-|-|
+|host|nomad server host, i.e. http://23.56.78.9:4646|string|yes|
+|secret_id|the nomad server secret for authenticated connections|string|no|
+|allocation_id|the allocation id for the allocation to access|string|yes|
+|task_name|the name of the task within the allocation to access|string|yes|
+
+Example configuration
+```hcl
+provider "enos" {
+  transport = {
+    nomad = {
+      host          = "http://127.0.0.1:4646"
+      secret_id     = "some secret"
+      allocation_id = "g72bc97a"
+      task_name     = "vault"
+    }
+  }
+}
+```
+
+The `transport` stanza for a provider or a resource has the same syntax.
+
 # Data Sources
 
 The provider provides the following datasources.

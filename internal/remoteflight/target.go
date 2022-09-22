@@ -16,13 +16,13 @@ func TargetPlatform(ctx context.Context, ssh transport.Transport) (string, error
 	// Get the platform and architecture of the remote machine so that we can
 	// make sure it's a supported target and so we can install the correct binary.
 	getPlatform := func(ctx context.Context) (interface{}, error) {
-		platform, _, err := ssh.Run(ctx, command.New("uname -s"))
+		platform, stderr, err := ssh.Run(ctx, command.New("uname -s"))
 		if err != nil {
 			return "", fmt.Errorf("determining target host platform: %w", err)
 		}
 
 		if platform == "" {
-			return "", fmt.Errorf("failed to determine platform")
+			return "", fmt.Errorf("failed to determine platform, stderr: %s", stderr)
 		}
 
 		return platform, nil
@@ -51,13 +51,13 @@ func TargetPlatform(ctx context.Context, ssh transport.Transport) (string, error
 // TargetArchitecture is a helper that determines the targets architecture
 func TargetArchitecture(ctx context.Context, ssh transport.Transport) (string, error) {
 	getArchitecture := func(ctx context.Context) (interface{}, error) {
-		arch, _, err := ssh.Run(ctx, command.New("uname -m"))
+		arch, stderr, err := ssh.Run(ctx, command.New("uname -m"))
 		if err != nil {
 			return "", fmt.Errorf("determining target host architecture: %w", err)
 		}
 
 		if arch == "" {
-			return "", fmt.Errorf("failed to determine architecture")
+			return "", fmt.Errorf("failed to determine architecture, stderr: %s", stderr)
 		}
 
 		return arch, nil

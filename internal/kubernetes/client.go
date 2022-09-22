@@ -1,8 +1,6 @@
 package kubernetes
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -10,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,8 +20,6 @@ import (
 	"k8s.io/client-go/util/exec"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 const kubeConfigEnvVar = "KUBECONFIG"
@@ -39,18 +34,19 @@ type ClientCfg struct {
 	ContextName      string
 }
 
-type ExecRequest struct {
+// execRequest A kubernetes based exec request
+type execRequest struct {
+	client  *Client
+	opts    ExecRequestOpts
+	streams *it.ExecStreams
+}
+
+type ExecRequestOpts struct {
 	Command   string
-	StdIn     io.Reader
+	StdIn     bool
 	Namespace string
 	Pod       string
 	Container string
-}
-
-type ExecResponse struct {
-	Stdout  io.Reader
-	Stderr  io.Reader
-	ExecErr chan error
 }
 
 type GetPodInfoRequest struct {
@@ -64,61 +60,12 @@ type PodInfo struct {
 	Namespace string
 }
 
-// WaitForResults waits for the execution to finish and returns the stdout, stderr and the execution error
-// if there is any.
-func (e *ExecResponse) WaitForResults() (stdout, stderr string, err error) {
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	captureOutput := func(writer io.StringWriter, reader io.Reader, errC chan error, stream string) {
-		scanner := bufio.NewScanner(reader)
-		for scanner.Scan() {
-			_, execErr := writer.WriteString(scanner.Text())
-			if execErr != nil {
-				errC <- fmt.Errorf("failed to write exec %s, due to %v", stream, execErr)
-				break
-			}
-		}
-		wg.Done()
+func NewExecRequest(client *Client, opts ExecRequestOpts) it.ExecRequest {
+	return &execRequest{
+		client:  client,
+		opts:    opts,
+		streams: it.NewExecStreams(opts.StdIn),
 	}
-
-	stdoutBuf := &bytes.Buffer{}
-	stderrBuf := &bytes.Buffer{}
-
-	streamWriteErrC := make(chan error, 2)
-	go captureOutput(stdoutBuf, e.Stdout, streamWriteErrC, "stdout")
-	go captureOutput(stderrBuf, e.Stderr, streamWriteErrC, "stderr")
-
-	execErr := <-e.ExecErr
-
-	wg.Wait()
-	close(streamWriteErrC)
-
-	writeErrs := &multierror.Error{}
-	for streamErr := range streamWriteErrC {
-		writeErrs = multierror.Append(writeErrs, streamErr)
-	}
-
-	stdout = stdoutBuf.String()
-	stderr = stderrBuf.String()
-
-	if execErr != nil {
-		switch e := execErr.(type) {
-		case *it.ExecError:
-			e.Append(writeErrs)
-			err = e
-		default:
-			// in the case that the exec error is not a transport.ExecError we create a new multierror
-			// here and append the exec error first then the other errors.
-			allErrors := &multierror.Error{}
-			allErrors = multierror.Append(allErrors, execErr, writeErrs)
-			err = allErrors.ErrorOrNil()
-		}
-	} else {
-		err = writeErrs.ErrorOrNil()
-	}
-
-	return stdout, stderr, err
 }
 
 func NewClient(cfg ClientCfg) (*Client, error) {
@@ -133,11 +80,13 @@ func NewClient(cfg ClientCfg) (*Client, error) {
 	}, nil
 }
 
+func (e *execRequest) Streams() *it.ExecStreams {
+	return e.streams
+}
+
 // Exec executes a command on a remote pod as would be done via `kubectl exec`.
-func (c *Client) Exec(ctx context.Context, request ExecRequest) *ExecResponse {
-	response := &ExecResponse{
-		ExecErr: make(chan error, 1),
-	}
+func (e *execRequest) Exec(ctx context.Context) *it.ExecResponse {
+	response := it.NewExecResponse()
 
 	select {
 	case <-ctx.Done():
@@ -146,28 +95,22 @@ func (c *Client) Exec(ctx context.Context, request ExecRequest) *ExecResponse {
 	default:
 	}
 
-	executor, err := c.createExecutor(request)
+	executor, err := e.client.createExecutor(*e)
 	if err != nil {
 		response.ExecErr <- err
 		return response
 	}
 
-	stdout, stdOutWriter := io.Pipe()
-	stderr, stdErrWriter := io.Pipe()
-	response.Stdout = stdout
-	response.Stderr = stderr
-
-	completeExec := func() {
-		stdOutWriter.Close()
-		stdErrWriter.Close()
-	}
+	streams := e.streams
+	response.Stdout = streams.Stdout()
+	response.Stderr = streams.Stderr()
 
 	stream := func(stdout, stderr io.Writer) {
-		defer completeExec()
+		defer streams.Close()
 		execErr := executor.Stream(remotecommand.StreamOptions{
 			Stdout: stdout,
 			Stderr: stderr,
-			Stdin:  request.StdIn,
+			Stdin:  streams.Stdin(),
 		})
 		if execErr != nil {
 			var e exec.CodeExitError
@@ -178,7 +121,7 @@ func (c *Client) Exec(ctx context.Context, request ExecRequest) *ExecResponse {
 		response.ExecErr <- execErr
 	}
 
-	go stream(stdOutWriter, stdErrWriter)
+	go stream(streams.StdoutWriter(), streams.StderrWriter())
 
 	return response
 }
@@ -244,20 +187,20 @@ func createClientset(kubeConfigBase64, contextName string) (*kubernetes.Clientse
 	return clientset, config, nil
 }
 
-func (c *Client) createExecutor(execRequest ExecRequest) (remotecommand.Executor, error) {
+func (c *Client) createExecutor(execRequest execRequest) (remotecommand.Executor, error) {
 	request := c.clientset.CoreV1().RESTClient().
 		Post().
-		Namespace(execRequest.Namespace).
+		Namespace(execRequest.opts.Namespace).
 		Resource("pods").
-		Name(execRequest.Pod).
+		Name(execRequest.opts.Pod).
 		SubResource("exec").
 		VersionedParams(&v1.PodExecOptions{
-			Command:   []string{"/bin/sh", "-c", execRequest.Command},
-			Stdin:     execRequest.StdIn != nil,
+			Command:   []string{"/bin/sh", "-c", execRequest.opts.Command},
+			Stdin:     execRequest.Streams().Stdin() != nil,
 			Stdout:    true,
 			Stderr:    true,
 			TTY:       false,
-			Container: execRequest.Container,
+			Container: execRequest.opts.Container,
 		}, scheme.ParameterCodec)
 
 	return remotecommand.NewSPDYExecutor(c.restConfig, "POST", request.URL())

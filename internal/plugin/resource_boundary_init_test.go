@@ -6,6 +6,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -13,45 +14,19 @@ import (
 
 // TestAccResourceBoundaryInit tests the boundary_init resource
 func TestAccResourceBoundaryInit(t *testing.T) {
-	cfg := template.Must(template.New("enos_boundary_init").Parse(`resource "enos_boundary_init" "{{.ID.Value}}" {
-		{{if .BinPath.Value}}
-		bin_path = "{{.BinPath.Value}}"
-		{{end}}
+	cfg := template.Must(template.New("enos_boundary_init").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_boundary_init" "{{.ID.Value}}" {
+  {{if .BinPath.Value}}
+  bin_path = "{{.BinPath.Value}}"
+  {{end}}
 
-		{{if .ConfigPath.Value}}
-		config_path = "{{.ConfigPath.Value}}"
-		{{end}}
+  {{if .ConfigPath.Value}}
+  config_path = "{{.ConfigPath.Value}}"
+  {{end}}
 
-		transport = {
-			ssh = {
-				{{if .Transport.SSH.User.Value}}
-				user = "{{.Transport.SSH.User.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Host.Value}}
-				host = "{{.Transport.SSH.Host.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKey.Value}}
-				private_key = <<EOF
-{{.Transport.SSH.PrivateKey.Value}}
-EOF
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKeyPath.Value}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Passphrase.Value}}
-				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PassphrasePath.Value}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
-				{{end}}
-			}
-		}
-	}`))
+  {{ renderTransport .Transport }}
+}`))
 
 	cases := []testAccResourceTemplate{}
 
@@ -61,7 +36,9 @@ EOF
 	boundaryStart.ConfigPath.Set("/etc/boundary")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	boundaryStart.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh := newEmbeddedTransportSSH()
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, boundaryStart.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		boundaryStart,

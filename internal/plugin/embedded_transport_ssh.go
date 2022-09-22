@@ -1,7 +1,10 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
@@ -37,6 +40,21 @@ var defaultSSHTransportBuilder = func(state *embeddedTransportSSHv1, ctx context
 }
 
 var sshAttributes = []string{"user", "host", "private_key", "private_key_path", "passphrase", "passphrase_path"}
+
+var sshTransportTmpl = template.Must(template.New("ssh_transport").Parse(`
+    ssh = {
+      {{range $key, $val := .}}
+      {{if $val.Value}} 
+      {{if eq $key "private_key"}}
+      {{$key}} = <<EOF
+{{$val}}
+EOF
+      {{else}}
+      {{$key}} = "{{$val.Value}}"
+      {{end}}
+      {{end}}
+      {{end}}
+    }`))
 
 type embeddedTransportSSHv1 struct {
 	sshTransportBuilder sshTransportBuilder // added in order to support testing
@@ -155,4 +173,18 @@ func (em *embeddedTransportSSHv1) GetAttributesForReplace() []string {
 		return []string{"host"}
 	}
 	return []string{}
+}
+
+func (em *embeddedTransportSSHv1) Type() TransportType {
+	return SSH
+}
+
+// render renders the transport to terraform
+func (em *embeddedTransportSSHv1) render() (string, error) {
+	buf := bytes.Buffer{}
+	if err := sshTransportTmpl.Execute(&buf, em.Attributes()); err != nil {
+		return "", fmt.Errorf("failed to render ssh transport config, due to: %w", err)
+	}
+
+	return buf.String(), nil
 }

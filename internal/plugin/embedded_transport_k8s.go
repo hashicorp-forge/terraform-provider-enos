@@ -1,8 +1,10 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/k8s"
@@ -38,6 +40,15 @@ var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context
 }
 
 var k8sAttributes = []string{"kubeconfig_base64", "context_name", "namespace", "pod", "container"}
+
+var k8sTransportTmpl = template.Must(template.New("k8s_transport").Parse(`
+    kubernetes = {
+      {{range $key, $val := .}}
+      {{if $val.Value}}
+      {{$key}} = "{{$val.Value}}"
+      {{end}}
+      {{end}}
+    }`))
 
 type embeddedTransportK8Sv1 struct {
 	k8sTransportBuilder k8sTransportBuilder // added in order to support testing
@@ -142,4 +153,18 @@ func (em *embeddedTransportK8Sv1) GetAttributesForReplace() []string {
 	}
 
 	return attribsForReplace
+}
+
+func (em *embeddedTransportK8Sv1) Type() TransportType {
+	return K8S
+}
+
+// render renders the transport to terraform
+func (em *embeddedTransportK8Sv1) render() (string, error) {
+	buf := bytes.Buffer{}
+	if err := k8sTransportTmpl.Execute(&buf, em.Attributes()); err != nil {
+		return "", fmt.Errorf("failed to render k8s transport config, due to: %w", err)
+	}
+
+	return buf.String(), nil
 }

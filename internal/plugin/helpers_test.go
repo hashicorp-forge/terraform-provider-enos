@@ -19,6 +19,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
+// transportRenderFunc can be used to rebder the embedded transport in a resource template
+var transportRenderFunc = map[string]any{
+	"renderTransport": func(v1 *embeddedTransportV1) (string, error) {
+		return v1.render()
+	},
+}
+
 func readTestFile(path string) (string, error) {
 	res := ""
 	abs, err := filepath.Abs(path)
@@ -88,6 +95,7 @@ func unsetAllEnosEnv(t *testing.T) {
 	t.Helper()
 	unsetSSHEnv(t)
 	unsetK8SEnv(t)
+	unsetNomadEnv(t)
 }
 
 func unsetSSHEnv(t *testing.T) {
@@ -115,28 +123,56 @@ func unsetK8SEnv(t *testing.T) {
 	}
 }
 
+func unsetNomadEnv(t *testing.T) {
+	for _, eVar := range []string{
+		"ENOS_NOMAD_HOST",
+		"ENOS_NOMAD_SECRET_ID",
+		"ENOS_NOMAD_ALLOCATION_ID",
+		"ENOS_NOMAD_TASK_NAME",
+	} {
+		assert.NoError(t, os.Unsetenv(eVar))
+	}
+}
+
 func setEnosSSHEnv(t *testing.T, et *embeddedTransportV1) {
 	t.Helper()
 
+	ssh, ok := et.SSH()
+	assert.True(t, ok)
 	setEnvVars(t, map[string]*tfString{
-		"ENOS_TRANSPORT_USER":             et.SSH.User,
-		"ENOS_TRANSPORT_HOST":             et.SSH.Host,
-		"ENOS_TRANSPORT_PRIVATE_KEY":      et.SSH.PrivateKey,
-		"ENOS_TRANSPORT_PRIVATE_KEY_PATH": et.SSH.PrivateKeyPath,
-		"ENOS_TRANSPORT_PASSPHRASE":       et.SSH.Passphrase,
-		"ENOS_TRANSPORT_PASSPHRASE_PATH":  et.SSH.PassphrasePath,
+		"ENOS_TRANSPORT_USER":             ssh.User,
+		"ENOS_TRANSPORT_HOST":             ssh.Host,
+		"ENOS_TRANSPORT_PRIVATE_KEY":      ssh.PrivateKey,
+		"ENOS_TRANSPORT_PRIVATE_KEY_PATH": ssh.PrivateKeyPath,
+		"ENOS_TRANSPORT_PASSPHRASE":       ssh.Passphrase,
+		"ENOS_TRANSPORT_PASSPHRASE_PATH":  ssh.PassphrasePath,
 	})
 }
 
 func setEnosK8SEnv(t *testing.T, et *embeddedTransportV1) {
 	t.Helper()
 
+	k8s, ok := et.K8S()
+	assert.True(t, ok)
 	setEnvVars(t, map[string]*tfString{
-		"ENOS_KUBECONFIG":       et.K8S.KubeConfigBase64,
-		"ENOS_K8S_CONTEXT_NAME": et.K8S.ContextName,
-		"ENOS_K8S_NAMESPACE":    et.K8S.Namespace,
-		"ENOS_K8S_POD":          et.K8S.Pod,
-		"ENOS_K8S_CONTAINER":    et.K8S.Container,
+		"ENOS_KUBECONFIG":       k8s.KubeConfigBase64,
+		"ENOS_K8S_CONTEXT_NAME": k8s.ContextName,
+		"ENOS_K8S_NAMESPACE":    k8s.Namespace,
+		"ENOS_K8S_POD":          k8s.Pod,
+		"ENOS_K8S_CONTAINER":    k8s.Container,
+	})
+}
+
+func setENosNomadEnv(t *testing.T, et *embeddedTransportV1) {
+	t.Helper()
+
+	nomad, ok := et.Nomad()
+	assert.True(t, ok)
+	setEnvVars(t, map[string]*tfString{
+		"ENOS_NOMAD_HOST":          nomad.Host,
+		"ENOS_NOMAD_SECRET_ID":     nomad.SecretID,
+		"ENOS_NOMAD_ALLOCATION_ID": nomad.AllocationID,
+		"ENOS_NOMAD_TASK_NAME":     nomad.TaskName,
 	})
 }
 
@@ -211,6 +247,25 @@ func configureSSHTransportFromEnvironment(em *embeddedTransportSSHv1) {
 	}
 }
 
+func configureNomadTransportFromEnvironment(em *embeddedTransportNomadv1) {
+	for _, key := range []struct {
+		name string
+		env  string
+		dst  *tfString
+	}{
+		{"host", "ENOS_NOMAD_USER", em.Host},
+		{"secret_id", "ENOS_NOMAD_SECRET_ID", em.SecretID},
+		{"allocation_id", "ENOS_NOMAD_ALLOCATION_ID", em.AllocationID},
+		{"task_name", "ENOS_NOMAD_TASK_NAME", em.TaskName},
+	} {
+		val, ok := os.LookupEnv(key.env)
+		if ok {
+			key.dst.Set(val)
+			em.Values[key.name] = key.dst.TFValue()
+		}
+	}
+}
+
 // providerOverrides can be used to provide an alternate datasource or resource to override the defaults.
 type providerOverrides struct {
 	datasources []datarouter.DataSource
@@ -224,8 +279,16 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 	t.Helper()
 
 	provider := newProvider()
-	configureK8STransportFromEnvironment(provider.config.Transport.K8S)
-	configureSSHTransportFromEnvironment(provider.config.Transport.SSH)
+	assert.NoError(t, provider.config.Transport.SetTransportState(newEmbeddedTransportK8Sv1(), newEmbeddedTransportSSH(), newEmbeddedTransportNomadv1()))
+	if k8S, ok := provider.config.Transport.K8S(); ok {
+		configureK8STransportFromEnvironment(k8S)
+	}
+	if ssh, ok := provider.config.Transport.SSH(); ok {
+		configureSSHTransportFromEnvironment(ssh)
+	}
+	if nomad, ok := provider.config.Transport.Nomad(); ok {
+		configureNomadTransportFromEnvironment(nomad)
+	}
 
 	var datasourceOverrides []datarouter.DataSource
 	var resourceOverrides []resourcerouter.Resource

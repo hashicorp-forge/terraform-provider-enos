@@ -7,6 +7,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -14,7 +15,9 @@ import (
 
 // TestAccResourceBundleInstall tests the bundle_install resource
 func TestAccResourceBundleInstall(t *testing.T) {
-	cfg := template.Must(template.New("enos_bundle_install").Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
+	cfg := template.Must(template.New("enos_bundle_install").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
 		destination = "{{ .Destination.Value }}"
 
 		{{ if .Path.Value -}}
@@ -38,35 +41,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		}
 		{{ end -}}
 
-		transport = {
-			ssh = {
-				{{if .Transport.SSH.User.Value}}
-				user = "{{.Transport.SSH.User.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Host.Value}}
-				host = "{{.Transport.SSH.Host.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKey.Value}}
-				private_key = <<EOF
-   {{.Transport.SSH.PrivateKey.Value}}
-   EOF
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKeyPath.Value}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Passphrase.Value}}
-				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PassphrasePath}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
-				{{end}}
-			}
-		}
+		{{ renderTransport .Transport }}
 }`))
 
 	cases := []testAccResourceTemplate{}
@@ -77,9 +52,11 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	installBundlePath.ID.Set("path")
 	installBundlePath.Destination.Set("/usr/local/bin/vault")
 	installBundlePath.Path.Set("/some/local/path")
-	installBundlePath.Transport.SSH.User.Set("ubuntu")
-	installBundlePath.Transport.SSH.Host.Set("localhost")
-	installBundlePath.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh := newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"path",
 		installBundlePath,
@@ -99,9 +76,11 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	installBundleRelease.Release.Product.Set("vault")
 	installBundleRelease.Release.Version.Set("1.7.0")
 	installBundleRelease.Release.Edition.Set("ent")
-	installBundleRelease.Transport.SSH.User.Set("ubuntu")
-	installBundleRelease.Transport.SSH.Host.Set("localhost")
-	installBundleRelease.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"release",
 		installBundleRelease,
@@ -124,9 +103,11 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	installBundleArtifactory.Artifactory.Username.Set("some@user.com")
 	installBundleArtifactory.Artifactory.URL.Set("https://artifactory.com")
 	installBundleArtifactory.Artifactory.SHA256.Set("abcd1234")
-	installBundleArtifactory.Transport.SSH.User.Set("ubuntu")
-	installBundleArtifactory.Transport.SSH.Host.Set("localhost")
-	installBundleArtifactory.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, installBundleArtifactory.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"artifactory",
 		installBundleArtifactory,
@@ -150,7 +131,8 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		bundleInstallRealPathInstall.ID.Set("realpath")
 		bundleInstallRealPathInstall.Path.Set("../fixtures/bundle.zip")
 		bundleInstallRealPathInstall.Destination.Set("/opt/vault/bin")
-		bundleInstallRealPathInstall.Transport.SSH.Host.Set(enosVars["host"])
+		ssh := newEmbeddedTransportSSH()
+		ssh.Host.Set(enosVars["host"])
 		cases = append(cases, testAccResourceTemplate{
 			"real_path",
 			bundleInstallRealPathInstall,
@@ -164,7 +146,9 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		bundleInstallReleaseInstall.Release.Edition.Set("oss")
 		bundleInstallReleaseInstall.Release.Product.Set("boundary") // use boundary 0.1.0 cause it's not a big bundle
 		bundleInstallReleaseInstall.Release.Version.Set("0.1.0")
-		bundleInstallReleaseInstall.Transport.SSH.Host.Set(enosVars["host"])
+		ssh = newEmbeddedTransportSSH()
+		ssh.Host.Set(enosVars["host"])
+		assert.NoError(t, bundleInstallReleaseInstall.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"real_release",
 			bundleInstallReleaseInstall,
@@ -185,7 +169,9 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			bundleInstallArtifactoryInstall.Artifactory.Token.Set(artToken)
 			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-packagespec-buildcache-local/cache-v1/vault-enterprise/7fb88d4d3d0a36ffc78a522d870492e5791bae1b0640232ce4c6d69cc22cf520/store/f45845666b4e552bfc8ca775834a3ef6fc097fe0-1a2809da73e5896b6f766b395ff6e1804f876c45.zip")
 			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("d01a82111133908167a5a140604ab3ec8fd18601758376a5f8e9dd54c7703373")
-			bundleInstallArtifactoryInstall.Transport.SSH.Host.Set(enosVars["host"])
+			ssh := newEmbeddedTransportSSH()
+			ssh.Host.Set(enosVars["host"])
+			assert.NoError(t, bundleInstallArtifactoryInstall.Transport.SetTransportState(ssh))
 			cases = append(cases, testAccResourceTemplate{
 				"real_art",
 				bundleInstallArtifactoryInstall,

@@ -57,13 +57,13 @@ func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirect
 	var stdout string
 	var stderr string
 
-	stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, dir.DirName)))
+	stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%[1]s' || sudo mkdir -p '%[1]s'`, dir.DirName)))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "creating directory on target host")
 	}
 
 	if dir.DirOwner != "" {
-		stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("sudo chown -R %s %s", dir.DirOwner, dir.DirName)))
+		stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chown -R %[1]s %[2]s || sudo chown -R %[1]s %[2]s", dir.DirOwner, dir.DirName)))
 		if err != nil {
 			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
 		}

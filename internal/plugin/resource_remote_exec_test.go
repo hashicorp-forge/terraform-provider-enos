@@ -7,6 +7,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -14,7 +15,9 @@ import (
 
 // TestAccResourceRemoteExec tests the remote_exec resource
 func TestAccResourceRemoteExec(t *testing.T) {
-	cfg := template.Must(template.New("enos_remote_exec").Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
+	cfg := template.Must(template.New("enos_remote_exec").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
 		{{if .Content.Value}}
 		content = <<EOF
 {{.Content.Value}}
@@ -45,35 +48,7 @@ EOF
 		}
 		{{end}}
 
-		transport = {
-			ssh = {
-				{{if .Transport.SSH.User.Value}}
-				user = "{{.Transport.SSH.User.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Host.Value}}
-				host = "{{.Transport.SSH.Host.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKey.Value}}
-				private_key = <<EOF
-{{.Transport.SSH.PrivateKey.Value}}
-EOF
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKeyPath.Value}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Passphrase.Value}}
-				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PassphrasePath.Value}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
-				{{end}}
-			}
-		}
+		{{ renderTransport .Transport }}
 	}`))
 
 	cases := []testAccResourceTemplate{}
@@ -84,11 +59,13 @@ EOF
 	remoteExec.Scripts.SetStrings([]string{"../fixtures/src.txt"})
 	remoteExec.Inline.SetStrings([]string{"touch /tmp/foo"})
 	remoteExec.Content.Set("some content")
-	remoteExec.Transport.SSH.User.Set("ubuntu")
-	remoteExec.Transport.SSH.Host.Set("localhost")
+	ssh := newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	remoteExec.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, remoteExec.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		remoteExec,
@@ -117,7 +94,9 @@ EOF
 		realTest.Scripts.SetStrings([]string{"../fixtures/script.sh"})
 		realTest.Inline.SetStrings([]string{"touch /tmp/foo && rm /tmp/foo"})
 		realTest.Content.Set(`echo "hello world" > /tmp/enos_remote_exec_script_content`)
-		realTest.Transport.SSH.Host.Set(host)
+		ssh := newEmbeddedTransportSSH()
+		ssh.Host.Set(host)
+		assert.NoError(t, realTest.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"real test",
 			realTest,
@@ -127,7 +106,9 @@ EOF
 		noStdoutOrStderr := newRemoteExecStateV1()
 		noStdoutOrStderr.ID.Set("foo")
 		noStdoutOrStderr.Inline.SetStrings([]string{"exit 0"})
-		noStdoutOrStderr.Transport.SSH.Host.Set(host)
+		ssh = newEmbeddedTransportSSH()
+		ssh.Host.Set(host)
+		assert.NoError(t, noStdoutOrStderr.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"NoStdoutOrStderr",
 			noStdoutOrStderr,
@@ -149,7 +130,9 @@ EOF
 				test := newRemoteExecStateV1()
 				test.ID.Set("foo")
 				test.Content.Set(cmd)
-				test.Transport.SSH.Host.Set(host)
+				ssh := newEmbeddedTransportSSH()
+				ssh.Host.Set(host)
+				assert.NoError(t, test.Transport.SetTransportState(ssh))
 				buf := bytes.Buffer{}
 				err := cfg.Execute(&buf, test)
 				if err != nil {

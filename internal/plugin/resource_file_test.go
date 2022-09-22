@@ -27,7 +27,7 @@ type testAccResourceTransportTemplate struct {
 	check            resource.TestCheckFunc
 	transport        *embeddedTransportV1
 	resourceTemplate *template.Template
-	transportUsed    string
+	transportUsed    TransportType
 }
 
 // TestAccResourceFileResourceTransport tests both the basic enos_file resource interface
@@ -50,74 +50,23 @@ EOF
 		destination = "{{.Dst.Value}}"
 	}`))
 
-	sshResourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
-		{{if .Src.Value}}
-		source = "{{.Src.Value}}"
-		{{end}}
-
-		{{if .Content.Value}}
-		content = <<EOF
-{{.Content.Value}}"
-EOF
-		{{end}}
-
-		destination = "{{.Dst.Value}}"
-
-		transport = {
-			ssh = {
-				user = "{{.Transport.SSH.User.Value}}"
-				host = "{{.Transport.SSH.Host.Value}}"
-
-				{{if .Transport.SSH.PrivateKey.Value}}
-				private_key = <<EOF
-{{.Transport.SSH.PrivateKey.Value}}
-EOF
-				{{end}}
-
-				{{if .Transport.SSH.PrivateKeyPath.Value}}
-				private_key_path = "{{.Transport.SSH.PrivateKeyPath.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.Passphrase.Value}}
-				passphrase = "{{.Transport.SSH.Passphrase.Value}}"
-				{{end}}
-
-				{{if .Transport.SSH.PassphrasePath.Value}}
-				passphrase_path = "{{.Transport.SSH.PassphrasePath.Value}}"
-				{{end}}
-			}
-		}
-	}`))
-
-	k8sResourceTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
-		{{if .Src.Value}}
-		source = "{{.Src.Value}}"
-		{{end}}
-
-		{{if .Content.Value}}
-		content = <<EOF
-{{.Content.Value}}"
-EOF
-		{{end}}
-
-		destination = "{{.Dst.Value}}"
-
-		transport = {
-			kubernetes = {
-				kubeconfig_base64 = "{{.Transport.K8S.KubeConfigBase64.Value}}"
-				context_name      = "{{.Transport.K8S.ContextName.Value}}"
-				pod               = "{{.Transport.K8S.Pod.Value}}"
-
-				{{if .Transport.K8S.Namespace.Value}}
-				namespace = "{{.Transport.K8S.Namespace.Value}}"
-				{{end}}
-
-				{{if .Transport.K8S.Container.Value}}
-				container = "{{.Transport.K8S.Container.Value}}"
-				{{end}}
-			}
-		}
-	}`))
+	resourceTransport := template.Must(template.New("enos_file").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_file" "{{.ID.Value}}" {
+			{{if .Src.Value}}
+			source = "{{.Src.Value}}"
+			{{end}}
+	
+			{{if .Content.Value}}
+			content = <<EOF
+	{{.Content.Value}}"
+	EOF
+			{{end}}
+	
+			destination = "{{.Dst.Value}}"
+	
+			{{ renderTransport .Transport }}
+		}`))
 
 	cases := []testAccResourceTransportTemplate{}
 
@@ -125,11 +74,13 @@ EOF
 	keyNoPass.ID.Set("foo")
 	keyNoPass.Src.Set("../fixtures/src.txt")
 	keyNoPass.Dst.Set("/tmp/dst")
-	keyNoPass.Transport.SSH.User.Set("ubuntu")
-	keyNoPass.Transport.SSH.Host.Set("localhost")
+	ssh := newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
-	keyNoPass.Transport.SSH.PrivateKey.Set(privateKey)
+	ssh.PrivateKey.Set(privateKey)
+	assert.NoError(t, keyNoPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with no passphrase",
 		keyNoPass,
@@ -141,93 +92,140 @@ EOF
 			resource.TestMatchResourceAttr("enos_file.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),
 		keyNoPass.Transport,
-		sshResourceTransport,
-		"ssh",
+		resourceTransport,
+		SSH,
 	})
 
 	keyPathNoPass := newFileState()
 	keyPathNoPass.ID.Set("foo")
 	keyPathNoPass.Src.Set("../fixtures/src.txt")
 	keyPathNoPass.Dst.Set("/tmp/dst")
-	keyPathNoPass.Transport.SSH.User.Set("ubuntu")
-	keyPathNoPass.Transport.SSH.Host.Set("localhost")
-	keyPathNoPass.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh.pem")
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKeyPath.Set("../fixtures/ssh.pem")
+	assert.NoError(t, keyPathNoPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key from a file path with no passphrase",
 		keyPathNoPass,
 		resource.ComposeTestCheckFunc(),
 		keyPathNoPass.Transport,
-		sshResourceTransport,
-		"ssh",
+		resourceTransport,
+		SSH,
 	})
 
 	keyPass := newFileState()
 	keyPass.ID.Set("foo")
 	keyPass.Src.Set("../fixtures/src.txt")
 	keyPass.Dst.Set("/tmp/dst")
-	keyPass.Transport.SSH.User.Set("ubuntu")
-	keyPass.Transport.SSH.Host.Set("localhost")
-	keyPass.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	passphrase, err := readTestFile("../fixtures/passphrase.txt")
 	require.NoError(t, err)
-	keyPass.Transport.SSH.Passphrase.Set(passphrase)
+	ssh.Passphrase.Set(passphrase)
+	assert.NoError(t, keyPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with passphrase value",
 		keyPass,
 		resource.ComposeTestCheckFunc(),
 		keyPass.Transport,
-		sshResourceTransport,
-		"ssh",
+		resourceTransport,
+		SSH,
 	})
 
 	keyPassPath := newFileState()
 	keyPassPath.ID.Set("foo")
 	keyPassPath.Src.Set("../fixtures/src.txt")
 	keyPassPath.Dst.Set("/tmp/dst")
-	keyPassPath.Transport.SSH.User.Set("ubuntu")
-	keyPassPath.Transport.SSH.Host.Set("localhost")
-	keyPassPath.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
-	keyPassPath.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
+	ssh.PassphrasePath.Set("../fixtures/passphrase.txt")
+	assert.NoError(t, keyPassPath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with passphrase from file path",
 		keyPassPath,
 		resource.ComposeTestCheckFunc(),
 		keyPassPath.Transport,
-		sshResourceTransport,
-		"ssh",
+		resourceTransport,
+		SSH,
 	})
 
 	content := newFileState()
 	content.ID.Set("foo")
 	content.Content.Set("hello world")
 	content.Dst.Set("/tmp/dst")
-	content.Transport.SSH.User.Set("ubuntu")
-	content.Transport.SSH.Host.Set("localhost")
-	content.Transport.SSH.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
-	content.Transport.SSH.PassphrasePath.Set("../fixtures/passphrase.txt")
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
+	ssh.PassphrasePath.Set("../fixtures/passphrase.txt")
+	assert.NoError(t, content.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] with string content instead of source file",
 		content,
 		resource.ComposeTestCheckFunc(),
 		content.Transport,
-		sshResourceTransport,
-		"ssh",
+		resourceTransport,
+		SSH,
 	})
 
 	content = newFileState()
 	content.ID.Set("foo")
 	content.Content.Set("hello world")
 	content.Dst.Set("/tmp/dst")
-	content.Transport.K8S.KubeConfigBase64.Set("../fixtures/kubeconfig")
-	content.Transport.K8S.ContextName.Set("kind-kind")
-	content.Transport.K8S.Pod.Set("some-pod")
+	k8s := newEmbeddedTransportK8Sv1()
+	k8s.KubeConfigBase64.Set("../fixtures/kubeconfig")
+	k8s.ContextName.Set("kind-kind")
+	k8s.Pod.Set("some-pod")
+	assert.NoError(t, content.Transport.SetTransportState(k8s))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[kubernetes] with string content instead of source file",
 		content,
 		resource.ComposeTestCheckFunc(),
 		content.Transport,
-		k8sResourceTransport,
-		"k8s",
+		resourceTransport,
+		K8S,
+	})
+
+	content = newFileState()
+	content.ID.Set("foo")
+	content.Content.Set("hello world")
+	content.Dst.Set("/tmp/dst")
+	nomad := newEmbeddedTransportNomadv1()
+	nomad.Host.Set("http://127.0.0.1:4646")
+	nomad.SecretID.Set("secret")
+	nomad.AllocationID.Set("d76bc89d")
+	nomad.TaskName.Set("task")
+	assert.NoError(t, content.Transport.SetTransportState(nomad))
+	cases = append(cases, testAccResourceTransportTemplate{
+		"[nomad] with string content instead of source file",
+		content,
+		resource.ComposeTestCheckFunc(),
+		content.Transport,
+		resourceTransport,
+		NOMAD,
+	})
+
+	content = newFileState()
+	content.ID.Set("foo")
+	content.Content.Set("hello world")
+	content.Dst.Set("/tmp/dst")
+	nomad = newEmbeddedTransportNomadv1()
+	nomad.Host.Set("http://127.0.0.1:4646")
+	nomad.AllocationID.Set("d76bc89d")
+	nomad.TaskName.Set("task")
+	assert.NoError(t, content.Transport.SetTransportState(nomad))
+	cases = append(cases, testAccResourceTransportTemplate{
+		"[nomad] with string content instead of source file no secret id",
+		content,
+		resource.ComposeTestCheckFunc(),
+		content.Transport,
+		resourceTransport,
+		NOMAD,
 	})
 
 	for _, test := range cases {
@@ -237,7 +235,7 @@ EOF
 			defer resetEnv(t)
 
 			buf := bytes.Buffer{}
-			err := sshResourceTransport.Execute(&buf, test.state)
+			err := test.resourceTemplate.Execute(&buf, test.state)
 			if err != nil {
 				t.Fatalf("error executing test template: %s", err.Error())
 			}
@@ -259,10 +257,12 @@ EOF
 		t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
 			unsetAllEnosEnv(t)
 			switch test.transportUsed {
-			case "ssh":
+			case SSH:
 				setEnosSSHEnv(t, test.transport)
-			case "k8s":
+			case K8S:
 				setEnosK8SEnv(t, test.transport)
+			case NOMAD:
+				setENosNomadEnv(t, test.transport)
 			default:
 				t.Errorf("unknown transport type: %s", test.transportUsed)
 			}
@@ -300,34 +300,38 @@ EOF
 		realTestSrc.ID.Set("real")
 		realTestSrc.Src.Set("../fixtures/src.txt")
 		realTestSrc.Dst.Set("/tmp/real_test_src")
-		realTestSrc.Transport.SSH.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
-		realTestSrc.Transport.SSH.Host.Set(host)
-		realTestSrc.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
-		realTestSrc.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
+		ssh := newEmbeddedTransportSSH()
+		ssh.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
+		ssh.Host.Set(host)
+		ssh.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
+		ssh.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
+		assert.NoError(t, realTestSrc.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"[ssh] real test source file",
 			realTestSrc,
 			resource.ComposeTestCheckFunc(),
 			realTestSrc.Transport,
-			sshResourceTransport,
-			"ssh",
+			resourceTransport,
+			SSH,
 		})
 
 		realTestContent := newFileState()
 		realTestContent.ID.Set("real")
 		realTestContent.Content.Set("string")
 		realTestContent.Dst.Set("/tmp/real_test_content")
-		realTestContent.Transport.SSH.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
-		realTestContent.Transport.SSH.Host.Set(host)
-		realTestContent.Transport.SSH.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
-		realTestContent.Transport.SSH.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
+		ssh = newEmbeddedTransportSSH()
+		ssh.User.Set(os.Getenv("ENOS_TRANSPORT_USER"))
+		ssh.Host.Set(host)
+		ssh.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
+		ssh.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
+		assert.NoError(t, realTestContent.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"[ssh] real test content",
 			realTestContent,
 			resource.ComposeTestCheckFunc(),
 			realTestContent.Transport,
-			sshResourceTransport,
-			"ssh",
+			resourceTransport,
+			SSH,
 		})
 
 		for _, test := range cases {
@@ -402,7 +406,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	}
 }`
 
-	k8sCfg := `resource enos_file "bad_ssh" {
+	k8sCfg := `resource enos_file "bad_k8s" {
 	destination = "/tmp/dst"
 	content = "content"
 
@@ -418,6 +422,21 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	}
 }`
 
+	nomadCfg := `resource enos_file "bad_nomad" {
+	destination = "/tmp/dst"
+	content = "content"
+
+	transport = {
+		nomad = {
+            host = "some host"
+            secret_id = "some secret"
+            allocation_id = "some allocation id"
+            task_name = "some task"
+            bogus_arg = "bogus"
+		}
+	}
+}`
+
 	for _, test := range []struct {
 		name       string
 		cfg        string
@@ -425,6 +444,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	}{
 		{"ssh_transport", sshCfg, regexp.MustCompile(`not_an_arg`)},
 		{"k8s_transsport", k8sCfg, regexp.MustCompile(`not_an_arg`)},
+		{"nomad_transport", nomadCfg, regexp.MustCompile(`bogus_arg`)},
 	} {
 		t.Run(test.name, func(tt *testing.T) {
 			resource.Test(tt, resource.TestCase{
@@ -444,24 +464,34 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	state := newFileState()
-	state.Transport.SSH.Values = testMapPropertiesToStruct([]testProperty{
-		{"user", "ubuntu", state.Transport.SSH.User},
-		{"host", "localhost", state.Transport.SSH.Host},
-		{"private_key", "PRIVATE KEY", state.Transport.SSH.PrivateKey},
-		{"private_key_path", "/path/to/key.pem", state.Transport.SSH.PrivateKeyPath},
+	ssh := newEmbeddedTransportSSH()
+	ssh.Values = testMapPropertiesToStruct([]testProperty{
+		{"user", "ubuntu", ssh.User},
+		{"host", "localhost", ssh.Host},
+		{"private_key", "PRIVATE KEY", ssh.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", ssh.PrivateKeyPath},
 	})
-	state.Transport.K8S.Values = testMapPropertiesToStruct([]testProperty{
-		{"kubeconfig_base64", "some kubeconfig", state.Transport.K8S.KubeConfigBase64},
-		{"context_name", "some context", state.Transport.K8S.ContextName},
-		{"namespace", "default", state.Transport.K8S.Namespace},
-		{"pod", "nginx-0", state.Transport.K8S.Pod},
-		{"container", "proxy", state.Transport.K8S.Container},
+	k8s := newEmbeddedTransportK8Sv1()
+	k8s.Values = testMapPropertiesToStruct([]testProperty{
+		{"kubeconfig_base64", "some kubeconfig", k8s.KubeConfigBase64},
+		{"context_name", "some context", k8s.ContextName},
+		{"namespace", "default", k8s.Namespace},
+		{"pod", "nginx-0", k8s.Pod},
+		{"container", "proxy", k8s.Container},
+	})
+	nomad := newEmbeddedTransportNomadv1()
+	nomad.Values = testMapPropertiesToStruct([]testProperty{
+		{"host", "some host", nomad.Host},
+		{"secret_id", "some secret", nomad.SecretID},
+		{"allocation_id", "some allocation id", nomad.AllocationID},
+		{"task_name", "some task", nomad.TaskName},
 	})
 	testMapPropertiesToStruct([]testProperty{
 		{"id", "foo", state.ID},
 		{"src", "/tmp/src", state.Src},
 		{"dst", "/tmp/dst", state.Dst},
 	})
+	assert.NoError(t, state.Transport.SetTransportState(ssh, k8s, nomad))
 
 	marshaled, err := marshal(state)
 	require.NoError(t, err)
@@ -473,15 +503,34 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, state.ID, newState.ID)
 	assert.Equal(t, state.Src, newState.Src)
 	assert.Equal(t, state.Dst, newState.Dst)
-	assert.Equal(t, state.Transport.SSH.User, newState.Transport.SSH.User)
-	assert.Equal(t, state.Transport.SSH.Host, newState.Transport.SSH.Host)
-	assert.Equal(t, state.Transport.SSH.PrivateKey, newState.Transport.SSH.PrivateKey)
-	assert.Equal(t, state.Transport.SSH.PrivateKeyPath, newState.Transport.SSH.PrivateKeyPath)
-	assert.Equal(t, state.Transport.K8S.KubeConfigBase64, newState.Transport.K8S.KubeConfigBase64)
-	assert.Equal(t, state.Transport.K8S.ContextName, newState.Transport.K8S.ContextName)
-	assert.Equal(t, state.Transport.K8S.Namespace, newState.Transport.K8S.Namespace)
-	assert.Equal(t, state.Transport.K8S.Pod, newState.Transport.K8S.Pod)
-	assert.Equal(t, state.Transport.K8S.Container, newState.Transport.K8S.Container)
+
+	SSH, ok := state.Transport.SSH()
+	assert.True(t, ok)
+	newSSH, ok := newState.Transport.SSH()
+	assert.True(t, ok)
+	assert.Equal(t, SSH.User, newSSH.User)
+	assert.Equal(t, SSH.Host, newSSH.Host)
+	assert.Equal(t, SSH.PrivateKey, newSSH.PrivateKey)
+	assert.Equal(t, SSH.PrivateKeyPath, newSSH.PrivateKeyPath)
+
+	K8S, ok := state.Transport.K8S()
+	assert.True(t, ok)
+	newK8S, ok := newState.Transport.K8S()
+	assert.True(t, ok)
+	assert.Equal(t, K8S.KubeConfigBase64, newK8S.KubeConfigBase64)
+	assert.Equal(t, K8S.ContextName, newK8S.ContextName)
+	assert.Equal(t, K8S.Namespace, newK8S.Namespace)
+	assert.Equal(t, K8S.Pod, newK8S.Pod)
+	assert.Equal(t, K8S.Container, newK8S.Container)
+
+	nmd, ok := state.Transport.Nomad()
+	assert.True(t, ok)
+	newNmd, ok := newState.Transport.Nomad()
+	assert.True(t, ok)
+	assert.Equal(t, nmd.Host, newNmd.Host)
+	assert.Equal(t, nmd.SecretID, newNmd.SecretID)
+	assert.Equal(t, nmd.AllocationID, newNmd.AllocationID)
+	assert.Equal(t, nmd.TaskName, newNmd.TaskName)
 }
 
 func TestSetProviderConfig(t *testing.T) {
@@ -489,30 +538,52 @@ func TestSetProviderConfig(t *testing.T) {
 	f := newFile()
 
 	tr := newEmbeddedTransport()
-	tr.SSH.Values = testMapPropertiesToStruct([]testProperty{
-		{"user", "ubuntu", tr.SSH.User},
-		{"host", "localhost", tr.SSH.Host},
-		{"private_key", "PRIVATE KEY", tr.SSH.PrivateKey},
-		{"private_key_path", "/path/to/key.pem", tr.SSH.PrivateKeyPath},
+	ssh := newEmbeddedTransportSSH()
+	ssh.Values = testMapPropertiesToStruct([]testProperty{
+		{"user", "ubuntu", ssh.User},
+		{"host", "localhost", ssh.Host},
+		{"private_key", "PRIVATE KEY", ssh.PrivateKey},
+		{"private_key_path", "/path/to/key.pem", ssh.PrivateKeyPath},
 	})
-	tr.K8S.Values = testMapPropertiesToStruct([]testProperty{
-		{"kubeconfig_base64", "some kubeconfig", tr.K8S.KubeConfigBase64},
-		{"context_name", "some context", tr.K8S.ContextName},
-		{"namespace", "default", tr.K8S.Namespace},
-		{"pod", "nginx-0", tr.K8S.Pod},
-		{"container", "proxy", tr.K8S.Container},
+	k8s := newEmbeddedTransportK8Sv1()
+	k8s.Values = testMapPropertiesToStruct([]testProperty{
+		{"kubeconfig_base64", "some kubeconfig", k8s.KubeConfigBase64},
+		{"context_name", "some context", k8s.ContextName},
+		{"namespace", "default", k8s.Namespace},
+		{"pod", "nginx-0", k8s.Pod},
+		{"container", "proxy", k8s.Container},
 	})
+	nomad := newEmbeddedTransportNomadv1()
+	nomad.Values = testMapPropertiesToStruct([]testProperty{
+		{"host", "some host", nomad.Host},
+		{"secret_id", "some secret", nomad.SecretID},
+		{"allocation_id", "some allocation id", nomad.AllocationID},
+		{"task_name", "some task", nomad.TaskName},
+	})
+	assert.NoError(t, p.Transport.SetTransportState(ssh, k8s, nomad))
 
 	require.NoError(t, p.Transport.FromTerraform5Value(tr.Terraform5Value()))
 	require.NoError(t, f.SetProviderConfig(p.Terraform5Value()))
 
-	assert.Equal(t, "ubuntu", f.providerConfig.Transport.SSH.User.Value())
-	assert.Equal(t, "localhost", f.providerConfig.Transport.SSH.Host.Value())
-	assert.Equal(t, "PRIVATE KEY", f.providerConfig.Transport.SSH.PrivateKey.Value())
-	assert.Equal(t, "/path/to/key.pem", f.providerConfig.Transport.SSH.PrivateKeyPath.Value())
-	assert.Equal(t, "some kubeconfig", f.providerConfig.Transport.K8S.KubeConfigBase64.Value())
-	assert.Equal(t, "some context", f.providerConfig.Transport.K8S.ContextName.Value())
-	assert.Equal(t, "default", f.providerConfig.Transport.K8S.Namespace.Value())
-	assert.Equal(t, "nginx-0", f.providerConfig.Transport.K8S.Pod.Value())
-	assert.Equal(t, "proxy", f.providerConfig.Transport.K8S.Container.Value())
+	SSH, ok := f.providerConfig.Transport.SSH()
+	assert.True(t, ok)
+	assert.Equal(t, "ubuntu", SSH.User.Value())
+	assert.Equal(t, "localhost", SSH.Host.Value())
+	assert.Equal(t, "PRIVATE KEY", SSH.PrivateKey.Value())
+	assert.Equal(t, "/path/to/key.pem", SSH.PrivateKeyPath.Value())
+
+	K8S, ok := f.providerConfig.Transport.K8S()
+	assert.True(t, ok)
+	assert.Equal(t, "some kubeconfig", K8S.KubeConfigBase64.Value())
+	assert.Equal(t, "some context", K8S.ContextName.Value())
+	assert.Equal(t, "default", K8S.Namespace.Value())
+	assert.Equal(t, "nginx-0", K8S.Pod.Value())
+	assert.Equal(t, "proxy", K8S.Container.Value())
+
+	nmd, ok := f.providerConfig.Transport.Nomad()
+	assert.True(t, ok)
+	assert.Equal(t, "some host", nmd.Host.Value())
+	assert.Equal(t, "some secret", nmd.SecretID.Value())
+	assert.Equal(t, "some allocation id", nmd.AllocationID.Value())
+	assert.Equal(t, "some task", nmd.TaskName.Value())
 }

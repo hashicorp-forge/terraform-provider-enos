@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"archive/tar"
 	"context"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/go-multierror"
 )
 
 type transport struct {
@@ -62,97 +60,37 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 	default:
 	}
 
-	stdInReader, stdInWriter := io.Pipe()
-
-	writeErrC := make(chan error, 1)
-
-	writeInput := func() {
-		defer stdInWriter.Close()
-
-		writer := tar.NewWriter(stdInWriter)
-
-		err := writer.WriteHeader(&tar.Header{
-			Name: filepath.Base(dst),
-			Mode: 0o644,
-			Size: src.Size(),
-		})
-		if err != nil {
-			writeErrC <- err
-			return
-		}
-
-		_, err = io.Copy(writer, src)
-		defer writer.Close()
-		writeErrC <- err
-	}
-
-	go writeInput()
-
-	response := t.client.Exec(ctx, kubernetes.ExecRequest{
+	request := kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
 		Command:   fmt.Sprintf("tar -xmf - -C %s", filepath.Dir(dst)),
-		StdIn:     stdInReader,
+		StdIn:     true,
 		Namespace: t.namespace,
 		Pod:       t.pod,
 		Container: t.container,
 	})
 
-	_, stderr, execErr := response.WaitForResults()
-
-	// merr is used to capture the write error and the stderr
-	merr := &multierror.Error{}
-
-	if err := <-writeErrC; err != nil {
-		merr = multierror.Append(merr, err)
-	}
-
-	if len(stderr) > 0 {
-		merr = multierror.Append(merr, fmt.Errorf("failed to copy to dst: [%s], due to: [%s]", dst, stderr))
-	}
-
-	if execErr != nil {
-		switch e := execErr.(type) {
-		case *it.ExecError:
-			e.Append(merr)
-			return e
-		default:
-			// in the case that the exec error is not a transport.ExecError we create a new multierror
-			// here and append the exec error first then the other errors.
-			allErrors := &multierror.Error{}
-			allErrors = multierror.Append(allErrors, execErr, merr)
-			return allErrors.ErrorOrNil()
-		}
-	}
-
-	return merr.ErrorOrNil()
+	return it.Copy(ctx, it.TarCopyWriter(src, dst, request.Streams().StdinWriter()), dst, request)
 }
 
 // Run runs the provided command on a remote Pod as specified th in the transport config. Run blocks
 // until the command execution has completed.
 func (t transport) Run(ctx context.Context, cmd it.Command) (stdout, stderr string, err error) {
-	response := t.client.Exec(ctx, kubernetes.ExecRequest{
+	return it.Run(ctx, kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
 		Command:   cmd.Cmd(),
 		Namespace: t.namespace,
 		Pod:       t.pod,
 		Container: t.container,
-	})
-
-	return response.WaitForResults()
+	}))
 }
 
 // Stream runs the provided command on a remote Pod and streams the results. Stream does not block and
 // is done when the error channel has either an error or nil.
 func (t transport) Stream(ctx context.Context, command it.Command) (stdout, stderr io.Reader, errC chan error) {
-	response := t.client.Exec(ctx, kubernetes.ExecRequest{
+	return it.Stream(ctx, kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
 		Command:   command.Cmd(),
 		Namespace: t.namespace,
 		Pod:       t.pod,
 		Container: t.container,
-	})
-	stdout = response.Stdout
-	stderr = response.Stderr
-	errC = response.ExecErr
-
-	return stdout, stderr, errC
+	}))
 }
 
 func (t transport) Close() error {
