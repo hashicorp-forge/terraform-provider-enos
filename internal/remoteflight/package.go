@@ -277,7 +277,12 @@ func packageInstallGetDownload(ctx context.Context, ssh it.Transport, req *Packa
 		fmt.Sprintf("enos_install_download.%s", random.ID()),
 	)
 
-	opts := []DownloadOpt{WithDownloadRequestDestination(req.TempArtifactPath)}
+	opts := []DownloadOpt{
+		WithDownloadRequestDestination(req.TempArtifactPath),
+		// since this request is run in a retry loop, we need to make sure to replace the file as it
+		// could potentially exist from an earlier failed attempt to download
+		WithDownloadRequestReplace(true),
+	}
 	opts = append(opts, req.DownloadOpts...)
 	_, err = Download(ctx, ssh, NewDownloadRequest(opts...))
 	if err != nil {
