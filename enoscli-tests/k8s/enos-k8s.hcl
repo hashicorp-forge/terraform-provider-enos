@@ -1,7 +1,7 @@
 
 terraform_cli "k8s" {
   credentials "app.terraform.io" {
-    token = "TFC_API_TOKEN"
+    token = var.tfc_api_token
   }
 }
 
@@ -10,8 +10,8 @@ terraform "k8s" {
 
   required_providers {
     enos = {
-      source  = "app.terraform.io/hashicorp-qti/ENOS_RELEASE_NAME"
-      version = ">= 0.2.1"
+      source  = "app.terraform.io/hashicorp-qti/ENOS_PROVIDER_NAME"
+      version = "ENOS_PROVIDER_VERSION"
     }
   }
 }
@@ -19,15 +19,15 @@ terraform "k8s" {
 provider "enos" "k8s" {}
 
 module "kind_cluster" {
-  source = "./modules/kind-cluster"
+  source = "../modules/kind-cluster"
 }
 
 module "helm_chart" {
-  source = "./modules/deploy-helm-chart"
+  source = "../modules/deploy-helm-chart"
 }
 
 module "test_container" {
-  source = "./modules/test-container"
+  source = "../modules/test-container"
 }
 
 scenario "kind_cluster" {
@@ -58,7 +58,8 @@ scenario "kind_cluster" {
       client_key             = step.create_cluster.client_key
       cluster_ca_certificate = step.create_cluster.cluster_ca_certificate
       replica_count          = local.pod_replica_count
-      image                  = step.create_cluster.image
+      repository             = step.create_cluster.repository
+      tag                    = step.create_cluster.tag
     }
   }
 

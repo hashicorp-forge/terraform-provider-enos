@@ -25,11 +25,11 @@ resource "helm_release" "ci-test" {
   }
   set {
     name = "image.repository"
-    value = split(":", var.image)[0]
+    value = var.repository
   }
   set {
     name = "image.tag"
-    value = split(":", var.image)[1]
+    value = var.tag
   }
 
   wait = true
@@ -60,7 +60,12 @@ variable "replica_count" {
   description = "The number of pods to deploy"
 }
 
-variable "image" {
+variable "repository" {
   type = string
-  description = "The docker image to deploy, must be formatted as image_repo:tag, i.e. alpine:3.16.0"
+  description = "The docker repository for the image to deploy"
+}
+
+variable "tag" {
+  type = string
+  description = "The tag of the docker image to deploy"
 }

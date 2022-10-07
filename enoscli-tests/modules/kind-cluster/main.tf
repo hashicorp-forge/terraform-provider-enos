@@ -1,8 +1,8 @@
 terraform {
   required_providers {
     enos = {
-      source  = "app.terraform.io/hashicorp-qti/ENOS_RELEASE_NAME"
-      version = ">= 0.2.1"
+      source  = "app.terraform.io/hashicorp-qti/ENOS_PROVIDER_NAME"
+      version = "ENOS_PROVIDER_VERSION"
     }
   }
 }
@@ -69,6 +69,10 @@ output "cluster_ca_certificate" {
   value = enos_local_kind_cluster.test.cluster_ca_certificate
 }
 
-output "image" {
-  value = enos_local_kind_load_image.bananas.loaded_images.image
+output "repository" {
+  value = enos_local_kind_load_image.bananas.loaded_images.repository
+}
+
+output "tag" {
+  value = enos_local_kind_load_image.bananas.loaded_images.tag
 }
