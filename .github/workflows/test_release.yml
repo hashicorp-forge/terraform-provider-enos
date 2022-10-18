@@ -11,6 +11,11 @@ on:
     types: [completed]
     branches: [main]
 
+# These permissions are necessary for the doormat-action to get the OIDC token
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   test-current-release:
     name: "Install and Test Current Artifact"
@@ -23,15 +28,15 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
-      - name: Configure AWS credentials from Test account
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Assume service user role via Doormat
+        uses: hashicorp/doormat-action@main
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::147451547303:role/github_actions-Enos-Provider
-          role-skip-session-tagging: true
-          role-duration-seconds: 3600
+          # This role, its associated IAM policy, the allowed Github workflow
+          # event types and their associated qualifiers are managed via
+          # Terraform in the hashicorp/enos-ci repository. If you wish to allow
+          # AWS credentials for different Github event types, workflows or
+          # branches you'll need to update the role there.
+          aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
