@@ -4,12 +4,7 @@ name: Test Current Release
 on:
   # Allow this pipeline to be triggered manually from GH Actions menu
   workflow_dispatch:
-  # This workflow runs only when Enos-Provider is successfully
-  # released to Current S3 bucket
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-    branches: [main]
+  workflow_call:
 
 # These permissions are necessary for the doormat-action to get the OIDC token
 permissions:
@@ -20,7 +15,6 @@ jobs:
   test-current-release:
     name: "Install and Test Current Artifact"
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

@@ -12,9 +12,9 @@ on:
         required: true
 
 jobs:
-  call-test-tfcartifact:
-    name: "Install and Test Dev TFC Artifact"
-    uses: ./.github/workflows/test_tfcartifact.yml
+  call-test-tfcrelease:
+    name: "Install and test enosdev provider"
+    uses: ./.github/workflows/test_tfcrelease.yml
     with:
       enos_provider_name: "enosdev"
       enos_provider_version: ${{ github.event.inputs.version }}
@@ -26,7 +26,7 @@ jobs:
   promote-tfcartifact:
     name: "Promote Enos provider TFC Artifact"
     runs-on: ubuntu-latest
-    needs: call-test-tfcartifact
+    needs: call-test-tfcrelease
     env:
       ENOS_VERSION: ${{ github.event.inputs.version }}
     steps:
@@ -54,10 +54,10 @@ jobs:
           TFC_PUBLISH_TOKEN: ${{ secrets.TFC_PUBLISH_TOKEN }}
           ENOS_VERSION: ${{ github.event.inputs.version }}
 
-  call-test-promoted-tfcartifact:
+  call-test-promoted-tfcrelease:
     name: "Install and Test promoted TFC Artifact"
     needs: promote-tfcartifact
-    uses: ./.github/workflows/test_tfcartifact.yml
+    uses: ./.github/workflows/test_tfcrelease.yml
     with:
       enos_provider_name: "enos"
       enos_provider_version: ${{ github.event.inputs.version }}
