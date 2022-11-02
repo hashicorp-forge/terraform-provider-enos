@@ -48,6 +48,7 @@ type vaultStartStateV1 struct {
 	ManageService   *tfBool
 	Transport       *embeddedTransportV1
 	Username        *tfString
+	Environment     *tfStringMap
 }
 
 type vaultConfig struct {
@@ -98,6 +99,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		ManageService:   newTfBool(),
 		Transport:       newEmbeddedTransport(),
 		Username:        newTfString(),
+		Environment:     newTfStringMap(),
 	}
 }
 
@@ -318,6 +320,12 @@ func (s *vaultStartStateV1) Schema() *tfprotov6.Schema {
 					Type:     tftypes.String,
 					Optional: true,
 				},
+				{
+					Name:        "environment",
+					Description: "An optional map of key/value pairs for additional environment variables to set when running the vault service.",
+					Type:        tftypes.Map{ElementType: tftypes.String},
+					Optional:    true,
+				},
 				s.Transport.SchemaAttributeTransport(),
 			},
 		},
@@ -355,6 +363,7 @@ func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"unit_name":      s.SystemdUnitName,
 		"manage_service": s.ManageService,
 		"username":       s.Username,
+		"environment":    s.Environment,
 	})
 	if err != nil {
 		return err
@@ -390,6 +399,7 @@ func (s *vaultStartStateV1) Terraform5Type() tftypes.Type {
 		"manage_service": s.ManageService.TFType(),
 		"transport":      s.Transport.Terraform5Type(),
 		"username":       s.Username.TFType(),
+		"environment":    s.Environment.TFType(),
 	}}
 }
 
@@ -406,6 +416,7 @@ func (s *vaultStartStateV1) Terraform5Value() tftypes.Value {
 		"manage_service": s.ManageService.TFValue(),
 		"transport":      s.Transport.Terraform5Value(),
 		"username":       s.Username.TFValue(),
+		"environment":    s.Environment.TFValue(),
 	})
 }
 
@@ -471,7 +482,7 @@ func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the tftypes.Value
+// Terraform5Value is the tftypes.Value
 func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
@@ -663,7 +674,15 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 	licensePath := filepath.Join(configDir, "vault.lic")
 
 	envFilePath := "/etc/vault.d/vault.env"
-	envFileContents := strings.Builder{}
+
+	var envVars []string
+	if environment, ok := s.Environment.Get(); ok {
+		for key, value := range environment {
+			if val, valOk := value.Get(); valOk {
+				envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+			}
+		}
+	}
 
 	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
 		remoteflight.WithUserName(vaultUsername),
@@ -687,14 +706,14 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 			return wrapErrWithDiagnostics(err, "vault license", "failed to copy vault license")
 		}
 
-		envFileContents.WriteString(fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
+		envVars = append(envVars, fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
 	}
 
 	err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
 		remoteflight.WithCopyFileDestination(envFilePath),
 		remoteflight.WithCopyFileChmod("644"),
 		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-		remoteflight.WithCopyFileContent(tfile.NewReader(envFileContents.String())),
+		remoteflight.WithCopyFileContent(tfile.NewReader(strings.Join(envVars, "\n"))),
 	))
 	if err != nil {
 		return wrapErrWithDiagnostics(err, "vault environment", "failed to create the vault environment file")
@@ -736,7 +755,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 				"StartLimitBurst":       "3",
 			},
 			"Service": {
-				"EnvironmentFile":       "/etc/vault.d/vault.env",
+				"EnvironmentFile":       envFilePath,
 				"User":                  "vault",
 				"Group":                 "vault",
 				"ProtectSystem":         "full",

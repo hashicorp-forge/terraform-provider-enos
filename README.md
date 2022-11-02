@@ -733,6 +733,7 @@ The following describes the enos_vault_start schema:
 |license|An optional Vault license|
 |unit_name|An optional name for the systemd unit. Default: 'vault'|
 |username|An optional name for the vault system user. Default: 'vault'|
+|environment|An optional map of environment variables to set when running the vault service.|
 |transport.ssh.host|The remote host you wish to copy the file to|
 |transport.ssh.user|The username to use when performing the SSH handshake|
 |transport.ssh.private_key|The text value of the private key you wish to use for SSH authentication|
