@@ -322,7 +322,10 @@ func packageInstallZipInstall(ctx context.Context, ssh it.Transport, req *Packag
 }
 
 func packageInstallDEBInstall(ctx context.Context, client it.Transport, req *PackageInstallRequest) error {
-	cmd := fmt.Sprintf("sudo dpkg --install %s", req.TempArtifactPath)
+	// If we have existing config files, we're assuming we want to keep them.
+	// --force-confold defaults to using the existing files, instead of
+	// interactively choosing which to use.
+	cmd := fmt.Sprintf("sudo dpkg --force-confold --install %s", req.TempArtifactPath)
 	stderr, stdout, err := client.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing debian package")
