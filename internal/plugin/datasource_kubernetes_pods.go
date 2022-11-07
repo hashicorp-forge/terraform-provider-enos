@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -51,7 +53,7 @@ type kubernetesPodsStateV1 struct {
 	Pods             *tfObjectSlice
 }
 
-var _ State = (*kubernetesPodsStateV1)(nil)
+var _ state.State = (*kubernetesPodsStateV1)(nil)
 
 func newKubernetesPods() *kubernetesPods {
 	return &kubernetesPods{
@@ -95,7 +97,7 @@ func (d *kubernetesPods) SetProviderConfig(meta tftypes.Value) error {
 func (d *kubernetesPods) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
@@ -105,7 +107,7 @@ func (d *kubernetesPods) ValidateDataResourceConfig(ctx context.Context, req tfp
 	state := newKubernetesPodStateV1()
 	err := unmarshal(state, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -114,31 +116,29 @@ func (d *kubernetesPods) ValidateDataResourceConfig(ctx context.Context, req tfp
 func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
 
-	state := newKubernetesPodStateV1()
+	podState := newKubernetesPodStateV1()
 
-	err := unmarshal(state, req.Config)
+	err := unmarshal(podState, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	if err = state.Validate(ctx); err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+	if err = podState.Validate(ctx); err != nil {
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 		return
 	}
 
-	state.ID.Set("static")
+	podState.ID.Set("static")
 
-	pods, err := d.podInfoGetter(ctx, *state)
+	pods, err := d.podInfoGetter(ctx, *podState)
 	if err != nil {
-		diag := errToDiagnostic(err)
-		diag.Summary = "Pod Info Query Error"
-		res.Diagnostics = append(res.Diagnostics, diag)
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Pod Query Error", err))
 		return
 	}
 
@@ -157,11 +157,11 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 		podResults = append(podResults, r)
 	}
 
-	state.Pods.Set(podResults)
+	podState.Pods.Set(podResults)
 
-	res.State, err = marshal(state)
+	res.State, err = state.Marshal(podState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -230,24 +230,24 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 	if !ok {
 		// this should never happen, since 'kubeconfig' is a required field and Terraform would barf
 		// before passing the request to the provider
-		return newErrWithDiagnostics("Validation Exception", "cannot get pods without a 'kubeconfig_base64'", "kubeconfig_base64")
+		return ValidationError("cannot query pods without a 'kubeconfig_base64'", "kubeconfig_base64")
 	}
 
 	contextName, ok := s.ContextName.Get()
 	if !ok {
 		// this should never happen, since 'context_name' is a required field and Terraform would barf
 		// before passing the request to the provider
-		return newErrWithDiagnostics("Validation Exception", "cannot get pods without a 'context_name'", "context_name")
+		return ValidationError("cannot query pods without a 'context_name'", "context_name")
 	}
 
 	kubeConfig, err := kubernetes.DecodeAndLoadKubeConfig(kubeconfig)
 	if err != nil {
-		return newErrWithDiagnostics("Validation Exception", "invalid kubeconfig, kubeconfig should be a valid base64 encoded kubeconfig string", "kubeconfig_base64")
+		return ValidationError("invalid kubeconfig, kubeconfig should be a valid base64 encoded kubeconfig string", "kubeconfig_base64")
 	}
 
 	// check if the context is exists in the provided kubeconfig
 	if _, ok := kubeConfig.Contexts[contextName]; !ok {
-		return newErrWithDiagnostics("Validation Exception", fmt.Sprintf("context: [%s] not present in the provided kubeconfig", contextName), "context_name")
+		return ValidationError(fmt.Sprintf("context: [%s] not present in the provided kubeconfig", contextName), "context_name")
 	}
 
 	return nil
@@ -282,7 +282,7 @@ func (s *kubernetesPodsStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":                s.ID.TFValue(),
@@ -293,4 +293,8 @@ func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 		"field_selectors":   s.FieldSelectors.TFValue(),
 		"pods":              s.Pods.TFValue(),
 	})
+}
+
+func (s *kubernetesPodsStateV1) Debug() string {
+	return ""
 }

@@ -123,7 +123,7 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 			*loadImageStateInvalid,
 			nil,
 			nil,
-			regexp.MustCompile(`Invalid Configuratio`),
+			regexp.MustCompile(`Validation Error`),
 		},
 	} {
 		t.Run(test.tmpl.name, func(tt *testing.T) {

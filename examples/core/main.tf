@@ -2,7 +2,7 @@ terraform {
   required_providers {
     enos = {
       version = ">= 0.1.8"
-      source  = "hashicorp.com/qti/enos"
+      source  = "app.terraform.io/hashicorp-qti/enos"
     }
 
     aws = {
@@ -26,6 +26,12 @@ provider "enos" {
 
 provider "aws" {
   region = "us-west-2"
+}
+
+locals {
+  foo_template_rendered = templatefile("${path.module}/files/foo.tmpl", {
+    "foo" = var.input_test
+  })
 }
 
 data "aws_vpc" "default" {
@@ -72,14 +78,6 @@ data "aws_ami" "rhel" {
 data "enos_environment" "localhost" {
 }
 
-data "template_file" "foo_template" {
-  template = file("${path.module}/files/foo.tmpl")
-
-  vars = {
-    "foo" = var.input_test
-  }
-}
-
 module "target_sg" {
   source = "terraform-aws-modules/security-group/aws//modules/ssh"
 
@@ -122,7 +120,7 @@ resource "enos_file" "from_source" {
 resource "enos_file" "from_content" {
   depends_on = [aws_instance.ubuntu]
 
-  content     = data.template_file.foo_template.rendered
+  content     = local.foo_template_rendered
   destination = "/tmp/from_content.txt"
 
   transport = {
@@ -145,7 +143,7 @@ resource "enos_remote_exec" "all" {
 
   inline  = ["rm /tmp/from_source.txt /tmp/from_content.txt"]
   scripts = ["${path.module}/files/script.sh"]
-  content = data.template_file.foo_template.rendered
+  content = local.foo_template_rendered
 
   transport = {
     ssh = {

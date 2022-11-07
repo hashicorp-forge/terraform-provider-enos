@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"sync"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cmd"
+
+	"github.com/hashicorp/enos-provider/internal/diags"
+
+	"github.com/hashicorp/enos-provider/internal/server/state"
 
 	"github.com/hashicorp/enos-provider/internal/kind"
 	"github.com/hashicorp/enos-provider/internal/log"
@@ -20,7 +23,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -30,7 +33,7 @@ type localKindCluster struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*localKindCluster)(nil)
+var _ resource.Resource = (*localKindCluster)(nil)
 
 type localKindClusterStateV1 struct {
 	ID             *tfString
@@ -46,7 +49,7 @@ type localKindClusterStateV1 struct {
 	Endpoint             *tfString
 }
 
-var _ State = (*localKindClusterStateV1)(nil)
+var _ state.State = (*localKindClusterStateV1)(nil)
 
 func newLocalKindCluster() *localKindCluster {
 	return &localKindCluster{
@@ -110,13 +113,13 @@ func (r *localKindCluster) ValidateResourceConfig(ctx context.Context, req tfpro
 	state := newLocalKindClusterStateV1()
 
 	transportUtil.ValidateResourceConfig(ctx, state, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	err := state.Validate(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 	}
 }
 
@@ -127,7 +130,7 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 
 	err := unmarshal(newState, req.CurrentState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
@@ -137,28 +140,31 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 	})
 
 	if err := newState.readLocalKindCluster(ctx); err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Kind Cluster Error",
+			fmt.Errorf("failed to read local kind cluster state, due to: %w", err),
+		))
 		return
 	}
 
 	// If the ID value is not set, the cluster was deleted outside of terraform, so we need to
 	// marshall a nil value. This should cause a no-op.
 	if newState.ID.Value() == "" {
-		res.NewState, err = marshalDelete(newState)
+		res.NewState, err = state.MarshalDelete(newState)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		}
 	} else {
-		res.NewState, err = marshal(newState)
+		res.NewState, err = state.Marshal(newState)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		}
 	}
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *localKindCluster) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *localKindCluster) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -168,16 +174,17 @@ func (r *localKindCluster) PlanResourceChange(ctx context.Context, req tfprotov6
 
 	priorState := newLocalKindClusterStateV1()
 	proposedState := newLocalKindClusterStateV1()
+	res.PlannedState = proposedState
 
-	err := unmarshal(priorState, req.PriorState)
+	err := priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	err = unmarshal(proposedState, req.ProposedNewState)
+	err = proposedState.FromTerraform5Value(req.ProposedNewState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
@@ -196,47 +203,38 @@ func (r *localKindCluster) PlanResourceChange(ctx context.Context, req tfprotov6
 	}), tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
 		tftypes.AttributeName("kubeconfig_path"),
 	})}
-
-	res.PlannedState, err = marshal(proposedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newLocalKindClusterStateV1()
 	plannedState := newLocalKindClusterStateV1()
+	res.NewState = plannedState
 
-	err := unmarshal(plannedState, req.PlannedState)
+	err := plannedState.FromTerraform5Value(req.PlannedState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	err = unmarshal(priorState, req.PriorState)
+	err = priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
-
-	isDelete := plannedState.Name.Val == ""
-	isCreate := priorState.ID.Val == ""
-	isUpdate := !isDelete && !isCreate && reflect.DeepEqual(plannedState, priorState)
 
 	logger := log.NewLogger(ctx)
 
 	switch {
-	case isDelete:
+	case req.IsDelete():
 		logger.Debug("Destroying a local kind cluster", map[string]interface{}{
 			"name":            priorState.Name.Val,
 			"kubeconfig_path": priorState.KubeConfigPath.Val,
 		})
 
 		if err := priorState.Validate(ctx); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 		}
 
 		client := kind.NewLocalClient(logger)
@@ -251,19 +249,14 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 			})
 			return
 		}
-
-		plannedState.ID.Set("")
-		if res.NewState, err = marshalDelete(plannedState); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-	case isCreate:
+	case req.IsCreate():
 		logger.Debug("Create a local kind cluster", map[string]interface{}{
 			"name":            plannedState.Name.Val,
 			"kubeconfig_path": plannedState.KubeConfigPath.Val,
 		})
 
 		if err := plannedState.Validate(ctx); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 		}
 		client := kind.NewLocalClient(logger)
 
@@ -273,7 +266,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 			WaitTimeout:    plannedState.WaitTimeout.Value(),
 		})
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Kind Cluster Error", err))
 			return
 		}
 
@@ -284,11 +277,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req tfprotov
 		plannedState.ClientKey.Set(info.ClientKey)
 		plannedState.ClusterCACertificate.Set(info.ClusterCACertificate)
 		plannedState.Endpoint.Set(info.Endpoint)
-
-		if res.NewState, err = marshal(plannedState); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-	case isUpdate:
+	case req.IsUpdate():
 		tflog.Warn(ctx, "Unexpected resource update for local kind cluster", map[string]interface{}{
 			"name":            plannedState.Name.Val,
 			"kubeconfig_path": plannedState.KubeConfigPath.Val,
@@ -397,7 +386,7 @@ func (s *localKindClusterStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"cluster_ca_certificate": s.ClusterCACertificate,
 		"endpoint":               s.Endpoint,
 	}); err != nil {
-		return wrapErrWithDiagnostics(err, "Error", "Failed to convert Terraform Value to kind cluster state.")
+		return err
 	}
 	return nil
 }
@@ -445,7 +434,10 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 
 	kubeConfigPath, err := kubernetes.GetKubeConfigPath(s.KubeConfigPath.Value())
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "Validation Failure", "Failed to get a valid kubeconfig path", "kubeconfig_path")
+		return AttributePathError(
+			fmt.Errorf("validation error, failed to get a valid kubeconfig path, due to: %w", err),
+			"kubeconfig_path",
+		)
 	}
 
 	// Check if the file exists
@@ -455,20 +447,23 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 			// cluster
 			return nil
 		} else {
-			return wrapErrWithDiagnostics(err, "Validation Error", "Failed to stat kubeconfig, this could be due to a permissions problem")
+			return ValidationError("failed to stat kubeconfig, this could be due to a permissions problem")
 		}
 	}
 
 	// the file exists, so we need to check if it's a valid kubeconfig file.
 	if _, err := clientcmd.LoadFromFile(kubeConfigPath); err != nil {
-		return wrapErrWithDiagnostics(
-			err,
-			"Validation Failure",
-			fmt.Sprintf("Failed to load existing kubeconfig file: [%s]", kubeConfigPath),
-			"kubeconfig_path")
+		return AttributePathError(
+			fmt.Errorf("validation error, failed to load existing kubeconfig file: [%s], due to: %w", kubeConfigPath, err),
+			"kubeconfig_path",
+		)
 	}
 
 	return nil
+}
+
+func (s *localKindClusterStateV1) Debug() string {
+	return ""
 }
 
 func (s *localKindClusterStateV1) readLocalKindCluster(ctx context.Context) error {

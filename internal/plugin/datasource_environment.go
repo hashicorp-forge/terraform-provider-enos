@@ -2,13 +2,16 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -27,7 +30,7 @@ type environmentStateV1 struct {
 
 type publicIPResolver struct{}
 
-var _ State = (*environmentStateV1)(nil)
+var _ state.State = (*environmentStateV1)(nil)
 
 func newEnvironment() *environment {
 	return &environment{
@@ -63,7 +66,7 @@ func (d *environment) SetProviderConfig(meta tftypes.Value) error {
 func (d *environment) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
@@ -73,7 +76,7 @@ func (d *environment) ValidateDataResourceConfig(ctx context.Context, req tfprot
 	newConfig := newEnvironmentStateV1()
 	err := unmarshal(newConfig, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -82,7 +85,7 @@ func (d *environment) ValidateDataResourceConfig(ctx context.Context, req tfprot
 func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
@@ -92,7 +95,7 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	// unmarshal and re-marshal the state to add default fields
 	err := unmarshal(newState, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 	newState.ID.Set("static")
@@ -100,16 +103,15 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	resolver := newPublicIPResolver()
 	ip, err := resolver.Resolve(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-			err, "ip address", "failed to resolve public IP address",
-		)))
+		res.Diagnostics = append(res.Diagnostics,
+			diags.ErrToDiagnostic("Resolve IP Error", fmt.Errorf("failed to resolve public IP address, due to: %w", err)))
 		return
 	}
 	newState.PublicIPAddress.Set(ip.String())
 
-	res.State, err = marshal(newState)
+	res.State, err = state.Marshal(newState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -273,4 +275,8 @@ func (r *publicIPResolver) resolveAWS(ctx context.Context) (net.IP, error) {
 	}
 
 	return net.ParseIP(strings.TrimSpace(string(body))), nil
+}
+
+func (s *environmentStateV1) Debug() string {
+	return ""
 }

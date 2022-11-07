@@ -6,8 +6,10 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -18,7 +20,7 @@ type vaultUnseal struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*vaultUnseal)(nil)
+var _ resource.Resource = (*vaultUnseal)(nil)
 
 type vaultUnsealStateV1 struct {
 	ID         *tfString
@@ -30,7 +32,7 @@ type vaultUnsealStateV1 struct {
 	Transport  *embeddedTransportV1
 }
 
-var _ State = (*vaultUnsealStateV1)(nil)
+var _ state.State = (*vaultUnsealStateV1)(nil)
 
 func newVaultUnseal() *vaultUnseal {
 	return &vaultUnseal{
@@ -122,47 +124,39 @@ func (r *vaultUnseal) ImportResourceState(ctx context.Context, req tfprotov6.Imp
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *vaultUnseal) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *vaultUnseal) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newVaultUnsealStateV1()
 	proposedState := newVaultUnsealStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 	if _, ok := priorState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
 	}
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newVaultUnsealStateV1()
 	plannedState := newVaultUnsealStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
-	// Check if the planned state attributes are blank. If they are then you
-	// should delete the resource.
-	_, okprior := priorState.ID.Get()
-	_, okplan := plannedState.ID.Get()
-	if okprior && !okplan {
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -170,7 +164,7 @@ func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -179,19 +173,17 @@ func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.Unseal(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Unseal Error", err))
 			return
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.Unseal(ctx, client)
 
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Unseal Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -242,11 +234,11 @@ func (s *vaultUnsealStateV1) Validate(ctx context.Context) error {
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the Vault bin path", "attribute")
+		return ValidationError("you must provide the Vault bin path", "bin_path")
 	}
 
 	if _, ok := s.VaultAddr.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the Vault address", "attribute")
+		return ValidationError("you must provide the Vault address", "vault_addr")
 	}
 
 	return nil
@@ -305,9 +297,13 @@ func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) er
 	req := s.buildUnsealRequest()
 	err := vault.Unseal(ctx, client, req)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "unseal", "failed to unseal")
+		return fmt.Errorf("failed to unseal Vault, due to: %w", err)
 	}
 	return err
+}
+
+func (s *vaultUnsealStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
 }
 
 func (s *vaultUnsealStateV1) buildUnsealRequest() *vault.UnsealRequest {

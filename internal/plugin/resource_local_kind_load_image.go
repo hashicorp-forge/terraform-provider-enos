@@ -3,14 +3,15 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/docker"
 	"github.com/hashicorp/enos-provider/internal/kind"
 	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -34,7 +35,7 @@ func newLocalKindLoadImage() *localKindLoadImage {
 	}
 }
 
-var _ resourcerouter.Resource = (*localKindLoadImage)(nil)
+var _ resource.Resource = (*localKindLoadImage)(nil)
 
 type localKindLoadImageStateV1 struct {
 	ID           *tfString
@@ -45,7 +46,7 @@ type localKindLoadImageStateV1 struct {
 	LoadedImages *loadedImagesStateV1
 }
 
-var _ State = (*localKindLoadImageStateV1)(nil)
+var _ state.State = (*localKindLoadImageStateV1)(nil)
 
 func newLocalKindLoadImageStateV1() *localKindLoadImageStateV1 {
 	return &localKindLoadImageStateV1{
@@ -64,7 +65,7 @@ type loadedImagesStateV1 struct {
 	Nodes      *tfStringSlice
 }
 
-var _ Serializable = (*loadedImagesStateV1)(nil)
+var _ state.Serializable = (*loadedImagesStateV1)(nil)
 
 func newLoadedImagesStateV1() *loadedImagesStateV1 {
 	return &loadedImagesStateV1{
@@ -118,13 +119,13 @@ func (k *localKindLoadImage) ReadResource(ctx context.Context, req tfprotov6.Rea
 
 	err := unmarshal(newState, req.CurrentState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	res.NewState, err = marshal(newState)
+	res.NewState, err = state.Marshal(newState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -132,7 +133,7 @@ func (k *localKindLoadImage) ImportResourceState(ctx context.Context, req tfprot
 	transportUtil.ImportResourceState(ctx, newBoundaryInitStateV1(), req, res)
 }
 
-func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -142,16 +143,17 @@ func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req tfproto
 
 	priorState := newLocalKindLoadImageStateV1()
 	proposedState := newLocalKindLoadImageStateV1()
+	res.PlannedState = proposedState
 
-	err := unmarshal(priorState, req.PriorState)
+	err := priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	err = unmarshal(proposedState, req.ProposedNewState)
+	err = proposedState.FromTerraform5Value(req.ProposedNewState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
@@ -176,21 +178,16 @@ func (k *localKindLoadImage) PlanResourceChange(ctx context.Context, req tfproto
 			tftypes.AttributeName("archive"),
 		}),
 	}
-
-	res.PlannedState, err = marshal(proposedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
 }
 
-func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newLocalKindLoadImageStateV1()
 	plannedState := newLocalKindLoadImageStateV1()
+	res.NewState = plannedState
 
-	err := unmarshal(plannedState, req.PlannedState)
+	err := plannedState.FromTerraform5Value(req.PlannedState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
@@ -203,22 +200,18 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 		"archive": plannedState.Archive.Value(),
 	})
 
-	err = unmarshal(priorState, req.PriorState)
+	err = priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	isCreate := priorState.ID.Val == ""
-	isDelete := plannedState.Image.Val == ""
-	isUpdate := !isCreate && !isDelete && reflect.DeepEqual(plannedState, priorState)
-
 	switch {
-	case isCreate:
+	case req.IsCreate():
 		logger.Debug("Loading image into kind cluster")
 
 		if err := plannedState.Validate(ctx); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 			return
 		}
 
@@ -234,7 +227,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 				ImageArchive: plannedState.Archive.Value(),
 			})
 			if err != nil {
-				res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Load Archive Error", err))
 				return
 			}
 		default:
@@ -244,7 +237,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 				Tag:         plannedState.Tag.Value(),
 			})
 			if err != nil {
-				res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Load Image Error", err))
 				return
 			}
 		}
@@ -283,23 +276,14 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req tfprot
 		plannedState.LoadedImages.Tag.Set(loadedImage.Tag)
 		plannedState.LoadedImages.Nodes.SetStrings(result.Nodes)
 
-		if res.NewState, err = marshal(plannedState); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-
-	case isDelete:
+	case req.IsDelete():
 		// we're not doing anything on delete, but maybe we should. The only time this would actually
 		// matter would be for a long-lived kind cluster. If we ignore deleting images we could start
 		// to use up too much disk space. As this is not the envisioned use case for a kind cluster,
 		// this should not be an issue.
 		logger.Debug("Deleting loaded image in kind clusters, not supported")
 
-		plannedState.ID.Set("")
-		if res.NewState, err = marshalDelete(plannedState); err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-
-	case isUpdate:
+	case req.IsUpdate():
 		logger.Debug("Updating loaded image in kind clusters, not supported")
 
 		// an update should never happen since all the attributes of this resource if changed should
@@ -374,7 +358,7 @@ func (k localKindLoadImageStateV1) Validate(ctx context.Context) error {
 		"archive":      k.Archive,
 	} {
 		if val, ok := attrib.Get(); ok && len(strings.TrimSpace(val)) == 0 {
-			return newErrWithDiagnostics("Invalid Configuration", fmt.Sprintf("'%s' attribute must contain a non-empty value", name), name)
+			return ValidationError(fmt.Sprintf("'%s' attribute must contain a non-empty value", name), name)
 		}
 	}
 
@@ -391,7 +375,7 @@ func (k localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error 
 		"loaded_images": k.LoadedImages,
 	})
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "Error", "Failed to convert Terraform Value to kind load image state.")
+		return fmt.Errorf("failed to convert Terraform value to kind image state, due to: %w", err)
 	}
 	return nil
 }
@@ -441,7 +425,14 @@ func (l *loadedImagesStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"nodes":      l.Nodes,
 	})
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "Error", "Failed to convert Terraform Value to loaded images state.", "loaded_images")
+		return AttributePathError(
+			fmt.Errorf("failed to convert Terraform Value to loaded images state, due to: %w", err),
+			"loaded_images",
+		)
 	}
 	return nil
+}
+
+func (k localKindLoadImageStateV1) Debug() string {
+	return ""
 }

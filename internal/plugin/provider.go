@@ -2,17 +2,20 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/server"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 var (
-	_ server.Provider = (*Provider)(nil)
-	_ Serializable    = (*config)(nil)
+	_ server.Provider    = (*Provider)(nil)
+	_ state.Serializable = (*config)(nil)
 )
 
 // newProvider returns a new instance of the plugin provider server
@@ -68,7 +71,7 @@ func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProvider
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return res, ctx.Err()
 	default:
 	}
@@ -76,7 +79,7 @@ func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProvider
 	cfg := newProviderConfig()
 	err := unmarshal(cfg, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return res, err
 	}
 
@@ -95,14 +98,14 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProvid
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return res, ctx.Err()
 	default:
 	}
 
 	err := unmarshal(p.config, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return res, err
 	}
 
@@ -128,7 +131,7 @@ func (c *config) FromTerraform5Value(val tftypes.Value) error {
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration", "unable to unmarshal provider configuration")
+		return fmt.Errorf("failed to unmarshal provider configuration, due to: %w", err)
 	}
 
 	if !vals["transport"].IsKnown() {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+    "github.com/hashicorp/enos-provider/internal/diags"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -14,14 +16,14 @@ type {{.Struct}} struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*{{.Struct}})(nil)
+var _ resource.Resource = (*{{.Struct}})(nil)
 
 type {{.State}} struct {
 	ID        *tfString
 	Transport *embeddedTransportV1
 }
 
-var _ State = (*{{.State}})(nil)
+var _ state.State = (*{{.State}})(nil)
 
 func new{{.StructCap}}() *{{.Struct}} {
 	return &{{.Struct}}{
@@ -121,9 +123,17 @@ func (r *{{.Struct}}) ImportResourceState(ctx context.Context, req tfprotov6.Imp
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
+    select {
+    case <-ctx.Done():
+        res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+        return
+    default:
+    }
+
 	priorState := new{{.StateCap}}()
 	proposedState := new{{.StateCap}}()
+	res.PlannedState = proposedState
 
 	// TODO: it is commonly required to unmarshal the PriorState and ProposedState
 	// in the request, unmarshal the private transport configuration, build
@@ -133,8 +143,8 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req tfprotov6.Plan
 	// and private data loaded, as well as a response with an errors encountered
 	// represented as diagnostics. Most of the time you will not need to write
 	// your own version of this, but beware.
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -145,43 +155,30 @@ func (r *{{.Struct}}) PlanResourceChange(ctx context.Context, req tfprotov6.Plan
 	if _, ok := priorState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
 	}
-
-	// TODO: After you've updated the proposedState and any RequiresReplace,
-	// you need to marshal the transport, transport private, and proposed state,
-	// into the the planned state and return a response. This function does just
-	// that.
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := new{{.StateCap}}()
 	plannedState := new{{.StateCap}}()
+	res.NewState = plannedState
 
 	// TODO: When applying you need to compare the prior state with the newly
 	// planned state. To do so you need to unmarshal them into a valid
 	// state representation. This function does that.
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	// TODO: Delete
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
-	/*
-		if _, ok := plannedState.Something.Get(); !ok {
-            // Delete the resource
-            newState, err := marshalDelete(plannedState)
-            if err != nil {
-                res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-            } else {
-                res.NewState = newState
-            }
+		if req.IsDelete() {
+            // implement delete logic or do nothing if there is nothing to do for delete
             return
-		}
-	*/
+        }
 
 	// TODO: After you've determined that you aren't deleting the resource you'll
 	// want to validate the proposed state and build a transport with the resource
@@ -189,7 +186,7 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 	/// function does that for you. In the event of an error it returns a response
 	// that has the Diagnostics added for you.
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -199,25 +196,17 @@ func (r *{{.Struct}}) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return res, err
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
+		return
 	}
 	defer client.Close() //nolint: staticcheck
 
 	// If our priorState ID is blank then we're creating the resource
-	if priorID, ok := priorState.ID.Get(); !ok  {
+	if req.IsCreate() {
 		// TODO: create the resource with the transport client
 	} else {
-		plannedID, ok := plannedState.ID.Get()
-		if !ok || (priorID != plannedID) {
-			// TODO: update the resource with the transport client
-		}
+        // TODO: update the resource with the transport client
 	}
-
-	// TODO: After you've performed your work you'll need to save marshal you
-	// plannedState and transport configuration and return a response. This
-	// function does that for you.
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -283,7 +272,7 @@ func (s *{{.State}}) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *{{.State}}) Terraform5Value() tftypes.Value {
 	// TODO: Add each state attribute
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
@@ -295,4 +284,9 @@ func (s *{{.State}}) Terraform5Value() tftypes.Value {
 // EmbeddedTransport returns a pointer the resources embedded transport.
 func (s *{{.State}}) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
+}
+
+func (s *{{.State}}) Debug() string {
+    // change this to implement a meaningful debug if necessary
+    return ""
 }

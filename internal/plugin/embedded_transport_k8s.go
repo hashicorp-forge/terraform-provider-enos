@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -108,8 +109,9 @@ func (em *embeddedTransportK8Sv1) FromTerraform5Value(val tftypes.Value) (err er
 		"container":         em.Container,
 	})
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
-			"unable to marshal transport Kubernetes values", "transport", "kubernetes",
+		return AttributePathError(
+			fmt.Errorf("failed to convert terraform value to 'Kubernetes' transport config, due to: %w", err),
+			"transport", "kubernetes",
 		)
 	}
 	return verifyConfiguration(k8sAttributes, em.Values, "kubernetes")
@@ -122,7 +124,10 @@ func (em *embeddedTransportK8Sv1) Validate(ctx context.Context) error {
 		"pod":               em.Pod,
 	} {
 		if _, ok := prop.Get(); !ok {
-			return newErrWithDiagnostics("Invalid Transport Configuration", fmt.Sprintf("missing value for required attribute: %s", name), "transport", "kubernetes", name)
+			return ValidationError(
+				fmt.Sprintf("missing value for required attribute: %s", name),
+				"transport", "kubernetes", name,
+			)
 		}
 	}
 	return nil
@@ -167,4 +172,29 @@ func (em *embeddedTransportK8Sv1) render() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (em *embeddedTransportK8Sv1) debug() string {
+	maxWidth := 0
+	attributes := em.Attributes()
+	for name := range attributes {
+		if len(name) > maxWidth {
+			maxWidth = len(name)
+		}
+	}
+
+	var vals []string
+	for _, name := range k8sAttributes {
+		val := "null"
+		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
+			if name == "kubeconfig_base64" {
+				val = "[redacted]"
+			} else {
+				val = value.String()
+			}
+		}
+		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+	}
+
+	return fmt.Sprintf("Kubernetes Transport Config:\n%s", strings.Join(vals, "\n"))
 }

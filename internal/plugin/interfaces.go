@@ -1,32 +1,21 @@
 package plugin
 
 import (
-	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-type State interface {
-	Schema() *tfprotov6.Schema
-	Validate(context.Context) error
-	Serializable
-}
-
-type Serializable interface {
-	Terraform5Type() tftypes.Type
-	Terraform5Value() tftypes.Value
-	FromTerraform5Value(val tftypes.Value) error
-}
-
 type TFType interface {
+	fmt.Stringer
 	TFType() tftypes.Type
 	TFValue() tftypes.Value
 	FromTFValue(val tftypes.Value) error
 }
 
 type StateWithTransport interface {
-	State
+	state.State
 	EmbeddedTransport() *embeddedTransportV1
 }
 

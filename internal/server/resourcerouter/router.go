@@ -35,8 +35,8 @@ type ResourceServerAdapter interface {
 	ValidateResourceConfig(context.Context, tfprotov6.ValidateResourceConfigRequest, *tfprotov6.ValidateResourceConfigResponse)
 	UpgradeResourceState(context.Context, tfprotov6.UpgradeResourceStateRequest, *tfprotov6.UpgradeResourceStateResponse)
 	ReadResource(context.Context, tfprotov6.ReadResourceRequest, *tfprotov6.ReadResourceResponse)
-	PlanResourceChange(context.Context, tfprotov6.PlanResourceChangeRequest, *tfprotov6.PlanResourceChangeResponse)
-	ApplyResourceChange(context.Context, tfprotov6.ApplyResourceChangeRequest, *tfprotov6.ApplyResourceChangeResponse)
+	PlanResourceChange(context.Context, PlanResourceChangeRequest, *PlanResourceChangeResponse)
+	ApplyResourceChange(context.Context, ApplyResourceChangeRequest, *ApplyResourceChangeResponse)
 	ImportResourceState(context.Context, tfprotov6.ImportResourceStateRequest, *tfprotov6.ImportResourceStateResponse)
 }
 
@@ -137,46 +137,6 @@ func (r Router) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceReq
 	}
 
 	resource.ReadResource(ctx, *req, res)
-	return res, nil
-}
-
-// PlanResourceChange proposes a new resource state
-func (r Router) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.PlanResourceChangeResponse, error) {
-	res := &tfprotov6.PlanResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
-	resource, ok := r.resources[req.TypeName]
-	if !ok {
-		return nil, errUnsupportedResource(req.TypeName)
-	}
-
-	err := resource.SetProviderConfig(providerConfig)
-	if err != nil {
-		return nil, newErrSetProviderConfig(err)
-	}
-
-	resource.PlanResourceChange(ctx, *req, res)
-	return res, nil
-}
-
-// ApplyResourceChange applies the newly planned resource state
-func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.ApplyResourceChangeResponse, error) {
-	res := &tfprotov6.ApplyResourceChangeResponse{
-		Diagnostics: []*tfprotov6.Diagnostic{},
-	}
-
-	resource, ok := r.resources[req.TypeName]
-	if !ok {
-		return nil, errUnsupportedResource(req.TypeName)
-	}
-
-	err := resource.SetProviderConfig(providerConfig)
-	if err != nil {
-		return nil, newErrSetProviderConfig(err)
-	}
-
-	resource.ApplyResourceChange(ctx, *req, res)
 	return res, nil
 }
 

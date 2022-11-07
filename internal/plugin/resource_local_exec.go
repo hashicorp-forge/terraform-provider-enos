@@ -10,7 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/diags"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -24,7 +26,7 @@ type localExec struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*localExec)(nil)
+var _ resource.Resource = (*localExec)(nil)
 
 type localExecStateV1 struct {
 	ID         *tfString
@@ -38,7 +40,7 @@ type localExecStateV1 struct {
 	Stdout     *tfString
 }
 
-var _ State = (*localExecStateV1)(nil)
+var _ state.State = (*localExecStateV1)(nil)
 
 func newLocalExec() *localExec {
 	return &localExec{
@@ -88,17 +90,7 @@ func (l *localExec) GetProviderConfig() (*config, error) {
 func (l *localExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	newState := newLocalExecStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return
-	default:
-	}
-
-	err := unmarshal(newState, req.Config)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-	}
+	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
 
 // UpgradeResourceState is the request Terraform sends when it wants to
@@ -106,46 +98,7 @@ func (l *localExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.Va
 func (l *localExec) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	newState := newLocalExecStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return
-	default:
-	}
-
-	switch req.Version {
-	case 1:
-		// 1. unmarshal the raw state against the type that maps to the raw state
-		// version. As this is version 1 and we're on version 1 we can use the
-		// current state type.
-		rawStateValues, err := req.RawState.Unmarshal(newState.Terraform5Type())
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(wrapErrWithDiagnostics(
-				err,
-				"upgrade error",
-				"unable to map version 1 to the current state",
-			)))
-			return
-		}
-
-		// 2. Since we're on version one we can pass the same values in without
-		// doing a transform.
-
-		// 3. Upgrade the current state with the new values, or in this case,
-		// the raw values.
-		res.UpgradedState, err = upgradeState(newState, rawStateValues)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
-
-		return
-	default:
-		err := newErrWithDiagnostics(
-			"Unexpected state version",
-			"The provider doesn't know how to upgrade from the current state version",
-		)
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-	}
+	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
@@ -153,48 +106,32 @@ func (l *localExec) UpgradeResourceState(ctx context.Context, req tfprotov6.Upgr
 func (l *localExec) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	newState := newLocalExecStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return
-	default:
-	}
-
-	err := unmarshal(newState, req.CurrentState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
-
-	res.NewState, err = marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
+	transportUtil.ReadResource(ctx, newState, req, res)
 }
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (l *localExec) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (l *localExec) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newLocalExecStateV1()
 	proposedState := newLocalExecStateV1()
+	res.PlannedState = proposedState
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
 
-	err := unmarshal(priorState, req.PriorState)
+	err := priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	err = unmarshal(proposedState, req.ProposedNewState)
+	err = proposedState.FromTerraform5Value(req.ProposedNewState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
@@ -202,8 +139,10 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req tfprotov6.PlanRe
 	if !proposedState.hasUnknownAttributes() {
 		sha256, err := l.SHA256(ctx, proposedState)
 		if err != nil {
-			err = wrapErrWithDiagnostics(err, "invalid configuration", "unable to read all scripts", "scripts")
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Invalid Configuration",
+				fmt.Errorf("failed to read all scripts, due to: %w", err),
+			))
 			return
 		}
 		proposedState.Sum.Set(sha256)
@@ -235,52 +174,43 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req tfprotov6.PlanRe
 			}
 		}
 	}
-
-	res.PlannedState, err = marshal(proposedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (l *localExec) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (l *localExec) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newLocalExecStateV1()
 	plannedState := newLocalExecStateV1()
+	res.NewState = plannedState
 
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
 
-	err := unmarshal(plannedState, req.PlannedState)
+	err := plannedState.FromTerraform5Value(req.PlannedState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	err = unmarshal(priorState, req.PriorState)
+	err = priorState.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	if plannedState.shouldDelete() {
-		// Delete the resource
-		res.NewState, err = marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 	plannedState.ID.Set("static")
 
 	err = plannedState.Validate(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Failure", err))
 		return
 	}
 
@@ -295,14 +225,12 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req tfprotov6.Apply
 		plannedState.Stdout.Set(ui.Stdout().String())
 		plannedState.Stderr.Set(ui.Stderr().String())
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Execution Error",
+				fmt.Errorf("failed to execute commands due to: %w%s", err, formatOutputIfExists(ui)),
+			))
 			return
 		}
-	}
-
-	res.NewState, err = marshal(plannedState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
 	}
 }
 
@@ -311,22 +239,7 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req tfprotov6.Apply
 func (l *localExec) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	newState := newLocalExecStateV1()
 
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
-		return
-	default:
-	}
-
-	importState, err := marshal(newState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
-	res.ImportedResources = append(res.ImportedResources, &tfprotov6.ImportedResource{
-		TypeName: req.TypeName,
-		State:    importState,
-	})
+	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
 
 // Schema is the file states Terraform schema.
@@ -411,8 +324,9 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 
 		sha, err := tfile.SHA256(content)
 		if err != nil {
-			return "", wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to determine content SHA256 sum", "content",
+			return "", AttributePathError(
+				fmt.Errorf("invalid configuration, unable to determine content SHA256 sum, due to: %w", err),
+				"content",
 			)
 		}
 
@@ -438,16 +352,18 @@ func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string
 
 			file, err = tfile.Open(path)
 			if err != nil {
-				return "", wrapErrWithDiagnostics(
-					err, "invalid configuration", "unable to open script file", "scripts",
+				return "", AttributePathError(
+					fmt.Errorf("invalid configuration, unable to open script file, due to: %w", err),
+					"scripts",
 				)
 			}
 			defer file.Close() // nolint: staticcheck
 
 			sha, err = tfile.SHA256(file)
 			if err != nil {
-				return "", wrapErrWithDiagnostics(
-					err, "invalid configuration", "unable to determine script file SHA256 sum", "scripts",
+				return "", AttributePathError(
+					fmt.Errorf("invalid configuration, unable to determine script file SHA256 sum, due to: %w", err),
+					"scripts",
 				)
 			}
 
@@ -474,7 +390,7 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 
 			err := l.copyAndRun(ctx, source, ui, state)
 			if err != nil {
-				return ui, err
+				return ui, fmt.Errorf("running inline command failed, due to: %w", err)
 			}
 		}
 	}
@@ -483,7 +399,7 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 		for _, path := range scripts {
 			source, err := os.Open(path)
 			if err != nil {
-				return ui, err
+				return ui, fmt.Errorf("failed to open script file: [%s], due to: %w", path, err)
 			}
 			defer source.Close()
 
@@ -497,7 +413,7 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 
 			err = l.copyAndRun(ctx, source, ui, state)
 			if err != nil {
-				return ui, err
+				return ui, fmt.Errorf("running script: [%s] failed, due to: %w", path, err)
 			}
 		}
 	}
@@ -507,7 +423,7 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 
 		err := l.copyAndRun(ctx, source, ui, state)
 		if err != nil {
-			return ui, err
+			return ui, fmt.Errorf("running command content failed, due to: %w", err)
 		}
 	}
 
@@ -520,7 +436,7 @@ func (l *localExec) ExecuteCommands(ctx context.Context, state *localExecStateV1
 func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, state *localExecStateV1) error {
 	select {
 	case <-ctx.Done():
-		return wrapErrWithDiagnostics(ctx.Err(), "timed out", "while executing commands")
+		return ctx.Err()
 	default: // continues on because we haven't timed out
 	}
 
@@ -536,8 +452,9 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 	}
 
 	if err := os.Chmod(destination.Name(), 0o755); err != nil {
-		return wrapErrWithDiagnostics(
-			err, "command failed", fmt.Sprintf("while changing ownership on script: %s", destination.Name()),
+		return fmt.Errorf(
+			"failed to change ownership on script: %s, while executing commands, due to: %w",
+			destination.Name(), err,
 		)
 	}
 
@@ -556,9 +473,7 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 	}
 
 	if err := cmd.Run(); err != nil {
-		return wrapErrWithDiagnostics(
-			err, "command failed", fmt.Sprintf("executing script: %s\n\n%s", err, ui.CombinedOutput()),
-		)
+		return fmt.Errorf("failed to execute command due to: %w", err)
 	}
 
 	return nil
@@ -578,7 +493,7 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 	_, oki := s.Inline.Get()
 	scripts, oks := s.Scripts.GetStrings()
 	if !okc && !oki && !oks {
-		return newErrWithDiagnostics("invalid configuration", "you must provide content, inline commands or scripts", "content")
+		return ValidationError("you must provide one of content, inline commands, or scripts")
 	}
 
 	// Make sure the scripts exist
@@ -587,8 +502,8 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 	for _, path := range scripts {
 		f, err = tfile.Open(path)
 		if err != nil {
-			return wrapErrWithDiagnostics(
-				err, "invalid configuration", "unable to open script file", "scripts",
+			return AttributePathError(fmt.Errorf("validation error, unable to open script file: [%s], due to: %w", path, err),
+				"scripts",
 			)
 		}
 		defer f.Close() // nolint: staticcheck
@@ -632,7 +547,7 @@ func (s *localExecStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *localExecStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":                  s.ID.TFValue(),
@@ -647,15 +562,8 @@ func (s *localExecStateV1) Terraform5Value() tftypes.Value {
 	})
 }
 
-func (s *localExecStateV1) shouldDelete() bool {
-	_, okc := s.Content.Get()
-	_, oki := s.Inline.Get()
-	_, oks := s.Scripts.GetStrings()
-	if !okc && !oki && !oks {
-		return true
-	}
-
-	return false
+func (s *localExecStateV1) Debug() string {
+	return ""
 }
 
 func (s *localExecStateV1) hasUnknownAttributes() bool {

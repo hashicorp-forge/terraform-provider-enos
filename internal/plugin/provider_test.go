@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/enos-provider/internal/server/state"
 )
 
 func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
@@ -18,7 +20,7 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 		"passphrase_path":  "/path/to/passphrase.txt",
 	}).build(t)
 
-	marshaled, err := marshal(provider.config)
+	marshaled, err := state.Marshal(provider.config)
 	require.NoError(t, err)
 
 	newProvider := newProvider()

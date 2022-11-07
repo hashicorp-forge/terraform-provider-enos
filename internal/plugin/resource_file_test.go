@@ -8,6 +8,7 @@ import (
 	"testing"
 	"text/template"
 
+	state "github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 
 	"github.com/stretchr/testify/assert"
@@ -16,14 +17,14 @@ import (
 
 type testAccResourceTemplate struct {
 	name  string
-	state State
+	state state.State
 	check resource.TestCheckFunc
 	apply bool
 }
 
 type testAccResourceTransportTemplate struct {
 	name             string
-	state            State
+	state            state.State
 	check            resource.TestCheckFunc
 	transport        *embeddedTransportV1
 	resourceTemplate *template.Template
@@ -463,7 +464,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 }
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
-	state := newFileState()
+	fileState := newFileState()
 	ssh := newEmbeddedTransportSSH()
 	ssh.Values = testMapPropertiesToStruct([]testProperty{
 		{"user", "ubuntu", ssh.User},
@@ -487,24 +488,24 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 		{"task_name", "some task", nomad.TaskName},
 	})
 	testMapPropertiesToStruct([]testProperty{
-		{"id", "foo", state.ID},
-		{"src", "/tmp/src", state.Src},
-		{"dst", "/tmp/dst", state.Dst},
+		{"id", "foo", fileState.ID},
+		{"src", "/tmp/src", fileState.Src},
+		{"dst", "/tmp/dst", fileState.Dst},
 	})
-	assert.NoError(t, state.Transport.SetTransportState(ssh, k8s, nomad))
+	assert.NoError(t, fileState.Transport.SetTransportState(ssh, k8s, nomad))
 
-	marshaled, err := marshal(state)
+	marshaled, err := state.Marshal(fileState)
 	require.NoError(t, err)
 
 	newState := newFileState()
 	err = unmarshal(newState, marshaled)
 	require.NoError(t, err)
 
-	assert.Equal(t, state.ID, newState.ID)
-	assert.Equal(t, state.Src, newState.Src)
-	assert.Equal(t, state.Dst, newState.Dst)
+	assert.Equal(t, fileState.ID, newState.ID)
+	assert.Equal(t, fileState.Src, newState.Src)
+	assert.Equal(t, fileState.Dst, newState.Dst)
 
-	SSH, ok := state.Transport.SSH()
+	SSH, ok := fileState.Transport.SSH()
 	assert.True(t, ok)
 	newSSH, ok := newState.Transport.SSH()
 	assert.True(t, ok)
@@ -513,7 +514,7 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, SSH.PrivateKey, newSSH.PrivateKey)
 	assert.Equal(t, SSH.PrivateKeyPath, newSSH.PrivateKeyPath)
 
-	K8S, ok := state.Transport.K8S()
+	K8S, ok := fileState.Transport.K8S()
 	assert.True(t, ok)
 	newK8S, ok := newState.Transport.K8S()
 	assert.True(t, ok)
@@ -523,7 +524,7 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, K8S.Pod, newK8S.Pod)
 	assert.Equal(t, K8S.Container, newK8S.Container)
 
-	nmd, ok := state.Transport.Nomad()
+	nmd, ok := fileState.Transport.Nomad()
 	assert.True(t, ok)
 	newNmd, ok := newState.Transport.Nomad()
 	assert.True(t, ok)

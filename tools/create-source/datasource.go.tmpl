@@ -3,7 +3,9 @@ package plugin
 import (
 	"context"
 
+    "github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
+    "github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -18,7 +20,7 @@ type {{.State}} struct {
 	ID *tfString
 }
 
-var _ State = (*{{.State}})(nil)
+var _ state.State = (*{{.State}})(nil)
 
 func new{{.StructCap}}() *{{.Struct}} {
 	return &{{.Struct}}{
@@ -49,7 +51,7 @@ func (d *{{.Struct}}) SetProviderConfig(meta tftypes.Value) error {
 func (d *{{.Struct}}) ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
@@ -59,7 +61,7 @@ func (d *{{.Struct}}) ValidateDataResourceConfig(ctx context.Context, req tfprot
 	newConfig := new{{.StateCap}}()
 	err := unmarshal(newConfig, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -68,7 +70,7 @@ func (d *{{.Struct}}) ValidateDataResourceConfig(ctx context.Context, req tfprot
 func (d *{{.Struct}}) ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse) {
 	select {
 	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(ctx.Err()))
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
 		return
 	default:
 	}
@@ -78,15 +80,15 @@ func (d *{{.Struct}}) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	// unmarshal and re-marshal the state to add default fields
 	err := unmarshal(newState, req.Config)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
 	// TODO: Perform whatever actions you need and update the state
 
-	res.State, err = marshal(newState)
+	res.State, err = state.Marshal(newState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -143,10 +145,15 @@ func (s *{{.State}}) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *{{.State}}) Terraform5Value() tftypes.Value {
 	// TODO: Add each state attribute
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":        s.ID.TFValue(),
 	})
+}
+
+func (s *{{.State}}) Debug() string {
+	// implement a meaningful debug method if required. This will be appended to any diagnostic error
+	return ""
 }

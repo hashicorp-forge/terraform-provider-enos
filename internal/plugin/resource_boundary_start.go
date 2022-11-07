@@ -7,9 +7,11 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/boundary"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -20,7 +22,7 @@ type boundaryStart struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*boundaryStart)(nil)
+var _ resource.Resource = (*boundaryStart)(nil)
 
 type boundaryStartStateV1 struct {
 	ID              *tfString
@@ -34,7 +36,7 @@ type boundaryStartStateV1 struct {
 	Username        *tfString
 }
 
-var _ State = (*boundaryStartStateV1)(nil)
+var _ state.State = (*boundaryStartStateV1)(nil)
 
 func newBoundaryStart() *boundaryStart {
 	return &boundaryStart{
@@ -113,12 +115,13 @@ func (r *boundaryStart) ImportResourceState(ctx context.Context, req tfprotov6.I
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *boundaryStart) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *boundaryStart) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newBoundaryStartStateV1()
 	proposedState := newBoundaryStartStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -126,36 +129,29 @@ func (r *boundaryStart) PlanResourceChange(ctx context.Context, req tfprotov6.Pl
 		proposedState.ID.Unknown = true
 		proposedState.Status.Unknown = true
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newBoundaryStartStateV1()
 	plannedState := newBoundaryStartStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
-	if _, ok := plannedState.BinPath.Get(); !ok {
-		// Delete the resource
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -163,7 +159,7 @@ func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -172,19 +168,17 @@ func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.startBoundary(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Start Error", err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startBoundary(ctx, client)
 
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Start Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -253,10 +247,10 @@ func (s *boundaryStartStateV1) Validate(ctx context.Context) error {
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the boundary binary path", "attribute")
+		return ValidationError("you must provide the boundary binary path", "bin_path")
 	}
 	if _, ok := s.ConfigPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the boundary config path", "attribute")
+		return ValidationError("you must provide the boundary config path", "config_path")
 	}
 
 	return nil
@@ -301,7 +295,7 @@ func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *boundaryStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":             s.ID.TFValue(),
@@ -349,7 +343,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 		remoteflight.WithUserShell("/bin/false"),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "boundary user", "failed to find or create the boundary user")
+		return fmt.Errorf("failed to find or create the boundary user, due to: %w", err)
 	}
 
 	// Manage the vault systemd service ourselves unless it has explicitly been
@@ -410,13 +404,13 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 		))
 
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the vault systemd unit")
+			return fmt.Errorf("failed to create the vault systemd unit, due to: %w", err)
 		}
 	}
 
 	err = boundary.Restart(ctx, client)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "boundary service", "failed to start the boundary service")
+		return fmt.Errorf("failed to start the boundary service, due to: %w", err)
 	}
 
 	// set unknown values
@@ -424,4 +418,8 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 	s.Status.Set(int(code))
 
 	return err
+}
+
+func (s *boundaryStartStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
 }

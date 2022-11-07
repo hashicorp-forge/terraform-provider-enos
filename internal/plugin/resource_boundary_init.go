@@ -2,12 +2,13 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/boundary"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -18,7 +19,7 @@ type boundaryInit struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*boundaryInit)(nil)
+var _ resource.Resource = (*boundaryInit)(nil)
 
 type boundaryInitStateV1 struct {
 	ID         *tfString
@@ -58,7 +59,7 @@ type boundaryInitStateV1 struct {
 	TargetName                   *tfString
 }
 
-var _ State = (*boundaryInitStateV1)(nil)
+var _ state.State = (*boundaryInitStateV1)(nil)
 
 func newBoundaryInit() *boundaryInit {
 	return &boundaryInit{
@@ -163,12 +164,13 @@ func (r *boundaryInit) ImportResourceState(ctx context.Context, req tfprotov6.Im
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *boundaryInit) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *boundaryInit) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newBoundaryInitStateV1()
 	proposedState := newBoundaryInitStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -205,35 +207,27 @@ func (r *boundaryInit) PlanResourceChange(ctx context.Context, req tfprotov6.Pla
 		proposedState.TargetScopeID.Unknown = true
 		proposedState.TargetName.Unknown = true
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newBoundaryInitStateV1()
 	plannedState := newBoundaryInitStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
-	_, okprior := priorState.ID.Get()
-	_, okplan := plannedState.ID.Get()
-	if okprior && !okplan {
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do for delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -242,7 +236,7 @@ func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Ap
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -251,19 +245,17 @@ func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Ap
 	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.Init(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Init Error", err))
 			return
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.Init(ctx, client)
 
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Init Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -452,12 +444,14 @@ func (s *boundaryInitStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
+	// TOOD: These validation checks are technically not required since the attributes are required,
+	// therefore Terraform will handle the validation
 	if _, ok := s.BinPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the Boundary bin path", "attribute")
+		return ValidationError("you must provide the Boundary bin path", "bin_path")
 	}
 
 	if _, ok := s.ConfigPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide the Boundary config path", "attribute")
+		return ValidationError("you must provide the Boundary config path", "config_path")
 	}
 
 	return nil
@@ -553,7 +547,7 @@ func (s *boundaryInitStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *boundaryInitStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          s.ID.TFValue(),
@@ -602,14 +596,13 @@ func (s *boundaryInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 // Init initializes a Boundary cluster
 func (s *boundaryInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
-	err := req.Validate()
-	if err != nil {
-		return wrapErrWithDiagnostics(err, "init", "could not validate config")
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
 	res, err := boundary.Init(ctx, client, req)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "init", "failed to init")
+		return err
 	}
 
 	s.AuthMethodID.Set(res.AuthMethod.AuthMethodID)
@@ -654,4 +647,8 @@ func (s *boundaryInitStateV1) buildInitRequest() *boundary.InitRequest {
 	}
 
 	return boundary.NewInitRequest(opts...)
+}
+
+func (s *boundaryInitStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
 }

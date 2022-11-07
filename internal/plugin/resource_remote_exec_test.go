@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hashicorp/enos-provider/internal/server/state"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
@@ -168,6 +170,94 @@ EOF
 				step.PlanOnly = true
 				step.ExpectNonEmptyPlan = true
 			}
+
+			resource.ParallelTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+	}
+}
+
+func TestBadTransportConfig(t *testing.T) {
+	cfg := template.Must(template.New("enos_remote_exec").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
+		content = "echo hello"
+
+		{{ renderTransport .Transport }}
+	}`))
+
+	k8sRemoteExecState := newRemoteExecStateV1()
+	k8sRemoteExecState.ID.Set("bad_k8s_transport")
+	k8sTransport := newEmbeddedTransportK8Sv1()
+	k8sTransport.KubeConfigBase64.Set("balogna")
+	k8sTransport.Namespace.Set("namespace")
+	k8sTransport.ContextName.Set("bananas")
+	k8sTransport.Pod.Set("yoyo")
+	k8sTransport.Container.Set("container")
+	assert.NoError(t, k8sRemoteExecState.Transport.SetTransportState(k8sTransport))
+
+	sshRemoteExecState := newRemoteExecStateV1()
+	sshRemoteExecState.ID.Set("bad_ssh_transport")
+	sshTransport := newEmbeddedTransportSSH()
+	sshTransport.Host.Set("127.0.0.1")
+	sshTransport.User.Set("ubuntu")
+	sshTransport.PrivateKey.Set("not a key")
+	sshTransport.PrivateKeyPath.Set("/not/a/real/path")
+	sshTransport.Passphrase.Set("balogna")
+	sshTransport.PassphrasePath.Set("/not/a/passphrase")
+	assert.NoError(t, sshRemoteExecState.Transport.SetTransportState(sshTransport))
+
+	nomadRemoteExecState := newRemoteExecStateV1()
+	nomadRemoteExecState.ID.Set("bad_nomad_transport")
+	nomadTransport := newEmbeddedTransportNomadv1()
+	nomadTransport.Host.Set("bogus_url")
+	nomadTransport.SecretID.Set("bologna")
+	nomadTransport.AllocationID.Set("some id")
+	nomadTransport.TaskName.Set("bananas")
+	assert.NoError(t, nomadRemoteExecState.Transport.SetTransportState(nomadTransport))
+
+	tests := []struct {
+		name               string
+		state              state.State
+		expectedErrorRegEx *regexp.Regexp
+	}{
+		{
+			"k8s",
+			k8sRemoteExecState,
+			regexp.MustCompile(`(?s:.*kubeconfig_base64 : \[redacted].*context_name : bananas.*namespace : namespace.*pod : yoyo.*container : container.*)`),
+		},
+		{
+			"ssh",
+			sshRemoteExecState,
+			regexp.MustCompile(`(?s:user : ubuntu.*host : 127\.0\.0\.1.*private_key : not a key.*private_key_path : \/not\/a\/real\/path.*passphrase : \[redacted].*passphrase_path : \/not\/a\/passphrase)`),
+		},
+		{
+			"nomad",
+			nomadRemoteExecState,
+			regexp.MustCompile(`(?s:host : bogus_url.*secret_id : \[redacted].*allocation_id : some id.*task_name : bananas)`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			buf := bytes.Buffer{}
+			err := cfg.Execute(&buf, test.state)
+			if err != nil {
+				t.Fatalf("error executing test template: %s", err.Error())
+			}
+
+			step := resource.TestStep{
+				Config:      buf.String(),
+				PlanOnly:    false,
+				ExpectError: test.expectedErrorRegEx,
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
 
 			resource.ParallelTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: testProviders(t),

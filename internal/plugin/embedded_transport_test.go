@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hashicorp/enos-provider/internal/server/state"
+
 	it "github.com/hashicorp/enos-provider/internal/transport"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -39,7 +41,7 @@ var (
 func TestEmbeddedTransportMarshalRoundTrip(t *testing.T) {
 	transport := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig).build(t)
 
-	marshaled, err := marshal(transport)
+	marshaled, err := state.Marshal(transport)
 	require.NoError(t, err)
 
 	newTransport := newEmbeddedTransport()

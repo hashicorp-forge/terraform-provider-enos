@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -96,8 +97,9 @@ func (em *embeddedTransportNomadv1) FromTerraform5Value(val tftypes.Value) (err 
 		"task_name":     em.TaskName,
 	})
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
-			"unable to marshal transport Nomad values", "transport", "nomad",
+		return AttributePathError(
+			fmt.Errorf("failed to convert terraform value to 'Nomad' transport config, due to: %w", err),
+			"transport", "nomad",
 		)
 	}
 	return verifyConfiguration(nomadAttributes, em.Values, "nomad")
@@ -110,8 +112,7 @@ func (em *embeddedTransportNomadv1) Validate(ctx context.Context) error {
 		"task_name":     em.TaskName,
 	} {
 		if _, ok := prop.Get(); !ok {
-			return newErrWithDiagnostics(
-				"Invalid Transport Configuration",
+			return ValidationError(
 				fmt.Sprintf("missing value for required attribute: %s", name),
 				"transport", "nomad", name,
 			)
@@ -157,4 +158,29 @@ func (em *embeddedTransportNomadv1) render() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (em *embeddedTransportNomadv1) debug() string {
+	maxWidth := 0
+	attributes := em.Attributes()
+	for name := range attributes {
+		if len(name) > maxWidth {
+			maxWidth = len(name)
+		}
+	}
+
+	var vals []string
+	for _, name := range nomadAttributes {
+		val := "null"
+		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
+			if name == "secret_id" {
+				val = "[redacted]"
+			} else {
+				val = value.String()
+			}
+		}
+		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+	}
+
+	return fmt.Sprintf("Nomad Transport Config:\n%s", strings.Join(vals, "\n"))
 }

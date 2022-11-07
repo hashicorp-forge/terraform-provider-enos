@@ -2,12 +2,15 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -18,7 +21,7 @@ type vaultInit struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*vaultInit)(nil)
+var _ resource.Resource = (*vaultInit)(nil)
 
 type vaultInitStateV1 struct {
 	ID        *tfString
@@ -48,7 +51,7 @@ type vaultInitStateV1 struct {
 	RootToken             *tfString
 }
 
-var _ State = (*vaultInitStateV1)(nil)
+var _ state.State = (*vaultInitStateV1)(nil)
 
 func newVaultInit() *vaultInit {
 	return &vaultInit{
@@ -159,12 +162,13 @@ func (r *vaultInit) ImportResourceState(ctx context.Context, req tfprotov6.Impor
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *vaultInit) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *vaultInit) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newVaultInitStateV1()
 	proposedState := newVaultInitStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -185,34 +189,27 @@ func (r *vaultInit) PlanResourceChange(ctx context.Context, req tfprotov6.PlanRe
 		proposedState.RecoveryKeysThreshold.Unknown = true
 		proposedState.RootToken.Unknown = true
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *vaultInit) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *vaultInit) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newVaultInitStateV1()
 	plannedState := newVaultInitStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
-	if _, ok := plannedState.BinPath.Get(); !ok {
-		// Delete the resource
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -220,7 +217,7 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Apply
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -228,11 +225,10 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req tfprotov6.Apply
 	if !reflect.DeepEqual(priorState, plannedState) {
 		err = plannedState.Init(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Init Error", err))
 			return
 		}
 	}
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -449,7 +445,7 @@ func (s *vaultInitStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *vaultInitStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":         s.ID.TFValue(),
@@ -485,12 +481,16 @@ func (s *vaultInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *vaultInitStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
+}
+
 // Init initializes a vault cluster
 func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
 	err := req.Validate()
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "init request", "validating vault init request")
+		return fmt.Errorf("failed to initialize vault, init request validation failed, due to: %w", err)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
@@ -503,12 +503,12 @@ func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error 
 		vault.WithStatusRequestVaultAddr(s.VaultAddr.Value()),
 	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault service", "waiting for vault service")
+		return fmt.Errorf("failed to wait for Vault to be running before initializing, due to: %w", err)
 	}
 
 	res, err := vault.Init(ctx, client, req)
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault init", "initializing vault cluster")
+		return fmt.Errorf("failed to initialize Vault cluster, due to: %w", err)
 	}
 
 	// Migrate the init response to the state

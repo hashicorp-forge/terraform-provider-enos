@@ -8,10 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/consul"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -23,7 +25,7 @@ type consulStart struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*consulStart)(nil)
+var _ resource.Resource = (*consulStart)(nil)
 
 type consulStartStateV1 struct {
 	ID              *tfString
@@ -47,7 +49,7 @@ type consulConfig struct {
 	LogLevel        *tfString
 }
 
-var _ State = (*consulStartStateV1)(nil)
+var _ state.State = (*consulStartStateV1)(nil)
 
 func newConsulStart() *consulStart {
 	return &consulStart{
@@ -150,49 +152,42 @@ func (r *consulStart) ImportResourceState(ctx context.Context, req tfprotov6.Imp
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *consulStart) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *consulStart) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newConsulStartStateV1()
 	proposedState := newConsulStartStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	if _, ok := priorState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *consulStart) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *consulStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newConsulStartStateV1()
 	plannedState := newConsulStartStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	// Check if the planned state attributes are blank. If they are then you
 	// should delete the resource.
-	if _, ok := plannedState.BinPath.Get(); !ok {
-		// Delete the resource
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
-
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -200,7 +195,7 @@ func (r *consulStart) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -209,19 +204,17 @@ func (r *consulStart) ApplyResourceChange(ctx context.Context, req tfprotov6.App
 	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.startConsul(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Consul Start Error", err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startConsul(ctx, client)
 
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Consul Start Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -337,7 +330,7 @@ func (s *consulStartStateV1) Validate(ctx context.Context) error {
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide a consul binary path", "attribute")
+		return ValidationError("you must provide a consul binary path", "attribute")
 	}
 
 	return nil
@@ -387,7 +380,7 @@ func (s *consulStartStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *consulStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"bin_path":   s.BinPath.TFValue(),
@@ -485,6 +478,10 @@ func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	return hlcBuilder
 }
 
+func (s *consulStartStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
+}
+
 func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transport) error {
 	var err error
 
@@ -510,7 +507,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		remoteflight.WithUserShell("/bin/false"),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "consul user", "failed to find or create the consul user")
+		return fmt.Errorf("failed to find or create the consul user, due to: %w", err)
 	}
 
 	configFilePath := filepath.Join(configDir, "consul.hcl")
@@ -556,7 +553,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		))
 
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "consul license", "failed to copy consul license")
+			return fmt.Errorf("failed to copy consul license, due to: %w", err)
 		}
 
 		// Validate the Consul license file
@@ -566,7 +563,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		))
 
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "invalid consul license", "consul license file empty or invalid")
+			return fmt.Errorf("consul license validation failed, due to: %w", err)
 		}
 
 		unit["Service"]["Environment"] = fmt.Sprintf("CONSUL_LICENSE_PATH=%s", licensePath)
@@ -581,7 +578,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	))
 
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the consul systemd unit")
+		return fmt.Errorf("failed to create the consul systemd unit, due to: %w", err)
 	}
 
 	config := s.Config.ToHCLConfig()
@@ -595,7 +592,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	))
 
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "consul configuration", "failed to create the consul configuration file")
+		return fmt.Errorf("failed to create the consul configuration file, due to: %w", err)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(1*time.Minute))
@@ -607,7 +604,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		remoteflight.WithDirChown(consulUsername),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "consul data directory", "failed to change ownership on data directory")
+		return fmt.Errorf("failed to change ownership on data directory, due to: %w", err)
 	}
 
 	// Create the consul config directory
@@ -616,7 +613,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		remoteflight.WithDirChown(consulUsername),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "consul config directory", "failed to change ownership on config directory")
+		return fmt.Errorf("failed to change ownership on config directory, due to: %w", err)
 	}
 
 	// Validate the Consul config file
@@ -625,7 +622,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		consul.WithValidateFilePath(configFilePath),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid consul configuration", "consul configuration file is invalid")
+		return fmt.Errorf("failed to validate consul configuration file, due to: %w", err)
 	}
 
 	// Restart the service and wait for it to be running
@@ -633,7 +630,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		consul.WithStatusRequestBinPath(s.BinPath.Value()),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "consul service", "failed to start the consul service")
+		return fmt.Errorf("failed to start the consul service, due to: %w", err)
 	}
 
 	return err

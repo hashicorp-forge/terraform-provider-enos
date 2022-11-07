@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"text/template"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -128,8 +129,9 @@ func (em *embeddedTransportSSHv1) FromTerraform5Value(val tftypes.Value) (err er
 		"passphrase_path":  em.PassphrasePath,
 	})
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "invalid configuration syntax",
-			"unable to marshal transport SSH values", "transport", "ssh",
+		return AttributePathError(
+			fmt.Errorf("failed to convert terraform value to 'SSH' transport config, due to: %w", err),
+			"transport", "ssh",
 		)
 	}
 	return verifyConfiguration(sshAttributes, em.Values, "ssh")
@@ -137,17 +139,17 @@ func (em *embeddedTransportSSHv1) FromTerraform5Value(val tftypes.Value) (err er
 
 func (em *embeddedTransportSSHv1) Validate(ctx context.Context) error {
 	if _, ok := em.User.Get(); !ok {
-		return newErrWithDiagnostics("Invalid Transport Configuration", "you must provide the transport SSH user", "transport", "ssh", "user")
+		return ValidationError("you must provide the transport SSH user", "transport", "ssh", "user")
 	}
 
 	if _, ok := em.Host.Get(); !ok {
-		return newErrWithDiagnostics("Invalid Transport Configuration", "you must provide the transport SSH host", "transport", "ssh", "host")
+		return ValidationError("you must provide the transport SSH host", "transport", "ssh", "host")
 	}
 
 	_, okpk := em.PrivateKey.Get()
 	_, okpkp := em.PrivateKeyPath.Get()
 	if !okpk && !okpkp {
-		return newErrWithDiagnostics("Invalid Transport Configuration", "you must provide either the private_key or private_key_path", "transport", "ssh", "private_key")
+		return ValidationError("you must provide either the private_key or private_key_path", "transport", "ssh", "private_key")
 	}
 
 	return nil
@@ -187,4 +189,29 @@ func (em *embeddedTransportSSHv1) render() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (em *embeddedTransportSSHv1) debug() string {
+	maxWidth := 0
+	attributes := em.Attributes()
+	for name := range attributes {
+		if len(name) > maxWidth {
+			maxWidth = len(name)
+		}
+	}
+
+	var vals []string
+	for _, name := range sshAttributes {
+		val := "null"
+		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
+			if name == "passphrase" {
+				val = "[redacted]"
+			} else {
+				val = value.String()
+			}
+		}
+		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+	}
+
+	return fmt.Sprintf("SSH Transport Config:\n%s", strings.Join(vals, "\n"))
 }

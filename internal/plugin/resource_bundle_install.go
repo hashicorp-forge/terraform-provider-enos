@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -10,9 +11,11 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/artifactory"
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/releases"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -23,7 +26,7 @@ type bundleInstall struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*bundleInstall)(nil)
+var _ resource.Resource = (*bundleInstall)(nil)
 
 type bundleInstallStateV1 struct {
 	ID          *tfString
@@ -47,7 +50,7 @@ type bundleInstallStateV1Release struct {
 	Edition *tfString
 }
 
-var _ State = (*bundleInstallStateV1)(nil)
+var _ state.State = (*bundleInstallStateV1)(nil)
 
 func newBundleInstall() *bundleInstall {
 	return &bundleInstall{
@@ -132,12 +135,13 @@ func (r *bundleInstall) ImportResourceState(ctx context.Context, req tfprotov6.I
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *bundleInstall) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *bundleInstall) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newBundleInstallStateV1()
 	proposedState := newBundleInstallStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -151,35 +155,28 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req tfprotov6.Pl
 			proposedState.Release.Edition.Set("oss")
 		}
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newBundleInstallStateV1()
 	plannedState := newBundleInstallStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	// If we don't have a valid package getter config we must be deleting
-	if _, err := plannedState.packageGetter(); err != nil {
-		// Delete the resource
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -187,7 +184,7 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -195,12 +192,10 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req tfprotov6.A
 	if !priorState.equaltTo(plannedState) {
 		err = plannedState.Install(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Install Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // packageGetter attempts to determine what package getter we'll use to acquire
@@ -236,7 +231,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 	// Determine where we're going to get the package
 	getter, err := s.packageGetter()
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "release", "determing package getter", "release")
+		return fmt.Errorf("failed to determine which package getter to use, due to: %w", err)
 	}
 	opts = append(opts, remoteflight.WithPackageInstallGetter(getter))
 
@@ -247,7 +242,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 		// Install by copying an artifact from a local path
 		path, ok := s.Path.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must set a package path for a local copy install", "path")
+			return ValidationError("you must set a package path for a local copy install", "path")
 		}
 
 		installer := remoteflight.PackageInstallInstallerForFile(path)
@@ -257,7 +252,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			// will install them.
 			dest, ok := s.Destination.Get()
 			if !ok {
-				return newErrWithDiagnostics("you must set a destination for a local copy install", "destination")
+				return ValidationError("you must set a destination for a local copy install", "destination")
 			}
 
 			opts = append(opts, remoteflight.WithPackageInstallDestination(dest))
@@ -275,35 +270,43 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 		// from that endpoint we'll assume it's a zip bundle and require a destination.
 		dest, ok := s.Destination.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must set a destination for a releases install", "destination")
+			return ValidationError("you must set a destination for a releases install", "destination")
 		}
 
 		prod, ok := s.Release.Product.Get()
 		if !ok {
-			return newErrWithDiagnostics(
-				"you must set a release product to install from releases.hashicorp.com", "release", "product",
+			return ValidationError(
+				"you must set a release product to install from releases.hashicorp.com",
+				"release", "product",
 			)
 		}
 		ver, ok := s.Release.Version.Get()
 		if !ok {
-			return newErrWithDiagnostics(
-				"you must set a release version to install from releases.hashicorp.com", "release", "version",
+			return ValidationError(
+				"you must set a release version to install from releases.hashicorp.com",
+				"release", "version",
 			)
 		}
 
 		platform, err := remoteflight.TargetPlatform(ctx, client)
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "transport", "determining target host platform", "transport")
+			return AttributePathError(
+				fmt.Errorf("failed to determine target host plaform, due to: %w", err),
+				"transport",
+			)
 		}
 
 		arch, err := remoteflight.TargetArchitecture(ctx, client)
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "transport", "determining target host architecture", "transport")
+			return AttributePathError(
+				fmt.Errorf("failed to determine target host architecture, due to: %w", err),
+				"transport",
+			)
 		}
 
 		ed, ok := s.Release.Edition.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must supply a release edition", "release", "edition")
+			return ValidationError("you must supply a release edition", "release", "edition")
 		}
 
 		release, err := releases.NewRelease(
@@ -314,12 +317,12 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			releases.WithReleaseArch(arch),
 		)
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "release", "determining release", "release")
+			return fmt.Errorf("failed to create release, due to: %w", err)
 		}
 
 		sha256, err := release.SHA256()
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "release", "determining release SHA", "release")
+			return fmt.Errorf("failed to determine release SHA, due to: %w", err)
 		}
 
 		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
@@ -334,7 +337,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 		// Install from artifactory.
 		url, ok := s.Artifactory.URL.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must supply an artifactory url", "artifactory", "url")
+			return ValidationError("you must supply an artifactory url", "artifactory", "url")
 		}
 
 		installer := remoteflight.PackageInstallInstallerForFile(filepath.Base(url))
@@ -344,7 +347,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			// will install them.
 			dest, ok := s.Destination.Get()
 			if !ok {
-				return newErrWithDiagnostics("you must set a destination for a local copy install", "destination")
+				return ValidationError("you must set a destination for a local copy install", "destination")
 			}
 
 			opts = append(opts, remoteflight.WithPackageInstallDestination(dest))
@@ -352,17 +355,17 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 
 		username, ok := s.Artifactory.Username.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must supply an artifactory username", "artifactory", "username")
+			return ValidationError("you must supply an artifactory username", "artifactory", "username")
 		}
 
 		token, ok := s.Artifactory.Token.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must supply an artifactory token", "artifactory", "token")
+			return ValidationError("you must supply an artifactory token", "artifactory", "token")
 		}
 
 		sha, ok := s.Artifactory.SHA256.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must supply an artifactory sha256", "artifactory", "sha256")
+			return ValidationError("you must supply an artifactory sha256", "artifactory", "sha256")
 		}
 
 		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
@@ -451,23 +454,23 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	}
 
 	if sources == 0 {
-		return newErrWithDiagnostics("invalid configuration", "no install source configured", "release", "product")
-	} else if sources == 2 {
-		return newErrWithDiagnostics("invalid configuration", "more than one install source configured", "release", "product")
+		return ValidationError(`no install source configured, you must configure one of ["path", "release", or "artifactory"]`)
+	} else if sources >= 2 {
+		return ValidationError(`only one of the install sources ["path", "release", or "artifactory"] can be configured`)
 	}
 
 	// Make sure the path is valid if it is the install source
 	if path, ok := s.Path.Get(); ok {
 		p, err := filepath.Abs(path)
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "invalid configuration", "unable to expand path", "path")
+			return ValidationError("unable to expand path", "path")
 		}
 		if strings.HasSuffix(p, string(os.PathSeparator)) {
-			return newErrWithDiagnostics("invalid configuration", "path must not be a directory", "path")
+			return ValidationError("path must not be a directory", "path")
 		}
 		_, err = os.Stat(filepath.Dir(p))
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "invalid configuration", "path base directory does not exist", "path")
+			return ValidationError("path base directory does not exist", "path")
 		}
 
 		if remoteflight.PackageInstallInstallerForFile(path) == remoteflight.PackageInstallInstallerZip {
@@ -476,7 +479,7 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 			// will install them.
 			_, ok := s.Destination.Get()
 			if !ok {
-				return newErrWithDiagnostics("you must set a destination for a local copy install of a zip bundle", "destination")
+				return ValidationError("you must set a destination for a local copy install of a zip bundle", "destination")
 			}
 		}
 	}
@@ -485,16 +488,16 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	if prod, ok := s.Release.Product.Get(); ok {
 		_, ok := s.Destination.Get()
 		if !ok {
-			return newErrWithDiagnostics("you must set a destination for a releases install", "destination")
+			return ValidationError("you must set a destination for a releases install", "destination")
 		}
 
 		if prod == "vault" {
 			ed, ok := s.Release.Edition.Get()
 			if !ok {
-				return newErrWithDiagnostics("invalid configuration", "you must supply a vault edition", "release", "edition")
+				return ValidationError("you must supply a vault edition", "release", "edition")
 			}
 			if !artifactory.SupportedVaultEdition(ed) {
-				return newErrWithDiagnostics("invalid configuration", "unsupported vault edition", "release", "edition")
+				return ValidationError(fmt.Sprintf("unsupported vault edition: %s", ed), "release", "edition")
 			}
 		}
 	}
@@ -503,7 +506,7 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 	if u, ok := s.Artifactory.URL.Get(); ok {
 		_, err := url.Parse(u)
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "invalid configuration", "artifactory URL is invalid", "artifactory", "url")
+			return ValidationError(fmt.Errorf("failed to parse artifactory URL due to: %w", err).Error(), "artifactory", "url")
 		}
 
 		if remoteflight.PackageInstallInstallerForFile(u) == remoteflight.PackageInstallInstallerZip {
@@ -512,7 +515,7 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 			// will install them.
 			_, ok := s.Destination.Get()
 			if !ok {
-				return newErrWithDiagnostics("you must set a destination for an artifactory install of a zip bundle", "destination")
+				return ValidationError("you must set a destination for an artifactory install of a zip bundle", "destination")
 			}
 		}
 	}
@@ -642,4 +645,8 @@ func (s *bundleInstallStateV1) equaltTo(p *bundleInstallStateV1) bool {
 // EmbeddedTransport returns a pointer the resources embedded transport.
 func (s *bundleInstallStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
+}
+
+func (s *bundleInstallStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
 }

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"text/template"
 
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -87,19 +89,15 @@ func (t Transports) getConfiguredTransport() (transportState, bool, error) {
 	var transport transportState
 	for _, trans := range t {
 		if transport != nil {
-			return nil, false, newErrWithDiagnostics(
-				"Invalid Transport Configuration",
-				fmt.Sprintf("Only one transport can be configured, %v were configured", t.types()),
-			)
+			return nil, false,
+				fmt.Errorf("invalid transport configuration, only one transport can be configured, %v were configured", t.types())
 		}
 		transport = trans
 	}
 
 	if transport == nil {
-		return nil, false, newErrWithDiagnostics(
-			"Invalid Transport Configuration",
-			fmt.Sprintf("No transport configured, one of %v must be configured", TransportTypes),
-		)
+		return nil, false,
+			fmt.Errorf("invalid transport configuration, no transport configured, one of %v must be configured", TransportTypes)
 	}
 
 	return transport, true, nil
@@ -122,7 +120,7 @@ type embeddedTransportV1 struct {
 
 // transportState interface defining the api of a transport
 type transportState interface {
-	Serializable
+	state.Serializable
 
 	// ApplyDefaults sets values from the provided defaults if they have not already been configured.
 	ApplyDefaults(defaults map[string]TFType) error
@@ -153,6 +151,10 @@ type transportState interface {
 
 	// render renders the transport state to HCL
 	render() (string, error)
+
+	// debug exports the state as a string in a format suitable for logging as part of a diagnostic
+	// message
+	debug() string
 }
 
 func newEmbeddedTransport() *embeddedTransportV1 {
@@ -406,9 +408,9 @@ func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) erro
 		}
 
 	case configuredCount > 1:
-		return newErrWithDiagnostics(
-			"Invalid Transport Configuration",
-			fmt.Sprintf("Only one transport can be configured, %v were configured", em.transports.types()),
+		return fmt.Errorf(
+			"invalid transport configuration, only one transport can be configured, %v were configured",
+			em.transports.types(),
 		)
 	}
 
@@ -427,6 +429,15 @@ func (em *embeddedTransportV1) GetConfiguredTransport() (transportState, error) 
 	return transport, nil
 }
 
+func (em *embeddedTransportV1) Debug() string {
+	var debug []string
+	for _, transport := range em.transports {
+		debug = append(debug, fmt.Sprintf("%s\n", transport.debug()))
+	}
+
+	return strings.Join(debug, "\n\n")
+}
+
 func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Value, transportType string) error {
 	// Because the transport type is a dynamic psuedo type we have to manually ensure
 	// that the user hasn't set any unknown attributes.
@@ -437,9 +448,9 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 			}
 		}
 
-		return newErrWithDiagnostics("Unsupported argument",
-			fmt.Sprintf(`An argument named "%s" is not expected here.`, attr), "transport", transportType, attr,
-		)
+		return AttributePathError(
+			fmt.Errorf("unsupported argument, an argument named \"%s\" is not expected here", attr),
+			"transport", transportType, attr)
 	}
 
 	for attribute := range values {
@@ -540,7 +551,10 @@ func isTransportConfigured(state transportState) bool {
 // is returned if the K8S transport is configured.
 func checkK8STransportNotConfigured(state StateWithTransport, resourceName string) error {
 	if _, ok := state.EmbeddedTransport().transports[K8S]; ok {
-		return newErrWithDiagnostics("invalid configuration", fmt.Sprintf("the '%s' resource does not support the 'kubernetes' transport", resourceName))
+		return fmt.Errorf(
+			"invalid configuration, the '%s' resource does not support the 'kubernetes' transport",
+			resourceName,
+		)
 	}
 	return nil
 }

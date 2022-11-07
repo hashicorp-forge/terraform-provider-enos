@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
@@ -15,7 +18,7 @@ type transportResourceUtil struct{}
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state Serializable, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
+func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state state.Serializable, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -24,7 +27,7 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 	}
 
 	if err := unmarshal(state, req.Config); err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
 }
 
@@ -39,7 +42,7 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 //     values to the new values.
 //  3. Upgrade the existing state with the new values and return the marshaled
 //     version of the current upgraded state.
-func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state Serializable, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
+func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state state.Serializable, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -69,16 +72,19 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 		// the raw values.
 		res.UpgradedState, err = upgradeState(state, rawStateValues)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Upgrade State Error", err))
 		}
 	default:
-		// TODO: shouldn't this raise an error?
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Upgrade State Error",
+			fmt.Errorf("the provider doesn't know how to upgrade from the current state version"),
+		))
 	}
 }
 
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
-func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWithTransport, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
+func (t *transportResourceUtil) ReadResource(ctx context.Context, serializable state.Serializable, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -86,31 +92,29 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, state StateWit
 	default:
 	}
 
-	err := unmarshal(state, req.CurrentState)
+	err := unmarshal(serializable, req.CurrentState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 
-	res.NewState, err = marshal(state)
+	res.NewState, err = state.Marshal(serializable)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
-	}
-
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Read Resource Error",
-			Detail:   fmt.Sprintf("Failed marshal embedded transport due to: %s", err.Error()),
-		})
 	}
 }
 
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
 // a request into prior and proposed states, builds a transport client,
 // verifies it, and returns the new transport.
-func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context.Context, prior, proposed StateWithTransport, resource ResourceWithProviderConfig, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) *embeddedTransportV1 {
+func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
+	ctx context.Context,
+	prior, proposed StateWithTransport,
+	resource ResourceWithProviderConfig,
+	req resource.PlanResourceChangeRequest,
+	res *resource.PlanResourceChangeResponse) *embeddedTransportV1 {
+
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -128,30 +132,29 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 		return nil
 	}
 
-	err = unmarshal(prior, req.PriorState)
+	err = prior.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return nil
 	}
 
-	err = unmarshal(proposed, req.ProposedNewState)
+	err = proposed.FromTerraform5Value(req.ProposedNewState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return nil
 	}
 
 	proposedTransport, err := proposed.EmbeddedTransport().Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("Failed to get proposed transport config, due to: %s", err.Error()),
-		})
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Transport Error",
+			fmt.Errorf("failed to get proposed transport config, due to: %w", err),
+		))
 		return nil
 	}
 	err = proposedTransport.ApplyDefaults(providerConfig.Transport)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return nil
 	}
 
@@ -160,27 +163,9 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(ctx context
 	return proposedTransport
 }
 
-// PlanMarshalPlannedState marshals a proposed state and transport into a plan response
-func (t *transportResourceUtil) PlanMarshalPlannedState(ctx context.Context, res *tfprotov6.PlanResourceChangeResponse, proposed StateWithTransport, transport *embeddedTransportV1) {
-	var err error
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
-		return
-	default:
-	}
-
-	res.PlannedState, err = marshal(proposed)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
-}
-
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, planned StateWithTransport, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, planned StateWithTransport, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -188,37 +173,33 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, 
 	default:
 	}
 
-	err := unmarshal(planned, req.PlannedState)
+	err := planned.FromTerraform5Value(req.PlannedState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Serialization Error",
+			fmt.Errorf("failed unmarshal planned state, due to: %s", err),
+		))
 		return
 	}
 
+	err = prior.FromTerraform5Value(req.PriorState)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("Failed unmarshal prior transport, due to: %s", err.Error()),
-		})
-		return
-	}
-
-	err = unmarshal(prior, req.PriorState)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Serialization Error",
+			fmt.Errorf("failed unmarshal prior state, due to: %s", err),
+		))
 	}
 }
 
 // ApplyValidatePlannedAndBuildTransport takes the planned state and provider transport,
 // validates them, and returns a new embedded transport that can be used to create a transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, resource ResourceWithProviderConfig, res *tfprotov6.ApplyResourceChangeResponse) *embeddedTransportV1 {
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, resource ResourceWithProviderConfig, res *resource.ApplyResourceChangeResponse) *embeddedTransportV1 {
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Apply Error",
-			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
-		})
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Apply Error",
+			fmt.Errorf("failed to get provider config, due to: %s", err),
+		))
 		return nil
 	}
 
@@ -226,11 +207,10 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 	// for the pointer.
 	providerConfig, err = providerConfig.Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Apply Error",
-			Detail:   fmt.Sprintf("Failed to copy provider config, due to: %s", err.Error()),
-		})
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Apply Error",
+			fmt.Errorf("failed to copy provider config, due to: %s", err),
+		))
 		return nil
 	}
 
@@ -244,52 +224,35 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 	etP := planned.EmbeddedTransport()
 	et, err := etP.Copy()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Apply Error",
-			Detail:   fmt.Sprintf("Failed to copy embedded transport, due to: %s", err.Error()),
-		})
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Apply Error",
+			fmt.Errorf("failed to copy embedded transport, due to: %s", err),
+		))
 		return nil
 	}
 
 	err = et.ApplyDefaults(providerConfig.Transport)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Transport Error",
+			fmt.Errorf("failed to apply transport defaults, due to: %w", err),
+		))
 		return nil
 	}
 
 	err = et.Validate(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 		return nil
 	}
 
 	err = planned.Validate(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 		return nil
 	}
 
 	return et
-}
-
-// ApplyMarshalNewState takes the planned state and transport and marshal it
-// into the new state
-func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *tfprotov6.ApplyResourceChangeResponse, planned StateWithTransport, transport *embeddedTransportV1) {
-	var err error
-
-	select {
-	case <-ctx.Done():
-		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
-		return
-	default:
-	}
-
-	res.NewState, err = marshal(planned)
-	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		return
-	}
 }
 
 // ImportResourceState is the request Terraform sends when it wants the provider
@@ -297,7 +260,7 @@ func (t *transportResourceUtil) ApplyMarshalNewState(ctx context.Context, res *t
 //
 // Importing a enos resources doesn't make a lot of sense but we have to support the
 // function regardless.
-func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state Serializable, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
+func (t *transportResourceUtil) ImportResourceState(ctx context.Context, serializable state.Serializable, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -305,9 +268,9 @@ func (t *transportResourceUtil) ImportResourceState(ctx context.Context, state S
 	default:
 	}
 
-	importState, err := marshal(state)
+	importState, err := state.Marshal(serializable)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
 

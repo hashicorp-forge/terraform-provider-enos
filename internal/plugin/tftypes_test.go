@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -468,5 +469,212 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 			require.Equal(t, test.val, val)
 			require.Equal(t, test.ok, ok)
 		})
+	}
+}
+
+func TestDebugTfString(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		val           *tfString
+		expectedDebug string
+	}{
+		{
+			newTfString(),
+			"null",
+		},
+		{
+			&tfString{Unknown: true},
+			"unknown",
+		},
+		{
+			&tfString{Val: "bananas"},
+			"bananas",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfNum(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		val           *tfNum
+		expectedDebug string
+	}{
+		{
+			newTfNum(),
+			"null",
+		},
+		{
+			&tfNum{Unknown: true},
+			"unknown",
+		},
+		{
+			&tfNum{Val: 50},
+			"50",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfBool(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		val           *tfBool
+		expectedDebug string
+	}{
+		{
+			newTfBool(),
+			"null",
+		},
+		{
+			&tfBool{Unknown: true},
+			"unknown",
+		},
+		{
+			&tfBool{Val: true},
+			"true",
+		},
+		{
+			&tfBool{Val: false},
+			"false",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfStringSlice(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		val           *tfStringSlice
+		expectedDebug string
+	}{
+		{
+			newTfStringSlice(),
+			"null",
+		},
+		{
+			&tfStringSlice{Unknown: true},
+			"unknown",
+		},
+		{
+			&tfStringSlice{Val: []*tfString{{Val: "bananas"}, {Val: "apples"}, {Val: "mangos"}}},
+			"[bananas apples mangos]",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfStringMap(t *testing.T) {
+	t.Parallel()
+
+	sMap := newTfStringMap()
+	sMap.SetStrings(map[string]string{
+		"one": "1",
+		"two": "2",
+	})
+
+	for _, test := range []struct {
+		val           *tfStringMap
+		expectedDebug string
+	}{
+		{
+			newTfStringMap(),
+			"null",
+		},
+		{
+			&tfStringMap{Unknown: true},
+			"unknown",
+		},
+		{
+			sMap,
+			"map[one:1 two:2]",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfObject(t *testing.T) {
+	t.Parallel()
+
+	object := newTfObject()
+	object.Set(map[string]interface{}{
+		"one":    1,
+		"true":   true,
+		"string": "string",
+	})
+
+	for _, test := range []struct {
+		val           *tfObject
+		expectedDebug string
+	}{
+		{
+			newTfObject(),
+			"null",
+		},
+		{
+			&tfObject{Unknown: true},
+			"unknown",
+		},
+		{
+			object,
+			"map[one:1 string:string true:true]",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
+	}
+}
+
+func TestDebugTfObjectSlice(t *testing.T) {
+	t.Parallel()
+
+	o1 := newTfObject()
+	o1.Set(map[string]interface{}{
+		"one":    1,
+		"true":   true,
+		"string": "string",
+	})
+
+	o2 := newTfObject()
+	o2.Set(map[string]interface{}{
+		"two":   1,
+		"false": false,
+		"slice": []string{"bananas", "mangos"},
+	})
+
+	o3 := newTfObject()
+	o3.Set(map[string]interface{}{
+		"one": map[string]string{"a": "a", "b": "b"},
+	})
+
+	slice := newTfObjectSlice()
+	slice.Set([]*tfObject{o1, o2, o3})
+
+	for _, test := range []struct {
+		val           *tfObjectSlice
+		expectedDebug string
+	}{
+		{
+			newTfObjectSlice(),
+			"null",
+		},
+		{
+			&tfObjectSlice{Unknown: true},
+			"unknown",
+		},
+		{
+			slice,
+			"[map[one:1 string:string true:true] map[false:false slice:[bananas mangos] two:1] map[one:map[a:a b:b]]]",
+		},
+	} {
+		assert.Equal(t, test.expectedDebug, test.val.String())
 	}
 }

@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -33,8 +35,8 @@ type vaultStart struct {
 }
 
 var (
-	_                 resourcerouter.Resource = (*vaultStart)(nil)
-	impliedTypeRegexp                         = regexp.MustCompile(`\d*?\[\"(\w*)\",.*]`)
+	_                 resource.Resource = (*vaultStart)(nil)
+	impliedTypeRegexp                   = regexp.MustCompile(`\d*?\[\"(\w*)\",.*]`)
 )
 
 type vaultStartStateV1 struct {
@@ -70,7 +72,7 @@ type vaultConfigBlock struct {
 	Unknown        bool
 }
 
-var _ State = (*vaultStartStateV1)(nil)
+var _ state.State = (*vaultStartStateV1)(nil)
 
 func newVaultStart() *vaultStart {
 	return &vaultStart{
@@ -185,12 +187,13 @@ func (r *vaultStart) ImportResourceState(ctx context.Context, req tfprotov6.Impo
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (r *vaultStart) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (r *vaultStart) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newVaultStartStateV1()
 	proposedState := newVaultStartStateV1()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -203,36 +206,27 @@ func (r *vaultStart) PlanResourceChange(ctx context.Context, req tfprotov6.PlanR
 		proposedState.ID.Unknown = true
 		proposedState.Status.Unknown = true
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (r *vaultStart) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (r *vaultStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newVaultStartStateV1()
 	plannedState := newVaultStartStateV1()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
-	// Check if the planned state attributes are blank. If they are then you
-	// should delete the resource.
-	if _, ok := plannedState.BinPath.Get(); !ok {
-		// Delete the resource
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -240,7 +234,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req tfprotov6.Appl
 
 	client, err := transport.Client(ctx)
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
 	defer client.Close() //nolint: staticcheck
@@ -249,19 +243,17 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req tfprotov6.Appl
 	if _, ok := priorState.ID.Get(); !ok {
 		err = plannedState.startVault(ctx, client)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Start Error", err))
 			return
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startVault(ctx, client)
 
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(fmt.Errorf("%s", err)))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Start Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -346,7 +338,7 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 	}
 
 	if _, ok := s.BinPath.Get(); !ok {
-		return newErrWithDiagnostics("invalid configuration", "you must provide a vault binary path", "attribute")
+		return ValidationError("you must provide a vault binary path", "bin_path")
 	}
 
 	return nil
@@ -403,7 +395,7 @@ func (s *vaultStartStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *vaultStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"bin_path":       s.BinPath.TFValue(),
@@ -428,7 +420,7 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 // FromTerraform5Value unmarshals the value to the struct
 func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
 	if val.IsNull() {
-		return newErrWithDiagnostics("missing required attribute", "the attribute must be set", s.AttributePaths...)
+		return AttributePathError(fmt.Errorf("serialization error, config block is missing"), s.AttributePaths...)
 	}
 
 	if !val.IsKnown() {
@@ -653,6 +645,10 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	return hclBuilder, nil
 }
 
+func (s *vaultStartStateV1) Debug() string {
+	return s.EmbeddedTransport().Debug()
+}
+
 func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport) error {
 	var err error
 
@@ -690,7 +686,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		remoteflight.WithUserShell("/bin/false"),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault user", "failed to find or create the vault user")
+		return fmt.Errorf("failed to find or create the vault user, due to: %w", err)
 	}
 
 	// Copy the license file if we have one
@@ -703,7 +699,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		))
 
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "vault license", "failed to copy vault license")
+			return fmt.Errorf("failed to copy vault license, due to: %w", err)
 		}
 
 		envVars = append(envVars, fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
@@ -716,13 +712,13 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		remoteflight.WithCopyFileContent(tfile.NewReader(strings.Join(envVars, "\n"))),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault environment", "failed to create the vault environment file")
+		return fmt.Errorf("failed to create the vault environment file, due to: %w", err)
 	}
 
 	// Create the vault HCL configuration file
 	config, err := s.Config.ToHCLConfig()
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault configuration", "failed to create the vault HCL configuration")
+		return fmt.Errorf("failed to create the vault HCL configuration, due to: %w", err)
 	}
 	err = hcl.CreateHCLConfigFile(ctx, client, hcl.NewCreateHCLConfigFileRequest(
 		hcl.WithHCLConfigFilePath(configFilePath),
@@ -732,7 +728,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 	))
 
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault configuration", "failed to create the vault configuration file")
+		return fmt.Errorf("failed to create the vault configuration file, due to: %w", err)
 	}
 
 	// Manage the vault systemd service ourselves unless it has explicitly been
@@ -794,7 +790,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		))
 
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "systemd unit", "failed to create the vault systemd unit")
+			return fmt.Errorf("failed to create the vault systemd unit, due to: %w", err)
 		}
 	}
 
@@ -804,11 +800,11 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 			remoteflight.WithDirChown(vaultUsername),
 		))
 		if err != nil {
-			return wrapErrWithDiagnostics(err, "raft data directory", "failed to change ownership on data directory")
+			return fmt.Errorf("failed to change ownership on raft data directory, due to: %w", err)
 		}
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(1*time.Minute))
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	// Restart the service and wait for it to be running
@@ -817,7 +813,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	))
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault service", "failed to start the vault service")
+		return fmt.Errorf("failed to start the vault service, due to: %w", err)
 	}
 
 	state, err := vault.WaitForState(timeoutCtx, client, vault.NewStatusRequest(
@@ -825,7 +821,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
 	if err != nil {
-		return wrapErrWithDiagnostics(err, "vault service", "waiting for vault service")
+		return fmt.Errorf("failed to start the vault service, due to: %w", err)
 	}
 	s.Status.Set(int(state.SealStatus))
 

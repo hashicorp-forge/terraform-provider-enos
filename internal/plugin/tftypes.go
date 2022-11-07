@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strconv"
 
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -14,80 +16,37 @@ var (
 	unknownDSTVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
 )
 
-// marshal converts a Serializable state value into a DynamicValue suitable for transporting over the
-// wire in response to the various Terraform callbacks, i.e. PlanResourceChange or ApplyResourceChange
-// The generated value must have the structure as the value receeved in the request from Terraform,
-// otherwise Terraform will blow up with an error.
-func marshal(state Serializable) (*tfprotov6.DynamicValue, error) {
-	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), state.Terraform5Value())
-	if err != nil {
-		return &dyn, wrapErrWithDiagnostics(err,
-			"Unexpected configuration format",
-			"Failed to marshal the state to a Terraform type",
-		)
-	}
-
-	return &dyn, nil
-}
-
-func unmarshal(state Serializable, dyn *tfprotov6.DynamicValue) error {
+func unmarshal(state state.Serializable, dyn *tfprotov6.DynamicValue) error {
 	val, err := dyn.Unmarshal(state.Terraform5Type())
 	if err != nil {
-		return wrapErrWithDiagnostics(err,
-			"Unexpected configuration format",
-			"The resource got a configuration that did not match its schema. This may indicate an error in the provider.",
-		)
+		return fmt.Errorf("failed to unmarshal Terraform value, this may indicate an error in the provider, cause: %w", err)
 	}
 
 	err = val.As(state)
 	if err != nil {
-		return wrapErrWithDiagnostics(err,
-			"Unexpected configuration format",
-			"The resource state implementation does not match its schema. This may indicate an error in the provider.",
-		)
+		return fmt.Errorf("failed to unmarshal Terraform value, configuration does not match its schema, this may indicate an error in the provider, cause: %w", err)
 	}
 
 	return nil
 }
 
-// marshalDelete creates a nil Terraform DynamicValue, that indicates that the resource has been deleted.
-func marshalDelete(state Serializable) (*tfprotov6.DynamicValue, error) {
-	dyn, err := tfprotov6.NewDynamicValue(state.Terraform5Type(), tftypes.NewValue(state.Terraform5Type(), nil))
-	if err != nil {
-		err = wrapErrWithDiagnostics(err,
-			"Unexpected configuration format",
-			"The resource state implementation does not match its schema. This may indicate an error in the provider.",
-		)
-	}
-
-	return &dyn, err
-}
-
 // upgradeState takes an existing state and the new values we're migrating.
 // It unmarshals the new values onto the current state and returns a new
 // marshaled upgraded state.
-func upgradeState(currentState Serializable, newValues tftypes.Value) (*tfprotov6.DynamicValue, error) {
+func upgradeState(currentState state.Serializable, newValues tftypes.Value) (*tfprotov6.DynamicValue, error) {
 	upgraded, err := tfprotov6.NewDynamicValue(currentState.Terraform5Type(), newValues)
 	if err != nil {
-		return &upgraded, wrapErrWithDiagnostics(
-			err,
-			"upgrade error",
-			"unable to map version 1 to the current state",
-		)
+		return &upgraded, fmt.Errorf("failed to upgrade state, unable to map version 1 to the current state, due to: %w", err)
 	}
 
 	// Apply the new values to current state
 	err = unmarshal(currentState, &upgraded)
 	if err != nil {
-		return &upgraded, wrapErrWithDiagnostics(
-			err,
-			"upgrade error",
-			"unable to apply upgraded values to state",
-		)
+		return &upgraded, fmt.Errorf("failed to upgrade state, unable to apply upgraded values to state, due to: %w", err)
 	}
 
 	// Return the current state in the wire format
-	return marshal(currentState)
+	return state.Marshal(currentState)
 }
 
 // mapAttributesTo is a helper that maps tftypes.Values into intermediary
@@ -152,6 +111,8 @@ type tfBool struct {
 	Val     bool
 }
 
+var _ TFType = (*tfBool)(nil)
+
 func (b *tfBool) TFType() tftypes.Type {
 	return tftypes.Bool
 }
@@ -212,6 +173,17 @@ func (b *tfBool) Eq(o *tfBool) bool {
 	return reflect.DeepEqual(b, o)
 }
 
+func (b *tfBool) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return strconv.FormatBool(b.Val)
+	}
+}
+
 func newTfNum() *tfNum {
 	return &tfNum{Null: true}
 }
@@ -221,6 +193,8 @@ type tfNum struct {
 	Null    bool
 	Val     int
 }
+
+var _ TFType = (*tfNum)(nil)
 
 func (b *tfNum) TFType() tftypes.Type {
 	return tftypes.Number
@@ -283,6 +257,17 @@ func (b *tfNum) Eq(o *tfNum) bool {
 	return reflect.DeepEqual(b, o)
 }
 
+func (b *tfNum) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return strconv.Itoa(b.Val)
+	}
+}
+
 func newTfString() *tfString {
 	return &tfString{Null: true}
 }
@@ -292,6 +277,8 @@ type tfString struct {
 	Null    bool
 	Val     string
 }
+
+var _ TFType = (*tfString)(nil)
 
 func (b *tfString) TFType() tftypes.Type {
 	return tftypes.String
@@ -353,6 +340,17 @@ func (b *tfString) Eq(o *tfString) bool {
 	return reflect.DeepEqual(b, o)
 }
 
+func (b *tfString) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return b.Val
+	}
+}
+
 func newTfStringSlice() *tfStringSlice {
 	return &tfStringSlice{
 		Null: true,
@@ -365,6 +363,8 @@ type tfStringSlice struct {
 	Null    bool
 	Val     []*tfString
 }
+
+var _ TFType = (*tfStringSlice)(nil)
 
 func (b *tfStringSlice) TFType() tftypes.Type {
 	return tftypes.List{ElementType: tftypes.String}
@@ -499,6 +499,17 @@ func (b *tfStringSlice) FullyKnown() bool {
 	return true
 }
 
+func (b *tfStringSlice) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return fmt.Sprintf("%s", b.Val)
+	}
+}
+
 func newTfStringMap() *tfStringMap {
 	return &tfStringMap{
 		Null: true,
@@ -511,6 +522,8 @@ type tfStringMap struct {
 	Null    bool
 	Val     map[string]*tfString
 }
+
+var _ TFType = (*tfStringMap)(nil)
 
 func (b *tfStringMap) TFType() tftypes.Type {
 	return tftypes.Map{ElementType: tftypes.String}
@@ -645,6 +658,17 @@ func (b *tfStringMap) FullyKnown() bool {
 	return true
 }
 
+func (b *tfStringMap) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return fmt.Sprintf("%s", b.Val)
+	}
+}
+
 func newTfObject() *tfObject {
 	return &tfObject{
 		Null:      true,
@@ -661,6 +685,8 @@ type tfObject struct {
 	Val       map[string]interface{}
 	Optional  map[string]struct{}
 }
+
+var _ TFType = (*tfObject)(nil)
 
 func (b *tfObject) TFType() tftypes.Type {
 	// Sometimes objects represent DynamicPseudoType's. In this cases we want
@@ -889,6 +915,17 @@ func (b *tfObject) Eq(o *tfObject) bool {
 	return reflect.DeepEqual(b, o)
 }
 
+func (b *tfObject) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return fmt.Sprintf("%v", b.Val)
+	}
+}
+
 func newTfObjectSlice() *tfObjectSlice {
 	return &tfObjectSlice{
 		Null:      true,
@@ -905,6 +942,8 @@ type tfObjectSlice struct {
 	AttrTypes map[string]tftypes.Type
 	Optional  map[string]struct{}
 }
+
+var _ TFType = (*tfObjectSlice)(nil)
 
 func (b *tfObjectSlice) TFType() tftypes.Type {
 	return tftypes.List{ElementType: tftypes.Object{
@@ -1040,4 +1079,15 @@ func (b *tfObjectSlice) FullyKnown() bool {
 	}
 
 	return true
+}
+
+func (b *tfObjectSlice) String() string {
+	switch {
+	case b.Unknown:
+		return "unknown"
+	case b.Null:
+		return "null"
+	default:
+		return fmt.Sprintf("%s", b.Val)
+	}
 }

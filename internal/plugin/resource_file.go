@@ -2,13 +2,15 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
-
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -18,7 +20,7 @@ type file struct {
 	mu             sync.Mutex
 }
 
-var _ resourcerouter.Resource = (*file)(nil)
+var _ resource.Resource = (*file)(nil)
 
 type fileStateV1 struct {
 	ID        *tfString
@@ -32,7 +34,7 @@ type fileStateV1 struct {
 	Transport *embeddedTransportV1
 }
 
-var _ State = (*fileStateV1)(nil)
+var _ state.State = (*fileStateV1)(nil)
 
 func newFile() *file {
 	return &file{
@@ -118,12 +120,13 @@ func (f *file) ImportResourceState(ctx context.Context, req tfprotov6.ImportReso
 
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
-func (f *file) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourceChangeRequest, res *tfprotov6.PlanResourceChangeResponse) {
+func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
 	priorState := newFileState()
 	proposedState := newFileState()
+	res.PlannedState = proposedState
 
-	transport := transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, f, req, res)
-	if hasErrors(res.Diagnostics) {
+	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, f, req, res)
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
@@ -141,7 +144,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourc
 		// Load the file source
 		src, srcType, err := proposedState.openSourceOrContent()
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 			return
 		}
 		defer src.Close() // nolint: staticcheck
@@ -149,62 +152,54 @@ func (f *file) PlanResourceChange(ctx context.Context, req tfprotov6.PlanResourc
 		// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
 		sum, err := tfile.SHA256(src)
 		if err != nil {
-			err = wrapErrWithDiagnostics(err,
-				"invalid configuration", "unable to obtain file SHA256 sum", srcType,
-			)
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Invalid Configuration",
+				fmt.Errorf("unable to obtain file SHA256 sum for %s, due to: %w", srcType, err),
+			))
 			return
 		}
 		proposedState.Sum.Set(sum)
 	}
-
-	transportUtil.PlanMarshalPlannedState(ctx, res, proposedState, transport)
 }
 
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (f *file) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResourceChangeRequest, res *tfprotov6.ApplyResourceChangeResponse) {
+func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
 	priorState := newFileState()
 	plannedState := newFileState()
+	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
-	// If our prior state has an ID but our planned does not we're deleting.
-	_, okprior := priorState.ID.Get()
-	_, okplan := plannedState.ID.Get()
-	if okprior && !okplan {
-		newState, err := marshalDelete(plannedState)
-		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
-		} else {
-			res.NewState = newState
-		}
+	if req.IsDelete() {
+		// nothing to do on delete
 		return
 	}
 
 	plannedState.ID.Set("static")
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, f, res)
-	if hasErrors(res.Diagnostics) {
+	if diags.HasErrors(res.Diagnostics) {
 		return
 	}
 
 	src, _, err := plannedState.openSourceOrContent()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 		return
 	}
 	defer src.Close() //nolint: staticcheck
 
+	_, okprior := priorState.ID.Get()
 	// If we're missing a prior ID we haven't created it yet. If the prior and
 	// planned sum don't match then we're updating.
 	if !okprior || !priorState.Sum.Eq(plannedState.Sum) {
 		client, err := transport.Client(ctx)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 			return
 		}
 		defer client.Close() //nolint: staticcheck
@@ -226,12 +221,10 @@ func (f *file) ApplyResourceChange(ctx context.Context, req tfprotov6.ApplyResou
 
 		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(opts...))
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, errToDiagnostic(err))
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Copy Error", err))
 			return
 		}
 	}
-
-	transportUtil.ApplyMarshalNewState(ctx, res, plannedState, transport)
 }
 
 // Schema is the file states Terraform schema.
@@ -300,23 +293,23 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 	cnt, okCnt := fs.Content.Get()
 
 	if !okSrc && !okCnt {
-		return newErrWithDiagnostics("invalid configuration", "you must provide either the source location or file content", "source")
+		return ValidationError("you must provide either the source location or file content")
 	}
 
 	if okSrc && okCnt {
-		return newErrWithDiagnostics("invalid configuration", "you must provide only of of the source location or file content", "source")
+		return ValidationError("you must provide only of of the source location or file content")
 	}
 
 	if okSrc {
 		f, err := tfile.Open(src)
 		if err != nil {
-			return newErrWithDiagnostics("invalid configuration", "unable to open source file", "source")
+			return ValidationError("unable to open source file", "source")
 		}
 		defer f.Close() // nolint: staticcheck
 	}
 
 	if okCnt && cnt == "" {
-		return newErrWithDiagnostics("invalid configuration", "you must provide content", "content")
+		return ValidationError("you must provide content", "content")
 	}
 
 	return nil
@@ -360,7 +353,7 @@ func (fs *fileStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(fs.Terraform5Type(), map[string]tftypes.Value{
 		"id":          fs.ID.TFValue(),
@@ -380,6 +373,10 @@ func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return fs.Transport
 }
 
+func (fs *fileStateV1) Debug() string {
+	return fs.EmbeddedTransport().Debug()
+}
+
 // openSourceOrContent returns a stream of the source content
 func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 	var err error
@@ -390,16 +387,16 @@ func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 		srcType = "source"
 		src, err = tfile.Open(srcVal)
 		if err != nil {
-			err = wrapErrWithDiagnostics(err,
-				"invalid configuration", "unable to open source file", srcType,
+			return src, srcType, AttributePathError(
+				err,
+				fmt.Sprintf("unable to open source file: [%s]", srcType), "source",
 			)
-			return src, srcType, err
 		}
 	} else if cntVal, ok := fs.Content.Get(); ok {
 		srcType = "content"
 		src = tfile.NewReader(cntVal)
 	} else {
-		return src, srcType, newErrWithDiagnostics("invalid configuration", "you must provide a source file or content", "source")
+		return src, srcType, fmt.Errorf("invalid configuration, you must provide a either a source file or content")
 	}
 
 	return src, srcType, nil
