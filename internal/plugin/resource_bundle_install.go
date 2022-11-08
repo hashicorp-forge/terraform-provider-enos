@@ -35,6 +35,8 @@ type bundleInstallStateV1 struct {
 	Release     *bundleInstallStateV1Release
 	Artifactory *bundleInstallStateV1Artifactory
 	Transport   *embeddedTransportV1
+
+	resolvedTransport transportState
 }
 
 type bundleInstallStateV1Artifactory struct {
@@ -647,6 +649,13 @@ func (s *bundleInstallStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *bundleInstallStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *bundleInstallStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }

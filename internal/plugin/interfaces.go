@@ -17,6 +17,9 @@ type TFType interface {
 type StateWithTransport interface {
 	state.State
 	EmbeddedTransport() *embeddedTransportV1
+	// setResolvedTransport sets the transport state that was resolved by applying the provider
+	// defaults to the embedded transport this state
+	setResolvedTransport(transport transportState)
 }
 
 type ResourceWithProviderConfig interface {

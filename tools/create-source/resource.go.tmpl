@@ -21,6 +21,8 @@ var _ resource.Resource = (*{{.Struct}})(nil)
 type {{.State}} struct {
 	ID        *tfString
 	Transport *embeddedTransportV1
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*{{.State}})(nil)
@@ -286,7 +288,13 @@ func (s *{{.State}}) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *{{.State}}) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *{{.State}}) Debug() string {
-    // change this to implement a meaningful debug if necessary
-    return ""
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }

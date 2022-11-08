@@ -32,6 +32,8 @@ type fileStateV1 struct {
 	Chmod     *tfString
 	Chown     *tfString
 	Transport *embeddedTransportV1
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*fileStateV1)(nil)
@@ -373,8 +375,15 @@ func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return fs.Transport
 }
 
+func (fs *fileStateV1) setResolvedTransport(transport transportState) {
+	fs.resolvedTransport = transport
+}
+
 func (fs *fileStateV1) Debug() string {
-	return fs.EmbeddedTransport().Debug()
+	if fs.resolvedTransport == nil {
+		return fs.EmbeddedTransport().Debug()
+	}
+	return fs.resolvedTransport.debug()
 }
 
 // openSourceOrContent returns a stream of the source content

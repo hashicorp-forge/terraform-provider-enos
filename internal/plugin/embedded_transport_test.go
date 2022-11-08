@@ -263,9 +263,11 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 			// Apply our provider defaults to our transport
 			transport := test.config.build(tt)
 			if test.wantErr {
-				require.Error(tt, transport.ApplyDefaults(test.defaultsTransport))
+				_, err := transport.ApplyDefaults(test.defaultsTransport)
+				require.Error(tt, err)
 			} else {
-				require.NoError(tt, transport.ApplyDefaults(test.defaultsTransport))
+				_, err := transport.ApplyDefaults(test.defaultsTransport)
+				require.NoError(tt, err)
 
 				for tType, expectedConfig := range test.expectedValues {
 					actualConfig := transport.Attributes()[tType]

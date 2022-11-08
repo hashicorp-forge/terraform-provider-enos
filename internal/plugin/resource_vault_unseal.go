@@ -30,6 +30,8 @@ type vaultUnsealStateV1 struct {
 	UnsealKeys *tfStringSlice
 	Status     *tfNum
 	Transport  *embeddedTransportV1
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*vaultUnsealStateV1)(nil)
@@ -302,8 +304,15 @@ func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) er
 	return err
 }
 
+func (s *vaultUnsealStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *vaultUnsealStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }
 
 func (s *vaultUnsealStateV1) buildUnsealRequest() *vault.UnsealRequest {

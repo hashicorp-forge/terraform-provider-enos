@@ -38,6 +38,8 @@ type remoteExecStateV1 struct {
 	Stderr    *tfString
 	Stdout    *tfString
 	Transport *embeddedTransportV1
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*remoteExecStateV1)(nil)
@@ -533,8 +535,15 @@ func (s *remoteExecStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *remoteExecStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *remoteExecStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }
 
 func (s *remoteExecStateV1) hasUnknownAttributes() bool {

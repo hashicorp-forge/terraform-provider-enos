@@ -369,52 +369,50 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 // 2. Configuration is ignored if this transport has a value already for that attribute. In this example
 // the transport already had a value for ssh.host, therefore the provided ssh.host from the defatults
 // is ignored.
-func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) error {
+func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) (transportState, error) {
 	defaults.mu.Lock()
 	defer defaults.mu.Unlock()
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
 	configuredCount := len(em.transports)
-	switch {
-	case configuredCount == 1:
+	if configuredCount == 1 {
 		if configured, configuredOk, _ := em.transports.getConfiguredTransport(); configuredOk {
 			if defaultsTransport, defaultsOk := defaults.transports[configured.Type()]; defaultsOk {
-				if err := configured.ApplyDefaults(defaultsTransport.Attributes()); err != nil {
-					return err
-				}
+				err := configured.ApplyDefaults(defaultsTransport.Attributes())
+				return configured, err
 			}
+			return configured, nil
 		}
+	}
 
 	// If this embedded transport configuration does not define a transport block, then it should
 	// receive its transport configuration entirely from the enos provider configuration.
 	// In this case the transport defaults cannot be configured with more than one  transport since
 	// it would not be possible to know which transport client to build when applying the resource.
-	case configuredCount == 0:
+	if configuredCount == 0 {
 		defaultsTransport, err := defaults.GetConfiguredTransport()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		transport, err := defaultsTransport.Type().createTransport()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := transport.ApplyDefaults(defaultsTransport.Attributes()); err != nil {
-			return err
+			return nil, err
 		}
 		if err := em.SetTransportState(transport); err != nil {
-			return err
+			return nil, err
 		}
-
-	case configuredCount > 1:
-		return fmt.Errorf(
-			"invalid transport configuration, only one transport can be configured, %v were configured",
-			em.transports.types(),
-		)
+		return transport, nil
 	}
 
-	return nil
+	return nil, fmt.Errorf(
+		"invalid transport configuration, only one transport can be configured, %v were configured",
+		em.transports.types(),
+	)
 }
 
 // GetConfiguredTransport Gets the configured transport for this embedded transport. There should be

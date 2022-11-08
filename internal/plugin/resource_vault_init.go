@@ -49,6 +49,8 @@ type vaultInitStateV1 struct {
 	RecoveryKeysShares    *tfNum
 	RecoveryKeysThreshold *tfNum
 	RootToken             *tfString
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*vaultInitStateV1)(nil)
@@ -481,8 +483,15 @@ func (s *vaultInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *vaultInitStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *vaultInitStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }
 
 // Init initializes a vault cluster

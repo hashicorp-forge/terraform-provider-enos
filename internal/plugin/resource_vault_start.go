@@ -51,6 +51,8 @@ type vaultStartStateV1 struct {
 	Transport       *embeddedTransportV1
 	Username        *tfString
 	Environment     *tfStringMap
+
+	resolvedTransport transportState
 }
 
 type vaultConfig struct {
@@ -645,8 +647,15 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	return hclBuilder, nil
 }
 
+func (s *vaultStartStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *vaultStartStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }
 
 func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport) error {

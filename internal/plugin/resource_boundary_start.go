@@ -34,6 +34,8 @@ type boundaryStartStateV1 struct {
 	SystemdUnitName *tfString
 	Transport       *embeddedTransportV1
 	Username        *tfString
+
+	resolvedTransport transportState
 }
 
 var _ state.State = (*boundaryStartStateV1)(nil)
@@ -420,6 +422,13 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 	return err
 }
 
+func (s *boundaryStartStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *boundaryStartStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }

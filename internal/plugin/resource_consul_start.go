@@ -37,6 +37,8 @@ type consulStartStateV1 struct {
 	SystemdUnitName *tfString
 	Transport       *embeddedTransportV1
 	Username        *tfString
+
+	resolvedTransport transportState
 }
 
 type consulConfig struct {
@@ -478,8 +480,15 @@ func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	return hlcBuilder
 }
 
+func (s *consulStartStateV1) setResolvedTransport(transport transportState) {
+	s.resolvedTransport = transport
+}
+
 func (s *consulStartStateV1) Debug() string {
-	return s.EmbeddedTransport().Debug()
+	if s.resolvedTransport == nil {
+		return s.EmbeddedTransport().Debug()
+	}
+	return s.resolvedTransport.debug()
 }
 
 func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transport) error {
