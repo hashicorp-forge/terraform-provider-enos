@@ -14,6 +14,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
+// transportClientFactory Factory function for creating transport clients, can be overridden in tests
+type transportClientFactory = func(ctx context.Context, transport transportState) (it.Transport, error)
+
+var defaultTransportClientFactory = func(ctx context.Context, transport transportState) (it.Transport, error) {
+	return transport.Client(ctx)
+}
+
 type TransportType uint
 
 const (
@@ -114,8 +121,9 @@ transport = {
 // resources and data source. It is intended to be used as ouput from the
 // transport data source and used as the transport input for all resources.
 type embeddedTransportV1 struct {
-	mu         sync.Mutex
-	transports Transports
+	mu            sync.Mutex
+	transports    Transports
+	clientFactory transportClientFactory
 }
 
 // transportState interface defining the api of a transport
@@ -159,8 +167,9 @@ type transportState interface {
 
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
-		mu:         sync.Mutex{},
-		transports: map[TransportType]transportState{},
+		mu:            sync.Mutex{},
+		transports:    map[TransportType]transportState{},
+		clientFactory: defaultTransportClientFactory,
 	}
 }
 
@@ -285,7 +294,10 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
+	factory := em.clientFactory
+
 	newCopy := newEmbeddedTransport()
+	newCopy.clientFactory = factory
 
 	if err := newCopy.FromTerraform5Value(em.Terraform5Value()); err != nil {
 		return nil, err
@@ -295,9 +307,9 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 }
 
 // CopyValues returns only the values that have received their configuration from the
-// terraform configuration for that resoruce. The configured attributes do not include the attributes
+// terraform configuration for that resource. The configured attributes do not include the attributes
 // that may have been received as default values via ApplyDefaults. To get all the attribute values
-// including those recieved via defaults use the Attributes method instead.
+// including those received via defaults use the Attributes method instead.
 func (em *embeddedTransportV1) CopyValues() map[TransportType]map[string]tftypes.Value {
 	configuredAttributes := map[TransportType]map[string]tftypes.Value{}
 
@@ -352,7 +364,7 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 	if err != nil {
 		return nil, err
 	}
-	return transport.Client(ctx)
+	return em.clientFactory(ctx, transport)
 }
 
 // ApplyDefaults given the provided 'defaults' transport, update this transport by setting values into

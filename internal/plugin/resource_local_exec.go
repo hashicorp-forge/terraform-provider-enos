@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +13,6 @@ import (
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/enos-provider/internal/ui"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -137,7 +135,7 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req resource.PlanRes
 
 	// Calculate the sum if we already know all of our attributes.
 	if !proposedState.hasUnknownAttributes() {
-		sha256, err := l.SHA256(ctx, proposedState)
+		sha256, err := proposedState.config().computeSHA256(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Invalid Configuration",
@@ -304,74 +302,6 @@ func (s *localExecStateV1) Schema() *tfprotov6.Schema {
 			},
 		},
 	}
-}
-
-// SHA256 is the aggregate sum of the resource
-func (l *localExec) SHA256(ctx context.Context, state *localExecStateV1) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	default:
-	}
-
-	// We're probably overthinking this but this is a sha256 sum of the
-	// aggregate of the inline commands, the rendered content, and scripts.
-	ag := strings.Builder{}
-
-	if cont, ok := state.Content.Get(); ok {
-		content := tfile.NewReader(cont)
-		defer content.Close()
-
-		sha, err := tfile.SHA256(content)
-		if err != nil {
-			return "", AttributePathError(
-				fmt.Errorf("invalid configuration, unable to determine content SHA256 sum, due to: %w", err),
-				"content",
-			)
-		}
-
-		ag.WriteString(sha)
-	}
-
-	if inline, ok := state.Inline.GetStrings(); ok {
-		for _, cmd := range inline {
-			ag.WriteString(command.SHA256(command.New(cmd)))
-		}
-	}
-
-	var sha string
-	var file it.Copyable
-	var err error
-	if scripts, ok := state.Scripts.GetStrings(); ok {
-		for _, path := range scripts {
-			select {
-			case <-ctx.Done():
-				return "", ctx.Err()
-			default:
-			}
-
-			file, err = tfile.Open(path)
-			if err != nil {
-				return "", AttributePathError(
-					fmt.Errorf("invalid configuration, unable to open script file, due to: %w", err),
-					"scripts",
-				)
-			}
-			defer file.Close() // nolint: staticcheck
-
-			sha, err = tfile.SHA256(file)
-			if err != nil {
-				return "", AttributePathError(
-					fmt.Errorf("invalid configuration, unable to determine script file SHA256 sum, due to: %w", err),
-					"scripts",
-				)
-			}
-
-			ag.WriteString(sha)
-		}
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(ag.String()))), nil
 }
 
 // ExecuteCommands executes any commands or scripts and returns the STDOUT, STDERR,
@@ -590,4 +520,13 @@ func (s *localExecStateV1) hasUnknownAttributes() bool {
 	}
 
 	return false
+}
+
+func (s *localExecStateV1) config() execConfig {
+	return execConfig{
+		Env:     s.Env,
+		Content: s.Content,
+		Inline:  s.Inline,
+		Scripts: s.Scripts,
+	}
 }

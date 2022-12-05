@@ -54,6 +54,10 @@ func (c *cmd) Cmd() string {
 		cmd.WriteString(fmt.Sprintf("%s='%s' ", key, val))
 	}
 
+	if len(c.env) > 0 {
+		cmd.WriteString(" ; ")
+	}
+
 	cmd.WriteString(c.cmd)
 
 	return cmd.String()

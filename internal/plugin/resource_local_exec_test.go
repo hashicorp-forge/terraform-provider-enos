@@ -2,9 +2,13 @@ package plugin
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"regexp"
 	"testing"
 	"text/template"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
@@ -133,4 +137,70 @@ EOF
 			Steps:                    steps,
 		})
 	})
+}
+
+func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
+
+	tempDir := t.TempDir() // Note: this dir is automatically deleted after the test is run
+	f, err := os.CreateTemp(tempDir, "reapply_test.txt")
+	assert.NoError(t, err)
+
+	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "reapply_test" {
+        content = "echo \"hello\" >> {{ .File }}"
+        
+        environment = {
+        {{range $name, $val := .Env}}
+            "{{$name}}": "{{$val}}",
+        {{end}}
+        }
+    }`))
+
+	data1 := map[string]interface{}{
+		"File": f.Name(),
+		"Env": map[string]string{
+			"one": "one",
+		},
+	}
+
+	s1 := bytes.Buffer{}
+	err = cfg.Execute(&s1, data1)
+	if err != nil {
+		t.Fatalf("error executing test template: %s", err.Error())
+	}
+
+	apply1 := resource.TestStep{
+		Config:   s1.String(),
+		PlanOnly: false,
+	}
+
+	data2 := map[string]interface{}{
+		"File": f.Name(),
+		"Env": map[string]string{
+			"one": "one",
+			"two": "one",
+		},
+	}
+
+	s2 := bytes.Buffer{}
+	err = cfg.Execute(&s2, data2)
+	if err != nil {
+		t.Fatalf("error executing test template: %s", err.Error())
+	}
+
+	apply2 := resource.TestStep{
+		Config:   s2.String(),
+		PlanOnly: false,
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProviders(t),
+		Steps: []resource.TestStep{
+			apply1,
+			apply2,
+		},
+	})
+
+	actual, err := io.ReadAll(f)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello\nhello\n", string(actual))
 }

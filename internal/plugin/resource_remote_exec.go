@@ -2,10 +2,8 @@ package plugin
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
@@ -24,6 +22,8 @@ import (
 type remoteExec struct {
 	providerConfig *config
 	mu             sync.Mutex
+
+	stateFactory remoteExecStateFactory
 }
 
 var _ resource.Resource = (*remoteExec)(nil)
@@ -44,10 +44,14 @@ type remoteExecStateV1 struct {
 
 var _ state.State = (*remoteExecStateV1)(nil)
 
+// remoteExecStateFactory a factory that can be used to override the default state creation, useful in tests
+type remoteExecStateFactory = func() *remoteExecStateV1
+
 func newRemoteExec() *remoteExec {
 	return &remoteExec{
 		providerConfig: newProviderConfig(),
 		mu:             sync.Mutex{},
+		stateFactory:   newRemoteExecStateV1,
 	}
 }
 
@@ -70,7 +74,7 @@ func (r *remoteExec) Name() string {
 }
 
 func (r *remoteExec) Schema() *tfprotov6.Schema {
-	return newRemoteExecStateV1().Schema()
+	return r.stateFactory().Schema()
 }
 
 func (r *remoteExec) SetProviderConfig(meta tftypes.Value) error {
@@ -90,7 +94,7 @@ func (r *remoteExec) GetProviderConfig() (*config, error) {
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
 func (r *remoteExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
-	newState := newRemoteExecStateV1()
+	newState := r.stateFactory()
 
 	transportUtil.ValidateResourceConfig(ctx, newState, req, res)
 }
@@ -98,7 +102,7 @@ func (r *remoteExec) ValidateResourceConfig(ctx context.Context, req tfprotov6.V
 // UpgradeResourceState is the request Terraform sends when it wants to
 // upgrade the resource's state to a new version.
 func (r *remoteExec) UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
-	newState := newRemoteExecStateV1()
+	newState := r.stateFactory()
 
 	transportUtil.UpgradeResourceState(ctx, newState, req, res)
 }
@@ -106,7 +110,7 @@ func (r *remoteExec) UpgradeResourceState(ctx context.Context, req tfprotov6.Upg
 // ReadResource is the request Terraform sends when it wants to get the latest
 // state for the resource.
 func (r *remoteExec) ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
-	newState := newRemoteExecStateV1()
+	newState := r.stateFactory()
 
 	transportUtil.ReadResource(ctx, newState, req, res)
 }
@@ -114,8 +118,8 @@ func (r *remoteExec) ReadResource(ctx context.Context, req tfprotov6.ReadResourc
 // PlanResourceChange is the request Terraform sends when it is generating a plan
 // for the resource and wants the provider's input on what the planned state should be.
 func (r *remoteExec) PlanResourceChange(ctx context.Context, req resource.PlanResourceChangeRequest, res *resource.PlanResourceChangeResponse) {
-	priorState := newRemoteExecStateV1()
-	proposedState := newRemoteExecStateV1()
+	priorState := r.stateFactory()
+	proposedState := r.stateFactory()
 	res.PlannedState = proposedState
 
 	transportUtil.PlanUnmarshalVerifyAndBuildTransport(ctx, priorState, proposedState, r, req, res)
@@ -126,7 +130,7 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req resource.PlanRe
 	// Since content is optional we need to make sure we only update the sum
 	// if we know it.
 	if !proposedState.hasUnknownAttributes() {
-		sha256, err := r.SHA256(ctx, proposedState)
+		sha256, err := proposedState.config().computeSHA256(ctx)
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Invalid Configuration",
@@ -168,8 +172,8 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req resource.PlanRe
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newRemoteExecStateV1()
-	plannedState := newRemoteExecStateV1()
+	priorState := r.stateFactory()
+	plannedState := r.stateFactory()
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
@@ -218,7 +222,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 // ImportResourceState is the request Terraform sends when it wants the provider
 // to import one or more resources specified by an ID.
 func (r *remoteExec) ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
-	newState := newRemoteExecStateV1()
+	newState := r.stateFactory()
 
 	transportUtil.ImportResourceState(ctx, newState, req, res)
 }
@@ -281,74 +285,6 @@ func (s *remoteExecStateV1) Schema() *tfprotov6.Schema {
 			},
 		},
 	}
-}
-
-// SHA256 is the aggregate sum of the resource
-func (r *remoteExec) SHA256(ctx context.Context, state *remoteExecStateV1) (string, error) {
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	default:
-	}
-
-	// We're probably overthinking this but this is a sha256 sum of the
-	// aggregate of the inline commands, the rendered content, and scripts.
-	ag := strings.Builder{}
-
-	if cont, ok := state.Content.Get(); ok {
-		content := tfile.NewReader(cont)
-		defer content.Close()
-
-		sha, err := tfile.SHA256(content)
-		if err != nil {
-			return "", AttributePathError(
-				fmt.Errorf("invalid configuration, unable to determine content SHA256 sum, due to: %w", err),
-				"content",
-			)
-		}
-
-		ag.WriteString(sha)
-	}
-
-	if inline, ok := state.Inline.GetStrings(); ok {
-		for _, cmd := range inline {
-			ag.WriteString(command.SHA256(command.New(cmd)))
-		}
-	}
-
-	if scripts, ok := state.Scripts.GetStrings(); ok {
-		var sha string
-		var file it.Copyable
-		var err error
-		for _, path := range scripts {
-			select {
-			case <-ctx.Done():
-				return "", ctx.Err()
-			default:
-			}
-
-			file, err = tfile.Open(path)
-			if err != nil {
-				return "", AttributePathError(
-					fmt.Errorf("invalid configuration, unable to open scripts file: [%s], due to: %w", path, err),
-					"scripts",
-				)
-			}
-			defer file.Close() // nolint: staticcheck
-
-			sha, err = tfile.SHA256(file)
-			if err != nil {
-				return "", AttributePathError(
-					fmt.Errorf("invalid configuration, unable to determine script file SHA256 sum, due to: %w", err),
-					"scripts",
-				)
-			}
-
-			ag.WriteString(sha)
-		}
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(ag.String()))), nil
 }
 
 // ExecuteCommands executes any commands or scripts and returns the STDOUT, STDERR,
@@ -570,6 +506,15 @@ func (s *remoteExecStateV1) hasUnknownAttributes() bool {
 	}
 
 	return false
+}
+
+func (s *remoteExecStateV1) config() execConfig {
+	return execConfig{
+		Env:     s.Env,
+		Content: s.Content,
+		Inline:  s.Inline,
+		Scripts: s.Scripts,
+	}
 }
 
 func formatOutputIfExists(ui ui.UI) string {

@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"regexp"
 	"testing"
@@ -9,6 +10,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/enos-provider/internal/transport/mock"
+
+	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	it "github.com/hashicorp/enos-provider/internal/transport"
 
 	"github.com/hashicorp/enos-provider/internal/server/state"
 
@@ -265,4 +271,92 @@ func TestBadTransportConfig(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestChangedEnvVars(t *testing.T) {
+	cfg1 := template.Must(template.New("enos_remote_exec").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
+
+        environment = {
+            "host" = "127.0.0.1"
+            "name" = "yoyo"
+        }
+
+		content = "echo hello"
+
+		{{ renderTransport .Transport }}
+	}`))
+
+	cfg2 := template.Must(template.New("enos_remote_exec").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
+
+        environment = {
+            "host" = "10.0.6.9"
+            "name" = "yoyo"
+        }
+
+		content = "echo hello"
+
+		{{ renderTransport .Transport }}
+	}`))
+
+	remoteExecState := newRemoteExecStateV1()
+	remoteExecState.ID.Set("test_changed_env")
+	transportSSH := newEmbeddedTransportSSH()
+	transportSSH.User.Set("ubuntu")
+	transportSSH.Host.Set("127.0.0.1")
+	transportSSH.PrivateKey.Set("not a private key")
+	assert.NoError(t, remoteExecState.Transport.SetTransportState(transportSSH))
+
+	var clientCreateCount int
+
+	remoteExecResource := newRemoteExec()
+	remoteExecResource.stateFactory = func() *remoteExecStateV1 {
+		remoteExecState := newRemoteExecStateV1()
+		embeddedTransport := newEmbeddedTransport()
+
+		embeddedTransport.clientFactory = func(ctx context.Context, transport transportState) (it.Transport, error) {
+			clientCreateCount = clientCreateCount + 1
+			return mock.New(), nil
+		}
+		remoteExecState.Transport = embeddedTransport
+
+		return remoteExecState
+	}
+
+	providers := testProviders(t, providerOverrides{resources: []resourcerouter.Resource{remoteExecResource}})
+
+	s1 := bytes.Buffer{}
+	err := cfg1.Execute(&s1, remoteExecState)
+	if err != nil {
+		t.Fatalf("error executing test template: %s", err.Error())
+	}
+
+	apply1 := resource.TestStep{
+		Config:   s1.String(),
+		PlanOnly: false,
+	}
+
+	s2 := bytes.Buffer{}
+	err = cfg2.Execute(&s2, remoteExecState)
+	if err != nil {
+		t.Fatalf("error executing test template: %s", err.Error())
+	}
+
+	apply2 := resource.TestStep{
+		Config:   s2.String(),
+		PlanOnly: false,
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providers,
+		Steps: []resource.TestStep{
+			apply1,
+			apply2,
+		},
+	})
+
+	assert.Equal(t, 2, clientCreateCount)
 }
