@@ -93,7 +93,7 @@ func TestSSH(t *testing.T) {
 	})
 
 	t.Run("nohup", func(t *testing.T) {
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
 		defer cancel()
 
 		// Make sure we can nohup and end our session

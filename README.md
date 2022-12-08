@@ -511,6 +511,10 @@ The following describes the enos_remote_file schema:
 |transport.ssh.passphrase|The text value of the passphrase for an encrypted private key|
 |transport.ssh.passphrase|The path of the passphrase for an encrypted private key|
 
+**Note**
+* Inline commands should not include double quotes, since the command will eventually be run as: `sh -c "<your command>"`.
+  If a double quote must be included in the command it should be escaped as follows: `\\\"`.
+
 The resource is also capable of using the SSH agent. It will attempt to connect
 to the agent socket as defined with the `SSH_AUTH_SOCK` environment variable.
 

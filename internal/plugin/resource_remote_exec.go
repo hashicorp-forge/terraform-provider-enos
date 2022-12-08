@@ -11,7 +11,6 @@ import (
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/enos-provider/internal/ui"
 	"github.com/hashicorp/go-multierror"
@@ -291,7 +290,6 @@ func (s *remoteExecStateV1) Schema() *tfprotov6.Schema {
 // and any errors encountered.
 func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, client it.Transport) (ui.UI, error) {
 	var err error
-	merr := &multierror.Error{}
 	ui := ui.NewBuffered()
 	env, _ := state.Env.GetStrings()
 
@@ -303,10 +301,18 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 			default:
 			}
 
-			stdout, stderr, err := client.Run(ctx, command.New(cmd, command.WithEnvVars(env)))
-			merr = multierror.Append(merr, err)
-			merr = multierror.Append(merr, ui.Append(stdout, stderr))
-			if err := merr.ErrorOrNil(); err != nil {
+			// continue early if line has no commands
+			if cmd == "" {
+				continue
+			}
+
+			exec := func(cmd string) error {
+				source := tfile.NewReader(cmd)
+				defer source.Close() // nolint: staticcheck
+
+				return r.copyAndRun(ctx, ui, client, source, "inline", env)
+			}
+			if err := exec(cmd); err != nil {
 				return ui, fmt.Errorf("running inline command failed, due to: %w", err)
 			}
 		}
@@ -314,14 +320,17 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 
 	if scripts, ok := state.Scripts.GetStrings(); ok {
 		for _, path := range scripts {
-			script, err := tfile.Open(path)
-			if err != nil {
-				return ui, fmt.Errorf("failed to open script file: [%s], due to: %w", path, err)
-			}
-			defer script.Close() // nolint: staticcheck
+			exec := func(path string) error {
+				script, err := tfile.Open(path)
+				if err != nil {
+					return fmt.Errorf("failed to open script file: [%s], due to: %w", path, err)
+				}
+				defer script.Close() // nolint: staticcheck
 
-			err = r.copyAndRun(ctx, ui, client, script, "script", env)
-			if err != nil {
+				return r.copyAndRun(ctx, ui, client, script, "script", env)
+			}
+
+			if err := exec(path); err != nil {
 				return ui, fmt.Errorf("running script: [%s] failed, due to: %w", path, err)
 			}
 		}

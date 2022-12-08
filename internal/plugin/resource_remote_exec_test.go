@@ -3,6 +3,7 @@ package plugin
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 	"testing"
@@ -10,6 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp/enos-provider/internal/transport/ssh"
 
 	"github.com/hashicorp/enos-provider/internal/transport/mock"
 
@@ -359,4 +363,68 @@ func TestChangedEnvVars(t *testing.T) {
 	})
 
 	assert.Equal(t, 2, clientCreateCount)
+}
+
+func TestInlineWithPipedCommandAndEnvVars(t *testing.T) {
+
+	host, hostOk := os.LookupEnv("ENOS_TRANSPORT_HOST")
+	privateKeyPath, keyOk := os.LookupEnv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
+	if !hostOk || !keyOk {
+		t.Skip("Test skipped since either ENOS_TRANSPORT_HOST and ENOS_TRANSPORT_PRIVATE_KEY_PATH environment variables are not set")
+	}
+
+	token := "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NvciI6IiIsImFkZHIiOiJodHRwOi8vMTAuMTMuMTIuMjE1OjgyMDAiLCJleHAiOjE2NzA1MTc1MTIsImlhdCI6MTY3MDUxNTcxMiwianRpIjoiaHZzLnEySmFXSzR4SER3algwVDZxQWJ3MkltYiIsIm5iZiI6MTY3MDUxNTcwNywidHlwZSI6IndyYXBwaW5nIn0.AXahR22v_CEESZBCk6N8YMYnoKSgjcEl-HI9-8n0pKXkQ9qXK50di8YcGiVspuMMdjPOZsEWy7N3KLXAKq4H7008AalNaqtuYPdR3f34dXo7c1DScepN1sURKZLV8xMbcsgnDa_4h_1ROmHVnObrOCoy2nZ-vsDB6CXHuxgTc7x5x-dM"
+	tokens := fmt.Sprintf(`Key                              Value
+---                              -----
+wrapping_token:                  %s
+wrapping_accessor:               NhPTqq7xRTdlG2a9kQbdVhy4
+wrapping_token_ttl:              30m
+wrapping_token_creation_time:    2022-12-08 16:08:32.532833589 +0000 UTC
+wrapping_token_creation_path:    sys/replication/performance/primary/secondary-token`, token)
+
+	client, err := ssh.New(ssh.WithHost(host), ssh.WithKeyPath(privateKeyPath), ssh.WithUser("ubuntu"))
+	assert.NoError(t, err)
+
+	tokensFile := "/tmp/tokens"
+	assert.NoError(t, client.Copy(context.Background(), tfile.NewReader(tokens), tokensFile))
+
+	cfg := template.Must(template.New("enos_remote_exec").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_remote_exec" "inline_with_piped_command_and_env_vars" {
+
+        environment = {
+            "TOKENS_FILE": "{{ .TokensFile }}"
+        }
+
+		inline = ["cat $TOKENS_FILE |sed -n '/^wrapping_token:/p' |awk '{print $2}'"]
+
+		{{ renderTransport .Transport }}
+	}`))
+
+	transport := newEmbeddedTransport()
+	transportSSH := newEmbeddedTransportSSH()
+	transportSSH.User.Set("ubuntu")
+	transportSSH.Host.Set(host)
+	transportSSH.PrivateKeyPath.Set(privateKeyPath)
+	assert.NoError(t, transport.SetTransportState(transportSSH))
+	data := map[string]interface{}{
+		"TokensFile": tokensFile,
+		"Transport":  transport,
+	}
+
+	s := bytes.Buffer{}
+	assert.NoError(t, cfg.Execute(&s, data))
+
+	apply := resource.TestStep{
+		Config:   s.String(),
+		PlanOnly: false,
+		Check:    resource.TestCheckResourceAttr("enos_remote_exec.inline_with_piped_command_and_env_vars", "stdout", token),
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProviders(t),
+		Steps: []resource.TestStep{
+			apply,
+		},
+	})
 }
