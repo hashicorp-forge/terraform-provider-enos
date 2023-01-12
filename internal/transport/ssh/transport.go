@@ -310,7 +310,9 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 	case <-ctx.Done():
 		return "", "", ctx.Err()
 	case err = <-errC:
-		return "", "", err
+		if err != nil {
+			return "", "", handleExecErr(err)
+		}
 	default:
 	}
 
@@ -339,7 +341,7 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 		return stdoutBuf.String(), stderrBuf.String(), ctx.Err()
 	case err = <-errC:
 		captureWait.Wait()
-		return stdoutBuf.String(), stderrBuf.String(), err
+		return stdoutBuf.String(), stderrBuf.String(), handleExecErr(err)
 	}
 }
 
