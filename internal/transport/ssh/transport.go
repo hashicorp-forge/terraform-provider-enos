@@ -12,6 +12,8 @@ import (
 
 	xssh "golang.org/x/crypto/ssh"
 
+	"github.com/hashicorp/go-multierror"
+
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
@@ -223,7 +225,8 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 }
 
 // Stream runs the given command and returns readers for STDOUT and STDERR and
-// a err channel where any encountered errors are streamed.
+// an err channel that will either contain one error or nil. The Stream request is considered complete
+// when the error channel yields either an error or nil.
 func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout, stderr io.Reader, errC chan error) {
 	var err error
 	errC = make(chan error, 3)
@@ -241,47 +244,53 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout, stderr 
 		return stdout, stderr, errC
 	}
 
-	disconnect := func() {
-		err = cleanup()
-		if err != nil {
-			errC <- err
+	// Executes the session cleanup and processes any errors. Errors will be consolidated and published
+	// to the error channel errC.
+	// err - can be any error raised while executing the remote exec streaming request.
+	completeStream := func(err error) {
+		cleanupErr := cleanup()
+
+		switch t := err.(type) {
+		case *it.ExecError:
+			t.Append(cleanupErr)
+		case nil:
+			err = cleanupErr
+		default:
+			merr := &multierror.Error{}
+			merr = multierror.Append(merr, t, cleanupErr)
+			err = merr.ErrorOrNil()
 		}
+		errC <- err
 	}
 
 	stdout, err = session.StdoutPipe()
 	if err != nil {
-		defer disconnect()
-		errC <- err
+		completeStream(err)
 		return stdout, stderr, errC
 	}
 
 	stderr, err = session.StderrPipe()
 	if err != nil {
-		defer disconnect()
-		errC <- err
+		completeStream(err)
 		return stdout, stderr, errC
 	}
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
-		defer disconnect()
-		errC <- err
+		completeStream(err)
 		return stdout, stderr, errC
 	}
 	defer stdin.Close()
 
 	err = session.Start(cmd.Cmd())
 	if err != nil {
-		defer disconnect()
-		errC <- err
+		completeStream(err)
 		return stdout, stderr, errC
 	}
 
 	waitForCommandToFinish := func() {
-		defer disconnect()
-		execErr := session.Wait()
-
-		errC <- handleExecErr(execErr)
+		execErr := handleExecErr(session.Wait())
+		completeStream(execErr)
 	}
 
 	go waitForCommandToFinish()
@@ -304,17 +313,13 @@ func handleExecErr(execErr error) error {
 func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, error) {
 	var err error
 
-	stdout, stderr, errC := t.Stream(ctx, cmd)
-
 	select {
 	case <-ctx.Done():
 		return "", "", ctx.Err()
-	case err = <-errC:
-		if err != nil {
-			return "", "", handleExecErr(err)
-		}
 	default:
 	}
+
+	stdout, stderr, errC := t.Stream(ctx, cmd)
 
 	captureWait := sync.WaitGroup{}
 	captureWait.Add(2)
@@ -335,14 +340,9 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 	go captureOutput(stdout, stdoutBuf)
 	go captureOutput(stderr, stderrBuf)
 
-	select {
-	case <-ctx.Done():
-		captureWait.Wait()
-		return stdoutBuf.String(), stderrBuf.String(), ctx.Err()
-	case err = <-errC:
-		captureWait.Wait()
-		return stdoutBuf.String(), stderrBuf.String(), handleExecErr(err)
-	}
+	err = <-errC
+	captureWait.Wait()
+	return stdoutBuf.String(), stderrBuf.String(), handleExecErr(err)
 }
 
 // Close closes any underlying connections
