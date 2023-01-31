@@ -179,14 +179,17 @@ func (e *ExecResponse) WaitForResults() (stdout, stderr string, err error) {
 	wg.Add(2)
 
 	captureOutput := func(writer io.StringWriter, reader io.Reader, errC chan error, stream string) {
-		scanner := bufio.NewScanner(reader)
-		scanner.Split(bufio.ScanBytes) // without this the scanner will swallow new lines
-		for scanner.Scan() {
-			text := scanner.Text()
-			_, execErr := writer.WriteString(text)
-			if execErr != nil {
-				errC <- fmt.Errorf("failed to write exec %s, due to %v", stream, execErr)
-				break
+		// the stream reader can be nil, if the exec call fails early, so we need to guard against that
+		if reader != nil {
+			scanner := bufio.NewScanner(reader)
+			scanner.Split(bufio.ScanBytes) // without this the scanner will swallow new lines
+			for scanner.Scan() {
+				text := scanner.Text()
+				_, execErr := writer.WriteString(text)
+				if execErr != nil {
+					errC <- fmt.Errorf("failed to write exec %s, due to %v", stream, execErr)
+					break
+				}
 			}
 		}
 		wg.Done()

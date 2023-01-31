@@ -239,7 +239,6 @@ func createStdErrMessage(stderr string) string {
 // WaitForState waits until the vault service state satisfies all of the provided StateCheck(s).
 // If the context has a duration we will keep trying until it is done.
 func WaitForState(ctx context.Context, ssh it.Transport, req *StatusRequest, checks ...StateCheck) (*State, error) {
-
 	var err error
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()

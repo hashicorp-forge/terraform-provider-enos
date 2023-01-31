@@ -140,7 +140,6 @@ EOF
 }
 
 func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
-
 	tempDir := t.TempDir() // Note: this dir is automatically deleted after the test is run
 	f, err := os.CreateTemp(tempDir, "reapply_test.txt")
 	assert.NoError(t, err)

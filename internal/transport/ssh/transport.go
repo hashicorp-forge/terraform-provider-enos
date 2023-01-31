@@ -325,10 +325,13 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 	captureWait.Add(2)
 
 	captureOutput := func(in io.Reader, out *bytes.Buffer) {
-		scanner := bufio.NewScanner(in)
+		// the stream reader can be nil, if the exec call fails early, so we need to guard against that
+		if in != nil {
+			scanner := bufio.NewScanner(in)
 
-		for scanner.Scan() {
-			out.WriteString(scanner.Text())
+			for scanner.Scan() {
+				out.WriteString(scanner.Text())
+			}
 		}
 
 		captureWait.Done()

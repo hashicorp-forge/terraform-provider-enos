@@ -53,7 +53,7 @@ func TestBundleURL(t *testing.T) {
 	}
 }
 
-var testEntSHASums = `7955d2823baf61db843c5c875eebb1de9a501f6324e021aeadaa5d9a8de94dc0  vault_1.7.0+ent_darwin_amd64.zip
+var testEntSHASums = `01f971a36ed6b7d631640d365ce87fed259982a55bc791a652e69121f8b6806a  vault_1.7.0+ent_darwin_amd64.zip
 e88e8cbaa8e116a5bc2d4fb541b63de212d2c3414772af1d39f258ed5f982d71  vault_1.7.0+ent_freebsd_386.zip
 08b36b9c0c09499c946676bae13c54cadb04493971943959c36406308a238c5f  vault_1.7.0+ent_freebsd_amd64.zip
 4a58ea1012b9ca0454acf411aa2db3a1f3be003a1a7a76e93137b9cfc1381b99  vault_1.7.0+ent_freebsd_arm.zip
@@ -153,7 +153,7 @@ func TestSHA256(t *testing.T) {
 				Platform: "darwin",
 				Arch:     "amd64",
 			},
-			"7955d2823baf61db843c5c875eebb1de9a501f6324e021aeadaa5d9a8de94dc0",
+			"01f971a36ed6b7d631640d365ce87fed259982a55bc791a652e69121f8b6806a",
 		},
 	} {
 		rel := test.Rel
