@@ -7,12 +7,9 @@ A terraform provider for quality infrastructure
 - [Example](#example)
 - [Supported Platforms](#supported-platforms)
 - [Installing the provider](#installing-the-provider)
-  - [Network mirror](#network-mirror)
+  - [TFC provider registry](#TFC-private-registry)
   - [Build from source](#build-from-source)
 - [Creating new sources](#creating-new-sources)
-- [Publishing to the network mirror](#publishing-to-the-network-mirror)
-  - [S3 bucket access](#s3-bucket-access)
-  - [Publishing the artifacts](#publishing-the-artifacts)
 - [Provider Configuration](#provider-configuration)
 - [Data Sources](#data-sources)
   - [enos_environment](#enos_environment)
@@ -44,12 +41,9 @@ A terraform provider for quality infrastructure
 - [Release Workflow:](#release-workflow)
     - [Validate](#validate)
     - [Release](#release)
-    - [Test Current Release](#test-current-release)
     - [Test TFC Upload](#test-tfc-upload)
     - [Promote Enos Provider in TFC](#promote-enos-provider-in-tfc)
     - [Promote](#promote)
-  - [Artifact publishing to `enos-provider-current` S3 bucket](#artifact-publishing-to-enos-provider-current-s3-bucket)
-  - [Artifact publishing to `enos-provider-stable` S3 bucket](#artifact-publishing-to-enos-provider-stable-s3-bucket)
   - [Artifact publishing to `enosdev` private provider registry in TFC](#artifact-publishing-to-enosdev-private-provider-registry-in-tfc)
   - [Artifact publishing to `enos` private provider registry in TFC](#artifact-publishing-to-enos-private-provider-registry-in-tfc)
 
@@ -71,33 +65,25 @@ The following table show the version compatability for different platform and ar
 # Installing the provider
 
 The provider is intended to be used as an internal testing tool, as such we want
-to keep it off the public registry. Since we don't have an internal provider registry
+to keep it off the public registry. We install it from private Terraform provider registry.
 there are two methods of installing the provider:
 
-## Network mirror
+## TFC private registry
 
-The easiest method is to install the latest stable version from the S3 network
-mirror. To do so you'll need to drop some configuration into `~/.terraformrc`
+The easiest method is to install the latest stable version from the TFC private registry.
+To do so you'll need to drop some configuration into `~/.terraformrc`
 
 ```hcl
-provider_installation {
-  network_mirror {
-    url = "https://enos-provider.s3-us-west-2.amazonaws.com/"
-  }
-  direct {
-    exclude = [
-      "hashicorp.com/qti/enos"
-    ]
+terraform "default" {
+  required_version = ">= 1.2.0"
+
+  required_providers {
+    enos = {
+      source = "app.terraform.io/hashicorp-qti/enos"
+    }
   }
 }
 ```
-
-This configuration will tell Terraform to resolve plugins from the network mirror
-and never attempt to pull it from the public registry.
-
-If you prefer keeping this configuration out of your personal Terraform CLI
-configuration you can write it to any file and use the `TF_CLI_CONFIG_FILE`
-environment variable to tell Terraform where the configuration is located.
 
 ## Build from source
 
@@ -126,34 +112,6 @@ go run ./tools/create-source -name <your_resource_name> -type <resource|datasour
 ```
 
 Note that you should not prepend it with enos_, the utility will do that for you.
-
-# Publishing to the network mirror
-
-In order to provider a network mirror we have to convert our build artifacts into
-archives and metadata that Terraform can remotely access. To do this you'll need
-access to the S3 bucket and provider developer toolchain installed.
-
-## S3 bucket access
-
-The enos-provider S3 bucket resides in the `vault_team_dev` account. You will
-need a `developer` role on that account to gain write access to the bucket. To
-download the artifacts from the S3 bucket you'll need your IP address added to
-the bucket policy that is maintained in the [mirror](./mirror) section of the
-repository.
-
-## Publishing the artifacts
-
-To publish you will need write access to the S3 bucket, your IP address allowlisted
-in the S3 bucket policy (see previous section), the `go` compiler installed, and
-`docker` installed and running. All of the following commands should be run from
-the root of the repository.
-
-1. Increment the version specified in the [VERSION](./VERSION) file.
-  If you fail to do this you'll overwrite the existing artifacts that exist for
-  that version.
-1. Remove any previous build artifacts. Run `rm ./dist/*`
-1. Build the release artifacts. Run `CI=true make`
-1. Publish the artifacts. Run `go run ./tools/populate-mirror -dist ./dist -bucket enos-provider`
 
 # Provider Configuration
 
@@ -1015,22 +973,12 @@ This repo currently runs the following workflows:
 
 ### Release
 `Release` workflow is run on merge to `main` when `VERSION` is updated. This workflow publishes the Enos-provider artifacts to:
-  - `enos-provider-current` bucket in `quality_team_enos_ci` AWS account
   - `enosdev` private provider registry in `hashicorp-qti` org in TFC
 
 You can also manually trigger the Release workflow from the GitHub Actions menu in this repo.
 
-### Test Current Release
-`Test Current Release` workflow is run only on successful completion of `Release` workflow.  This workflow installs and
-tests the latest Enos-provider artifact published to `enos-provider-current` bucket.
-
 ### Test TFC Upload
 `Test TFC Upload` workflow is run only on successful completion of `Release` workflow.  This workflow calls the reusable workflow `Test TFC Artifact` which installs and tests the latest Enos provider artifact installed from `enosdev` private provider registry of `hashicorp-qti` org in TFC.
-
-### Promote
-`Promote` workflow can only be triggered manually from the GitHub Actions menu in this repo.  It requires the Provider
-version to be promoted as input. This workflow installs and tests the given provider version from `enos-provider-current`
-S3 bucket and publishes it to `enos-provider-stable` bucket after successful completion of the integration tests.
 
 ### Promote Enos Provider in TFC
 `Promote Enos Provider in TFC` workflow can only be triggered manually from the GitHub Actions menu in this repo.  It requires the Provider version to be promoted as input. This workflow calls the reusable workflow `Test TFC Artifact` which installs and tests the given provider version from `enosdev` private provider registry of `hashicorp-qti` org and publishes it to `enos` private provider registry of `hashicorp-qti` org in Terraform Cloud. This workflow also tests the promoted artifact using the reusable workflow `Test TFC Artifact` by installing the promoted provider version from `enos` private provider registry of `hashicorp-qti` org in TFC.
@@ -1040,9 +988,3 @@ The Enos-provider artifacts are built and published to `enosdev` private provide
 
 ## Artifact publishing to `enos` private provider registry in TFC
 The Enos-provider artifacts are published to `enos` private provider registry of `hashicorp-qti` org in TFC by the `Promote Enos Provider in TFC` workflow.  This workflow uses the `tfc promote` [command](./tools/publish/README.md#tfc-promote-command) which downloads, renames, and publishes the tested `enosdev` registry artifacts to `enos` private provider registry.
-
-## Artifact publishing to `enos-provider-current` S3 bucket
-The Enos-provider artifacts are built and published to `enos-provider-current` bucket in `quality_team_enos_ci` AWS account by the `Release` workflow.
-
-## Artifact publishing to `enos-provider-stable` S3 bucket
-The Enos-provider artifacts are built and published to `enos-provider-stable` bucket in `quality_team_enos_ci` AWS account by the `Promote` workflow.

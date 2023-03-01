@@ -7,7 +7,6 @@ import (
 
 func main() {
 	rootCmd := newRootCommand()
-	rootCmd.AddCommand(newS3Cmd())
 	rootCmd.AddCommand(newTFCCmd())
 
 	err := rootCmd.Execute()
