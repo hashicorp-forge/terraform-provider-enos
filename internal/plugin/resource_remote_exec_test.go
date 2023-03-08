@@ -366,7 +366,6 @@ func TestChangedEnvVars(t *testing.T) {
 }
 
 func TestInlineWithPipedCommandAndEnvVars(t *testing.T) {
-
 	host, hostOk := os.LookupEnv("ENOS_TRANSPORT_HOST")
 	privateKeyPath, keyOk := os.LookupEnv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
 	if !hostOk || !keyOk {

@@ -124,6 +124,10 @@ type embeddedTransportV1 struct {
 	mu            sync.Mutex
 	transports    Transports
 	clientFactory transportClientFactory
+
+	// resolvedTransport the transport state that was resolved after applying defaults from the the
+	// proivider configuration
+	resolvedTransport transportState
 }
 
 // transportState interface defining the api of a transport
@@ -224,9 +228,10 @@ func (em *embeddedTransportV1) SetTransportState(states ...transportState) error
 // Resources that embed a transport should use this as transport schema.
 func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov6.SchemaAttribute {
 	return &tfprotov6.SchemaAttribute{
-		Name:     "transport",
-		Type:     em.Terraform5Type(),
-		Optional: true, // We'll handle our own schema validation
+		Name:        "transport",
+		Type:        em.Terraform5Type(),
+		Description: "The default transport configuration that transport enabled resources will inherit unless otherwise set",
+		Optional:    true, // We'll handle our own schema validation
 	}
 }
 
@@ -440,12 +445,74 @@ func (em *embeddedTransportV1) GetConfiguredTransport() (transportState, error) 
 }
 
 func (em *embeddedTransportV1) Debug() string {
+	if em.resolvedTransport != nil {
+		return fmt.Sprintf("%s\n", em.resolvedTransport.debug())
+	}
+
 	var debug []string
 	for _, transport := range em.transports {
 		debug = append(debug, fmt.Sprintf("%s\n", transport.debug()))
 	}
 
 	return strings.Join(debug, "\n\n")
+}
+
+func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embeddedTransportV1) []*tftypes.AttributePath {
+	var attrs []*tftypes.AttributePath
+
+	for tType, transport := range em.transports {
+		proposedTransport := proposed.transports[tType]
+		if transport.IsConfigured() && proposedTransport.IsConfigured() {
+			addAttributesForReplace(transport, proposedTransport, attrs, tType.String())
+		}
+	}
+
+	if len(attrs) > 0 {
+		return attrs
+	}
+
+	return nil
+}
+
+func (em *embeddedTransportV1) render() (string, error) {
+	if len(em.transports) == 0 {
+		return "", nil
+	}
+
+	var cfgs []string
+	for _, state := range em.transports {
+		cfg, err := state.render()
+		if err != nil {
+			return "", err
+		}
+		cfgs = append(cfgs, cfg)
+	}
+
+	buf := bytes.Buffer{}
+	if err := transportTmpl.Execute(&buf, cfgs); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+func (em *embeddedTransportV1) setResolvedTransport(transport transportState) {
+	em.resolvedTransport = transport
+}
+
+func addAttributesForReplace(priorState, proposedState transportState, attrs []*tftypes.AttributePath, transportName string) []*tftypes.AttributePath {
+	for _, attribute := range priorState.GetAttributesForReplace() {
+		proposedValue := proposedState.Attributes()[attribute].TFValue()
+		currentValue := priorState.Attributes()[attribute].TFValue()
+		if !proposedValue.Equal(currentValue) {
+			attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
+				tftypes.AttributeName("transport"),
+				tftypes.AttributeName(transportName),
+				tftypes.AttributeName(attribute),
+			}))
+		}
+	}
+	return attrs
 }
 
 func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Value, transportType string) error {
@@ -470,38 +537,6 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 		}
 	}
 	return nil
-}
-
-func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embeddedTransportV1) []*tftypes.AttributePath {
-	var attrs []*tftypes.AttributePath
-
-	for tType, transport := range em.transports {
-		proposedTransport := proposed.transports[tType]
-		if transport.IsConfigured() && proposedTransport.IsConfigured() {
-			addAttributesForReplace(transport, proposedTransport, attrs, tType.String())
-		}
-	}
-
-	if len(attrs) > 0 {
-		return attrs
-	}
-
-	return nil
-}
-
-func addAttributesForReplace(priorState, proposedState transportState, attrs []*tftypes.AttributePath, transportName string) []*tftypes.AttributePath {
-	for _, attribute := range priorState.GetAttributesForReplace() {
-		proposedValue := proposedState.Attributes()[attribute].TFValue()
-		currentValue := priorState.Attributes()[attribute].TFValue()
-		if !proposedValue.Equal(currentValue) {
-			attrs = append(attrs, tftypes.NewAttributePathWithSteps([]tftypes.AttributePathStep{
-				tftypes.AttributeName("transport"),
-				tftypes.AttributeName(transportName),
-				tftypes.AttributeName(attribute),
-			}))
-		}
-	}
-	return attrs
 }
 
 func copyValues(values map[string]tftypes.Value) map[string]tftypes.Value {
@@ -567,26 +602,4 @@ func checkK8STransportNotConfigured(state StateWithTransport, resourceName strin
 		)
 	}
 	return nil
-}
-
-func (em *embeddedTransportV1) render() (string, error) {
-	if len(em.transports) == 0 {
-		return "", nil
-	}
-
-	var cfgs []string
-	for _, state := range em.transports {
-		cfg, err := state.render()
-		if err != nil {
-			return "", err
-		}
-		cfgs = append(cfgs, cfg)
-	}
-
-	buf := bytes.Buffer{}
-	if err := transportTmpl.Execute(&buf, cfgs); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }

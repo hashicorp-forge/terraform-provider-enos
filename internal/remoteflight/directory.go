@@ -63,7 +63,7 @@ func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirect
 	}
 
 	if dir.DirOwner != "" {
-		stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chown -R %[1]s %[2]s || sudo chown -R %[1]s %[2]s", dir.DirOwner, dir.DirName)))
+		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chown -R %[1]s %[2]s || sudo chown -R %[1]s %[2]s", dir.DirOwner, dir.DirName)))
 		if err != nil {
 			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
 		}

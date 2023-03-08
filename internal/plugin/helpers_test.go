@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// transportRenderFunc can be used to rebder the embedded transport in a resource template
+// transportRenderFunc can be used to render the embedded transport in a resource template
 var transportRenderFunc = map[string]any{
 	"renderTransport": func(v1 *embeddedTransportV1) (string, error) {
 		return v1.render()

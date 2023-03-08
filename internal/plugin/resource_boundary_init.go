@@ -58,7 +58,7 @@ type boundaryInitStateV1 struct {
 	TargetScopeID                *tfString
 	TargetName                   *tfString
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*boundaryInitStateV1)(nil)
@@ -71,9 +71,11 @@ func newBoundaryInit() *boundaryInit {
 }
 
 func newBoundaryInitStateV1() *boundaryInitStateV1 {
+	transport := newEmbeddedTransport()
+	handlers := failureHandlers{TransportDebugFailureHandler(transport)}
 	return &boundaryInitStateV1{
 		ID:         newTfString(),
-		Transport:  newEmbeddedTransport(),
+		Transport:  transport,
 		BinPath:    newTfString(),
 		ConfigPath: newTfString(),
 		// outputs
@@ -107,6 +109,7 @@ func newBoundaryInitStateV1() *boundaryInitStateV1 {
 		TargetType:                   newTfString(),
 		TargetScopeID:                newTfString(),
 		TargetName:                   newTfString(),
+		failureHandlers:              handlers,
 	}
 }
 
@@ -649,15 +652,4 @@ func (s *boundaryInitStateV1) buildInitRequest() *boundary.InitRequest {
 	}
 
 	return boundary.NewInitRequest(opts...)
-}
-
-func (s *boundaryInitStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *boundaryInitStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }

@@ -26,6 +26,8 @@ var _ datarouter.DataSource = (*environment)(nil)
 type environmentStateV1 struct {
 	ID              *tfString
 	PublicIPAddress *tfString
+
+	failureHandlers
 }
 
 type publicIPResolver struct{}
@@ -42,6 +44,7 @@ func newEnvironmentStateV1() *environmentStateV1 {
 	return &environmentStateV1{
 		ID:              newTfString(),
 		PublicIPAddress: newTfString(),
+		failureHandlers: failureHandlers{},
 	}
 }
 
@@ -165,7 +168,7 @@ func (s *environmentStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *environmentStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":                s.ID.TFValue(),
@@ -275,8 +278,4 @@ func (r *publicIPResolver) resolveAWS(ctx context.Context) (net.IP, error) {
 	}
 
 	return net.ParseIP(strings.TrimSpace(string(body))), nil
-}
-
-func (s *environmentStateV1) Debug() string {
-	return ""
 }

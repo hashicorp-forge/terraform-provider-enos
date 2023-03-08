@@ -224,6 +224,32 @@ provider "enos" {
 
 The `transport` stanza for a provider or a resource has the same syntax.
 
+## Diagnostics Configuration
+
+All `enos-provider` resources and data sources will automatically bubble up
+appropriate error and warning information using Terraforms diagnostics system.
+Additional debugging diagnostic information such as systemd or application
+logs can be useful when a resource fails. Many resources contain built-in failure
+handlers which can attempt to export additional diagnostics information to aid
+in these cases. This additional data will be copied from resource `transport`
+targets back to the host machine executing enos-provider. E.g. if the `enos_vault_start`
+resource has been configured with an `ssh` and `host` transport and it fails, we'll
+automatically attempt to export systemd and journald information back to the
+host executing the `enos-provider` and Enos scenario.
+
+To enable this behavior you'll need to configure the `enos-provider` with a
+`debug_data_root_dir` attribute. It's important to note that the information
+being copied could be fairly large, so you'll want to keep an eye on the directory
+when using failure handler diagnostics.
+
+For example, If I want to enable failure handler diagnostics and have them
+written to `./enos/support/debug`, I would configure the `enos-provider`
+with that directory as the `debug_data_root_dir`.
+
+```hcl
+provider "enos" {
+  debug_data_root_dir = "./enos/support/debug"
+}
 # Data Sources
 
 The provider provides the following datasources.

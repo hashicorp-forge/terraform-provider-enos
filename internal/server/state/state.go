@@ -15,12 +15,14 @@ type Serializable interface {
 }
 
 type State interface {
+	Serializable
+
 	Schema() *tfprotov6.Schema
 	Validate(context.Context) error
-	// Debug generates a debug message suitable for adding to a diagnostic, formatted as a key/value
-	// table.
-	Debug() string
-	Serializable
+
+	// HandleFailure is called when either an apply or plan fails, diag is the tfprotov6.Diagnostic
+	// for the failure, providerConfig is the tftypes.Value of the provider configuration.
+	HandleFailure(ctx context.Context, diag *tfprotov6.Diagnostic, providerConfig tftypes.Value)
 }
 
 // Marshal converts a Serializable state value into a DynamicValue suitable for transporting over the

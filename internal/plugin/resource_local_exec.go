@@ -36,6 +36,8 @@ type localExecStateV1 struct {
 	Sum        *tfString
 	Stderr     *tfString
 	Stdout     *tfString
+
+	failureHandlers
 }
 
 var _ state.State = (*localExecStateV1)(nil)
@@ -49,15 +51,16 @@ func newLocalExec() *localExec {
 
 func newLocalExecStateV1() *localExecStateV1 {
 	return &localExecStateV1{
-		ID:         newTfString(),
-		Env:        newTfStringMap(),
-		InheritEnv: newTfBool(),
-		Content:    newTfString(),
-		Inline:     newTfStringSlice(),
-		Scripts:    newTfStringSlice(),
-		Sum:        newTfString(),
-		Stderr:     newTfString(),
-		Stdout:     newTfString(),
+		ID:              newTfString(),
+		Env:             newTfStringMap(),
+		InheritEnv:      newTfBool(),
+		Content:         newTfString(),
+		Inline:          newTfStringSlice(),
+		Scripts:         newTfStringSlice(),
+		Sum:             newTfString(),
+		Stderr:          newTfString(),
+		Stdout:          newTfString(),
+		failureHandlers: failureHandlers{},
 	}
 }
 
@@ -490,10 +493,6 @@ func (s *localExecStateV1) Terraform5Value() tftypes.Value {
 		"environment":         s.Env.TFValue(),
 		"inherit_environment": s.InheritEnv.TFValue(),
 	})
-}
-
-func (s *localExecStateV1) Debug() string {
-	return ""
 }
 
 func (s *localExecStateV1) hasUnknownAttributes() bool {

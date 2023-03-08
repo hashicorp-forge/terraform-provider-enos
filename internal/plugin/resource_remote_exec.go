@@ -38,7 +38,7 @@ type remoteExecStateV1 struct {
 	Stdout    *tfString
 	Transport *embeddedTransportV1
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*remoteExecStateV1)(nil)
@@ -55,16 +55,21 @@ func newRemoteExec() *remoteExec {
 }
 
 func newRemoteExecStateV1() *remoteExecStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+	}
 	return &remoteExecStateV1{
-		ID:        newTfString(),
-		Env:       newTfStringMap(),
-		Content:   newTfString(),
-		Inline:    newTfStringSlice(),
-		Scripts:   newTfStringSlice(),
-		Sum:       newTfString(),
-		Stderr:    newTfString(),
-		Stdout:    newTfString(),
-		Transport: newEmbeddedTransport(),
+		ID:              newTfString(),
+		Env:             newTfStringMap(),
+		Content:         newTfString(),
+		Inline:          newTfStringSlice(),
+		Scripts:         newTfStringSlice(),
+		Sum:             newTfString(),
+		Stderr:          newTfString(),
+		Stdout:          newTfString(),
+		Transport:       transport,
+		failureHandlers: fh,
 	}
 }
 
@@ -478,17 +483,6 @@ func (s *remoteExecStateV1) Terraform5Value() tftypes.Value {
 
 func (s *remoteExecStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
-}
-
-func (s *remoteExecStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *remoteExecStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }
 
 func (s *remoteExecStateV1) hasUnknownAttributes() bool {

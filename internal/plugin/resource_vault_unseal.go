@@ -31,7 +31,7 @@ type vaultUnsealStateV1 struct {
 	Status     *tfNum
 	Transport  *embeddedTransportV1
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*vaultUnsealStateV1)(nil)
@@ -44,13 +44,19 @@ func newVaultUnseal() *vaultUnseal {
 }
 
 func newVaultUnsealStateV1() *vaultUnsealStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, "vault"),
+	}
 	return &vaultUnsealStateV1{
-		ID:         newTfString(),
-		BinPath:    newTfString(),
-		VaultAddr:  newTfString(),
-		SealType:   newTfString(),
-		UnsealKeys: newTfStringSlice(),
-		Transport:  newEmbeddedTransport(),
+		ID:              newTfString(),
+		BinPath:         newTfString(),
+		VaultAddr:       newTfString(),
+		SealType:        newTfString(),
+		UnsealKeys:      newTfStringSlice(),
+		Transport:       transport,
+		failureHandlers: fh,
 	}
 }
 
@@ -278,7 +284,7 @@ func (s *vaultUnsealStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Type is the file state tftypes.Value.
+// Terraform5Value is the file state tftypes.Value.
 func (s *vaultUnsealStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          s.ID.TFValue(),
@@ -302,17 +308,6 @@ func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) er
 		return fmt.Errorf("failed to unseal Vault, due to: %w", err)
 	}
 	return err
-}
-
-func (s *vaultUnsealStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *vaultUnsealStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }
 
 func (s *vaultUnsealStateV1) buildUnsealRequest() *vault.UnsealRequest {

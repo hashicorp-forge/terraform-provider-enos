@@ -47,6 +47,8 @@ type localKindClusterStateV1 struct {
 	ClientKey            *tfString
 	ClusterCACertificate *tfString
 	Endpoint             *tfString
+
+	failureHandlers
 }
 
 var _ state.State = (*localKindClusterStateV1)(nil)
@@ -70,6 +72,7 @@ func newLocalKindClusterStateV1() *localKindClusterStateV1 {
 		ClientKey:            newTfString(),
 		ClusterCACertificate: newTfString(),
 		Endpoint:             newTfString(),
+		failureHandlers:      failureHandlers{},
 	}
 }
 
@@ -460,10 +463,6 @@ func (s *localKindClusterStateV1) Validate(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (s *localKindClusterStateV1) Debug() string {
-	return ""
 }
 
 func (s *localKindClusterStateV1) readLocalKindCluster(ctx context.Context) error {

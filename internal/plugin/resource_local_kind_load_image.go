@@ -44,18 +44,21 @@ type localKindLoadImageStateV1 struct {
 	Tag          *tfString
 	Archive      *tfString
 	LoadedImages *loadedImagesStateV1
+
+	failureHandlers
 }
 
 var _ state.State = (*localKindLoadImageStateV1)(nil)
 
 func newLocalKindLoadImageStateV1() *localKindLoadImageStateV1 {
 	return &localKindLoadImageStateV1{
-		ID:           newTfString(),
-		ClusterName:  newTfString(),
-		Image:        newTfString(),
-		Tag:          newTfString(),
-		Archive:      newTfString(),
-		LoadedImages: newLoadedImagesStateV1(),
+		ID:              newTfString(),
+		ClusterName:     newTfString(),
+		Image:           newTfString(),
+		Tag:             newTfString(),
+		Archive:         newTfString(),
+		LoadedImages:    newLoadedImagesStateV1(),
+		failureHandlers: failureHandlers{},
 	}
 }
 
@@ -298,7 +301,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 	// if you put anything here, it must be applicable for any of the create, update or delete cases
 }
 
-func (k localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
+func (k *localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
@@ -344,7 +347,7 @@ func (k localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
 	}
 }
 
-func (k localKindLoadImageStateV1) Validate(ctx context.Context) error {
+func (k *localKindLoadImageStateV1) Validate(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -365,7 +368,7 @@ func (k localKindLoadImageStateV1) Validate(ctx context.Context) error {
 	return nil
 }
 
-func (k localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error {
+func (k *localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
 		"id":            k.ID,
 		"cluster_name":  k.ClusterName,
@@ -380,7 +383,7 @@ func (k localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error 
 	return nil
 }
 
-func (k localKindLoadImageStateV1) Terraform5Type() tftypes.Type {
+func (k *localKindLoadImageStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":            k.ID.TFType(),
 		"cluster_name":  k.ClusterName.TFType(),
@@ -391,7 +394,7 @@ func (k localKindLoadImageStateV1) Terraform5Type() tftypes.Type {
 	}}
 }
 
-func (k localKindLoadImageStateV1) Terraform5Value() tftypes.Value {
+func (k *localKindLoadImageStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(k.Terraform5Type(), map[string]tftypes.Value{
 		"id":            k.ID.TFValue(),
 		"cluster_name":  k.ClusterName.TFValue(),
@@ -431,8 +434,4 @@ func (l *loadedImagesStateV1) FromTerraform5Value(val tftypes.Value) error {
 		)
 	}
 	return nil
-}
-
-func (k localKindLoadImageStateV1) Debug() string {
-	return ""
 }

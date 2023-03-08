@@ -326,7 +326,7 @@ func packageInstallDEBInstall(ctx context.Context, client it.Transport, req *Pac
 	// --force-confold defaults to using the existing files, instead of
 	// interactively choosing which to use.
 	cmd := fmt.Sprintf("sudo dpkg --force-confold --install %s", req.TempArtifactPath)
-	stderr, stdout, err := client.Run(ctx, command.New(cmd))
+	stdout, stderr, err := client.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing debian package")
 	}
@@ -339,7 +339,7 @@ func packageInstallRPMInstall(ctx context.Context, client it.Transport, req *Pac
 	// reinstall on update without lots of special logic. Eventually we could
 	// get much more clever here to handle upgrade, reinstall, etc.
 	cmd := fmt.Sprintf("sudo rpm -U --force %s", req.TempArtifactPath)
-	stderr, stdout, err := client.Run(ctx, command.New(cmd))
+	stdout, stderr, err := client.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing rpm package")
 	}

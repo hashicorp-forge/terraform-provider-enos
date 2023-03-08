@@ -33,7 +33,7 @@ type fileStateV1 struct {
 	Chown     *tfString
 	Transport *embeddedTransportV1
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*fileStateV1)(nil)
@@ -46,16 +46,19 @@ func newFile() *file {
 }
 
 func newFileState() *fileStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{TransportDebugFailureHandler(transport)}
 	return &fileStateV1{
-		ID:        newTfString(),
-		Src:       newTfString(),
-		Dst:       newTfString(),
-		Content:   newTfString(),
-		Sum:       newTfString(),
-		TmpDir:    newTfString(),
-		Chmod:     newTfString(),
-		Chown:     newTfString(),
-		Transport: newEmbeddedTransport(),
+		ID:              newTfString(),
+		Src:             newTfString(),
+		Dst:             newTfString(),
+		Content:         newTfString(),
+		Sum:             newTfString(),
+		TmpDir:          newTfString(),
+		Chmod:           newTfString(),
+		Chown:           newTfString(),
+		Transport:       transport,
+		failureHandlers: fh,
 	}
 }
 
@@ -375,17 +378,6 @@ func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return fs.Transport
 }
 
-func (fs *fileStateV1) setResolvedTransport(transport transportState) {
-	fs.resolvedTransport = transport
-}
-
-func (fs *fileStateV1) Debug() string {
-	if fs.resolvedTransport == nil {
-		return fs.EmbeddedTransport().Debug()
-	}
-	return fs.resolvedTransport.debug()
-}
-
 // openSourceOrContent returns a stream of the source content
 func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 	var err error
@@ -414,5 +406,5 @@ func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 // hasUnknownAttributes determines if the source or content is not known
 // yet.
 func (fs *fileStateV1) hasUnknownAttributes() bool {
-	return (fs.Src.Unknown || fs.Content.Unknown)
+	return fs.Src.Unknown || fs.Content.Unknown
 }

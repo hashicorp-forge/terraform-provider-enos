@@ -33,6 +33,8 @@ type artifactoryItemStateV1 struct {
 	Name       *tfString
 	Properties *tfStringMap
 	Results    *tfObjectSlice
+
+	failureHandlers
 }
 
 var _ state.State = (*artifactoryItemStateV1)(nil)
@@ -54,15 +56,16 @@ func newArtifactoryItemStateV1() *artifactoryItemStateV1 {
 	}
 
 	return &artifactoryItemStateV1{
-		ID:         newTfString(),
-		Username:   newTfString(),
-		Token:      newTfString(),
-		Host:       newTfString(),
-		Repo:       newTfString(),
-		Path:       newTfString(),
-		Name:       newTfString(),
-		Properties: newTfStringMap(),
-		Results:    results,
+		ID:              newTfString(),
+		Username:        newTfString(),
+		Token:           newTfString(),
+		Host:            newTfString(),
+		Repo:            newTfString(),
+		Path:            newTfString(),
+		Name:            newTfString(),
+		Properties:      newTfStringMap(),
+		Results:         results,
+		failureHandlers: failureHandlers{},
 	}
 }
 
@@ -324,8 +327,4 @@ func (s *artifactoryItemStateV1) Search(ctx context.Context) error {
 	s.Results.Set(results)
 
 	return nil
-}
-
-func (s *artifactoryItemStateV1) Debug() string {
-	return ""
 }

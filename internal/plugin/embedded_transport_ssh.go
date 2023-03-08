@@ -7,6 +7,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/enos-provider/internal/log"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -58,7 +60,8 @@ EOF
     }`))
 
 type embeddedTransportSSHv1 struct {
-	sshTransportBuilder sshTransportBuilder // added in order to support testing
+	sshTransportBuilder  sshTransportBuilder // added in order to support testing
+	systemdClientFactory func(transport it.Transport, logger log.Logger) systemd.Client
 
 	User           *tfString
 	Host           *tfString
@@ -88,14 +91,15 @@ var _ transportState = (*embeddedTransportSSHv1)(nil)
 
 func newEmbeddedTransportSSH() *embeddedTransportSSHv1 {
 	return &embeddedTransportSSHv1{
-		sshTransportBuilder: defaultSSHTransportBuilder,
-		User:                newTfString(),
-		Host:                newTfString(),
-		PrivateKey:          newTfString(),
-		PrivateKeyPath:      newTfString(),
-		Passphrase:          newTfString(),
-		PassphrasePath:      newTfString(),
-		Values:              map[string]tftypes.Value{},
+		sshTransportBuilder:  defaultSSHTransportBuilder,
+		systemdClientFactory: systemd.NewClient,
+		User:                 newTfString(),
+		Host:                 newTfString(),
+		PrivateKey:           newTfString(),
+		PrivateKeyPath:       newTfString(),
+		Passphrase:           newTfString(),
+		PassphrasePath:       newTfString(),
+		Values:               map[string]tftypes.Value{},
 	}
 }
 
@@ -214,4 +218,14 @@ func (em *embeddedTransportSSHv1) debug() string {
 	}
 
 	return fmt.Sprintf("SSH Transport Config:\n%s", strings.Join(vals, "\n"))
+}
+
+// systemdClient creates a new systemd client for this transport
+func (em *embeddedTransportSSHv1) systemdClient(ctx context.Context, logger log.Logger) (systemd.Client, error) {
+	client, err := em.Client(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ssh client, due to: %w", err)
+	}
+
+	return em.systemdClientFactory(client, logger), nil
 }

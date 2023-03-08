@@ -36,7 +36,7 @@ type bundleInstallStateV1 struct {
 	Artifactory *bundleInstallStateV1Artifactory
 	Transport   *embeddedTransportV1
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 type bundleInstallStateV1Artifactory struct {
@@ -62,6 +62,8 @@ func newBundleInstall() *bundleInstall {
 }
 
 func newBundleInstallStateV1() *bundleInstallStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{TransportDebugFailureHandler(transport)}
 	return &bundleInstallStateV1{
 		ID:          newTfString(),
 		Path:        newTfString(),
@@ -77,7 +79,8 @@ func newBundleInstallStateV1() *bundleInstallStateV1 {
 			Version: newTfString(),
 			Edition: newTfString(),
 		},
-		Transport: newEmbeddedTransport(),
+		Transport:       transport,
+		failureHandlers: fh,
 	}
 }
 
@@ -647,15 +650,4 @@ func (s *bundleInstallStateV1) equaltTo(p *bundleInstallStateV1) bool {
 // EmbeddedTransport returns a pointer the resources embedded transport.
 func (s *bundleInstallStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
-}
-
-func (s *bundleInstallStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *bundleInstallStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }

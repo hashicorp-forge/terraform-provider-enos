@@ -11,7 +11,7 @@ import (
 )
 
 type transport struct {
-	client    *kubernetes.Client
+	client    kubernetes.Client
 	namespace string
 	pod       string
 	container string
@@ -60,7 +60,7 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 	default:
 	}
 
-	request := kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
+	request := t.client.NewExecRequest(kubernetes.ExecRequestOpts{
 		Command:   fmt.Sprintf("tar -xmf - -C %s", filepath.Dir(dst)),
 		StdIn:     true,
 		Namespace: t.namespace,
@@ -74,7 +74,7 @@ func (t transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 // Run runs the provided command on a remote Pod as specified th in the transport config. Run blocks
 // until the command execution has completed.
 func (t transport) Run(ctx context.Context, cmd it.Command) (stdout, stderr string, err error) {
-	return it.Run(ctx, kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
+	return it.Run(ctx, t.client.NewExecRequest(kubernetes.ExecRequestOpts{
 		Command:   cmd.Cmd(),
 		Namespace: t.namespace,
 		Pod:       t.pod,
@@ -85,7 +85,7 @@ func (t transport) Run(ctx context.Context, cmd it.Command) (stdout, stderr stri
 // Stream runs the provided command on a remote Pod and streams the results. Stream does not block and
 // is done when the error channel has either an error or nil.
 func (t transport) Stream(ctx context.Context, command it.Command) (stdout, stderr io.Reader, errC chan error) {
-	return it.Stream(ctx, kubernetes.NewExecRequest(t.client, kubernetes.ExecRequestOpts{
+	return it.Stream(ctx, t.client.NewExecRequest(kubernetes.ExecRequestOpts{
 		Command:   command.Cmd(),
 		Namespace: t.namespace,
 		Pod:       t.pod,

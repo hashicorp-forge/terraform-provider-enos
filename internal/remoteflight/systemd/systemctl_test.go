@@ -1,4 +1,4 @@
-package remoteflight
+package systemd
 
 import (
 	"testing"
@@ -16,7 +16,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl start vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandStart,
 			},
 			false,
@@ -25,7 +25,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl --user start vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandStart,
 				User:       true,
 			},
@@ -35,7 +35,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl enable vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandEnable,
 			},
 			false,
@@ -44,7 +44,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl --now enable vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandEnable,
 				Options:    "--now",
 			},
@@ -54,7 +54,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl --user --now enable vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandEnable,
 				Options:    "--now",
 				User:       true,
@@ -65,7 +65,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl stop vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault.service",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandStop,
 			},
 			false,
@@ -74,7 +74,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl status vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandStatus,
 			},
 			false,
@@ -83,7 +83,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl status vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault.service",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandStatus,
 			},
 			false,
@@ -92,7 +92,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl reload vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault.service",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandReload,
 			},
 			false,
@@ -101,7 +101,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl restart vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandRestart,
 			},
 			false,
@@ -110,7 +110,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl kill vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandKill,
 			},
 			false,
@@ -119,7 +119,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl daemon-reload",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandDaemonReload,
 			},
 			false,
@@ -128,7 +128,7 @@ func TestSystemctlCommandString(t *testing.T) {
 			"sudo systemctl kill vault.service another.service",
 			&SystemctlCommandReq{
 				Name:       "vault",
-				Type:       SystemdUnitTypeService,
+				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandKill,
 				Pattern:    "another.service",
 			},

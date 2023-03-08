@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -53,6 +54,7 @@ var k8sTransportTmpl = template.Must(template.New("k8s_transport").Parse(`
 
 type embeddedTransportK8Sv1 struct {
 	k8sTransportBuilder k8sTransportBuilder // added in order to support testing
+	k8sClientFactory    func(cfg kubernetes.ClientCfg) (kubernetes.Client, error)
 
 	KubeConfigBase64 *tfString
 	ContextName      *tfString
@@ -69,6 +71,7 @@ var _ transportState = (*embeddedTransportK8Sv1)(nil)
 func newEmbeddedTransportK8Sv1() *embeddedTransportK8Sv1 {
 	return &embeddedTransportK8Sv1{
 		k8sTransportBuilder: defaultK8STransportBuilder,
+		k8sClientFactory:    kubernetes.NewClient,
 		KubeConfigBase64:    newTfString(),
 		ContextName:         newTfString(),
 		Namespace:           newTfString(),
@@ -197,4 +200,22 @@ func (em *embeddedTransportK8Sv1) debug() string {
 	}
 
 	return fmt.Sprintf("Kubernetes Transport Config:\n%s", strings.Join(vals, "\n"))
+}
+
+func (em *embeddedTransportK8Sv1) k8sClient() (kubernetes.Client, error) {
+	cfg := kubernetes.ClientCfg{}
+
+	kubeconfig, ok := em.KubeConfigBase64.Get()
+	if !ok {
+		return nil, fmt.Errorf("failed to create kubernetes client, 'kubeconfig_base64' was not configured")
+	}
+	cfg.KubeConfigBase64 = kubeconfig
+
+	contextName, ok := em.ContextName.Get()
+	if !ok {
+		return nil, fmt.Errorf("failed to create kubernetes client, 'context_name' was not configured")
+	}
+	cfg.ContextName = contextName
+
+	return em.k8sClientFactory(cfg)
 }

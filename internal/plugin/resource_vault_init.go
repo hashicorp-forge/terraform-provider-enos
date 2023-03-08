@@ -50,7 +50,7 @@ type vaultInitStateV1 struct {
 	RecoveryKeysThreshold *tfNum
 	RootToken             *tfString
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*vaultInitStateV1)(nil)
@@ -63,11 +63,16 @@ func newVaultInit() *vaultInit {
 }
 
 func newVaultInitStateV1() *vaultInitStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, "vault"),
+	}
 	return &vaultInitStateV1{
 		ID:        newTfString(),
 		BinPath:   newTfString(),
 		VaultAddr: newTfString(),
-		Transport: newEmbeddedTransport(),
+		Transport: transport,
 		// inputs
 		KeyShares:         newTfNum(),
 		KeyThreshold:      newTfNum(),
@@ -89,6 +94,7 @@ func newVaultInitStateV1() *vaultInitStateV1 {
 		RecoveryKeysShares:    newTfNum(),
 		RecoveryKeysThreshold: newTfNum(),
 		RootToken:             newTfString(),
+		failureHandlers:       fh,
 	}
 }
 
@@ -481,17 +487,6 @@ func (s *vaultInitStateV1) Terraform5Value() tftypes.Value {
 // EmbeddedTransport returns a pointer the resources embedded transport.
 func (s *vaultInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
-}
-
-func (s *vaultInitStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *vaultInitStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }
 
 // Init initializes a vault cluster

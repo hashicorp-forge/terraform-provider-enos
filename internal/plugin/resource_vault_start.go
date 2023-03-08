@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 
@@ -52,7 +54,7 @@ type vaultStartStateV1 struct {
 	Username        *tfString
 	Environment     *tfStringMap
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 type vaultConfig struct {
@@ -84,6 +86,11 @@ func newVaultStart() *vaultStart {
 }
 
 func newVaultStartStateV1() *vaultStartStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, "vault"),
+	}
 	return &vaultStartStateV1{
 		ID:      newTfString(),
 		BinPath: newTfString(),
@@ -101,9 +108,10 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		Status:          newTfNum(),
 		SystemdUnitName: newTfString(),
 		ManageService:   newTfBool(),
-		Transport:       newEmbeddedTransport(),
+		Transport:       transport,
 		Username:        newTfString(),
 		Environment:     newTfStringMap(),
+		failureHandlers: fh,
 	}
 }
 
@@ -647,18 +655,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	return hclBuilder, nil
 }
 
-func (s *vaultStartStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *vaultStartStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
-}
-
-func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport) error {
+func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transport) error {
 	var err error
 
 	// Set the status to unknown. After we start vault and wait for it to be running
@@ -689,7 +686,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		}
 	}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(vaultUsername),
 		remoteflight.WithUserHomeDir(configDir),
 		remoteflight.WithUserShell("/bin/false"),
@@ -700,7 +697,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 
 	// Copy the license file if we have one
 	if license, ok := s.License.Get(); ok {
-		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
+		err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("640"),
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -714,7 +711,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		envVars = append(envVars, fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
 	}
 
-	err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
+	err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
 		remoteflight.WithCopyFileDestination(envFilePath),
 		remoteflight.WithCopyFileChmod("644"),
 		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -729,7 +726,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 	if err != nil {
 		return fmt.Errorf("failed to create the vault HCL configuration, due to: %w", err)
 	}
-	err = hcl.CreateHCLConfigFile(ctx, client, hcl.NewCreateHCLConfigFileRequest(
+	err = hcl.CreateHCLConfigFile(ctx, transport, hcl.NewCreateHCLConfigFileRequest(
 		hcl.WithHCLConfigFilePath(configFilePath),
 		hcl.WithHCLConfigChmod("640"),
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
@@ -740,6 +737,8 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		return fmt.Errorf("failed to create the vault configuration file, due to: %w", err)
 	}
 
+	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
+
 	// Manage the vault systemd service ourselves unless it has explicitly been
 	// set that we should not.
 	if manage, set := s.ManageService.Get(); !set || (set && manage) {
@@ -749,7 +748,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		}
 
 		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
-		unit := remoteflight.SystemdUnit{
+		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Vault - A tool for managing secrets",
 				"Documentation":         "https://www.vaultproject.io/docs/",
@@ -791,11 +790,11 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 		}
 
 		// Write the systemd unit
-		err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
-			remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
-			remoteflight.WithSystemdUnitChmod("640"),
-			remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-			remoteflight.WithSystemdUnitFile(unit),
+		err = sysd.CreateUnitFile(ctx, systemd.NewCreateUnitFileRequest(
+			systemd.WithUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
+			systemd.WithUnitChmod("640"),
+			systemd.WithUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
+			systemd.WithUnitFile(unit),
 		))
 
 		if err != nil {
@@ -804,7 +803,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 	}
 
 	if storageType, ok := s.Config.Storage.Type.Get(); ok && storageType == raftStorageType {
-		err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
+		err = remoteflight.CreateDirectory(ctx, transport, remoteflight.NewCreateDirectoryRequest(
 			remoteflight.WithDirName(defaultRaftDataDir),
 			remoteflight.WithDirChown(vaultUsername),
 		))
@@ -817,15 +816,12 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, client it.Transport)
 	defer cancel()
 
 	// Restart the service and wait for it to be running
-	err = vault.Restart(timeoutCtx, client, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath.Value()),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
-	))
+	err = sysd.RestartService(timeoutCtx, "vault")
 	if err != nil {
 		return fmt.Errorf("failed to start the vault service, due to: %w", err)
 	}
 
-	state, err := vault.WaitForState(timeoutCtx, client, vault.NewStatusRequest(
+	state, err := vault.WaitForState(timeoutCtx, transport, vault.NewStatusRequest(
 		vault.WithStatusRequestBinPath(s.BinPath.Value()),
 		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
 	), vault.CheckIsActive(), vault.CheckSealStatusKnown())

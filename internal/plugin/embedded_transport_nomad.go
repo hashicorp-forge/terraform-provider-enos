@@ -7,10 +7,13 @@ import (
 	"strings"
 	"text/template"
 
+	nomadapi "github.com/hashicorp/enos-provider/internal/nomad"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/nomad"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
+
+type nomadClientFactory func(cfg nomadapi.ClientCfg) (nomadapi.Client, error)
 
 type nomadTransportBuilder func(state *embeddedTransportNomadv1, ctx context.Context) (it.Transport, error)
 
@@ -46,6 +49,7 @@ var nomadTransportTmpl = template.Must(template.New("nomad_transport").Parse(`
 
 type embeddedTransportNomadv1 struct {
 	nomadTransportBuilder nomadTransportBuilder
+	nomadClientFactory    nomadClientFactory
 
 	Host         *tfString
 	SecretID     *tfString
@@ -59,6 +63,7 @@ type embeddedTransportNomadv1 struct {
 func newEmbeddedTransportNomadv1() *embeddedTransportNomadv1 {
 	return &embeddedTransportNomadv1{
 		nomadTransportBuilder: defaultNomadTransportBuilder,
+		nomadClientFactory:    nomadapi.NewClient,
 		Host:                  newTfString(),
 		SecretID:              newTfString(),
 		AllocationID:          newTfString(),
@@ -183,4 +188,17 @@ func (em *embeddedTransportNomadv1) debug() string {
 	}
 
 	return fmt.Sprintf("Nomad Transport Config:\n%s", strings.Join(vals, "\n"))
+}
+
+// nomadClient creates a nomad client for this transport
+func (em *embeddedTransportNomadv1) nomadClient() (nomadapi.Client, error) {
+	client, err := em.nomadClientFactory(nomadapi.ClientCfg{
+		Host:     em.Host.Val,
+		SecretID: em.SecretID.Val,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nomad client due to: %w", err)
+	}
+
+	return client, nil
 }

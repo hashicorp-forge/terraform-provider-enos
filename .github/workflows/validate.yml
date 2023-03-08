@@ -3,8 +3,6 @@ name: Validate
 
 on:
   pull_request:
-    branches:
-      - main
 
 # These permissions are necessary for the doormat-action to get the OIDC token
 permissions:

@@ -8,8 +8,9 @@ import (
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/boundary"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -35,7 +36,7 @@ type boundaryStartStateV1 struct {
 	Transport       *embeddedTransportV1
 	Username        *tfString
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 var _ state.State = (*boundaryStartStateV1)(nil)
@@ -48,6 +49,11 @@ func newBoundaryStart() *boundaryStart {
 }
 
 func newBoundaryStartStateV1() *boundaryStartStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, "boundary"),
+	}
 	return &boundaryStartStateV1{
 		ID:              newTfString(),
 		BinPath:         newTfString(),
@@ -57,7 +63,8 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 		Status:          newTfNum(),
 		SystemdUnitName: newTfString(),
 		Username:        newTfString(),
-		Transport:       newEmbeddedTransport(),
+		Transport:       transport,
+		failureHandlers: fh,
 	}
 }
 
@@ -317,7 +324,7 @@ func (s *boundaryStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Transport) error {
+func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.Transport) error {
 	var err error
 
 	// defaults
@@ -339,7 +346,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below
 	configFilePath := filepath.Join(configPath, configName)
 
-	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(boundaryUser),
 		remoteflight.WithUserHomeDir(configPath),
 		remoteflight.WithUserShell("/bin/false"),
@@ -347,6 +354,8 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 	if err != nil {
 		return fmt.Errorf("failed to find or create the boundary user, due to: %w", err)
 	}
+
+	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
 
 	// Manage the vault systemd service ourselves unless it has explicitly been
 	// set that we should not.
@@ -357,7 +366,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 		}
 
 		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
-		unit := remoteflight.SystemdUnit{
+		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Boundary",
 				"Documentation":         "https://www.boundaryproject.io/docs/",
@@ -398,11 +407,11 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 		}
 
 		// Write the systemd unit
-		err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
-			remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
-			remoteflight.WithSystemdUnitChmod("640"),
-			remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
-			remoteflight.WithSystemdUnitFile(unit),
+		err = sysd.CreateUnitFile(ctx, systemd.NewCreateUnitFileRequest(
+			systemd.WithUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
+			systemd.WithUnitChmod("640"),
+			systemd.WithUnitChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
+			systemd.WithUnitFile(unit),
 		))
 
 		if err != nil {
@@ -410,25 +419,14 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, client it.Tran
 		}
 	}
 
-	err = boundary.Restart(ctx, client)
+	err = sysd.RestartService(ctx, "boundary")
 	if err != nil {
 		return fmt.Errorf("failed to start the boundary service, due to: %w", err)
 	}
 
 	// set unknown values
-	code, err := boundary.Status(ctx, client, "boundary")
+	code := sysd.ServiceStatus(ctx, "boundary")
 	s.Status.Set(int(code))
 
 	return err
-}
-
-func (s *boundaryStartStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *boundaryStartStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
 }

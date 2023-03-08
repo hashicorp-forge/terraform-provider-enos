@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
@@ -33,14 +34,16 @@ type Provider struct {
 }
 
 type config struct {
-	mu        sync.Mutex
-	Transport *embeddedTransportV1
+	mu               sync.Mutex
+	Transport        *embeddedTransportV1
+	DebugDataRootDir *tfString
 }
 
 func newProviderConfig() *config {
 	return &config{
-		mu:        sync.Mutex{},
-		Transport: newEmbeddedTransport(),
+		mu:               sync.Mutex{},
+		Transport:        newEmbeddedTransport(),
+		DebugDataRootDir: newTfString(),
 	}
 }
 
@@ -52,6 +55,14 @@ func (p *Provider) Schema() *tfprotov6.Schema {
 			Version: 1,
 			Attributes: []*tfprotov6.SchemaAttribute{
 				p.config.Transport.SchemaAttributeTransport(),
+				{
+					Name:     "debug_data_root_dir",
+					Type:     tftypes.String,
+					Optional: true,
+					Description: `The root directory where failure diagnostics files (e.g. application log files) are saved. 
+If configured and the directory does not exist, it will be created. 
+If the directory is not configured, diagnostic files will not be saved locally.`,
+				},
 			},
 		},
 	}
@@ -83,6 +94,24 @@ func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProvider
 		return res, err
 	}
 
+	if dir, ok := cfg.DebugDataRootDir.Get(); ok {
+		info, err := os.Stat(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return res, nil
+			}
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
+			return res, nil
+		}
+		if !info.IsDir() {
+			res.Diagnostics = append(res.Diagnostics,
+				diags.ErrToDiagnostic("Validation Error",
+					ValidationError("configured diagnostics dir is not a directory",
+						"debug_data_root_dir")))
+			return res, nil
+		}
+	}
+
 	return res, nil
 }
 
@@ -107,6 +136,19 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProvid
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return res, err
+	}
+
+	if dir, ok := p.config.DebugDataRootDir.Get(); ok {
+		if _, err := os.Stat(dir); err != nil {
+			if os.IsNotExist(err) {
+				err := os.MkdirAll(dir, 0o755)
+				if err == nil {
+					return res, nil
+				}
+			}
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Provider Config Error", err))
+			return res, nil
+		}
 	}
 
 	return res, nil
@@ -138,20 +180,36 @@ func (c *config) FromTerraform5Value(val tftypes.Value) error {
 		return nil
 	}
 
-	return c.Transport.FromTerraform5Value(vals["transport"])
+	err = c.Transport.FromTerraform5Value(vals["transport"])
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal transport configuration, due to: %w", err)
+	}
+
+	if !vals["debug_data_root_dir"].IsKnown() {
+		return nil
+	}
+
+	err = c.DebugDataRootDir.FromTFValue(vals["debug_data_root_dir"])
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal [debug_data_root_dir], due to: %w", err)
+	}
+
+	return err
 }
 
 // Terraform5Type is the provider as a tftypes.Type
 func (c *config) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"transport": c.Transport.Terraform5Type(),
+		"transport":           c.Transport.Terraform5Type(),
+		"debug_data_root_dir": c.DebugDataRootDir.TFType(),
 	}}
 }
 
 // Terraform5Value is the provider as a tftypes.Value
 func (c *config) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
-		"transport": c.Transport.Terraform5Value(),
+		"transport":           c.Transport.Terraform5Value(),
+		"debug_data_root_dir": c.DebugDataRootDir.TFValue(),
 	})
 }
 
@@ -165,6 +223,9 @@ func (c *config) Copy() (*config, error) {
 
 	newCopy := newProviderConfig()
 	newCopy.Transport, err = c.Transport.Copy()
+	dir := newTfString()
+	dir.Set(c.DebugDataRootDir.Val)
+	newCopy.DebugDataRootDir = dir
 
 	return newCopy, err
 }

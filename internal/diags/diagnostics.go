@@ -2,9 +2,7 @@ package diags
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -42,17 +40,4 @@ func ErrToDiagnostic(summary string, err error) *tfprotov6.Diagnostic {
 	}
 
 	return diagnostic
-}
-
-// AddDebugToDiagnostics Add the state debug message to the diagnostics if there is an error diagnostic
-// and the state has an non-empty debug message
-func AddDebugToDiagnostics(diagnostics []*tfprotov6.Diagnostic, state state.State) {
-	if HasErrors(diagnostics) {
-		if diag := GetErrorDiagnostic(diagnostics); diag != nil {
-			debug := state.Debug()
-			if len(debug) > 0 {
-				diag.Detail = fmt.Sprintf("%s\n\nDebug Info:\n%s", diag.Detail, debug)
-			}
-		}
-	}
 }

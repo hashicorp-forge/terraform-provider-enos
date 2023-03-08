@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	xssh "golang.org/x/crypto/ssh"
@@ -328,6 +329,7 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 		// the stream reader can be nil, if the exec call fails early, so we need to guard against that
 		if in != nil {
 			scanner := bufio.NewScanner(in)
+			scanner.Split(bufio.ScanBytes) // without this the scanner will swallow new lines
 
 			for scanner.Scan() {
 				out.WriteString(scanner.Text())
@@ -345,7 +347,13 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 
 	err = <-errC
 	captureWait.Wait()
-	return stdoutBuf.String(), stderrBuf.String(), handleExecErr(err)
+
+	// remove the trailing new line here, since in cases where the remote exec returns a single value
+	// the trailing new line causes issues.
+	sout := strings.TrimSuffix(stdoutBuf.String(), "\n")
+	serr := strings.TrimSuffix(stderrBuf.String(), "\n")
+
+	return sout, serr, handleExecErr(err)
 }
 
 // Close closes any underlying connections

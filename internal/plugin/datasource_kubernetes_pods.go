@@ -51,6 +51,8 @@ type kubernetesPodsStateV1 struct {
 	LabelSelectors   *tfStringSlice
 	FieldSelectors   *tfStringSlice
 	Pods             *tfObjectSlice
+
+	failureHandlers
 }
 
 var _ state.State = (*kubernetesPodsStateV1)(nil)
@@ -77,6 +79,7 @@ func newKubernetesPodStateV1() *kubernetesPodsStateV1 {
 		LabelSelectors:   newTfStringSlice(),
 		FieldSelectors:   newTfStringSlice(),
 		Pods:             pods,
+		failureHandlers:  failureHandlers{},
 	}
 }
 
@@ -293,8 +296,4 @@ func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 		"field_selectors":   s.FieldSelectors.TFValue(),
 		"pods":              s.Pods.TFValue(),
 	})
-}
-
-func (s *kubernetesPodsStateV1) Debug() string {
-	return ""
 }

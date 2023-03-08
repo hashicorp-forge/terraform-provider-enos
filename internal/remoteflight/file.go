@@ -160,14 +160,14 @@ func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) e
 		}
 
 		if file.Chmod != "" {
-			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chmod %[1]s %[2]s || sudo chmod %[1]s %[2]s", file.Chmod, tmpPath)))
+			stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chmod %[1]s %[2]s || sudo chmod %[1]s %[2]s", file.Chmod, tmpPath)))
 			if err != nil {
 				return res, WrapErrorWith(err, stdout, stderr, "changing file permissions")
 			}
 		}
 
 		if file.Chown != "" {
-			stderr, stdout, err = client.Run(ctx, command.New(fmt.Sprintf("chown %[1]s %[2]s || sudo chown %[1]s %[2]s", file.Chown, tmpPath)))
+			stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chown %[1]s %[2]s || sudo chown %[1]s %[2]s", file.Chown, tmpPath)))
 			if err != nil {
 				return res, WrapErrorWith(err, stdout, stderr, "changing file ownership")
 			}
@@ -208,7 +208,7 @@ func DeleteFile(ctx context.Context, client it.Transport, req *DeleteFileRequest
 
 	rmFile := func(ctx context.Context) (interface{}, error) {
 		var res interface{}
-		stderr, stdout, err := client.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
+		stdout, stderr, err := client.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
 		}

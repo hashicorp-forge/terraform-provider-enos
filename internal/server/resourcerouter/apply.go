@@ -69,8 +69,7 @@ type ApplyResourceChangeResponse struct {
 	UnsafeToUseLegacyTypeSystem bool
 }
 
-// ToTFProto6Response Converts the response to a tfproto6 response type. Adds debug information to
-// the diagnostic if the apply request failed.
+// ToTFProto6Response Converts the response to a tfproto6 response type.
 func (a ApplyResourceChangeResponse) ToTFProto6Response(isDelete bool) *tfprotov6.ApplyResourceChangeResponse {
 	resp := &tfprotov6.ApplyResourceChangeResponse{
 		Private:                     a.Private,
@@ -81,18 +80,17 @@ func (a ApplyResourceChangeResponse) ToTFProto6Response(isDelete bool) *tfprotov
 	if !diags.HasErrors(a.Diagnostics) {
 		val, err := marshalApply(a.NewState, isDelete)
 		if err != nil {
-			a.Diagnostics = append(a.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
+			resp.Diagnostics = append(resp.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		} else {
 			resp.NewState = val
 		}
 	}
 
-	diags.AddDebugToDiagnostics(a.Diagnostics, a.NewState)
-
 	return resp
 }
 
-// ApplyResourceChange applies the newly planned resource state
+// ApplyResourceChange applies the newly planned resource state and executes any configured failure
+// handlers
 func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	resource, ok := r.resources[req.TypeName]
 	if !ok {
@@ -114,6 +112,10 @@ func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyRes
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	} else {
 		resource.ApplyResourceChange(ctx, *request, res)
+	}
+
+	if errDiag := diags.GetErrorDiagnostic(res.Diagnostics); errDiag != nil {
+		res.NewState.HandleFailure(ctx, errDiag, providerConfig)
 	}
 
 	return res.ToTFProto6Response(request.IsDelete()), nil

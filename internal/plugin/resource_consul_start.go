@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/consul"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
+	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -38,7 +40,7 @@ type consulStartStateV1 struct {
 	Transport       *embeddedTransportV1
 	Username        *tfString
 
-	resolvedTransport transportState
+	failureHandlers
 }
 
 type consulConfig struct {
@@ -61,6 +63,11 @@ func newConsulStart() *consulStart {
 }
 
 func newConsulStartStateV1() *consulStartStateV1 {
+	transport := newEmbeddedTransport()
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, "consul"),
+	}
 	return &consulStartStateV1{
 		ID:        newTfString(),
 		BinPath:   newTfString(),
@@ -77,8 +84,9 @@ func newConsulStartStateV1() *consulStartStateV1 {
 		},
 		License:         newTfString(),
 		SystemdUnitName: newTfString(),
-		Transport:       newEmbeddedTransport(),
+		Transport:       transport,
 		Username:        newTfString(),
+		failureHandlers: fh,
 	}
 }
 
@@ -480,18 +488,7 @@ func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	return hlcBuilder
 }
 
-func (s *consulStartStateV1) setResolvedTransport(transport transportState) {
-	s.resolvedTransport = transport
-}
-
-func (s *consulStartStateV1) Debug() string {
-	if s.resolvedTransport == nil {
-		return s.EmbeddedTransport().Debug()
-	}
-	return s.resolvedTransport.debug()
-}
-
-func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transport) error {
+func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Transport) error {
 	var err error
 
 	// Ensure that the consul user is created
@@ -510,7 +507,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		dataDir = ddir
 	}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, client, remoteflight.NewUser(
+	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(consulUsername),
 		remoteflight.WithUserHomeDir(dataDir),
 		remoteflight.WithUserShell("/bin/false"),
@@ -527,7 +524,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	}
 
 	//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
-	unit := remoteflight.SystemdUnit{
+	unit := systemd.Unit{
 		"Unit": {
 			"Description":           "HashiCorp Consul - A service mesh solution",
 			"Documentation":         "https://www.consul.io/",
@@ -554,7 +551,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 
 	if license, ok := s.License.Get(); ok {
 		licensePath := filepath.Join(configDir, "consul.lic")
-		err = remoteflight.CopyFile(ctx, client, remoteflight.NewCopyFileRequest(
+		err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
 			remoteflight.WithCopyFileDestination(licensePath),
 			remoteflight.WithCopyFileChmod("644"),
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
@@ -566,7 +563,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		}
 
 		// Validate the Consul license file
-		err = consul.ValidateConsulLicense(ctx, client, consul.NewValidateFileRequest(
+		err = consul.ValidateConsulLicense(ctx, transport, consul.NewValidateFileRequest(
 			consul.WithValidateConfigBinPath(s.BinPath.Value()),
 			consul.WithValidateFilePath(licensePath),
 		))
@@ -578,12 +575,14 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 		unit["Service"]["Environment"] = fmt.Sprintf("CONSUL_LICENSE_PATH=%s", licensePath)
 	}
 
+	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
+
 	// Write the systemd unit
-	err = remoteflight.CreateSystemdUnitFile(ctx, client, remoteflight.NewCreateSystemdUnitFileRequest(
-		remoteflight.WithSystemdUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
-		remoteflight.WithSystemdUnitChmod("644"),
-		remoteflight.WithSystemdUnitChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
-		remoteflight.WithSystemdUnitFile(unit),
+	err = sysd.CreateUnitFile(ctx, systemd.NewCreateUnitFileRequest(
+		systemd.WithUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
+		systemd.WithUnitChmod("644"),
+		systemd.WithUnitChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
+		systemd.WithUnitFile(unit),
 	))
 
 	if err != nil {
@@ -593,7 +592,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	config := s.Config.ToHCLConfig()
 
 	// Create the consul HCL configuration file
-	err = hcl.CreateHCLConfigFile(ctx, client, hcl.NewCreateHCLConfigFileRequest(
+	err = hcl.CreateHCLConfigFile(ctx, transport, hcl.NewCreateHCLConfigFileRequest(
 		hcl.WithHCLConfigFilePath(configFilePath),
 		hcl.WithHCLConfigChmod("644"),
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
@@ -608,7 +607,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	defer cancel()
 
 	// Create the consul data directory
-	err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
+	err = remoteflight.CreateDirectory(ctx, transport, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(dataDir),
 		remoteflight.WithDirChown(consulUsername),
 	))
@@ -617,7 +616,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	}
 
 	// Create the consul config directory
-	err = remoteflight.CreateDirectory(ctx, client, remoteflight.NewCreateDirectoryRequest(
+	err = remoteflight.CreateDirectory(ctx, transport, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(configDir),
 		remoteflight.WithDirChown(consulUsername),
 	))
@@ -626,7 +625,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	}
 
 	// Validate the Consul config file
-	err = consul.ValidateConsulConfig(ctx, client, consul.NewValidateFileRequest(
+	err = consul.ValidateConsulConfig(ctx, transport, consul.NewValidateFileRequest(
 		consul.WithValidateConfigBinPath(s.BinPath.Value()),
 		consul.WithValidateFilePath(configFilePath),
 	))
@@ -635,9 +634,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, client it.Transpor
 	}
 
 	// Restart the service and wait for it to be running
-	err = consul.Restart(timeoutCtx, client, consul.NewStatusRequest(
-		consul.WithStatusRequestBinPath(s.BinPath.Value()),
-	))
+	err = sysd.RestartService(timeoutCtx, "consul")
 	if err != nil {
 		return fmt.Errorf("failed to start the consul service, due to: %w", err)
 	}

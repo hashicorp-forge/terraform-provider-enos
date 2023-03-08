@@ -23,7 +23,7 @@ func Version(ctx context.Context, ssh it.Transport, req *StatusRequest) (semver.
 		return ver, remoteflight.WrapErrorWith(err, stdout, stderr)
 	}
 
-	return parseVaultVersion(stdout)
+	return parseVaultVersion(strings.ReplaceAll(stdout, "\n", ""))
 }
 
 // parseVaultVersion takes the vault version string and parses it.

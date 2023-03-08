@@ -157,7 +157,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return nil
 	}
-	proposed.setResolvedTransport(configuredTransport)
+	proposed.EmbeddedTransport().setResolvedTransport(configuredTransport)
 
 	res.RequiresReplace = prior.EmbeddedTransport().transportReplacedAttributePaths(proposedTransport)
 
@@ -240,7 +240,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 		))
 		return nil
 	}
-	planned.setResolvedTransport(configuredTransport)
+	etP.setResolvedTransport(configuredTransport)
 
 	err = et.Validate(ctx)
 	if err != nil {

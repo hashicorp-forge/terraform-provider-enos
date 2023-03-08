@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,9 +26,14 @@ import (
 
 const kubeConfigEnvVar = "KUBECONFIG"
 
-type Client struct {
-	clientset  *kubernetes.Clientset
-	restConfig *rest.Config
+// Client A wrapper around the k8s clientset that provides an api that the provider can use
+type Client interface {
+	// NewExecRequest creates a new exec request for the given opts
+	NewExecRequest(opts ExecRequestOpts) it.ExecRequest
+	// GetPodInfos gets a slice of all the pods that matched the GetPodInfoRequest
+	GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodInfo, error)
+	// GetLogs gets the logs for the provided GetPodInfoRequest
+	GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error)
 }
 
 type ClientCfg struct {
@@ -34,9 +41,22 @@ type ClientCfg struct {
 	ContextName      string
 }
 
+// NewClient creates a new Kubernetes Client.
+func NewClient(cfg ClientCfg) (Client, error) {
+	clientset, restConfig, err := createClientset(cfg.KubeConfigBase64, cfg.ContextName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes clientset, due to: %w", err)
+	}
+
+	return &client{
+		clientset:  clientset,
+		restConfig: restConfig,
+	}, nil
+}
+
 // execRequest A kubernetes based exec request
 type execRequest struct {
-	client  *Client
+	client  *client
 	opts    ExecRequestOpts
 	streams *it.ExecStreams
 }
@@ -60,24 +80,43 @@ type PodInfo struct {
 	Namespace string
 }
 
-func NewExecRequest(client *Client, opts ExecRequestOpts) it.ExecRequest {
-	return &execRequest{
-		client:  client,
-		opts:    opts,
-		streams: it.NewExecStreams(opts.StdIn),
-	}
+type GetPodLogsRequest struct {
+	Namespace string
+	Pod       string
+	Container string
 }
 
-func NewClient(cfg ClientCfg) (*Client, error) {
-	clientset, restConfig, err := createClientset(cfg.KubeConfigBase64, cfg.ContextName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes clientset, due to: %w", err)
+type GetPodLogsResponse struct {
+	Namespace string
+	Pod       string
+	Container string
+	Logs      []byte
+}
+
+func (p GetPodLogsResponse) GetLogFileName(prefix string) string {
+	var parts []string
+	if prefix != "" {
+		parts = append(parts, prefix)
 	}
 
-	return &Client{
-		clientset:  clientset,
-		restConfig: restConfig,
-	}, nil
+	if p.Namespace != "" {
+		parts = append(parts, p.Namespace)
+	}
+
+	parts = append(parts, p.Pod)
+
+	if p.Container != "" {
+		parts = append(parts, p.Container)
+	}
+
+	filename := strings.Join(parts, "_")
+	filename = fmt.Sprintf("%s.log", filename)
+
+	return filename
+}
+
+func (p GetPodLogsResponse) GetLogs() []byte {
+	return p.Logs
 }
 
 func (e *execRequest) Streams() *it.ExecStreams {
@@ -126,9 +165,22 @@ func (e *execRequest) Exec(ctx context.Context) *it.ExecResponse {
 	return response
 }
 
+type client struct {
+	clientset  *kubernetes.Clientset
+	restConfig *rest.Config
+}
+
+func (c *client) NewExecRequest(opts ExecRequestOpts) it.ExecRequest {
+	return &execRequest{
+		client:  c,
+		opts:    opts,
+		streams: it.NewExecStreams(opts.StdIn),
+	}
+}
+
 // GetPodInfos queries Kubernetes using search criteria for the given GetPodInfoRequest and returns a
 // list of pod infos that match the query.
-func (c *Client) GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodInfo, error) {
+func (c *client) GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodInfo, error) {
 	podList, err := c.clientset.
 		CoreV1().
 		Pods(req.Namespace).
@@ -149,6 +201,49 @@ func (c *Client) GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodI
 	}
 
 	return pods, err
+}
+
+func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error) {
+	if strings.TrimSpace(req.Pod) == "" {
+		return nil, fmt.Errorf("cannot get pod logs without providing a pod name")
+	}
+
+	namespace := req.Namespace
+	if strings.TrimSpace(namespace) == "" {
+		namespace = "default"
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("failed to get logs, due to: %w", ctx.Err())
+	default:
+		// if the context is not done, just carry on...
+	}
+
+	getLogsReq := c.clientset.CoreV1().
+		Pods(namespace).
+		GetLogs(req.Pod, &v1.PodLogOptions{
+			Container: req.Container,
+		})
+
+	podLogs, err := getLogsReq.Stream(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pod logs, for Pod: [%s], in Namepsace: [%s], due to: %w", req.Pod, req.Namespace, err)
+	}
+	defer podLogs.Close()
+
+	buf := &bytes.Buffer{}
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy pod logs, for Pod: [%s], in Namepsace: [%s], due to: %w", req.Pod, req.Namespace, err)
+	}
+
+	return &GetPodLogsResponse{
+		Namespace: namespace,
+		Pod:       req.Pod,
+		Container: req.Container,
+		Logs:      buf.Bytes(),
+	}, nil
 }
 
 // DecodeAndLoadKubeConfig decodes a base64 encoded kubeconfig and attempts to load the Config.
@@ -187,7 +282,7 @@ func createClientset(kubeConfigBase64, contextName string) (*kubernetes.Clientse
 	return clientset, config, nil
 }
 
-func (c *Client) createExecutor(execRequest execRequest) (remotecommand.Executor, error) {
+func (c *client) createExecutor(execRequest execRequest) (remotecommand.Executor, error) {
 	request := c.clientset.CoreV1().RESTClient().
 		Post().
 		Namespace(execRequest.opts.Namespace).

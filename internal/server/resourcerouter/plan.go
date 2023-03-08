@@ -67,13 +67,11 @@ func (p PlanResourceChangeResponse) ToTFProto6Response() *tfprotov6.PlanResource
 	if !diags.HasErrors(p.Diagnostics) {
 		val, err := state.Marshal(p.PlannedState)
 		if err != nil {
-			p.Diagnostics = append(p.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
+			resp.Diagnostics = append(resp.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		} else {
 			resp.PlannedState = val
 		}
 	}
-
-	diags.AddDebugToDiagnostics(p.Diagnostics, p.PlannedState)
 
 	return resp
 }
@@ -99,6 +97,10 @@ func (r Router) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResou
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	} else {
 		resource.PlanResourceChange(ctx, *request, res)
+	}
+
+	if errDiag := diags.GetErrorDiagnostic(res.Diagnostics); errDiag != nil {
+		res.PlannedState.HandleFailure(ctx, errDiag, providerConfig)
 	}
 
 	return res.ToTFProto6Response(), nil
