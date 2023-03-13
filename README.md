@@ -242,6 +242,10 @@ To enable this behavior you'll need to configure the `enos-provider` with a
 being copied could be fairly large, so you'll want to keep an eye on the directory
 when using failure handler diagnostics.
 
+The `debug_data_root_dir` can also be configured via the environment variable: `ENOS_DEBUG_DATA_ROOT_DIR`.
+Configuring via an environment variable will override the value configured within any `enos` provider
+configuration block within the Terraform configuration that is being run.
+
 For example, If I want to enable failure handler diagnostics and have them
 written to `./enos/support/debug`, I would configure the `enos-provider`
 with that directory as the `debug_data_root_dir`.

@@ -409,67 +409,7 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 			nomad.TaskName.Set("not a task")
 			assert.NoError(tt, transportCopy.SetTransportState(nomad))
 
-			for tType, tConfig := range test.config {
-				if len(tConfig) > 0 {
-					for attr, value := range tConfig {
-						switch tType {
-						case SSH:
-							ssh, ok := transport.SSH()
-							assert.True(tt, ok)
-							switch attr {
-							case "host":
-								assert.Equal(tt, value, ssh.Host.Val)
-							case "user":
-								assert.Equal(tt, value, ssh.User.Val)
-							case "private_key":
-								assert.Equal(tt, value, ssh.PrivateKey.Val)
-							case "private_key_path":
-								assert.Equal(tt, value, ssh.PrivateKeyPath.Val)
-							case "passphrase":
-								assert.Equal(tt, value, ssh.Passphrase.Val)
-							case "passphrase_path":
-								assert.Equal(tt, value, ssh.PassphrasePath.Val)
-							default:
-								t.Fatalf("unknown SSH attr: %s", attr)
-							}
-						case K8S:
-							k8s, ok := transport.K8S()
-							assert.True(tt, ok)
-							switch attr {
-							case "kubeconfig_base64":
-								assert.Equal(tt, value, k8s.KubeConfigBase64.Val)
-							case "context_name":
-								assert.Equal(tt, value, k8s.ContextName.Val)
-							case "namespace":
-								assert.Equal(tt, value, k8s.Namespace.Val)
-							case "pod":
-								assert.Equal(tt, value, k8s.Pod.Val)
-							case "container":
-								assert.Equal(tt, value, k8s.Container.Val)
-							default:
-								t.Fatalf("unknown K8S attr: %s", attr)
-							}
-						case NOMAD:
-							nomad, ok := transport.Nomad()
-							assert.True(tt, ok)
-							switch attr {
-							case "host":
-								assert.Equal(tt, value, nomad.Host.Val)
-							case "secret_id":
-								assert.Equal(tt, value, nomad.SecretID.Val)
-							case "allocation_id":
-								assert.Equal(tt, value, nomad.AllocationID.Val)
-							case "task_name":
-								assert.Equal(tt, value, nomad.TaskName.Val)
-							default:
-								t.Fatalf("unknown Nomad attr: %s", attr)
-							}
-						default:
-							t.Fatalf("unknown transport type: %s", tType.String())
-						}
-					}
-				}
-			}
+			assertTransportCfg(tt, transport, test.config)
 		})
 	}
 }
@@ -616,4 +556,68 @@ func (tc transportconfig) toTFValue(t *testing.T) tftypes.Value {
 	}
 
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: types}, values)
+}
+
+func assertTransportCfg(tt *testing.T, transport *embeddedTransportV1, config transportconfig) {
+	for tType, tConfig := range config {
+		if len(tConfig) > 0 {
+			for attr, value := range tConfig {
+				switch tType {
+				case SSH:
+					ssh, ok := transport.SSH()
+					assert.True(tt, ok)
+					switch attr {
+					case "host":
+						assert.Equal(tt, value, ssh.Host.Val)
+					case "user":
+						assert.Equal(tt, value, ssh.User.Val)
+					case "private_key":
+						assert.Equal(tt, value, ssh.PrivateKey.Val)
+					case "private_key_path":
+						assert.Equal(tt, value, ssh.PrivateKeyPath.Val)
+					case "passphrase":
+						assert.Equal(tt, value, ssh.Passphrase.Val)
+					case "passphrase_path":
+						assert.Equal(tt, value, ssh.PassphrasePath.Val)
+					default:
+						tt.Fatalf("unknown SSH attr: %s", attr)
+					}
+				case K8S:
+					k8s, ok := transport.K8S()
+					assert.True(tt, ok)
+					switch attr {
+					case "kubeconfig_base64":
+						assert.Equal(tt, value, k8s.KubeConfigBase64.Val)
+					case "context_name":
+						assert.Equal(tt, value, k8s.ContextName.Val)
+					case "namespace":
+						assert.Equal(tt, value, k8s.Namespace.Val)
+					case "pod":
+						assert.Equal(tt, value, k8s.Pod.Val)
+					case "container":
+						assert.Equal(tt, value, k8s.Container.Val)
+					default:
+						tt.Fatalf("unknown K8S attr: %s", attr)
+					}
+				case NOMAD:
+					nomad, ok := transport.Nomad()
+					assert.True(tt, ok)
+					switch attr {
+					case "host":
+						assert.Equal(tt, value, nomad.Host.Val)
+					case "secret_id":
+						assert.Equal(tt, value, nomad.SecretID.Val)
+					case "allocation_id":
+						assert.Equal(tt, value, nomad.AllocationID.Val)
+					case "task_name":
+						assert.Equal(tt, value, nomad.TaskName.Val)
+					default:
+						tt.Fatalf("unknown Nomad attr: %s", attr)
+					}
+				default:
+					tt.Fatalf("unknown transport type: %s", tType.String())
+				}
+			}
+		}
+	}
 }

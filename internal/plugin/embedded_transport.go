@@ -126,7 +126,7 @@ type embeddedTransportV1 struct {
 	clientFactory transportClientFactory
 
 	// resolvedTransport the transport state that was resolved after applying defaults from the the
-	// proivider configuration
+	// provider configuration
 	resolvedTransport transportState
 }
 

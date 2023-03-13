@@ -96,6 +96,7 @@ func unsetAllEnosEnv(t *testing.T) {
 	unsetSSHEnv(t)
 	unsetK8SEnv(t)
 	unsetNomadEnv(t)
+	unsetProviderEnv(t)
 }
 
 func unsetSSHEnv(t *testing.T) {
@@ -132,6 +133,10 @@ func unsetNomadEnv(t *testing.T) {
 	} {
 		assert.NoError(t, os.Unsetenv(eVar))
 	}
+}
+
+func unsetProviderEnv(t *testing.T) {
+	assert.NoError(t, os.Unsetenv(enosDebugDataRootDirEnvVarKey))
 }
 
 func setEnosSSHEnv(t *testing.T, et *embeddedTransportV1) {

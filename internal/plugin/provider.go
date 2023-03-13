@@ -14,6 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
+// env var for setting the debug_data_root_dir
+const enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR"
+
 var (
 	_ server.Provider    = (*Provider)(nil)
 	_ state.Serializable = (*config)(nil)
@@ -136,6 +139,11 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProvid
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return res, err
+	}
+
+	// the env var ENOS_DEBUG_DATA_ROOT_DIR should override the value configured in the provider block
+	if debugDir, ok := os.LookupEnv(enosDebugDataRootDirEnvVarKey); ok {
+		p.config.DebugDataRootDir.Set(debugDir)
 	}
 
 	if dir, ok := p.config.DebugDataRootDir.Get(); ok {

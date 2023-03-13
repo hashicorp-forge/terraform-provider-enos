@@ -1,10 +1,15 @@
 package plugin
 
 import (
+	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
 	"github.com/hashicorp/enos-provider/internal/server/state"
 )
@@ -45,4 +50,65 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	newDir, ok := newProvider.config.DebugDataRootDir.Get()
 	assert.True(t, ok)
 	assert.Equal(t, dir, newDir)
+}
+
+func TestDebugDataRootDirFromEnvVar(t *testing.T) {
+
+	debugDir := t.TempDir()
+
+	transportCfg := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig)
+	transport := transportCfg.build(t)
+	transport.Terraform5Value()
+
+	cfg := newProviderConfig()
+	cfg.Transport = transport
+	val, err := state.Marshal(cfg)
+	assert.NoError(t, err)
+
+	assert.NoError(t, os.Setenv(enosDebugDataRootDirEnvVarKey, debugDir))
+
+	provider := newProvider()
+	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{
+		TerraformVersion: "1.3",
+		Config:           val,
+	})
+	assert.NoError(t, err)
+	assert.False(t, diags.HasErrors(resp.Diagnostics))
+
+	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
+
+	assertTransportCfg(t, provider.config.Transport, transportCfg)
+
+	resetEnv(t)
+}
+
+func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
+
+	debugDir := t.TempDir()
+
+	transportCfg := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig)
+	transport := transportCfg.build(t)
+	transport.Terraform5Value()
+
+	cfg := newProviderConfig()
+	cfg.Transport = transport
+	cfg.DebugDataRootDir.Set("/this/is/where/I/thought/the/debug/should/be")
+	val, err := state.Marshal(cfg)
+	assert.NoError(t, err)
+
+	assert.NoError(t, os.Setenv(enosDebugDataRootDirEnvVarKey, debugDir))
+
+	provider := newProvider()
+	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{
+		TerraformVersion: "1.3",
+		Config:           val,
+	})
+	assert.NoError(t, err)
+	assert.False(t, diags.HasErrors(resp.Diagnostics))
+
+	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
+
+	assertTransportCfg(t, provider.config.Transport, transportCfg)
+
+	resetEnv(t)
 }
