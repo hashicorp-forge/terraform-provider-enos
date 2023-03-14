@@ -43,20 +43,51 @@ const (
 	UnitTypeScope
 )
 
+func (u UnitType) String() string {
+	switch u {
+	case UnitTypeService, UnitTypeNotSet:
+		return "service"
+	case UnitTypeSocket:
+		return "socket"
+	case UnitTypeDevice:
+		return "device"
+	case UnitTypeMount:
+		return "mount"
+	case UnitTypeAutomount:
+		return "automount"
+	case UnitTypeSwap:
+		return "swap"
+	case UnitTypeTarget:
+		return "target"
+	case UnitTypePath:
+		return "path"
+	case UnitTypeTimer:
+		return "timer"
+	case UnitTypeSlice:
+		return "slice"
+	case UnitTypeScope:
+		return "scope"
+	default:
+		return "service"
+	}
+}
+
 // SystemctlSubCommand is the systemctl sub command to use
 type SystemctlSubCommand int
 
 // SystemctlSubCommands are the systemctl sub commands
 const (
 	SystemctlSubCommandNotSet SystemctlSubCommand = iota
-	SystemctlSubCommandStatus
-	SystemctlSubCommandStart
+	SystemctlSubCommandDaemonReload
 	SystemctlSubCommandEnable
+	SystemctlSubCommandIsActive
+	SystemctlSubCommandKill
+	SystemctlSubCommandListUnits
+	SystemctlSubCommandStart
+	SystemctlSubCommandStatus
 	SystemctlSubCommandStop
 	SystemctlSubCommandReload
 	SystemctlSubCommandRestart
-	SystemctlSubCommandKill
-	SystemctlSubCommandDaemonReload
 )
 
 // RunSystemctlCommandOpt is a functional option for an systemd unit request
@@ -137,41 +168,35 @@ func (c *SystemctlCommandReq) String() (string, error) {
 		cmd.WriteString(fmt.Sprintf("%s ", c.Options))
 	}
 
-	unitSuffix := filepath.Ext(c.Name)
-	switch c.Type {
-	case UnitTypeNotSet:
-	case UnitTypeService:
-		if unitSuffix != ".service" {
-			c.Name = fmt.Sprintf("%s.service", c.Name)
-		}
-	case UnitTypeSocket, UnitTypeDevice,
-		UnitTypeMount, UnitTypeAutomount,
-		UnitTypeSwap, UnitTypeTarget,
-		UnitTypePath, UnitTypeTimer,
-		UnitTypeSlice, UnitTypeScope:
-		return "", fmt.Errorf("support for unit type has not been implemented yet")
-	default:
-		return "", fmt.Errorf("unknown unit type: %d", c.Type)
+	unitName := c.Name
+	unitNameSuffix := filepath.Ext(unitName)
+	unitTypeSuffix := fmt.Sprintf(".%s", c.Type)
+	if unitNameSuffix != unitTypeSuffix {
+		unitName = fmt.Sprintf("%s%s", unitName, unitTypeSuffix)
 	}
 
 	switch c.SubCommand {
 	case SystemctlSubCommandStatus:
 		cmd.WriteString("status")
-		if c.Name != "" {
-			cmd.WriteString(fmt.Sprintf(" %s", c.Name))
+		if unitName != "" {
+			cmd.WriteString(fmt.Sprintf(" %s", unitName))
 		}
 	case SystemctlSubCommandEnable:
-		cmd.WriteString(fmt.Sprintf("enable %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("enable %s", unitName))
+	case SystemctlSubCommandIsActive:
+		cmd.WriteString(fmt.Sprintf("is-active %s", unitName))
 	case SystemctlSubCommandStart:
-		cmd.WriteString(fmt.Sprintf("start %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("start %s", unitName))
 	case SystemctlSubCommandStop:
-		cmd.WriteString(fmt.Sprintf("stop %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("stop %s", unitName))
 	case SystemctlSubCommandReload:
-		cmd.WriteString(fmt.Sprintf("reload %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("reload %s", unitName))
 	case SystemctlSubCommandRestart:
-		cmd.WriteString(fmt.Sprintf("restart %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("restart %s", unitName))
 	case SystemctlSubCommandKill:
-		cmd.WriteString(fmt.Sprintf("kill %s", c.Name))
+		cmd.WriteString(fmt.Sprintf("kill %s", unitName))
+	case SystemctlSubCommandListUnits:
+		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
 	case SystemctlSubCommandDaemonReload:
 		cmd.WriteString("daemon-reload")
 	default:

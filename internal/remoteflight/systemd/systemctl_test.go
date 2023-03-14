@@ -62,6 +62,15 @@ func TestSystemctlCommandString(t *testing.T) {
 			false,
 		},
 		{
+			"sudo systemctl is-active consul.service",
+			&SystemctlCommandReq{
+				Name:       "consul",
+				Type:       UnitTypeService,
+				SubCommand: SystemctlSubCommandIsActive,
+			},
+			false,
+		},
+		{
 			"sudo systemctl stop vault.service",
 			&SystemctlCommandReq{
 				Name:       "vault.service",
@@ -131,6 +140,24 @@ func TestSystemctlCommandString(t *testing.T) {
 				Type:       UnitTypeService,
 				SubCommand: SystemctlSubCommandKill,
 				Pattern:    "another.service",
+			},
+			false,
+		},
+		{
+			"sudo systemctl --full --all --plain --no-legend list-units -t service another.service",
+			&SystemctlCommandReq{
+				Type:       UnitTypeService,
+				SubCommand: SystemctlSubCommandListUnits,
+				Options:    "--full --all --plain --no-legend",
+				Pattern:    "another.service",
+			},
+			false,
+		},
+		{
+			"sudo systemctl list-units -t mount",
+			&SystemctlCommandReq{
+				Type:       UnitTypeMount,
+				SubCommand: SystemctlSubCommandListUnits,
 			},
 			false,
 		},

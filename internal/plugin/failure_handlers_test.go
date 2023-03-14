@@ -66,6 +66,11 @@ func (m mockSystemdClient) CreateUnitFile(ctx context.Context, req *systemd.Crea
 	panic("implement me")
 }
 
+func (m mockSystemdClient) ListServices(ctx context.Context) ([]systemd.ServiceInfo, error) {
+	// intentionally not implemented
+	panic("implement me")
+}
+
 func (m mockSystemdClient) RunSystemctlCommand(ctx context.Context, req *systemd.SystemctlCommandReq) (*systemd.SystemctlCommandRes, error) {
 	// intentionally not implemented
 	panic("implement me")
