@@ -2,8 +2,10 @@ package remoteflight
 
 // GetLogsResponse interface defining the functions required for any get logs request response.
 type GetLogsResponse interface {
-	// GetLogFileName given a prefix, creates a log file name that should be unique.
-	GetLogFileName(prefix string) string
+	// GetAppName gets the name of the application that the logs pertain to.
+	GetAppName() string
+	// GetLogFileName creates a unique log file name.
+	GetLogFileName() string
 	// GetLogs gets the logs that were retrieved by a log file request
 	GetLogs() []byte
 }

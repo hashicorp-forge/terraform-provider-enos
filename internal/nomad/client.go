@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/nomad/api"
 )
@@ -22,16 +23,19 @@ type GetTaskLogsResponse struct {
 	Logs       []byte
 }
 
+var _ remoteflight.GetLogsResponse = (*GetTaskLogsResponse)(nil)
+
+// GetAppName implements remoteflight.GetLogsResponse.GetAppName
+func (p GetTaskLogsResponse) GetAppName() string {
+	return p.Task
+}
+
 // GetLogFileName gets the name that should be used for the log file, using the following pattern:
 //
 //	[prefix]_[namespace]_[allocation-name]_[task-name].log, where prefix and namespace are only
 //	added if they are not empty.
-func (r *GetTaskLogsResponse) GetLogFileName(prefix string) string {
+func (r *GetTaskLogsResponse) GetLogFileName() string {
 	var parts []string
-
-	if prefix != "" {
-		parts = append(parts, prefix)
-	}
 
 	if r.Namespace != "" {
 		parts = append(parts, r.Namespace)

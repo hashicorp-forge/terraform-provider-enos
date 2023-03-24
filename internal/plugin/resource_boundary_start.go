@@ -52,7 +52,7 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, "boundary"),
+		GetApplicationLogsFailureHandler(transport, []string{"boundary"}),
 	}
 	return &boundaryStartStateV1{
 		ID:              newTfString(),

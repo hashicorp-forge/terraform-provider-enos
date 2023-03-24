@@ -7,57 +7,33 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
-	"github.com/hashicorp/enos-provider/internal/nomad"
-	"github.com/hashicorp/nomad/api"
-
-	"github.com/hashicorp/enos-provider/internal/transport/mock"
-
+	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	"github.com/hashicorp/enos-provider/internal/log"
-
+	"github.com/hashicorp/enos-provider/internal/nomad"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
-
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp/enos-provider/internal/transport/mock"
+	"github.com/hashicorp/nomad/api"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/stretchr/testify/assert"
 )
 
-type mockK8SClient struct {
-	logs []byte
-}
-
-func (m *mockK8SClient) NewExecRequest(opts kubernetes.ExecRequestOpts) it.ExecRequest {
-	// intentionally not implemented
-	panic("implement me")
-}
-
-func (m *mockK8SClient) GetPodInfos(ctx context.Context, req kubernetes.GetPodInfoRequest) ([]kubernetes.PodInfo, error) {
-	// intentionally not implemented
-	panic("implement me")
-}
-
-func (m *mockK8SClient) GetLogs(ctx context.Context, req kubernetes.GetPodLogsRequest) (*kubernetes.GetPodLogsResponse, error) {
-	return &kubernetes.GetPodLogsResponse{
-		Namespace: req.Namespace,
-		Pod:       req.Pod,
-		Container: req.Container,
-		Logs:      m.logs,
-	}, nil
-}
-
 type mockSystemdClient struct {
-	logs []byte
+	// logs is a map of unit name to logs
+	logs map[string][]byte
 }
 
 func (m mockSystemdClient) GetLogs(ctx context.Context, req systemd.GetLogsRequest) (remoteflight.GetLogsResponse, error) {
+	logs, ok := m.logs[req.Unit]
+	if !ok {
+		return nil, fmt.Errorf("unit not installed")
+	}
 	return systemd.GetLogsResponse{
+		Unit: req.Unit,
 		Host: req.Host,
-		Logs: m.logs,
+		Logs: logs,
 	}, nil
 }
 
@@ -67,8 +43,29 @@ func (m mockSystemdClient) CreateUnitFile(ctx context.Context, req *systemd.Crea
 }
 
 func (m mockSystemdClient) ListServices(ctx context.Context) ([]systemd.ServiceInfo, error) {
-	// intentionally not implemented
-	panic("implement me")
+	return []systemd.ServiceInfo{
+		{
+			Unit:        "fish",
+			Load:        "loaded",
+			Active:      "active",
+			Sub:         "exited",
+			Description: "fish taco",
+		},
+		{
+			Unit:        "consul",
+			Load:        "loaded",
+			Active:      "active",
+			Sub:         "running",
+			Description: "consul service",
+		},
+		{
+			Unit:        "chicken",
+			Load:        "loaded",
+			Active:      "active",
+			Sub:         "running",
+			Description: "chicken taco",
+		},
+	}, nil
 }
 
 func (m mockSystemdClient) RunSystemctlCommand(ctx context.Context, req *systemd.SystemctlCommandReq) (*systemd.SystemctlCommandRes, error) {
@@ -297,12 +294,17 @@ func TestGetLogsFailureHandler(t *testing.T) {
 	noExistDir := t.TempDir()
 	assert.NoError(t, os.RemoveAll(noExistDir))
 
-	logs := []byte(`Preparing to make tacos
+	chickenLogs := []byte(`Preparing to make tacos
 Found cheese
 Found Tortillas
 Found Beans
 Error: Failed to find chicken
 Taco Failed`)
+
+	consulLogs := []byte(`Preparing to run consul
+Found vault
+Found members
+Error: Failed to find consul`)
 
 	k8sTransport := newEmbeddedTransportK8Sv1()
 	k8sTransport.Pod.Set("tacos")
@@ -311,7 +313,9 @@ Taco Failed`)
 	k8sTransport.KubeConfigBase64.Set("bogus")
 	k8sTransport.ContextName.Set("taco_cluster")
 	k8sTransport.k8sClientFactory = func(cfg kubernetes.ClientCfg) (kubernetes.Client, error) {
-		return &mockK8SClient{logs: logs}, nil
+		return &kubernetes.MockClient{
+			GetLogsFunc: kubernetes.NewMockGetLogsFunc(chickenLogs),
+		}, nil
 	}
 
 	sshTransport := newEmbeddedTransportSSH()
@@ -321,43 +325,58 @@ Taco Failed`)
 	sshTransport.sshTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error) {
 		return mock.New(), nil
 	}
+	serviceMap := map[string][]byte{
+		"chicken": chickenLogs,
+		"consul":  consulLogs,
+	}
 	sshTransport.systemdClientFactory = func(transport it.Transport, logger log.Logger) systemd.Client {
-		return &mockSystemdClient{logs: logs}
+		return &mockSystemdClient{logs: serviceMap}
 	}
 
 	nomadTransport := newEmbeddedTransportNomadv1()
 	nomadTransport.TaskName.Set("chicken")
 	nomadTransport.nomadClientFactory = func(cfg nomad.ClientCfg) (nomad.Client, error) {
 		return &mockNomadClient{
-			logs:       logs,
+			logs:       chickenLogs,
 			namespace:  "food",
 			allocation: "tacos",
 		}, nil
 	}
 
 	tests := []struct {
-		name                string
-		dir                 string
-		transport           transportState
-		expectedLogFileName string
+		name                 string
+		dir                  string
+		transport            transportState
+		expectedLogFileNames map[string]string
+		expectedServices     []string
 	}{
 		{
-			name:                "dir_exists",
-			dir:                 existDir,
-			transport:           k8sTransport,
-			expectedLogFileName: "taco-truck_food_tacos_chicken.log",
+			name:      "dir_exists",
+			dir:       existDir,
+			transport: k8sTransport,
+			expectedLogFileNames: map[string]string{
+				"chicken": "taco_cluster_food_tacos_chicken.log",
+			},
+			expectedServices: []string{"chicken"},
 		},
 		{
-			name:                "dir_not_exists",
-			dir:                 noExistDir,
-			transport:           sshTransport,
-			expectedLogFileName: "taco-truck_10.0.0.1.log",
+			name:      "dir_not_exists",
+			dir:       noExistDir,
+			transport: sshTransport,
+			expectedLogFileNames: map[string]string{
+				"chicken": "chicken_10.0.0.1.log",
+				"consul":  "consul_10.0.0.1.log",
+			},
+			expectedServices: []string{"consul", "chicken"},
 		},
 		{
-			name:                "nomad_transport",
-			dir:                 existDir,
-			transport:           nomadTransport,
-			expectedLogFileName: "taco-truck_food_tacos_chicken.log",
+			name:      "nomad_transport",
+			dir:       existDir,
+			transport: nomadTransport,
+			expectedLogFileNames: map[string]string{
+				"chicken": "food_tacos_chicken.log",
+			},
+			expectedServices: []string{"chicken"},
 		},
 	}
 
@@ -365,8 +384,9 @@ Taco Failed`)
 		t.Run(tt.name, func(t *testing.T) {
 			embeddedTransport := newEmbeddedTransport()
 			embeddedTransport.resolvedTransport = tt.transport
+			services := []string{"chicken", "sshd", "fish"}
 
-			handler := GetApplicationLogsFailureHandler(embeddedTransport, "taco-truck")
+			handler := GetApplicationLogsFailureHandler(embeddedTransport, services)
 
 			diag := &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
@@ -378,18 +398,20 @@ Taco Failed`)
 
 			handler(context.Background(), diag, providerConfig.Terraform5Value())
 
-			logFile := filepath.Join(tt.dir, tt.expectedLogFileName)
+			for _, service := range tt.expectedServices {
+				logFile := filepath.Join(tt.dir, tt.expectedLogFileNames[service])
 
-			assert.FileExists(t, logFile)
+				assert.FileExists(t, logFile)
 
-			logContents, err := os.ReadFile(logFile)
-			assert.NoError(t, err)
-			assert.Equal(t, logs, logContents)
+				logContents, err := os.ReadFile(logFile)
+				assert.NoError(t, err)
+				assert.Equal(t, serviceMap[service], logContents)
+				assert.Contains(t, diag.Detail, fmt.Sprintf("  %s: %s", service, logFile))
+			}
 
-			assert.Equal(t, fmt.Sprintf(`Failed to make taco since there was no chicken.
+			assert.Contains(t, diag.Detail, `Failed to make taco since there was no chicken.
 
-Application Logs:
-  taco-truck: %s`, logFile), diag.Detail)
+Application Logs:`)
 		})
 	}
 }
@@ -410,12 +432,14 @@ Taco Failed`)
 	k8sTransport.KubeConfigBase64.Set("bogus")
 	k8sTransport.ContextName.Set("taco_cluster")
 	k8sTransport.k8sClientFactory = func(cfg kubernetes.ClientCfg) (kubernetes.Client, error) {
-		return &mockK8SClient{logs: logs}, nil
+		return &kubernetes.MockClient{
+			GetLogsFunc: kubernetes.NewMockGetLogsFunc(logs),
+		}, nil
 	}
 	embeddedTransport := newEmbeddedTransport()
 	embeddedTransport.resolvedTransport = k8sTransport
 
-	handler := GetApplicationLogsFailureHandler(embeddedTransport, "taco-truck")
+	handler := GetApplicationLogsFailureHandler(embeddedTransport, []string{"taco-truck"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -426,7 +450,7 @@ Taco Failed`)
 
 	handler(context.Background(), diag, providerConfig.Terraform5Value())
 
-	logFile := filepath.Join(dir, "taco-truck_food_tacos_chicken.log")
+	logFile := filepath.Join(dir, "taco_cluster_food_tacos_chicken.log")
 
 	assert.NoFileExists(t, logFile)
 

@@ -26,12 +26,16 @@ const (
 // serviceInfoRegex is the regex used to parse the systemctl services output into a slice of ServiceInfo
 var serviceInfoRegex = regexp.MustCompile(`^(?P<unit>\S+)\.service\s+(?P<load>\S+)\s+(?P<active>\S+)\s+(?P<sub>\S+)\s+(?P<description>\S.*)$`)
 
+// KnownServices are list of known HashiCorp services
+var KnownServices = []string{"boundary", "consul", "vault"}
+
 type GetLogsRequest struct {
 	Unit string
 	Host string
 }
 
 type GetLogsResponse struct {
+	Unit string
 	Host string
 	Logs []byte
 }
@@ -47,14 +51,13 @@ type ServiceInfo struct {
 
 var _ remoteflight.GetLogsResponse = (*GetLogsResponse)(nil)
 
-func (s GetLogsResponse) GetLogFileName(prefix string) string {
-	var name string
+// GetAppName implements remoteflight.GetLogsResponse
+func (s GetLogsResponse) GetAppName() string {
+	return s.Unit
+}
 
-	if prefix != "" {
-		name = fmt.Sprintf("%s_", prefix)
-	}
-
-	return fmt.Sprintf("%s%s.log", name, s.Host)
+func (s GetLogsResponse) GetLogFileName() string {
+	return fmt.Sprintf("%s_%s.log", s.Unit, s.Host)
 }
 
 func (s GetLogsResponse) GetLogs() []byte {
@@ -115,6 +118,7 @@ func (c *client) GetLogs(ctx context.Context, req GetLogsRequest) (remoteflight.
 	}
 
 	return GetLogsResponse{
+		Unit: req.Unit,
 		Host: req.Host,
 		Logs: []byte(stdout),
 	}, nil

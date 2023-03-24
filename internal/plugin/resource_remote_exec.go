@@ -58,6 +58,7 @@ func newRemoteExecStateV1() *remoteExecStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
+		GetApplicationLogsFailureHandler(transport, []string{}),
 	}
 	return &remoteExecStateV1{
 		ID:              newTfString(),

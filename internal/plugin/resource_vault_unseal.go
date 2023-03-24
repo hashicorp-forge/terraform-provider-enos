@@ -47,7 +47,7 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, "vault"),
+		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
 	return &vaultUnsealStateV1{
 		ID:              newTfString(),

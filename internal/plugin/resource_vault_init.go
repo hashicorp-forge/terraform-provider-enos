@@ -66,7 +66,7 @@ func newVaultInitStateV1() *vaultInitStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, "vault"),
+		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
 	return &vaultInitStateV1{
 		ID:        newTfString(),

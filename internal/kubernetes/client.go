@@ -21,18 +21,34 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
 
+	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-const kubeConfigEnvVar = "KUBECONFIG"
+const (
+	kubeConfigEnvVar = "KUBECONFIG"
+	defaultNamespace = "default"
+)
+
+// GetPodInfoRequest a request for getting pod info
+type GetPodInfoRequest struct {
+	// Namespace the namespace that the pod is in
+	Namespace string
+	// Name the name of the pod
+	Name string
+}
 
 // Client A wrapper around the k8s clientset that provides an api that the provider can use
 type Client interface {
 	// NewExecRequest creates a new exec request for the given opts
 	NewExecRequest(opts ExecRequestOpts) it.ExecRequest
-	// GetPodInfos gets a slice of all the pods that matched the GetPodInfoRequest
-	GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodInfo, error)
-	// GetLogs gets the logs for the provided GetPodInfoRequest
+	// QueryPodInfos gets a slice of all the pods that match the QueryPodInfosRequest. If the namespace
+	// is not provided in the request it will be defaulted to 'default'.
+	QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([]PodInfo, error)
+	// GetPodInfo get pod info for the pod that matches the request. If the namespace is not provided
+	// in the request it will be defaulted to 'default'.
+	GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error)
+	// GetLogs gets the logs for the provided QueryPodInfosRequest
 	GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error)
 }
 
@@ -69,45 +85,42 @@ type ExecRequestOpts struct {
 	Container string
 }
 
-type GetPodInfoRequest struct {
+type QueryPodInfosRequest struct {
 	Namespace     string
 	LabelSelector string
 	FieldSelector string
 }
 
 type PodInfo struct {
-	Name      string
-	Namespace string
+	Name       string
+	Namespace  string
+	Containers []string
 }
 
 type GetPodLogsRequest struct {
-	Namespace string
-	Pod       string
-	Container string
+	ContextName string
+	Namespace   string
+	Pod         string
+	Container   string
 }
 
 type GetPodLogsResponse struct {
-	Namespace string
-	Pod       string
-	Container string
-	Logs      []byte
+	ContextName string
+	Namespace   string
+	Pod         string
+	Container   string
+	Logs        []byte
 }
 
-func (p GetPodLogsResponse) GetLogFileName(prefix string) string {
-	var parts []string
-	if prefix != "" {
-		parts = append(parts, prefix)
-	}
+var _ remoteflight.GetLogsResponse = (*GetPodLogsResponse)(nil)
 
-	if p.Namespace != "" {
-		parts = append(parts, p.Namespace)
-	}
+// GetAppName implements remoteflight.GetLogsResponse.GetAppName
+func (p GetPodLogsResponse) GetAppName() string {
+	return p.Container
+}
 
-	parts = append(parts, p.Pod)
-
-	if p.Container != "" {
-		parts = append(parts, p.Container)
-	}
+func (p GetPodLogsResponse) GetLogFileName() string {
+	parts := []string{p.ContextName, p.Namespace, p.Pod, p.Container}
 
 	filename := strings.Join(parts, "_")
 	filename = fmt.Sprintf("%s.log", filename)
@@ -178,12 +191,17 @@ func (c *client) NewExecRequest(opts ExecRequestOpts) it.ExecRequest {
 	}
 }
 
-// GetPodInfos queries Kubernetes using search criteria for the given GetPodInfoRequest and returns a
+// QueryPodInfos queries Kubernetes using search criteria for the given QueryPodInfosRequest and returns a
 // list of pod infos that match the query.
-func (c *client) GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodInfo, error) {
+func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([]PodInfo, error) {
+	namespace := req.Namespace
+	if strings.TrimSpace(namespace) == "" {
+		namespace = defaultNamespace
+	}
+
 	podList, err := c.clientset.
 		CoreV1().
-		Pods(req.Namespace).
+		Pods(namespace).
 		List(ctx, metav1.ListOptions{
 			LabelSelector: req.LabelSelector,
 			FieldSelector: req.FieldSelector,
@@ -195,12 +213,38 @@ func (c *client) GetPodInfos(ctx context.Context, req GetPodInfoRequest) ([]PodI
 	var pods []PodInfo
 	for _, pod := range podList.Items {
 		pods = append(pods, PodInfo{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
+			Name:       pod.Name,
+			Namespace:  pod.Namespace,
+			Containers: getContainers(pod),
 		})
 	}
 
 	return pods, err
+}
+
+func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error) {
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, fmt.Errorf("cannot get pod info without the pod name")
+	}
+
+	namespace := req.Namespace
+	if strings.TrimSpace(namespace) == "" {
+		namespace = defaultNamespace
+	}
+
+	pod, err := c.clientset.
+		CoreV1().
+		Pods(namespace).
+		Get(ctx, req.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get a pod for name: %s and namespace: %s, due to: %w", req.Name, req.Namespace, err)
+	}
+
+	return &PodInfo{
+		Name:       req.Name,
+		Namespace:  namespace,
+		Containers: getContainers(*pod),
+	}, nil
 }
 
 func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error) {
@@ -210,7 +254,7 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 
 	namespace := req.Namespace
 	if strings.TrimSpace(namespace) == "" {
-		namespace = "default"
+		namespace = defaultNamespace
 	}
 
 	select {
@@ -239,10 +283,11 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 	}
 
 	return &GetPodLogsResponse{
-		Namespace: namespace,
-		Pod:       req.Pod,
-		Container: req.Container,
-		Logs:      buf.Bytes(),
+		ContextName: req.ContextName,
+		Namespace:   namespace,
+		Pod:         req.Pod,
+		Container:   req.Container,
+		Logs:        buf.Bytes(),
 	}, nil
 }
 
@@ -328,4 +373,12 @@ func GetKubeConfigPath(kubeConfigPath string) (string, error) {
 	}
 
 	return filepath.Join(homeDir, ".kube", "config"), nil
+}
+
+func getContainers(pod v1.Pod) []string {
+	var containers []string
+	for _, container := range pod.Spec.Containers {
+		containers = append(containers, container.Name)
+	}
+	return containers
 }

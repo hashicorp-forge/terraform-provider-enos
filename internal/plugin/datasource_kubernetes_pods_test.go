@@ -42,7 +42,47 @@ func TestAccDataSourceKubernetesPods(t *testing.T) {
 }
 
 output "pods" {
-  value = jsonencode(data.enos_kubernetes_pods.bogus.pods)
+  value = jsonencode([for podInfo in data.enos_kubernetes_pods.bogus.pods : "${podInfo.name}_${podInfo.namespace}_${jsonencode(podInfo.containers)}"])
+}
+
+output "transports_0_kubeconfig" {
+  value = data.enos_kubernetes_pods.bogus.transports[0].kubeconfig_base64
+}
+
+output "transports_0_context_name" {
+  value = data.enos_kubernetes_pods.bogus.transports[0].context_name
+}
+
+output "transports_0_namespace" {
+  value = data.enos_kubernetes_pods.bogus.transports[0].namespace
+}
+
+output "transports_0_pod" {
+  value = data.enos_kubernetes_pods.bogus.transports[0].pod
+}
+
+output "transports_0_container" {
+  value = data.enos_kubernetes_pods.bogus.transports[0].container
+}
+
+output "transports_1_kubeconfig" {
+  value = data.enos_kubernetes_pods.bogus.transports[1].kubeconfig_base64
+}
+
+output "transports_1_context_name" {
+  value = data.enos_kubernetes_pods.bogus.transports[1].context_name
+}
+
+output "transports_1_namespace" {
+  value = data.enos_kubernetes_pods.bogus.transports[1].namespace
+}
+
+output "transports_1_pod" {
+  value = data.enos_kubernetes_pods.bogus.transports[1].pod
+}
+
+output "transports_1_container" {
+  value = data.enos_kubernetes_pods.bogus.transports[1].container
 }
 `))
 
@@ -52,12 +92,14 @@ output "pods" {
 
 	pods1 := []kubernetes.PodInfo{
 		{
-			Name:      "pod1",
-			Namespace: "blablabla",
+			Name:       "pod1",
+			Namespace:  "bla",
+			Containers: []string{"foo"},
 		},
 		{
-			Name:      "pod2",
-			Namespace: "yoyo",
+			Name:       "pod2",
+			Namespace:  "yoyo",
+			Containers: []string{"bar"},
 		},
 	}
 
@@ -68,7 +110,17 @@ output "pods" {
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "id", regexp.MustCompile(`^static$`)),
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "kubeconfig_base64", regexp.MustCompile(kubeConfig)),
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "context_name", regexp.MustCompile(`^kind-bogus$`)),
-		resource.TestMatchOutput("pods", regexp.MustCompile(`.*pod1.*blablabla.*pod2.*yoyo.*`)),
+		resource.TestMatchOutput("pods", regexp.MustCompile(`.*pod1.*bla.*foo.*pod2.*yoyo.*bar.*`)),
+		resource.TestCheckOutput("transports_0_kubeconfig", kubeConfig),
+		resource.TestCheckOutput("transports_0_context_name", "kind-bogus"),
+		resource.TestCheckOutput("transports_0_namespace", "bla"),
+		resource.TestCheckOutput("transports_0_pod", "pod1"),
+		resource.TestCheckOutput("transports_0_container", "foo"),
+		resource.TestCheckOutput("transports_1_kubeconfig", kubeConfig),
+		resource.TestCheckOutput("transports_1_context_name", "kind-bogus"),
+		resource.TestCheckOutput("transports_1_namespace", "yoyo"),
+		resource.TestCheckOutput("transports_1_pod", "pod2"),
+		resource.TestCheckOutput("transports_1_container", "bar"),
 	)
 
 	state2 := newKubernetesPodStateV1()

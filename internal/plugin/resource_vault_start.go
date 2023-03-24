@@ -89,7 +89,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, "vault"),
+		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
 	return &vaultStartStateV1{
 		ID:      newTfString(),

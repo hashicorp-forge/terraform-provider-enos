@@ -24,7 +24,7 @@ var defaultPodInfoGetter podInfoGetter = func(ctx context.Context, state kuberne
 		return nil, fmt.Errorf("failed to create a Kubernetes Client, due to: %w", err)
 	}
 
-	pods, err := client.GetPodInfos(ctx, kubernetes.GetPodInfoRequest{
+	pods, err := client.QueryPodInfos(ctx, kubernetes.QueryPodInfosRequest{
 		Namespace:     state.Namespace.Value(),
 		LabelSelector: strings.Join(state.LabelSelectors.StringValue(), ","),
 		FieldSelector: strings.Join(state.FieldSelectors.StringValue(), ","),
@@ -51,6 +51,7 @@ type kubernetesPodsStateV1 struct {
 	LabelSelectors   *tfStringSlice
 	FieldSelectors   *tfStringSlice
 	Pods             *tfObjectSlice
+	Transports       *tfObjectSlice
 
 	failureHandlers
 }
@@ -69,6 +70,18 @@ func newKubernetesPodStateV1() *kubernetesPodsStateV1 {
 	pods.AttrTypes = map[string]tftypes.Type{
 		"name":      tftypes.String,
 		"namespace": tftypes.String,
+		"containers": tftypes.List{
+			ElementType: tftypes.String,
+		},
+	}
+
+	transports := newTfObjectSlice()
+	transports.AttrTypes = map[string]tftypes.Type{
+		"kubeconfig_base64": tftypes.String,
+		"context_name":      tftypes.String,
+		"namespace":         tftypes.String,
+		"pod":               tftypes.String,
+		"container":         tftypes.String,
 	}
 
 	return &kubernetesPodsStateV1{
@@ -79,6 +92,7 @@ func newKubernetesPodStateV1() *kubernetesPodsStateV1 {
 		LabelSelectors:   newTfStringSlice(),
 		FieldSelectors:   newTfStringSlice(),
 		Pods:             pods,
+		Transports:       transports,
 		failureHandlers:  failureHandlers{},
 	}
 }
@@ -146,21 +160,47 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 	}
 
 	var podResults []*tfObject
+	var transportResults []*tfObject
 	for _, result := range pods {
-		r := newTfObject()
+		pod := newTfObject()
 		podName := newTfString()
 		podName.Set(result.Name)
 		podNamespace := newTfString()
 		podNamespace.Set(result.Namespace)
 
-		r.Set(map[string]interface{}{
-			"name":      podName,
-			"namespace": podNamespace,
-		})
-		podResults = append(podResults, r)
-	}
+		containers := newTfStringSlice()
+		containers.SetStrings(result.Containers)
 
+		pod.Set(map[string]interface{}{
+			"name":       podName,
+			"namespace":  podNamespace,
+			"containers": containers,
+		})
+		podResults = append(podResults, pod)
+
+		for _, c := range result.Containers {
+			transport := newTfObject()
+			kubeConfigBase64 := newTfString()
+			kubeConfigBase64.Set(podState.KubeConfigBase64.Val)
+			contextName := newTfString()
+			contextName.Set(podState.ContextName.Val)
+			container := newTfString()
+			container.Set(c)
+
+			transport.Set(map[string]interface{}{
+				"kubeconfig_base64": kubeConfigBase64,
+				"context_name":      contextName,
+				"namespace":         podNamespace,
+				"pod":               podName,
+				"container":         container,
+			})
+
+			transportResults = append(transportResults, transport)
+		}
+
+	}
 	podState.Pods.Set(podResults)
+	podState.Transports.Set(transportResults)
 
 	res.State, err = state.Marshal(podState)
 	if err != nil {
@@ -212,9 +252,16 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 				},
 				{
 					Name:        "pods",
-					Description: "A map of namespaces to pod names for the pods that match the search criteria.",
+					Description: "A list of PodInfo objects for all the pods that match the search.",
 					Type:        s.Pods.TFType(),
 					Computed:    true,
+				},
+				{
+					Name: "transports",
+					Description: "A list of transport blocks for all the pods (and their containers) that match the search. " +
+						"The values can be used for the transport argument of any resource that requires Kubernetes transport.",
+					Type:     s.Transports.TFType(),
+					Computed: true,
 				},
 			},
 		},
@@ -266,6 +313,7 @@ func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"label_selectors":   s.LabelSelectors,
 		"field_selectors":   s.FieldSelectors,
 		"pods":              s.Pods,
+		"transports":        s.Transports,
 	})
 
 	return err
@@ -282,6 +330,7 @@ func (s *kubernetesPodsStateV1) Terraform5Type() tftypes.Type {
 		"label_selectors":   s.LabelSelectors.TFType(),
 		"field_selectors":   s.FieldSelectors.TFType(),
 		"pods":              s.Pods.TFType(),
+		"transports":        s.Transports.TFType(),
 	}}
 }
 
@@ -295,5 +344,6 @@ func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 		"label_selectors":   s.LabelSelectors.TFValue(),
 		"field_selectors":   s.FieldSelectors.TFValue(),
 		"pods":              s.Pods.TFValue(),
+		"transports":        s.Transports.TFValue(),
 	})
 }

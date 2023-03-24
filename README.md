@@ -360,8 +360,9 @@ The query will return a list of `PodInfo` objects, which has the following schem
 
 ```
 PodInfo{
-  Name      string
-  Namespace string
+  Name       string
+  Namespace  string
+  Containers []string
 }
 ```
 **Important Note:**
@@ -404,15 +405,11 @@ data "enos_kubernetes_pods" "test" {
 }
 
 resource "enos_remote_exec" "create_file" {
+  for_each = data.enos_kubernetes_pods.test.transports
   inline = ["touch /tmp/some_file"]
 
   transport = {
-    kubernetes = {
-      kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
-      context_name      = enos_local_kind_cluster.test.context_name
-      namespace         = try(data.enos_kubernetes_pods.test.pods[0].namespace, "")
-      pod               = try(data.enos_kubernetes_pods.test.pods[0].name, "")
-    }
+    kubernetes = each.value
   }
 }
 ```
@@ -433,6 +430,7 @@ The following is the schema for the `enos_kubernetes_pods` datasource:
 |label_selectors|\[optional\] - A list(string) of label selectors to use when querying the cluster for pods|
 |field_selectors|\[optional\] - A list(string) of field selectors to use when querying the cluster for pods|
 |pods|\[output\] - a list of kubernetes `PodInfo` object, see description above |
+|transports|\[output\] - a list of Kubernetes transport blocks that can be used as the transport configuration for another resource that requires a Kubernetes transport block. The list will contain one item per pod + container that was returned when querying the pods | 
 
 # Resources
 

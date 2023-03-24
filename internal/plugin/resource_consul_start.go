@@ -66,7 +66,7 @@ func newConsulStartStateV1() *consulStartStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, "consul"),
+		GetApplicationLogsFailureHandler(transport, []string{"consul"}),
 	}
 	return &consulStartStateV1{
 		ID:        newTfString(),

@@ -53,7 +53,7 @@ func TestBundleURL(t *testing.T) {
 	}
 }
 
-var testEntSHASums = `01f971a36ed6b7d631640d365ce87fed259982a55bc791a652e69121f8b6806a  vault_1.7.0+ent_darwin_amd64.zip
+var testEntSHASums = `0c7e49ecc0b00202a515f2e819664850aad0ff617991aec03589b725a0540880  vault_1.7.0+ent_darwin_amd64.zip
 e88e8cbaa8e116a5bc2d4fb541b63de212d2c3414772af1d39f258ed5f982d71  vault_1.7.0+ent_freebsd_386.zip
 08b36b9c0c09499c946676bae13c54cadb04493971943959c36406308a238c5f  vault_1.7.0+ent_freebsd_amd64.zip
 4a58ea1012b9ca0454acf411aa2db3a1f3be003a1a7a76e93137b9cfc1381b99  vault_1.7.0+ent_freebsd_arm.zip
@@ -71,7 +71,7 @@ f46ea11dbd06426e4bdaaed41a2de08270b33371076390a54225f222cf0b5117  vault_1.7.0+en
 355416ff4e191935c87a166b1a754b9e7fee5073c8482e9f6537a74d188a5bc0  vault_1.7.0+ent_windows_amd64.zip
 `
 
-var testOSSSHASums = `374fca0c8fcde45d5710e06673d03596371e92e18c33612396484758d2967d07  vault_1.7.0_darwin_amd64.zip
+var testOSSSHASums = `1d59ff9054496ccd2c4f803ce599a163794f7455764b186453fe7e975606b2a0  vault_1.7.0_darwin_amd64.zip
 d87871390363add49c4c432aed43c8b53fbe74e83a7101920ef0c83b49f18d55  vault_1.7.0_freebsd_386.zip
 04e45b4f475c3b67cfa6c33327d37dd00384129592d1b7bd62d8790b804c6ead  vault_1.7.0_freebsd_amd64.zip
 65183e85fce98b5fe0eed08af95e656198a9c61272a1afa780ee2d922764186f  vault_1.7.0_freebsd_arm.zip
@@ -123,7 +123,7 @@ func TestSHA256(t *testing.T) {
 				Platform: "darwin",
 				Arch:     "amd64",
 			},
-			"374fca0c8fcde45d5710e06673d03596371e92e18c33612396484758d2967d07",
+			"1d59ff9054496ccd2c4f803ce599a163794f7455764b186453fe7e975606b2a0",
 		},
 		{
 			&Release{
@@ -153,7 +153,7 @@ func TestSHA256(t *testing.T) {
 				Platform: "darwin",
 				Arch:     "amd64",
 			},
-			"01f971a36ed6b7d631640d365ce87fed259982a55bc791a652e69121f8b6806a",
+			"0c7e49ecc0b00202a515f2e819664850aad0ff617991aec03589b725a0540880",
 		},
 	} {
 		rel := test.Rel
