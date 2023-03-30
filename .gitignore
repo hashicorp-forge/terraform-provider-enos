@@ -39,3 +39,9 @@ mirror/*.tfvars
 
 # build dir for tests
 test-build
+
+# Enos
+enos/.enos
+enos/support
+enoscli-tests/.enos
+enoscli-tests/support/*

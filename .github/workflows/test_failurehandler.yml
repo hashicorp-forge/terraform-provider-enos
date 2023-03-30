@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      ENOS_PROVIDER_NAME: enos
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -45,22 +43,62 @@ jobs:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - name: Build assets
         run: 'sudo apt-get install -y upx-ucl && make flight-control-build'
-      - name: Setup Vault Enterprise License
-        id: license
-        run: |
-          mkdir -p ./enoscli-tests/support
-          echo "${{ secrets.VAULT_LICENSE }}" > ./enoscli-tests/support/vault.hclic
       - name: Setup Enos SSH Keys
         id: sshkey
         run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enoscli-tests/support/enos-ci-ssh-key.pem
-          chmod 600 ./enoscli-tests/support/enos-ci-ssh-key.pem
+          mkdir -p ./enos/support
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./enos/support/enos-ci-ssh-key.pem
+          chmod 600 ./enos/support/enos-ci-ssh-key.pem
       - name: "Cleanup Enos tmp directories"
         continue-on-error: true
         if: ${{ always() }}
-        run: rm -rf /tmp/enos*
+        run: |
+          [[ -d $HOME/.terraform.d ]] && rm -rf $HOME/.terraform.d
+          rm -rf /tmp/enos*
       # we set CI false here as we will use the local artifact path to test
       - name: Build and Install Artifacts
         run: CI='false' make
+      - name: Get scenario dependencies
+        id: scenario-deps
+        run: |
+          echo "debug_data_root_dir=/tmp/enos/logs" >> $GITHUB_OUTPUT
+          cp -r $HOME/.terraform.d/plugins/app.terraform.io ./dist
       - name: "Enos Version"
         run: enos version
+      - name: "Run Enos Scenario"
+        id: launch
+        continue-on-error: true
+        env:
+          ENOS_DEBUG_DATA_ROOT_DIR: ${{ steps.scenario-deps.outputs.debug_data_root_dir }}
+        run: enos scenario launch --timeout 60m0s --chdir ./enos
+      - name: Retry Enos scenario if necessary
+        id: launch_retry
+        if: steps.launch.outcome == 'failure'
+        env:
+          ENOS_DEBUG_DATA_ROOT_DIR: ${{ steps.scenario-deps.outputs.debug_data_root_dir }}
+        run: enos scenario launch --timeout 60m0s --chdir ./enos
+      - name: Run Failing Remote Exec
+        id: run_remote_exec
+        continue-on-error: true
+        env:
+          ENOS_VAR_run_failure_handler_tests: true
+          ENOS_DEBUG_DATA_ROOT_DIR: ${{ steps.scenario-deps.outputs.debug_data_root_dir }}
+        run: enos scenario run --timeout 60m0s --chdir ./enos
+      - name: Verify Log Files Exist
+        id: test_logs_exist
+        if: steps.run_remote_exec.outcome == 'failure'
+        run: |
+          log_file_count=$(ls ${{ steps.scenario-deps.outputs.debug_data_root_dir }}/{consul,vault}* | wc -l)
+          test $log_file_count -eq 2
+      - name: Ensure scenario has been destroyed
+        env:
+          ENOS_DEBUG_DATA_ROOT_DIR: ${{ steps.scenario-deps.outputs.debug_data_root_dir }}
+        if: ${{ always() }}
+        run: enos scenario destroy --timeout 60m0s --chdir ./enos
+      - name: Clean up Enos runtime directories
+        if: ${{ always() }}
+        run: |
+          rm -rf /tmp/enos*
+          rm -rf ./enos/support
+          rm -rf ./enos/.enos
+          rm -rf $HOME/.terraform.d

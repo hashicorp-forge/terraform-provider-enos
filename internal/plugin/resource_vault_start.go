@@ -637,19 +637,19 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	}
 
 	if storageLabel, ok := c.Storage.Type.Get(); ok {
+		storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel})
 		if attrs, ok := c.Storage.Attrs.GetObject(); ok {
-			storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel}).AppendAttributes(attrs)
-
-			if storageLabel == raftStorageType {
-				storageBlock.AppendAttribute("path", defaultRaftDataDir)
-				clusterName, ok := c.ClusterName.Get()
-				if !ok {
-					return nil, errors.New("ClusterName not found in Vault config")
-				}
-				storageBlock.AppendBlock("retry_join", []string{}).
-					AppendAttribute("auto_join", fmt.Sprintf("provider=aws tag_key=Type tag_value=%s", clusterName)).
-					AppendAttribute("auto_join_scheme", "http")
+			storageBlock.AppendAttributes(attrs)
+		}
+		if storageLabel == raftStorageType {
+			storageBlock.AppendAttribute("path", defaultRaftDataDir)
+			clusterName, ok := c.ClusterName.Get()
+			if !ok {
+				return nil, errors.New("ClusterName not found in Vault config")
 			}
+			storageBlock.AppendBlock("retry_join", []string{}).
+				AppendAttribute("auto_join", fmt.Sprintf("provider=aws tag_key=Type tag_value=%s", clusterName)).
+				AppendAttribute("auto_join_scheme", "http")
 		}
 	}
 	return hclBuilder, nil
