@@ -26,6 +26,7 @@ type boundaryInitStateV1 struct {
 	Transport  *embeddedTransportV1
 	BinPath    *tfString
 	ConfigPath *tfString
+	License    *tfString
 	// outputs
 	AuthMethodID                 *tfString
 	AuthMethodName               *tfString
@@ -78,6 +79,7 @@ func newBoundaryInitStateV1() *boundaryInitStateV1 {
 		Transport:  transport,
 		BinPath:    newTfString(),
 		ConfigPath: newTfString(),
+		License:    newTfString(),
 		// outputs
 		AuthMethodID:                 newTfString(),
 		AuthMethodName:               newTfString(),
@@ -285,6 +287,12 @@ func (s *boundaryInitStateV1) Schema() *tfprotov6.Schema {
 					Required: true,
 				},
 				{
+					Name:      "license",
+					Type:      tftypes.String,
+					Optional:  true,
+					Sensitive: true,
+				},
+				{
 					Name:     "auth_method_id",
 					Type:     tftypes.String,
 					Computed: true,
@@ -468,6 +476,7 @@ func (s *boundaryInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"id":          s.ID,
 		"bin_path":    s.BinPath,
 		"config_path": s.ConfigPath,
+		"license":     s.License,
 		// outputs
 		"auth_method_id":                  s.AuthMethodID,
 		"auth_method_name":                s.AuthMethodName,
@@ -518,6 +527,7 @@ func (s *boundaryInitStateV1) Terraform5Type() tftypes.Type {
 		"transport":   s.Transport.Terraform5Type(),
 		"bin_path":    s.BinPath.TFType(),
 		"config_path": s.ConfigPath.TFType(),
+		"license":     s.License.TFType(),
 		// outputs
 		"auth_method_id":                  s.AuthMethodID.TFType(),
 		"auth_method_name":                s.AuthMethodName.TFType(),
@@ -559,6 +569,7 @@ func (s *boundaryInitStateV1) Terraform5Value() tftypes.Value {
 		"transport":   s.Transport.Terraform5Value(),
 		"bin_path":    s.BinPath.TFValue(),
 		"config_path": s.ConfigPath.TFValue(),
+		"license":     s.License.TFValue(),
 		// outputs
 		"auth_method_id":                  s.AuthMethodID.TFValue(),
 		"auth_method_name":                s.AuthMethodName.TFValue(),
@@ -649,6 +660,9 @@ func (s *boundaryInitStateV1) buildInitRequest() *boundary.InitRequest {
 	opts := []boundary.InitRequestOpt{
 		boundary.WithInitRequestBinPath(s.BinPath.Value()),
 		boundary.WithInitRequestConfigPath(s.ConfigPath.Value()),
+	}
+	if license, ok := s.License.Get(); ok {
+		opts = append(opts, boundary.WithInitRequestLicense(license))
 	}
 
 	return boundary.NewInitRequest(opts...)

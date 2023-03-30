@@ -4,4 +4,5 @@ package boundary
 type CLIRequest struct {
 	BinPath    string
 	ConfigPath string
+	License    string
 }

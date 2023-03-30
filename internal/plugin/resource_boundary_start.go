@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
@@ -14,6 +15,7 @@ import (
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
+	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -30,6 +32,7 @@ type boundaryStartStateV1 struct {
 	BinPath         *tfString
 	ConfigPath      *tfString
 	ConfigName      *tfString
+	License         *tfString
 	ManageService   *tfBool
 	Status          *tfNum
 	SystemdUnitName *tfString
@@ -60,6 +63,7 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 		ConfigPath:      newTfString(),
 		ConfigName:      newTfString(),
 		ManageService:   newTfBool(),
+		License:         newTfString(),
 		Status:          newTfNum(),
 		SystemdUnitName: newTfString(),
 		Username:        newTfString(),
@@ -217,6 +221,12 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 					Optional: true,
 				},
 				{
+					Name:      "license",
+					Type:      tftypes.String,
+					Optional:  true,
+					Sensitive: true,
+				},
+				{
 					Name:     "status",
 					Type:     tftypes.Number,
 					Computed: true,
@@ -273,6 +283,7 @@ func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"config_path":    s.ConfigPath,
 		"config_name":    s.ConfigName,
 		"manage_service": s.ManageService,
+		"license":        s.License,
 		"status":         s.Status,
 		"unit_name":      s.SystemdUnitName,
 		"username":       s.Username,
@@ -296,6 +307,7 @@ func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 		"config_path":    s.ConfigPath.TFType(),
 		"config_name":    s.ConfigName.TFType(),
 		"manage_service": s.ManageService.TFType(),
+		"license":        s.License.TFType(),
 		"status":         s.Status.TFType(),
 		"unit_name":      s.SystemdUnitName.TFType(),
 		"username":       s.Username.TFType(),
@@ -312,6 +324,7 @@ func (s *boundaryStartStateV1) Terraform5Value() tftypes.Value {
 		"config_path":    s.ConfigPath.TFValue(),
 		"config_name":    s.ConfigName.TFValue(),
 		"manage_service": s.ManageService.TFValue(),
+		"license":        s.License.TFValue(),
 		"status":         s.Status.TFValue(),
 		"unit_name":      s.SystemdUnitName.TFValue(),
 		"username":       s.Username.TFValue(),
@@ -343,9 +356,14 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 		configName = name
 	}
 
+	var envVars []string
+
 	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below
 	configFilePath := filepath.Join(configPath, configName)
+	licensePath := filepath.Join(configPath, "boundary.lic")
+	envFilePath := "/etc/boundary/boundary.env"
 
+	// Create the OS user
 	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(boundaryUser),
 		remoteflight.WithUserHomeDir(configPath),
@@ -355,9 +373,35 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 		return fmt.Errorf("failed to find or create the boundary user, due to: %w", err)
 	}
 
+	// Copy the license file if we have one
+	if license, ok := s.License.Get(); ok {
+		err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
+			remoteflight.WithCopyFileDestination(licensePath),
+			remoteflight.WithCopyFileChmod("640"),
+			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
+			remoteflight.WithCopyFileContent(tfile.NewReader(license)),
+		))
+		if err != nil {
+			return fmt.Errorf("failed to copy boundary license, due to: %w", err)
+		}
+
+		envVars = append(envVars, fmt.Sprintf("BOUNDARY_LICENSE_PATH=%s\n", licensePath))
+	}
+
+	// Copy the env file regardless, even if envVars empty, so the systemd unit is happy
+	err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
+		remoteflight.WithCopyFileDestination(envFilePath),
+		remoteflight.WithCopyFileChmod("644"),
+		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
+		remoteflight.WithCopyFileContent(tfile.NewReader(strings.Join(envVars, "\n"))),
+	))
+	if err != nil {
+		return fmt.Errorf("failed to create the boundary environment file, due to: %w", err)
+	}
+
 	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
 
-	// Manage the vault systemd service ourselves unless it has explicitly been
+	// Manage the boundary systemd service ourselves unless it has explicitly been
 	// set that we should not.
 	if manage, set := s.ManageService.Get(); !set || (set && manage) {
 		unitName := "boundary"
@@ -377,6 +421,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 				"StartLimitBurst":       "3",
 			},
 			"Service": {
+				"EnvironmentFile":       envFilePath,
 				"User":                  boundaryUser,
 				"Group":                 boundaryUser,
 				"ProtectSystem":         "full",
@@ -415,7 +460,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 		))
 
 		if err != nil {
-			return fmt.Errorf("failed to create the vault systemd unit, due to: %w", err)
+			return fmt.Errorf("failed to create the boundary systemd unit, due to: %w", err)
 		}
 	}
 

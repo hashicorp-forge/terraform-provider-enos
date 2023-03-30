@@ -114,6 +114,13 @@ func WithInitRequestConfigPath(path string) InitRequestOpt {
 	}
 }
 
+func WithInitRequestLicense(license string) InitRequestOpt {
+	return func(i *InitRequest) *InitRequest {
+		i.License = license
+		return i
+	}
+}
+
 // Validate validates that the init request has the required fields
 func (r *InitRequest) Validate() error {
 	if r.BinPath == "" {
@@ -122,7 +129,7 @@ func (r *InitRequest) Validate() error {
 	if r.ConfigPath == "" {
 		return fmt.Errorf("no config path has been supplied")
 	}
-
+	// License is optional for OSS, required for Enterprise
 	return nil
 }
 
@@ -140,7 +147,9 @@ func (r *InitRequest) String() string {
 func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(req.String()))
+	stdout, stderr, err := ssh.Run(ctx, command.New(
+		req.String(),
+		command.WithEnvVar("BOUNDARY_LICENSE", req.License)))
 	if err != nil {
 		return res, fmt.Errorf("failed to init: %s stderr: %s", err, stderr)
 	}
