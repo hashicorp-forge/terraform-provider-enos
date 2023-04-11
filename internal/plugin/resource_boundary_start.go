@@ -385,7 +385,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 			return fmt.Errorf("failed to copy boundary license, due to: %w", err)
 		}
 
-		envVars = append(envVars, fmt.Sprintf("BOUNDARY_LICENSE_PATH=%s\n", licensePath))
+		envVars = append(envVars, fmt.Sprintf("BOUNDARY_LICENSE=file:///%s\n", licensePath))
 	}
 
 	// Copy the env file regardless, even if envVars empty, so the systemd unit is happy
