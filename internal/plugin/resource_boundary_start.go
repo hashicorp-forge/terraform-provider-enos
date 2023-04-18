@@ -29,6 +29,7 @@ var _ resource.Resource = (*boundaryStart)(nil)
 
 type boundaryStartStateV1 struct {
 	ID              *tfString
+	BinName         *tfString
 	BinPath         *tfString
 	ConfigPath      *tfString
 	ConfigName      *tfString
@@ -59,6 +60,7 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 	}
 	return &boundaryStartStateV1{
 		ID:              newTfString(),
+		BinName:         newTfString(),
 		BinPath:         newTfString(),
 		ConfigPath:      newTfString(),
 		ConfigName:      newTfString(),
@@ -206,6 +208,11 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 					Computed: true,
 				},
 				{
+					Name:     "bin_name",
+					Type:     tftypes.String,
+					Optional: true,
+				},
+				{
 					Name:     "bin_path",
 					Type:     tftypes.String,
 					Required: true,
@@ -265,9 +272,6 @@ func (s *boundaryStartStateV1) Validate(ctx context.Context) error {
 		return err
 	}
 
-	if _, ok := s.BinPath.Get(); !ok {
-		return ValidationError("you must provide the boundary binary path", "bin_path")
-	}
 	if _, ok := s.ConfigPath.Get(); !ok {
 		return ValidationError("you must provide the boundary config path", "config_path")
 	}
@@ -279,6 +283,7 @@ func (s *boundaryStartStateV1) Validate(ctx context.Context) error {
 func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
 		"id":             s.ID,
+		"bin_name":       s.BinName,
 		"bin_path":       s.BinPath,
 		"config_path":    s.ConfigPath,
 		"config_name":    s.ConfigName,
@@ -303,6 +308,7 @@ func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":             s.ID.TFType(),
+		"bin_name":       s.BinName.TFType(),
 		"bin_path":       s.BinPath.TFType(),
 		"config_path":    s.ConfigPath.TFType(),
 		"config_name":    s.ConfigName.TFType(),
@@ -320,6 +326,7 @@ func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 func (s *boundaryStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":             s.ID.TFValue(),
+		"bin_name":       s.BinName.TFValue(),
 		"bin_path":       s.BinPath.TFValue(),
 		"config_path":    s.ConfigPath.TFValue(),
 		"config_name":    s.ConfigName.TFValue(),
@@ -341,6 +348,12 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 	var err error
 
 	// defaults
+	//nolint:typecheck // False positive lint error: binName declared but not used. binName is used below in the unit file
+	binName := "boundary"
+	if name, ok := s.BinName.Get(); ok {
+		binName = name
+	}
+
 	boundaryUser := "boundary"
 	if user, ok := s.Username.Get(); ok {
 		boundaryUser = user
@@ -358,7 +371,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 
 	var envVars []string
 
-	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below
+	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below in the unit file
 	configFilePath := filepath.Join(configPath, configName)
 	licensePath := filepath.Join(configPath, "boundary.lic")
 	envFilePath := "/etc/boundary/boundary.env"
@@ -433,7 +446,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 				"Capabilities":          "CAP_IPC_LOCK+ep",
 				"CapabilityBoundingSet": "CAP_SYSLOG CAP_IPC_LOCK",
 				"NoNewPrivileges":       "yes",
-				"ExecStart":             fmt.Sprintf("%s/boundary server -config %s", s.BinPath.Value(), configFilePath),
+				"ExecStart":             fmt.Sprintf("%s/%s server -config %s", s.BinPath.Value(), binName, configFilePath),
 				"ExecReload":            "/bin/kill --signal HUP $MAINPID",
 				"KillMode":              "process",
 				"KillSignal":            "SIGINT",

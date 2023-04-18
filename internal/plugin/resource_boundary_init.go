@@ -24,6 +24,7 @@ var _ resource.Resource = (*boundaryInit)(nil)
 type boundaryInitStateV1 struct {
 	ID         *tfString
 	Transport  *embeddedTransportV1
+	BinName    *tfString
 	BinPath    *tfString
 	ConfigPath *tfString
 	License    *tfString
@@ -77,6 +78,7 @@ func newBoundaryInitStateV1() *boundaryInitStateV1 {
 	return &boundaryInitStateV1{
 		ID:         newTfString(),
 		Transport:  transport,
+		BinName:    newTfString(),
 		BinPath:    newTfString(),
 		ConfigPath: newTfString(),
 		License:    newTfString(),
@@ -277,6 +279,11 @@ func (s *boundaryInitStateV1) Schema() *tfprotov6.Schema {
 					Computed: true,
 				},
 				{
+					Name:     "bin_name",
+					Type:     tftypes.String,
+					Optional: true,
+				},
+				{
 					Name:     "bin_path",
 					Type:     tftypes.String,
 					Required: true,
@@ -474,6 +481,7 @@ func (s *boundaryInitStateV1) Validate(ctx context.Context) error {
 func (s *boundaryInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
 		"id":          s.ID,
+		"bin_name":    s.BinName,
 		"bin_path":    s.BinPath,
 		"config_path": s.ConfigPath,
 		"license":     s.License,
@@ -525,6 +533,7 @@ func (s *boundaryInitStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":          s.ID.TFType(),
 		"transport":   s.Transport.Terraform5Type(),
+		"bin_name":    s.BinName.TFType(),
 		"bin_path":    s.BinPath.TFType(),
 		"config_path": s.ConfigPath.TFType(),
 		"license":     s.License.TFType(),
@@ -567,6 +576,7 @@ func (s *boundaryInitStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          s.ID.TFValue(),
 		"transport":   s.Transport.Terraform5Value(),
+		"bin_name":    s.BinName.TFValue(),
 		"bin_path":    s.BinPath.TFValue(),
 		"config_path": s.ConfigPath.TFValue(),
 		"license":     s.License.TFValue(),
@@ -657,7 +667,14 @@ func (s *boundaryInitStateV1) Init(ctx context.Context, client it.Transport) err
 
 // buildInitRequest builds an InitRequest with options set
 func (s *boundaryInitStateV1) buildInitRequest() *boundary.InitRequest {
+	// defaults
+	binName := "boundary"
+	if name, ok := s.BinName.Get(); ok {
+		binName = name
+	}
+
 	opts := []boundary.InitRequestOpt{
+		boundary.WithInitRequestBinName(binName),
 		boundary.WithInitRequestBinPath(s.BinPath.Value()),
 		boundary.WithInitRequestConfigPath(s.ConfigPath.Value()),
 	}

@@ -98,6 +98,14 @@ func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	return c
 }
 
+// WithInitRequestBinName sets the Boundary binary name
+func WithInitRequestBinName(name string) InitRequestOpt {
+	return func(i *InitRequest) *InitRequest {
+		i.BinName = name
+		return i
+	}
+}
+
 // WithInitRequestBinPath sets the Boundary binary path
 func WithInitRequestBinPath(path string) InitRequestOpt {
 	return func(i *InitRequest) *InitRequest {
@@ -136,7 +144,7 @@ func (r *InitRequest) Validate() error {
 // String returns the init request as an init command
 func (r *InitRequest) String() string {
 	cmd := &strings.Builder{}
-	cmd.WriteString(fmt.Sprintf("%s/boundary database init -format json", r.BinPath))
+	cmd.WriteString(fmt.Sprintf("%s/%s database init -format json", r.BinPath, r.BinName))
 	// TODO: add the other init options for upgrades
 	cmd.WriteString(fmt.Sprintf(" -config=%s/boundary.hcl", r.ConfigPath))
 	return cmd.String()
@@ -146,10 +154,15 @@ func (r *InitRequest) String() string {
 // providing default credentials to use upon completion
 func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
+	envVars := map[string]string{}
+
+	if req.License != "" {
+		envVars["BOUNDARY_LICENSE"] = req.License
+	}
 
 	stdout, stderr, err := ssh.Run(ctx, command.New(
 		req.String(),
-		command.WithEnvVar("BOUNDARY_LICENSE", req.License)))
+		command.WithEnvVars(envVars)))
 	if err != nil {
 		return res, fmt.Errorf("failed to init: %s stderr: %s", err, stderr)
 	}

@@ -17,6 +17,11 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 	cfg := template.Must(template.New("enos_boundary_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_boundary_start" "{{.ID.Value}}" {
+
+		{{if .BinName.Value}}
+		bin_name = "{{.BinName.Value}}"
+		{{end}}
+
 		{{if .BinPath.Value}}
 		bin_path = "{{.BinPath.Value}}"
 		{{end}}
@@ -32,6 +37,7 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 
 	boundaryStart := newBoundaryStartStateV1()
 	boundaryStart.ID.Set("foo")
+	boundaryStart.BinName.Set("boundary-worker")
 	boundaryStart.BinPath.Set("/opt/boundary/bin")
 	boundaryStart.ConfigPath.Set("/etc/boundary")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
@@ -44,6 +50,7 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 		boundaryStart,
 		resource.ComposeTestCheckFunc(
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "id", regexp.MustCompile(`^foo$`)),
+			resource.TestMatchResourceAttr("enos_boundary_start.foo", "bin_name", regexp.MustCompile(`^boundary-worker$`)),
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "bin_path", regexp.MustCompile(`^/opt/boundary/bin$`)),
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "config_path", regexp.MustCompile(`^/etc/boundary$`)),
 		),

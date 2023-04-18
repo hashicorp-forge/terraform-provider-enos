@@ -15,6 +15,7 @@ func TestInitRequestString(t *testing.T) {
 		{
 			`/bin/boundary database init -format json -config=/etc/boundary/boundary.hcl`,
 			[]InitRequestOpt{
+				WithInitRequestBinName("boundary"),
 				WithInitRequestBinPath("/bin"),
 				WithInitRequestConfigPath("/etc/boundary"),
 			},
@@ -46,6 +47,7 @@ func TestInitRequestValidate(t *testing.T) {
 		{
 			"missing config path",
 			[]InitRequestOpt{
+				WithInitRequestBinName("boundary-test"),
 				WithInitRequestBinPath("/opt/boundary"),
 			},
 			false,
@@ -53,6 +55,7 @@ func TestInitRequestValidate(t *testing.T) {
 		{
 			"missing bin path",
 			[]InitRequestOpt{
+				WithInitRequestBinName("boundary-test"),
 				WithInitRequestConfigPath("/etc/boundary"),
 			},
 			false,
