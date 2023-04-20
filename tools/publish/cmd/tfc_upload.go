@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/hashicorp/enos-provider/tools/publish/pkg/publish"
 )
@@ -19,7 +20,7 @@ func newTFCUploadCmd() *cobra.Command {
 		Run:   runTFCUploadCmd,
 	}
 
-	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.DistDir, "dist", "", "the output directory of goreleaser that build the artifacts")
+	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.DistDir, "dist", "", "the output directory of go build artifacts")
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.ProviderName, "provider-name", "enos", "the name of the provider")
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.BinaryName, "binary-name", "terraform-provider-enos", "the name of the provider binary")
 	tfcUploadCmd.PersistentFlags().StringVar(&tfcUploadCfg.BinaryRename, "rename-binary", "", "the desired provider binary name during upload")
@@ -46,9 +47,12 @@ func runTFCUploadCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(err)
 	defer publish.Close()
 
-	exitIfErr(publish.SetLogLevel(*Level))
+	lvl, err := zapcore.ParseLevel(rootCfg.logLevel)
+	exitIfErr(err)
 
-	exitIfErr(publish.AddGoreleaserBinariesFrom(tfcUploadCfg.DistDir))
+	exitIfErr(publish.SetLogLevel(lvl))
+
+	exitIfErr(publish.AddGoBinariesFrom(tfcUploadCfg.DistDir))
 
 	exitIfErr(publish.WriteSHA256Sums(ctx, tfcUploadCfg.GPGIdentityName, true))
 

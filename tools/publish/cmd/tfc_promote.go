@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/hashicorp/enos-provider/tools/publish/pkg/publish"
 )
@@ -52,7 +53,10 @@ func runTFCPromoteCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(err)
 	defer publishDownload.Close()
 
-	exitIfErr(publishDownload.SetLogLevel(*Level))
+	lvl, err := zapcore.ParseLevel(rootCfg.logLevel)
+	exitIfErr(err)
+
+	exitIfErr(publishDownload.SetLogLevel(lvl))
 
 	downloadCfg := &publish.TFCDownloadReq{
 		DownloadDir:     tfcPromoteCfg.DownloadsDir,
@@ -69,11 +73,11 @@ func runTFCPromoteCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(err)
 	defer publishPromote.Close()
 
-	exitIfErr(publishPromote.SetLogLevel(*Level))
+	exitIfErr(publishPromote.SetLogLevel(lvl))
 
 	exitIfErr(publishPromote.ExtractProviderBinaries(ctx, tfcPromoteCfg))
 
-	exitIfErr(publishPromote.AddGoreleaserBinariesFrom(tfcPromoteCfg.PromoteDir))
+	exitIfErr(publishPromote.AddGoBinariesFrom(tfcPromoteCfg.PromoteDir))
 
 	exitIfErr(publishPromote.WriteSHA256Sums(ctx, tfcPromoteCfg.GPGIdentityName, true))
 

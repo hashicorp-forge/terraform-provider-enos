@@ -166,10 +166,10 @@ func (l *Local) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCPromoteR
 	return l.artifacts.ExtractProviderBinaries(ctx, tfcreq)
 }
 
-// AddGoreleaserBinariesFrom takes a directory path to the goreleaser builds,
-// walks it, finds any providers binaries, creates an archive of them and
-// adds them to the artifacts and index.
-func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
+// AddGoBinariesFrom takes a directory path to the go builds, walks it, finds
+// any providers binaries, creates an archive of them and adds them to the
+// artifacts and index.
+func (l *Local) AddGoBinariesFrom(binPath string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -185,96 +185,95 @@ func (l *Local) AddGoreleaserBinariesFrom(binPath string) error {
 		return err
 	}
 
+	var renameTempDir string
+	if l.binaryRename != "" {
+		var err error
+		renameTempDir, err = os.MkdirTemp("", "rename-temp-dir")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(renameTempDir)
+	}
+
 	return filepath.Walk(binPath, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("accessing binary path: %w", err)
 		}
 
-		// If the path isn't a goreleaser terraform plugin output directory we
-		// don't care about it
-		if !info.IsDir() {
+		// Our directory should be filled with binaries with the following name
+		// schema: terraform-provider-enos_0.3.24_darwin_amd64
+		if info.IsDir() {
 			return nil
 		}
 
-		l.log.Debugw("checking directory", "directory", info.Name())
+		l.log.Debugw("found file", "file", info.Name())
 
 		parts := strings.Split(info.Name(), "_")
-		if len(parts) < 3 {
+		if len(parts) != 4 {
+			l.log.Debugw("skipping file as it does not appear to be a provider binary", "file", info.Name())
 			return nil
 		}
 
 		if parts[0] != l.binaryName {
+			l.log.Debugw("skipping file as it does not appear to be a provider binary", "file", info.Name())
 			return nil
 		}
 
-		platform := parts[1]
-		arch := parts[2]
-		// parts[3] might be the GOAMD64 version but we don't need it
-		version := ""
+		binaryName := parts[0]
+		version := parts[1]
+		platform := parts[2]
+		arch := parts[3]
+		releasePath := path
 
-		// Look in the release dir for a binary and get the version from its name
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return err
-		}
+		l.log.Debugw("found provider binary",
+			"binary_name", binaryName,
+			"version", version,
+			"platform", platform,
+			"arch", arch,
+			"file_path", releasePath,
+			"file", info.Name(),
+		)
 
-		var renameTempDir string
 		if l.binaryRename != "" {
-			var err error
-			renameTempDir, err = os.MkdirTemp("", "rename-temp-dir")
+			newPath := filepath.Join(renameTempDir, strings.Join([]string{
+				l.binaryRename, version, platform, arch,
+			}, "_"))
+
+			l.log.Infow("renaming provider binary",
+				"original_name", binaryName,
+				"new_name", l.binaryRename,
+				"original_path", releasePath,
+				"new_path", newPath,
+				"version", version,
+				"platform", platform,
+				"arch", arch,
+				"file", info.Name(),
+			)
+
+			newFile, err := os.Create(newPath)
 			if err != nil {
 				return err
 			}
 
-			defer os.RemoveAll(renameTempDir)
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-
-			info, err := entry.Info()
+			err = os.Chmod(newFile.Name(), 0o755)
 			if err != nil {
 				return err
 			}
 
-			parts = strings.Split(info.Name(), "_")
-			if len(parts) != 2 {
-				continue
-			}
-			version = parts[1]
-			releasePath := filepath.Join(path, entry.Name())
-			if l.binaryRename != "" {
-				parts[0] = l.binaryRename
-				newPath := filepath.Join(renameTempDir, strings.Join(parts, "_"))
-				newFile, err := os.Create(newPath)
-				if err != nil {
-					return err
-				}
-
-				err = os.Chmod(newFile.Name(), 0o755)
-				if err != nil {
-					return err
-				}
-
-				sourceFile, err := os.Open(releasePath)
-				if err != nil {
-					return err
-				}
-
-				// Copying the files to another directory to preserve the source dist directory
-				_, err = io.Copy(newFile, sourceFile)
-				if err != nil {
-					return err
-				}
-
-				releasePath = newPath
+			sourceFile, err := os.Open(releasePath)
+			if err != nil {
+				return err
 			}
 
-			return l.artifacts.AddBinary(version, platform, arch, releasePath)
+			// Copying the files to another directory to preserve the source dist directory
+			_, err = io.Copy(newFile, sourceFile)
+			if err != nil {
+				return err
+			}
+
+			releasePath = newPath
 		}
 
-		return nil
+		return l.artifacts.AddBinary(version, platform, arch, releasePath)
 	})
 }

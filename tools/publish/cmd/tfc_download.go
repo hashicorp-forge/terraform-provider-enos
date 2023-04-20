@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/hashicorp/enos-provider/tools/publish/pkg/publish"
 )
@@ -43,7 +44,10 @@ func runTFCDownloadCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(err)
 	defer publish.Close()
 
-	exitIfErr(publish.SetLogLevel(*Level))
+	lvl, err := zapcore.ParseLevel(rootCfg.logLevel)
+	exitIfErr(err)
+
+	exitIfErr(publish.SetLogLevel(lvl))
 
 	exitIfErr(publish.DownloadFromTFC(ctx, tfcDownloadCfg))
 
