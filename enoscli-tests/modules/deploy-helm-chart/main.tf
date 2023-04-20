@@ -24,11 +24,11 @@ resource "helm_release" "ci-test" {
     value = var.replica_count
   }
   set {
-    name = "image.repository"
+    name  = "image.repository"
     value = var.repository
   }
   set {
-    name = "image.tag"
+    name  = "image.tag"
     value = var.tag
   }
 
@@ -61,11 +61,11 @@ variable "replica_count" {
 }
 
 variable "repository" {
-  type = string
+  type        = string
   description = "The docker repository for the image to deploy"
 }
 
 variable "tag" {
-  type = string
+  type        = string
   description = "The tag of the docker image to deploy"
 }

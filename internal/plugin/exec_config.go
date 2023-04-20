@@ -12,11 +12,6 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// execResource interface that all exec resources should implement
-type execResource interface {
-	config() execConfig
-}
-
 // execConfig User provided configuration for an exec Resource
 type execConfig struct {
 	Env     *tfStringMap

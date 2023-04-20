@@ -1,0 +1,16 @@
+---
+name: Build flight-control
+description: Build flight-control
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
+      with:
+        go-version-file: .go-version
+    - name: Install upx
+      run: sudo apt-get install -y upx-ucl
+      shell: bash
+    - name: Build flight-control
+      run: make flight-control
+      shell: bash

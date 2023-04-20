@@ -24,10 +24,6 @@ type FailureHandler func(ctx context.Context, errDiag *tfprotov6.Diagnostic, pro
 // of multiple failure handlers.
 type failureHandlers []FailureHandler
 
-func newFailureHandlers(handlers ...FailureHandler) failureHandlers {
-	return handlers
-}
-
 // HandleFailure cycles through all the failure handlers and handles a failure
 func (f failureHandlers) HandleFailure(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
 	for _, h := range f {

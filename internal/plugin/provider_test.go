@@ -53,7 +53,6 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 }
 
 func TestDebugDataRootDirFromEnvVar(t *testing.T) {
-
 	debugDir := t.TempDir()
 
 	transportCfg := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig)
@@ -83,7 +82,6 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 }
 
 func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
-
 	debugDir := t.TempDir()
 
 	transportCfg := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig)

@@ -69,6 +69,6 @@ resource "random_string" "cluster_id" {
   length  = 8
   lower   = true
   upper   = false
-  numeric  = false
+  numeric = false
   special = false
 }

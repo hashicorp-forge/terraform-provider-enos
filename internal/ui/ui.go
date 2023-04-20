@@ -2,14 +2,16 @@ package ui
 
 import (
 	"bytes"
+	"errors"
 	"io"
-
-	"github.com/hashicorp/go-multierror"
+	"sync"
 )
 
 type UI interface {
-	Stdout() Output
-	Stderr() Output
+	Stdout() io.Writer
+	StdoutString() string
+	Stderr() io.Writer
+	StderrString() string
 	CombinedOutput() string
 	Write(stdout, stderr string) error
 	Append(stdout, stderr string) error
@@ -21,115 +23,140 @@ type Output interface {
 }
 
 func NewBuffered() *Buffered {
-	combined := &bytes.Buffer{}
-	return &Buffered{
-		stdout:   NewBufferedOut(combined),
-		stderr:   NewBufferedOut(combined),
-		combined: combined,
+	b := &Buffered{
+		stdoutBuf:   newBufferedWriter(),
+		stderrBuf:   newBufferedWriter(),
+		combinedBuf: newBufferedWriter(),
 	}
+	b.stdout = io.MultiWriter(b.stdoutBuf, b.combinedBuf)
+	b.stderr = io.MultiWriter(b.stderrBuf, b.combinedBuf)
+
+	return b
 }
 
 var _ UI = (*Buffered)(nil)
 
 type Buffered struct {
-	stdout   *BufferedOut
-	stderr   *BufferedOut
-	combined *bytes.Buffer
+	stdoutBuf   *bufferedWriter
+	stderrBuf   *bufferedWriter
+	combinedBuf *bufferedWriter
+	stdout      io.Writer
+	stderr      io.Writer
 }
 
-func (b *Buffered) Stdout() Output {
+func (b *Buffered) Stdout() io.Writer {
 	return b.stdout
 }
 
-func (b *Buffered) Stderr() Output {
+func (b *Buffered) Stderr() io.Writer {
 	return b.stderr
 }
 
+func (b *Buffered) StdoutString() string {
+	return b.stdoutBuf.String()
+}
+
+func (b *Buffered) StderrString() string {
+	return b.stderrBuf.String()
+}
+
 func (b *Buffered) CombinedOutput() string {
-	return b.combined.String()
+	return b.combinedBuf.String()
 }
 
 func (b *Buffered) Write(stdout, stderr string) error {
 	var err error
-	merr := &multierror.Error{}
+	var err1 error
 
 	if stdout != "" {
-		_, err = b.stdout.Write([]byte(stdout))
-		merr = multierror.Append(merr, err)
+		_, err1 = b.stdout.Write([]byte(stdout))
+		err = errors.Join(err, err1)
 	}
 
 	if stderr != "" {
-		_, err = b.stderr.Write([]byte(stderr))
-		merr = multierror.Append(merr, err)
+		_, err1 = b.stderr.Write([]byte(stderr))
+		err = errors.Join(err, err1)
 	}
 
-	return merr.ErrorOrNil()
+	return err
 }
 
 // Append is like Write but ensures that it's on a newline from any previously
 // written data.
 func (b *Buffered) Append(stdout, stderr string) error {
 	var err error
-	merr := &multierror.Error{}
+	var err1 error
 
 	if stdout != "" {
-		_, err = b.stdout.Append([]byte(stdout))
-		merr = multierror.Append(merr, err)
+		_, err1 = b.stdout.Write([]byte(stdout))
+		err = errors.Join(err, err1)
 	}
 
 	if stderr != "" {
-		_, err = b.stderr.Append([]byte(stderr))
-		merr = multierror.Append(merr, err)
+		_, err1 = b.stderr.Write([]byte(stderr))
+		err = errors.Join(err, err1)
 	}
 
-	return merr.ErrorOrNil()
+	return err
 }
 
-func NewBufferedOut(combined *bytes.Buffer) *BufferedOut {
-	buf := &bytes.Buffer{}
-	writer := io.MultiWriter(buf, combined)
-	return &BufferedOut{
-		buf:    buf,
-		writer: writer,
+var (
+	_ Output    = (*bufferedWriter)(nil)
+	_ io.Writer = (*bufferedWriter)(nil)
+)
+
+func newBufferedWriter() *bufferedWriter {
+	return &bufferedWriter{
+		buf: &bytes.Buffer{},
+		m:   sync.Mutex{},
 	}
 }
 
-var _ Output = (*BufferedOut)(nil)
-
-type BufferedOut struct {
-	buf    *bytes.Buffer
-	writer io.Writer
+type bufferedWriter struct {
+	buf *bytes.Buffer
+	m   sync.Mutex
 }
 
-func (b *BufferedOut) Read(p []byte) (int, error) {
+func (b *bufferedWriter) Read(p []byte) (int, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
 	unread := b.buf.Bytes()
 	r := bytes.NewReader(unread)
 
 	return r.Read(p)
 }
 
-func (b *BufferedOut) Write(p []byte) (int, error) {
-	return b.writer.Write(p)
+func (b *bufferedWriter) Write(p []byte) (int, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return b.buf.Write(p)
 }
 
 // Append is like write but adds a newline to the previous line
-func (b *BufferedOut) Append(p []byte) (int, error) {
+func (b *bufferedWriter) Append(p []byte) (int, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
 	if len(p) == 0 {
 		return 0, nil
 	}
 
 	if b.buf.Len() > 0 {
-		i, err := b.writer.Write([]byte("\n"))
+		i, err := b.buf.Write([]byte("\n"))
 		if err != nil {
 			return i, err
 		}
 	}
 
-	return b.writer.Write(p)
+	return b.buf.Write(p)
 }
 
-func (b *BufferedOut) String() string {
-	unread := b.buf.Bytes()
+func (b *bufferedWriter) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
 
+	unread := b.buf.Bytes()
 	return string(unread)
 }

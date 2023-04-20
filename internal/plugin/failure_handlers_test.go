@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/nomad"
@@ -17,7 +19,6 @@ import (
 	"github.com/hashicorp/nomad/api"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockSystemdClient struct {
@@ -148,7 +149,7 @@ func TestTransportDebugFailureHandler(t *testing.T) {
 	type test struct {
 		name      string
 		transport transportState
-		want      map[string]string //key value map transport output to diagnostic
+		want      map[string]string // key value map transport output to diagnostic
 	}
 
 	var tests []test

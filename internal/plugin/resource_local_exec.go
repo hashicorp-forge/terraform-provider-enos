@@ -223,8 +223,8 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req resource.ApplyR
 
 	if !pok || !prsumok || !plsumok || (priorSum != plannedSum) {
 		ui, err := l.ExecuteCommands(ctx, plannedState)
-		plannedState.Stdout.Set(ui.Stdout().String())
-		plannedState.Stderr.Set(ui.Stderr().String())
+		plannedState.Stdout.Set(ui.StdoutString())
+		plannedState.Stderr.Set(ui.StderrString())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Execution Error",

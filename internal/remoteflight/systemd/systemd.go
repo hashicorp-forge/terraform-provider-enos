@@ -103,7 +103,6 @@ func NewClient(transport it.Transport, logger log.Logger) Client {
 }
 
 func (c *client) GetLogs(ctx context.Context, req GetLogsRequest) (remoteflight.GetLogsResponse, error) {
-
 	stdout, stderr, err := c.transport.Run(ctx, command.New(fmt.Sprintf("journalctl -x -u %s", req.Unit)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get systemd logs, due to: %w", err)
@@ -159,7 +158,7 @@ func (c *client) ListServices(ctx context.Context) ([]ServiceInfo, error) {
 		WithSystemctlCommandOptions("--full --all --plain --no-legend"),
 	))
 	if err != nil {
-		return nil, remoteflight.WrapErrorWith(err, res.Stderr, fmt.Sprintf("listing services"))
+		return nil, remoteflight.WrapErrorWith(err, res.Stderr, "listing services")
 	}
 
 	return parseServiceInfos(res.Stdout), nil

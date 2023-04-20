@@ -37,7 +37,7 @@ resource "enos_local_exec" "bar" {
 
 resource "enos_local_exec" "baz" {
   depends_on = [enos_local_exec.bar]
-  inline = ["true"]
+  inline     = ["true"]
 }
 
 output "blank" {

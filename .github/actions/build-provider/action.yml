@@ -1,0 +1,41 @@
+---
+name: Build provider
+description: Build the enos-provider
+inputs:
+  target:
+    description: The platform and operation system to build, i.e linux/amd64.. By default all supported targets are built
+    required: true
+    default: all
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/build-flight-control
+    - if: ${{ inputs.target == 'all' || inputs.target == 'linux/amd64' }}
+      name: Build enos-provider linux/amd64
+      env:
+        PROVIDER_BIN_OS: linux
+        PROVIDER_BIN_ARCH: amd64
+      run: make build
+      shell: bash
+    - if: ${{ inputs.target == 'all' || inputs.target == 'linux/arm64' }}
+      name: Build enos-provider linux/arm64
+      env:
+        PROVIDER_BIN_OS: linux
+        PROVIDER_BIN_ARCH: arm64
+      run: make build
+      shell: bash
+    - if: ${{ inputs.target == 'all' || inputs.target == 'darwin/amd64' }}
+      name: Build enos-provider darwin/amd64
+      env:
+        PROVIDER_BIN_OS: darwin
+        PROVIDER_BIN_ARCH: amd64
+      run: make build
+      shell: bash
+    - if: ${{ inputs.target == 'all' || inputs.target == 'darwin/arm64' }}
+      name: Build enos-provider darwin/arm64
+      env:
+        PROVIDER_BIN_OS: darwin
+        PROVIDER_BIN_ARCH: arm64
+      run: make build
+      shell: bash

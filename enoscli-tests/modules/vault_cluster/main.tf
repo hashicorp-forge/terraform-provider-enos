@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     enos = {
-      source = "app.terraform.io/hashicorp-qti/ENOS_PROVIDER_NAME"
+      source  = "app.terraform.io/hashicorp-qti/ENOS_PROVIDER_NAME"
       version = "ENOS_VER"
     }
   }

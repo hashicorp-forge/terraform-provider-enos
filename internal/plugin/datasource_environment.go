@@ -2,17 +2,12 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -24,13 +19,12 @@ type environment struct {
 var _ datarouter.DataSource = (*environment)(nil)
 
 type environmentStateV1 struct {
-	ID              *tfString
-	PublicIPAddress *tfString
+	ID                *tfString
+	PublicIPAddress   *tfString
+	PublicIPAddresses *tfStringSlice
 
 	failureHandlers
 }
-
-type publicIPResolver struct{}
 
 var _ state.State = (*environmentStateV1)(nil)
 
@@ -42,14 +36,11 @@ func newEnvironment() *environment {
 
 func newEnvironmentStateV1() *environmentStateV1 {
 	return &environmentStateV1{
-		ID:              newTfString(),
-		PublicIPAddress: newTfString(),
-		failureHandlers: failureHandlers{},
+		ID:                newTfString(),
+		PublicIPAddress:   newTfString(),
+		PublicIPAddresses: newTfStringSlice(),
+		failureHandlers:   failureHandlers{},
 	}
-}
-
-func newPublicIPResolver() *publicIPResolver {
-	return &publicIPResolver{}
 }
 
 func (d *environment) Name() string {
@@ -103,14 +94,22 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	}
 	newState.ID.Set("static")
 
-	resolver := newPublicIPResolver()
-	ip, err := resolver.Resolve(ctx)
+	ips, err := newPublicIPResolver().resolve(ctx, defaultResolvers()...)
+	if len(ips) == 0 {
+		err = errors.Join(err, fmt.Errorf("unable to resolve public ip address"))
+	}
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics,
-			diags.ErrToDiagnostic("Resolve IP Error", fmt.Errorf("failed to resolve public IP address, due to: %w", err)))
+			diags.ErrToDiagnostic("Resolve IP Error", fmt.Errorf("failed to resolve public IP addresses, due to: %w", err)))
 		return
 	}
-	newState.PublicIPAddress.Set(ip.String())
+	newState.PublicIPAddress.Set(ips[0].String())
+
+	ipStrings := []string{}
+	for _, ip := range ips {
+		ipStrings = append(ipStrings, ip.String())
+	}
+	newState.PublicIPAddresses.SetStrings(ipStrings)
 
 	res.State, err = state.Marshal(newState)
 	if err != nil {
@@ -130,8 +129,16 @@ func (s *environmentStateV1) Schema() *tfprotov6.Schema {
 					Computed: true,
 				},
 				{
-					Name:     "public_ip_address",
-					Type:     tftypes.String,
+					Name:       "public_ip_address",
+					Type:       tftypes.String,
+					Computed:   true,
+					Deprecated: true, // Use public_ip_addresses
+				},
+				{
+					Name: "public_ip_addresses",
+					Type: tftypes.List{
+						ElementType: tftypes.String,
+					},
 					Computed: true,
 				},
 			},
@@ -153,8 +160,9 @@ func (s *environmentStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"id":                s.ID,
-		"public_ip_address": s.PublicIPAddress,
+		"id":                  s.ID,
+		"public_ip_address":   s.PublicIPAddress,
+		"public_ip_addresses": s.PublicIPAddresses,
 	})
 
 	return err
@@ -163,119 +171,17 @@ func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *environmentStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                s.ID.TFType(),
-		"public_ip_address": s.PublicIPAddress.TFType(),
+		"id":                  s.ID.TFType(),
+		"public_ip_address":   s.PublicIPAddress.TFType(),
+		"public_ip_addresses": s.PublicIPAddresses.TFType(),
 	}}
 }
 
 // Terraform5Value is the file state tftypes.Value.
 func (s *environmentStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":                s.ID.TFValue(),
-		"public_ip_address": s.PublicIPAddress.TFValue(),
+		"id":                  s.ID.TFValue(),
+		"public_ip_address":   s.PublicIPAddress.TFValue(),
+		"public_ip_addresses": s.PublicIPAddresses.TFValue(),
 	})
-}
-
-func (r *publicIPResolver) Resolve(ctx context.Context) (net.IP, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	// Try all of our resolvers one-by-one until we successfully resolve the
-	// public IP address. Start with the DNS resolvers as they have far less
-	// overhead and will try both UDP and TCP. If they both fail for some reason
-	// fall back to the HTTPS AWS resolver.
-	ip, err := r.resolveOpenDNS(ctx)
-	if err == nil {
-		return ip, err
-	}
-	merr := &multierror.Error{}
-	merr = multierror.Append(merr, err)
-
-	ip, err = r.resolveGoogle(ctx)
-	if err == nil {
-		return ip, err
-	}
-	merr = multierror.Append(merr, err)
-
-	ip, err = r.resolveAWS(ctx)
-	if err == nil {
-		return ip, err
-	}
-	merr = multierror.Append(merr, err)
-
-	return nil, merr.ErrorOrNil()
-}
-
-func (r *publicIPResolver) resolverFor(addr string) *net.Resolver {
-	return &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: time.Millisecond * time.Duration(10000),
-			}
-			return d.DialContext(ctx, "udp4", addr)
-		},
-	}
-}
-
-func (r *publicIPResolver) resolveOpenDNS(ctx context.Context) (net.IP, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	openDNS := r.resolverFor("resolver1.opendns.com:53")
-	ips, err := openDNS.LookupHost(ctx, "myip.opendns.com")
-	if err != nil {
-		return nil, err
-	}
-
-	return net.ParseIP(ips[0]), nil
-}
-
-func (r *publicIPResolver) resolveGoogle(ctx context.Context) (net.IP, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	google := r.resolverFor("ns1.google.com:53")
-	ips, err := google.LookupTXT(ctx, "o-o.myaddr.l.google.com")
-	if err != nil {
-		return nil, err
-	}
-
-	return net.ParseIP(ips[0]), nil
-}
-
-func (r *publicIPResolver) resolveAWS(ctx context.Context) (net.IP, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	req, err := http.NewRequest("GET", "https://checkip.amazonaws.com", nil)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return net.ParseIP(strings.TrimSpace(string(body))), nil
 }

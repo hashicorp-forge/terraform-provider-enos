@@ -12,9 +12,6 @@ func TestGetPodLogsResponse_GetLogFileName(t *testing.T) {
 		Container   string
 		Logs        []byte
 	}
-	type args struct {
-		prefix string
-	}
 	tests := []struct {
 		name   string
 		fields fields

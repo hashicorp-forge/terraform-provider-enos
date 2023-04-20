@@ -1,67 +1,4 @@
-terraform_cli "default" {
-  provider_installation {
-    filesystem_mirror {
-      path    = abspath(joinpath(path.root, "../dist"))
-      include = ["app.terraform.io/*/*"]
-    }
-    direct {
-      exclude = ["app.terraform.io/*/*"]
-    }
-  }
-}
-
-terraform "default" {
-  required_version = ">= 1.2.0"
-
-  required_providers {
-    enos = {
-      source = "app.terraform.io/hashicorp-qti/enos"
-    }
-
-    aws = {
-      source = "hashicorp/aws"
-    }
-
-    random = {
-      source = "hashicorp/random"
-    }
-  }
-}
-
-module "setup_remote_host" {
-  source = abspath("./modules/setup_remote_host")
-}
-
-module "install_and_start_vault" {
-  source = abspath("./modules/install_and_start_vault")
-}
-
-module "install_and_start_consul" {
-  source = abspath("./modules/install_and_start_consul")
-}
-
-module "test_failure_handlers" {
-  source = abspath("./modules/test_failure_handlers")
-}
-
-module "create_vpc" {
-  source = abspath("./modules/create_vpc")
-}
-
-variable "run_failure_handler_tests" {
-  description = "Whether or not to run the failure handlers tests"
-  type        = bool
-  default     = false
-}
-
-variable "environment" {
-  description = "The environment that the scenario is being run in"
-  type        = string
-  default     = "ci"
-}
-
 scenario "failure_handlers" {
-
   locals {
     common_tags = {
       Name        = "enos_provider_remote_host"
@@ -81,7 +18,7 @@ scenario "failure_handlers" {
     module = module.create_vpc
 
     providers = {
-      aws  = provider.aws.east
+      aws = provider.aws.east
     }
 
     variables {

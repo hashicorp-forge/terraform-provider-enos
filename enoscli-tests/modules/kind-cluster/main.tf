@@ -9,8 +9,8 @@ terraform {
 
 locals {
   kubeconfig_path = abspath("${path.root}/.terraform/kubeconfig")
-  image_name = "bananas"
-  image_tag = "0.1.0"
+  image_name      = "bananas"
+  image_tag       = "0.1.0"
 }
 
 resource "random_pet" "cluster_name" {}
@@ -23,16 +23,16 @@ resource "enos_local_kind_cluster" "test" {
 resource "enos_local_exec" "create_bananas" {
   environment = {
     IMAGE_NAME = local.image_name
-    IMAGE_TAG = local.image_tag
+    IMAGE_TAG  = local.image_tag
   }
   inherit_environment = true
-  scripts = [abspath("${path.module}/scripts/image.sh")]
+  scripts             = [abspath("${path.module}/scripts/image.sh")]
 }
 
 resource "enos_local_kind_load_image" "bananas" {
   cluster_name = random_pet.cluster_name.id
-  image = local.image_name
-  tag = local.image_tag
+  image        = local.image_name
+  tag          = local.image_tag
 
   depends_on = [enos_local_kind_cluster.test, enos_local_exec.create_bananas]
 }

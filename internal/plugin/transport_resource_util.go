@@ -113,8 +113,8 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 	prior, proposed StateWithTransport,
 	resource ResourceWithProviderConfig,
 	req resource.PlanResourceChangeRequest,
-	res *resource.PlanResourceChangeResponse) *embeddedTransportV1 {
-
+	res *resource.PlanResourceChangeResponse,
+) *embeddedTransportV1 {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))

@@ -159,7 +159,7 @@ func (e *execRequest) Exec(ctx context.Context) *it.ExecResponse {
 
 	stream := func(stdout, stderr io.Writer) {
 		defer streams.Close()
-		execErr := executor.Stream(remotecommand.StreamOptions{
+		execErr := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
 			Stdout: stdout,
 			Stderr: stderr,
 			Stdin:  streams.Stdin(),

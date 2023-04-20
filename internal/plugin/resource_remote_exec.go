@@ -212,8 +212,8 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 		defer client.Close() //nolint: staticcheck
 
 		ui, err := r.ExecuteCommands(ctx, plannedState, client)
-		plannedState.Stdout.Set(ui.Stdout().String())
-		plannedState.Stderr.Set(ui.Stderr().String())
+		plannedState.Stdout.Set(ui.StdoutString())
+		plannedState.Stderr.Set(ui.StderrString())
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Execution Error",

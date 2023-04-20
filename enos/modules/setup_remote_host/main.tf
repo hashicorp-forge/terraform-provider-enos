@@ -62,7 +62,7 @@ resource "aws_security_group" "this" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${data.enos_environment.this.public_ip_address}/32"]
+    cidr_blocks = [for ip in data.enos_environment.this.public_ip_addresses : "${ip}/32"]
   }
 
   # Allow access to external hosts

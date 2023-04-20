@@ -115,10 +115,10 @@ Note that you should not prepend it with enos_, the utility will do that for you
 
 # Provider Configuration
 
-The enos provider can execute commands on remote hosts using a transport. Currently, the 
+The enos provider can execute commands on remote hosts using a transport. Currently, the
 provider supports two transports, `SSH` and `Kubernetes`. The `SSH` transport is suitable for executing
 commands that would normally have been done via `SSH`, and the `Kubernetes` transport can be used
-where the command would have been executed via `kubectl exec`. 
+where the command would have been executed via `kubectl exec`.
 
 Currently, you can provide transport configuration at the provider level,
 and it will be inherited by all resources with transport configuration. If you define the same configuration
@@ -127,9 +127,9 @@ the provider level transport options in the HCL terraform file.
 
 Configuration precedence: Resource HCL > Provider HCL.
 
-A resource can only configure one transport, attempting to configure more than one will result 
-in a Validation error. The provider however, can configure more than one transport. This is due 
-to the fact that the provider level transport configuration is never used to make remote calls, but 
+A resource can only configure one transport, attempting to configure more than one will result
+in a Validation error. The provider however, can configure more than one transport. This is due
+to the fact that the provider level transport configuration is never used to make remote calls, but
 rather is only used to provide default values for resources that require a transport. When the default
 values from the provider are applied to a resource, only the default values for the transport that
 the resource has configured will be applied.
@@ -271,7 +271,7 @@ The following describes the enos_environment schema:
 |key|description|
 |-|-|
 |id|The id of the datasource. It is always 'static'|
-|public_ip_address|The public IP address of the host executing Terraform|
+|public_ip_addresses|The public IP addresses of the host executing Terraform|
 
 Example
 ```hcl
@@ -284,7 +284,7 @@ module "security_group" {
   description = "Enos provider core example security group"
   vpc_id      = data.aws_vpc.default.id
 
-  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+  ingress_cidr_blocks = [for ip in data.enos_environment.localhost.public_ip_addresses : "${ip}/32"]
 }
 ```
 
@@ -370,10 +370,10 @@ PodInfo{
 As this is a datasource it will be run during plan time, unless the datasource
 depends on information not available till apply. Therefore, if this datasource is used in a module
 where the kubernetes cluster is being created at the same time, you must make the datasource depend
-either directly or indirectly on the resources required for the cluster to be created and the app 
+either directly or indirectly on the resources required for the cluster to be created and the app
 to be deployed.
 
-Here's an example configuration (boilerplate excluded for `brevity`) that creates a kind clutser, 
+Here's an example configuration (boilerplate excluded for `brevity`) that creates a kind clutser,
 deploys a helm chart and queries for pods:
 
 ```terraform
@@ -430,7 +430,7 @@ The following is the schema for the `enos_kubernetes_pods` datasource:
 |label_selectors|\[optional\] - A list(string) of label selectors to use when querying the cluster for pods|
 |field_selectors|\[optional\] - A list(string) of field selectors to use when querying the cluster for pods|
 |pods|\[output\] - a list of kubernetes `PodInfo` object, see description above |
-|transports|\[output\] - a list of Kubernetes transport blocks that can be used as the transport configuration for another resource that requires a Kubernetes transport block. The list will contain one item per pod + container that was returned when querying the pods | 
+|transports|\[output\] - a list of Kubernetes transport blocks that can be used as the transport configuration for another resource that requires a Kubernetes transport block. The list will contain one item per pod + container that was returned when querying the pods |
 
 # Resources
 
