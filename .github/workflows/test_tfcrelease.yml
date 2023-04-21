@@ -29,14 +29,19 @@ jobs:
     name: "Install and Test TFC Artifact"
     runs-on: ubuntu-latest
     env:
+      ENOS_PROVIDER_NAME: ${{ inputs.enos_provider_name }}
+      ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+      ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
+      ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
+      ENOS_VERSION: ${{ inputs.enos_provider_version }}
+      PROVIDER_BIN_NAME: ${{ inputs.enos_provider_name }}
+      PROVIDER_BIN_VERSION: ${{ inputs.enos_provider_version }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
-      - name: Assume service user role via Doormat
-        uses: hashicorp/doormat-action@main
+      - uses: hashicorp/doormat-action@main
         with:
           # This role, its associated IAM policy, the allowed Github workflow
           # event types and their associated qualifiers are managed via
@@ -44,15 +49,13 @@ jobs:
           # AWS credentials for different Github event types, workflows or
           # branches you'll need to update the role there.
           aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+      - uses: hashicorp/setup-terraform@v2
         with:
           # the terraform wrapper will break terraform execution in enos because
           # it changes the output to text when we expect it to be JSON.
           terraform_wrapper: false
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-      - name: Setup Enos
-        uses: hashicorp/action-setup-enos@v1
+      - uses: hashicorp/action-setup-enos@v1
         with:
           github-token:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
@@ -72,25 +75,21 @@ jobs:
         run: rm -rf /tmp/enos*
       - name: "Update Provider Name for Backend module"
         run: |
-          export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
           sed "s/ENOS_PROVIDER_NAME/$ENOS_PROVIDER_NAME/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/backend_consul
       - name: "Update Provider Name for Vault module"
         run: |
-          export ENOS_PROVIDER_NAME=${{ inputs.enos_provider_name }}
           sed "s/ENOS_PROVIDER_NAME/$ENOS_PROVIDER_NAME/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/vault_cluster
       - name: "Update Provider Version Backend module"
         run: |
-          export ENOS_VERSION=${{ inputs.enos_provider_version }}
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/backend_consul
       - name: "Update Provider Version Vault module"
         run: |
-          export ENOS_VERSION=${{ inputs.enos_provider_version }}
           sed "s/ENOS_VER/$ENOS_VERSION/g" main.tf > main.tf.upt
           mv main.tf.upt main.tf
         working-directory: ./enoscli-tests/modules/vault_cluster
@@ -98,27 +97,15 @@ jobs:
         run: enos version
       - name: "Run Enos Scenario List"
         id: enoslist
-        env:
-          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
-          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
-          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario list
         working-directory: ./enoscli-tests
       - name: "Run Enos Scenario Run with Consul backend"
         id: enosrun
-        env:
-          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
-          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
-          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario run vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
         working-directory: ./enoscli-tests
       - name: "Run Enos Scenario destroy"
         id: enosdestroy
         if: ${{ always() }}
-        env:
-          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
-          ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
-          ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
         run: enos scenario destroy vault  arch:amd64  backend:consul  distro:ubuntu  edition:ent
         working-directory: ./enoscli-tests
       - name: Cleanup Enos runtime directories
@@ -129,8 +116,4 @@ jobs:
           rm -rf ./enoscli-tests/.enos
       - name: K8S tests
         id: enoscli-k8s
-        env:
-          ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
-          ENOS_PROVIDER_NAME: ${{ inputs.enos_provider_name }}
-          ENOS_PROVIDER_VERSION: ${{ inputs.enos_provider_version }}
         run: make test-k8s

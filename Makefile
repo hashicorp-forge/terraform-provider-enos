@@ -85,8 +85,8 @@ test-k8s: K8S_TEST_DIR = $(ENOS_CLI_TEST_DIR)/k8s
 test-k8s:
 	rm -rf $(ENOS_CLI_TEST_DIR); mkdir -p $(ENOS_CLI_TEST_DIR); \
 	cp -r enoscli-tests $(TEST_BLD_DIR); \
-    LC_ALL=C grep -lr "PROVIDER_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/PROVIDER_NAME/$(PROVIDER_NAME)/g" ; \
-    LC_ALL=C grep -lr "ENOS_PROVIDER_PROVIDER_BIN_VERSION" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_PROVIDER_BIN_VERSION/$(ENOS_PROVIDER_PROVIDER_BIN_VERSION)/g" ; \
+    LC_ALL=C grep -lr "ENOS_PROVIDER_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_NAME/$(PROVIDER_NAME)/g" ; \
+    LC_ALL=C grep -lr "ENOS_PROVIDER_VERSION" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_VERSION/$(PROVIDER_BIN_VERSION)/g" ; \
     enos scenario launch -d $(K8S_TEST_DIR) kind_cluster; \
     enos scenario output -d $(K8S_TEST_DIR) kind_cluster; \
     enos scenario destroy -d $(K8S_TEST_DIR) kind_cluster
