@@ -5,32 +5,44 @@ resource "aws_security_group" "enos_vault_sg" {
 
   # SSH
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32", join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block)]
+    from_port = 22
+    to_port   = 22
+    protocol  = "tcp"
+    cidr_blocks = flatten([
+      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
+    ])
   }
 
   # Vault traffic
   ingress {
-    from_port   = 8200
-    to_port     = 8201
-    protocol    = "tcp"
-    cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32", join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block)]
+    from_port = 8200
+    to_port   = 8201
+    protocol  = "tcp"
+    cidr_blocks = flatten([
+      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
+    ])
   }
 
   # Consul Agent traffic
   ingress {
-    from_port   = 8301
-    to_port     = 8301
-    protocol    = "tcp"
-    cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32", join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block)]
+    from_port = 8301
+    to_port   = 8301
+    protocol  = "tcp"
+    cidr_blocks = flatten([
+      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
+    ])
   }
   ingress {
-    from_port   = 8301
-    to_port     = 8301
-    protocol    = "udp"
-    cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32", join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block)]
+    from_port = 8301
+    to_port   = 8301
+    protocol  = "udp"
+    cidr_blocks = flatten([
+      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
+    ])
   }
 
   # Internal Traffic

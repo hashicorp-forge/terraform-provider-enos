@@ -34,7 +34,7 @@ jobs:
       ENOS_VAR_enos_provider_name: ${{ inputs.enos_provider_name }}
       ENOS_VAR_enos_provider_version: ${{ inputs.enos_provider_version }}
       ENOS_VERSION: ${{ inputs.enos_provider_version }}
-      PROVIDER_BIN_NAME: ${{ inputs.enos_provider_name }}
+      PROVIDER_NAME: ${{ inputs.enos_provider_name }}
       PROVIDER_BIN_VERSION: ${{ inputs.enos_provider_version }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
