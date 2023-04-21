@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -395,105 +396,85 @@ func (a *Artifacts) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCProm
 		"extracting TFC private provider binaries",
 	)
 
-	archivePath, err := filepath.Abs(tfcreq.DownloadsDir)
+	archiveDir, err := filepath.Abs(tfcreq.DownloadsDir)
 	if err != nil {
 		return err
 	}
 
-	promotePath, err := filepath.Abs(tfcreq.PromoteDir)
+	promoteDir, err := filepath.Abs(tfcreq.PromoteDir)
 	if err != nil {
 		return err
 	}
 
-	archivefiles, err := os.ReadDir(archivePath)
-	if err != nil {
-		return err
-	}
-
-	// Empty the contents of promote direcotry if it exists
-	err = os.RemoveAll(promotePath)
-	if err != nil {
-		return err
-	}
-
-	// Read the zip files from source directory
-	for _, file := range archivefiles {
-		parts := strings.Split(file.Name(), "_")
-		if len(parts) != 4 {
-			return fmt.Errorf("source binaries unexpected format %s", file.Name())
-		}
-		binname := parts[0]
-		version := parts[1]
-		platform := parts[2]
-		arch := strings.Trim(parts[3], ".zip")
-
-		if parts[0] != tfcreq.SrcBinaryName {
-			return fmt.Errorf("source binaries expected name %s, but found %s ", tfcreq.SrcBinaryName, binname)
-		}
-
-		sourcefile := filepath.Join(tfcreq.DownloadsDir, file.Name())
-		sourcefilepath, err := filepath.Abs(sourcefile)
-		if err != nil {
-			return err
-		}
-
-		// Open the zip file
-		reader, err := zip.OpenReader(sourcefilepath)
-		if err != nil {
-			return err
-		}
-		defer reader.Close()
-
-		// Create the destination path to extract files
-		destFilename := fmt.Sprintf("%s_%s", binname, version)
-		destDir := filepath.Join(promotePath, fmt.Sprintf("%s_%s_%s", binname, platform, arch))
-		if _, err := os.Stat(destDir); err != nil {
-			if os.IsNotExist(err) {
-				err := os.MkdirAll(destDir, 0o755)
-				if err != nil {
-					return err
-				}
-			} else {
+	if _, err := os.Stat(promoteDir); err != nil {
+		if os.IsNotExist(err) {
+			err := os.MkdirAll(promoteDir, 0o755)
+			if err != nil {
 				return err
 			}
+		} else {
+			return err
 		}
-		destFile := filepath.Join(destDir, destFilename)
-		destFilePath, err := filepath.Abs(destFile)
+	}
+
+	return filepath.Walk(archiveDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
+			return fmt.Errorf("accessing archive path: %w", err)
+		}
+
+		// Our directory should be filled with archives with the following name
+		// schema: terraform-provider-enos_0.3.24_darwin_amd64.zip
+		// Each archive should contain a single file with a matching binary.
+		// Extract all of them into the "promote" dir.
+		if info.IsDir() {
+			return nil
+		}
+
+		a.log.Debugw("found file", "file", info.Name())
+
+		if !strings.HasSuffix(info.Name(), ".zip") {
+			return fmt.Errorf("unexpected provider archive file name %s", info.Name())
+		}
+
+		parts := strings.Split(info.Name(), "_")
+		if len(parts) != 4 {
+			return fmt.Errorf("unexpected provider archive file name %s", info.Name())
+		}
+
+		if parts[0] != tfcreq.SrcBinaryName {
+			return fmt.Errorf("unexpected provider archive name, expected %s, found %s", tfcreq.SrcBinaryName, parts[0])
+		}
+
+		zipArchive, err := zip.OpenReader(filepath.Join(archiveDir, info.Name()))
+		if err != nil {
+			return fmt.Errorf("%w: opening zip archive", err)
+		}
+		defer zipArchive.Close()
+
+		if len(zipArchive.File) != 1 {
+			return fmt.Errorf("unexpected provider archive file contents. Expected 1 file, got %d files", len(zipArchive.File))
+		}
+
+		zippedBinFile := zipArchive.File[0]
+		zippedBin, err := zippedBinFile.Open()
+		if err != nil {
+			return fmt.Errorf("%w: opening zipped binary in zip archive", err)
+		}
+		defer zippedBin.Close()
+
+		binPath := filepath.Join(promoteDir, zippedBinFile.Name)
+		binFile, err := os.OpenFile(binPath, os.O_RDWR|os.O_CREATE, zippedBinFile.Mode())
+		if err != nil {
+			return fmt.Errorf("%w: unzipping binary from archive", err)
+		}
+		defer binFile.Close()
+
+		if _, err := io.Copy(binFile, zippedBin); err != nil {
 			return err
 		}
 
-		// Iterate over zip files inside the archive and unzip each of them
-		for _, f := range reader.File {
-			err := unzipArtifact(f, destFilePath)
-			if err != nil {
-				return fmt.Errorf("failed to unzip archive file: [%s] to destination: [%s], due to: %w", f.Name, destFilePath, err)
-			}
-		}
-	}
-	return nil
-}
-
-// unzipArtifact unzips a source file to destination
-func unzipArtifact(f *zip.File, destination string) error {
-	// Create a destination file for unzipped content
-	destinationFile, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-	if err != nil {
-		return err
-	}
-	defer destinationFile.Close()
-
-	// Unzip the content of a file and copy it to the destination file
-	zippedFile, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer zippedFile.Close()
-
-	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
-		return err
-	}
-	return nil
+		return nil
+	})
 }
 
 // LoadRemoteIndex fetches the existing index.json from the remote bucket and loads
