@@ -9,7 +9,7 @@ resource "aws_security_group" "enos_vault_sg" {
     to_port   = 22
     protocol  = "tcp"
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
   }
@@ -20,7 +20,7 @@ resource "aws_security_group" "enos_vault_sg" {
     to_port   = 8201
     protocol  = "tcp"
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
   }
@@ -31,7 +31,7 @@ resource "aws_security_group" "enos_vault_sg" {
     to_port   = 8301
     protocol  = "tcp"
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
   }
@@ -40,7 +40,7 @@ resource "aws_security_group" "enos_vault_sg" {
     to_port   = 8301
     protocol  = "udp"
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
   }

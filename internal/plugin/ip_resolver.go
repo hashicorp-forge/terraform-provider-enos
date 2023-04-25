@@ -19,8 +19,33 @@ type (
 	dnsQClass uint16
 )
 
+func (t dnsQtype) String() string {
+	switch t {
+	case dnsTypeIPV6Host:
+		return "AAAA"
+	case dnsTypeIPV4Host:
+		return "A"
+	case dnsTypeTXT:
+		return "TXT"
+	default:
+		return ""
+	}
+}
+
+func (c dnsQClass) String() string {
+	switch c {
+	case dnsClassChaos:
+		return "CHAOSNET"
+	case dnsClassInet:
+		return "Inet"
+	default:
+		return ""
+	}
+}
+
 const (
 	dnsTypeIPV4Host dnsQtype  = dnsQtype(dns.TypeA)
+	dnsTypeIPV6Host dnsQtype  = dnsQtype(dns.TypeAAAA)
 	dnsTypeTXT      dnsQtype  = dnsQtype(dns.TypeTXT)
 	dnsClassInet    dnsQClass = dnsQClass(dns.ClassINET)
 	dnsClassChaos   dnsQClass = dnsQClass(dns.ClassCHAOS)
@@ -29,14 +54,16 @@ const (
 type ipResolver func(context.Context) ([]net.IP, error)
 
 type publicIPResolver struct {
-	ips []net.IP
-	m   sync.Mutex
+	v4Ips map[string]net.IP
+	v6Ips map[string]net.IP
+	m     sync.Mutex
 }
 
 func newPublicIPResolver() *publicIPResolver {
 	return &publicIPResolver{
-		ips: []net.IP{},
-		m:   sync.Mutex{},
+		v4Ips: map[string]net.IP{},
+		v6Ips: map[string]net.IP{},
+		m:     sync.Mutex{},
 	}
 }
 
@@ -45,6 +72,10 @@ func defaultResolvers() []ipResolver {
 		withDNSResolver(
 			"resolver1.opendns.com:53", "myip.opendns.com.",
 			dnsClassInet, dnsTypeIPV4Host,
+		),
+		withDNSResolver(
+			"resolver1.opendns.com:53", "myip.opendns.com.",
+			dnsClassInet, dnsTypeIPV6Host,
 		),
 		withDNSResolver(
 			"ns1.google.com:53", "o-o.myaddr.l.google.com.",
@@ -80,14 +111,18 @@ func withDNSResolver(
 			}},
 		}
 
+		baseErr := fmt.Sprintf("%s@%s (%s/%s)",
+			host, nameserver, qType.String(), qClass.String(),
+		)
+
 		client := dns.Client{}
 		res, _, err := client.ExchangeContext(ctx, msg, nameserver)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %v", baseErr, err)
 		}
 
 		if len(res.Answer) < 1 {
-			return nil, fmt.Errorf("no records found")
+			return nil, fmt.Errorf("%s: no records found", baseErr)
 		}
 
 		ips := []net.IP{}
@@ -96,24 +131,30 @@ func withDNSResolver(
 			case dnsTypeIPV4Host:
 				a, ok := ans.(*dns.A)
 				if !ok {
-					return ips, fmt.Errorf("unable to convert answer to correct type. Expected A got %T", ans)
+					return ips, fmt.Errorf("%s: unable to convert answer to correct type. Expected A got %T", baseErr, ans)
 				}
 				ips = append(ips, a.A)
+			case dnsTypeIPV6Host:
+				a, ok := ans.(*dns.AAAA)
+				if !ok {
+					return ips, fmt.Errorf("%s: unable to convert answer to correct type. Expected AAAA got %T", baseErr, ans)
+				}
+				ips = append(ips, a.AAAA)
 			case dnsTypeTXT:
 				t, ok := ans.(*dns.TXT)
 				if !ok {
-					return ips, fmt.Errorf("unable to convert answer to correct type. Expected TXT got %T", ans)
+					return ips, fmt.Errorf("%s: unable to convert answer to correct type. Expected A got %T", baseErr, ans)
 				}
 
 				if len(t.Txt) < 1 {
-					return ips, fmt.Errorf("no ips found in txt record")
+					return ips, fmt.Errorf("%s: no ips found in txt record", baseErr)
 				}
 
 				for _, txt := range t.Txt {
 					ips = append(ips, net.ParseIP(txt))
 				}
 			default:
-				return ips, fmt.Errorf("unsupported answer type. Expected A got %T", ans)
+				return ips, fmt.Errorf("%s: unsupported answer type. got %T", baseErr, ans)
 			}
 		}
 
@@ -129,21 +170,23 @@ func withHTTPSBodyResolver(host string) ipResolver {
 		default:
 		}
 
+		baseErr := fmt.Sprintf("host(%s)", host)
+
 		req, err := http.NewRequest("GET", host, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %v", baseErr, err)
 		}
 		req = req.WithContext(ctx)
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %v", baseErr, err)
 		}
 		defer res.Body.Close()
 
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %v", baseErr, err)
 		}
 
 		return []net.IP{net.ParseIP(strings.TrimSpace(string(body)))}, nil
@@ -155,43 +198,46 @@ func (r *publicIPResolver) addIPs(ips []net.IP) {
 	r.m.Lock()
 	defer r.m.Unlock()
 
-	updatedIPs := map[string]net.IP{}
-	for _, ip := range append(r.ips, ips...) {
-		if ip == nil || ip.String() == "" {
+	for _, ip := range ips {
+		// Make sure it's a valid IP address. To16() handles 4 and 16 byte addresses
+		if ip == nil || ip.To16() == nil {
 			continue
 		}
-		updatedIPs[ip.String()] = ip
-	}
 
-	r.ips = []net.IP{}
-	for _, v := range updatedIPs {
-		r.ips = append(r.ips, v)
+		// See if it's a v4 address
+		if ipv4 := ip.To4(); ipv4 != nil {
+			r.v4Ips[ipv4.String()] = ipv4
+			continue
+		}
+
+		// Must be v6
+		r.v6Ips[ip.String()] = ip
 	}
 }
 
-func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver) ([]net.IP, error) {
+func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver) error {
 	var err error
 
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	default:
 	}
 
 	switch len(resolvers) {
 	case 0:
-		return nil, fmt.Errorf("no resolvers have been provided")
+		return fmt.Errorf("no resolvers have been provided")
 	case 1:
 		ips, err := resolvers[0](ctx)
 		if err != nil {
 			r.addIPs(ips)
 		}
-		return r.ips, err
+		return err
 	default:
 	}
 
 	wg := sync.WaitGroup{}
-	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Millisecond*500))
+	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Second*1))
 
 	defer ipCancel()
 	errC := make(chan error)
@@ -241,9 +287,71 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 
 	wg.Wait()
 
-	if len(r.ips) > 0 {
-		return r.ips, nil
+	if len(r.ips()) == 0 {
+		return err
 	}
 
-	return r.ips, err
+	return nil
+}
+
+func (r *publicIPResolver) v4() []net.IP {
+	r.m.Lock()
+	defer r.m.Unlock()
+
+	if r.v4Ips == nil || len(r.v4Ips) < 1 {
+		return nil
+	}
+
+	ips := []net.IP{}
+	for _, ip := range r.v4Ips {
+		ips = append(ips, ip)
+	}
+
+	return ips
+}
+
+func (r *publicIPResolver) v4Strings() []string {
+	v4s := r.v4()
+	ips := []string{}
+
+	for _, ip := range v4s {
+		ips = append(ips, ip.String())
+	}
+
+	return ips
+}
+
+func (r *publicIPResolver) v6() []net.IP {
+	r.m.Lock()
+	defer r.m.Unlock()
+
+	if r.v6Ips == nil || len(r.v6Ips) < 1 {
+		return nil
+	}
+
+	ips := []net.IP{}
+	for _, ip := range r.v6Ips {
+		ips = append(ips, ip)
+	}
+
+	return ips
+}
+
+func (r *publicIPResolver) v6Strings() []string {
+	v6s := r.v6()
+	ips := []string{}
+
+	for _, ip := range v6s {
+		ips = append(ips, ip.String())
+	}
+
+	return ips
+}
+
+func (r *publicIPResolver) ips() []net.IP {
+	return append(r.v4(), r.v6()...)
+}
+
+func (r *publicIPResolver) ipsStrings() []string {
+	return append(r.v4Strings(), r.v6Strings()...)
 }

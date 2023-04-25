@@ -88,11 +88,19 @@ func (b *Buffered) Append(stdout, stderr string) error {
 	var err1 error
 
 	if stdout != "" {
+		if b.stdoutBuf.HasBytes() {
+			_, err1 := b.stdout.Write([]byte("\n"))
+			err = errors.Join(err, err1)
+		}
 		_, err1 = b.stdout.Write([]byte(stdout))
 		err = errors.Join(err, err1)
 	}
 
 	if stderr != "" {
+		if b.stderrBuf.HasBytes() {
+			_, err1 := b.stderr.Write([]byte("\n"))
+			err = errors.Join(err, err1)
+		}
 		_, err1 = b.stderr.Write([]byte(stderr))
 		err = errors.Join(err, err1)
 	}
@@ -134,29 +142,17 @@ func (b *bufferedWriter) Write(p []byte) (int, error) {
 	return b.buf.Write(p)
 }
 
-// Append is like write but adds a newline to the previous line
-func (b *bufferedWriter) Append(p []byte) (int, error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-
-	if len(p) == 0 {
-		return 0, nil
-	}
-
-	if b.buf.Len() > 0 {
-		i, err := b.buf.Write([]byte("\n"))
-		if err != nil {
-			return i, err
-		}
-	}
-
-	return b.buf.Write(p)
-}
-
 func (b *bufferedWriter) String() string {
 	b.m.Lock()
 	defer b.m.Unlock()
 
 	unread := b.buf.Bytes()
 	return string(unread)
+}
+
+func (b *bufferedWriter) HasBytes() bool {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return b.buf.Len() > 0
 }

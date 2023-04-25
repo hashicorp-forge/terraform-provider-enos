@@ -272,6 +272,8 @@ The following describes the enos_environment schema:
 |-|-|
 |id|The id of the datasource. It is always 'static'|
 |public_ip_addresses|The public IP addresses of the host executing Terraform|
+|public_ipv4_addresses|The public IPv4 addresses of the host executing Terraform|
+|public_ipv6_addresses|The public IPv6 addresses of the host executing Terraform|
 
 Example
 ```hcl
@@ -284,7 +286,7 @@ module "security_group" {
   description = "Enos provider core example security group"
   vpc_id      = data.aws_vpc.default.id
 
-  ingress_cidr_blocks = [for ip in data.enos_environment.localhost.public_ip_addresses : "${ip}/32"]
+  ingress_cidr_blocks = [for ip in data.enos_environment.localhost.public_ipv4_addresses : "${ip}/32"]
 }
 ```
 

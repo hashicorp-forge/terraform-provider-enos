@@ -27,6 +27,7 @@ func TestAccDataSourceEnvironment(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestMatchResourceAttr("data.enos_environment.localhost", "public_ip_address", regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)),
 					resource.TestMatchResourceAttr("data.enos_environment.localhost", "public_ip_addresses.0", regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)),
+					resource.TestMatchResourceAttr("data.enos_environment.localhost", "public_ipv4_addresses.0", regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)),
 				),
 			},
 		},

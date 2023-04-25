@@ -24,30 +24,25 @@ func TestAccPublicIPAddressResolver(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*time.Second))
 	defer cancel()
 
-	// This will test resolving multiple or singluar resolvers and ensure
-	// that an address is returned. Since we can technically get multiple
-	// different values we should not validate that they always match.
-	for _, resolvers := range [][]ipResolver{
-		defaultResolvers(),
-		{withDNSResolver(
-			"resolver1.opendns.com:53", "myip.opendns.com.",
-			dnsClassInet, dnsTypeIPV4Host,
-		)},
-		{withDNSResolver(
-			"ns1.google.com:53", "o-o.myaddr.l.google.com.",
-			dnsClassInet, dnsTypeTXT,
-		)},
-		{withDNSResolver(
-			"one.one.one.one:53", "whoami.cloudflare.",
-			dnsClassChaos, dnsTypeTXT,
-		)},
-		{withHTTPSBodyResolver("https://checkip.amazonaws.com")},
-	} {
-		ips, err := pubip.resolve(ctx, resolvers...)
-		t.Logf("ips %v", ips)
+	// Test that we can resolve something out of all of our providers
+	t.Run("defaultResolvers_all", func(t *testing.T) {
+		err := pubip.resolve(ctx, defaultResolvers()...)
 		require.NoError(t, err)
-		require.NotEmpty(t, ips)
-	}
+		t.Logf("v4 ips %v", pubip.v4Strings())
+		t.Logf("v6 ips %v", pubip.v6Strings())
+		require.NotEmpty(t, pubip.ips())
+	})
+
+	// Since ISPs run things differently not all of these will work for everyone.
+	// Only warn if they can't resolve an IP address
+	t.Run("defaultResolvers_each", func(t *testing.T) {
+		for _, resolver := range defaultResolvers() {
+			err := pubip.resolve(ctx, resolver)
+			if err != nil {
+				t.Logf("Warning, a DNS resolver failed to resolve a public IP addr. %v", err)
+			}
+		}
+	})
 }
 
 type byIP []net.IP
@@ -61,10 +56,20 @@ func TestPublicIPAddressResolver_add_ips(t *testing.T) {
 	pubip := newPublicIPResolver()
 
 	for _, ips := range [][]net.IP{
+		{net.ParseIP("2605:56c8:517b:cb10:dc78:62b9:61ce:8243")},
+		{net.ParseIP("2603:6b11:2c99:cda1:e12b:aef1:b3d2:8241")},
+		{net.ParseIP("2603:6b11:2c99:cda1:e12b:aef1:b3d2:8241"), net.ParseIP("2605:56c8:517b:cb10:dc78:62b9:61ce:8243")},
 		{net.ParseIP("1.2.3.4"), net.ParseIP("1.2.3.4")},
 		{net.ParseIP("3.4.5.6")},
 		{net.ParseIP("1.2.3.4"), net.ParseIP("3.4.5.6")},
 		{net.ParseIP("3.4.5.6"), net.ParseIP("3.4.5.6"), net.ParseIP("1.2.3.4")},
+		{
+			net.ParseIP("2603:6b11:2c99:cda1:e12b:aef1:b3d2:8241"),
+			net.ParseIP("3.4.5.6"),
+			net.ParseIP("1.2.3.4"),
+			net.ParseIP("2605:56c8:517b:cb10:dc78:62b9:61ce:8243"),
+			net.ParseIP("3.4.5.6"),
+		},
 	} {
 		ips := ips
 		wg.Add(1)
@@ -75,12 +80,35 @@ func TestPublicIPAddressResolver_add_ips(t *testing.T) {
 		}()
 	}
 
-	expected := []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("3.4.5.6")}
-	sort.Sort(byIP(expected))
+	expectedV4 := []net.IP{
+		net.ParseIP("1.2.3.4").To4(),
+		net.ParseIP("3.4.5.6").To4(),
+	}
+	expectedV6 := []net.IP{
+		net.ParseIP("2603:6b11:2c99:cda1:e12b:aef1:b3d2:8241"),
+		net.ParseIP("2605:56c8:517b:cb10:dc78:62b9:61ce:8243"),
+	}
+	expectedAll := []net.IP{
+		net.ParseIP("1.2.3.4").To4(),
+		net.ParseIP("3.4.5.6").To4(),
+		net.ParseIP("2603:6b11:2c99:cda1:e12b:aef1:b3d2:8241"),
+		net.ParseIP("2605:56c8:517b:cb10:dc78:62b9:61ce:8243"),
+	}
+
+	sort.Sort(byIP(expectedV4))
+	sort.Sort(byIP(expectedV6))
+	sort.Sort(byIP(expectedAll))
 
 	wg.Wait()
 
-	got := pubip.ips
-	sort.Sort(byIP(got))
-	require.EqualValues(t, expected, got)
+	gotV4 := pubip.v4()
+	gotV6 := pubip.v6()
+	gotAll := pubip.ips()
+	sort.Sort(byIP(gotV4))
+	sort.Sort(byIP(gotV6))
+	sort.Sort(byIP(gotAll))
+
+	require.EqualValues(t, expectedV4, gotV4)
+	require.EqualValues(t, expectedV6, gotV6)
+	require.EqualValues(t, expectedAll, gotAll)
 }

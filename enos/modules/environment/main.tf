@@ -17,3 +17,11 @@ output "public_ip_address" {
 output "public_ip_addresses" {
   value = data.enos_environment.localhost.public_ip_addresses
 }
+
+output "public_ipv4_addresses" {
+  value = data.enos_environment.localhost.public_ipv4_addresses
+}
+
+output "public_ipv6_addresses" {
+  value = data.enos_environment.localhost.public_ipv6_addresses
+}

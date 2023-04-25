@@ -19,9 +19,11 @@ type environment struct {
 var _ datarouter.DataSource = (*environment)(nil)
 
 type environmentStateV1 struct {
-	ID                *tfString
-	PublicIPAddress   *tfString
-	PublicIPAddresses *tfStringSlice
+	ID                  *tfString
+	PublicIPAddress     *tfString
+	PublicIPAddresses   *tfStringSlice
+	PublicIPV4Addresses *tfStringSlice
+	PublicIPV6Addresses *tfStringSlice
 
 	failureHandlers
 }
@@ -36,10 +38,12 @@ func newEnvironment() *environment {
 
 func newEnvironmentStateV1() *environmentStateV1 {
 	return &environmentStateV1{
-		ID:                newTfString(),
-		PublicIPAddress:   newTfString(),
-		PublicIPAddresses: newTfStringSlice(),
-		failureHandlers:   failureHandlers{},
+		ID:                  newTfString(),
+		PublicIPAddress:     newTfString(),
+		PublicIPAddresses:   newTfStringSlice(),
+		PublicIPV4Addresses: newTfStringSlice(),
+		PublicIPV6Addresses: newTfStringSlice(),
+		failureHandlers:     failureHandlers{},
 	}
 }
 
@@ -94,8 +98,9 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	}
 	newState.ID.Set("static")
 
-	ips, err := newPublicIPResolver().resolve(ctx, defaultResolvers()...)
-	if len(ips) == 0 {
+	resolver := newPublicIPResolver()
+	err = resolver.resolve(ctx, defaultResolvers()...)
+	if len(resolver.ips()) == 0 {
 		err = errors.Join(err, fmt.Errorf("unable to resolve public ip address"))
 	}
 	if err != nil {
@@ -103,13 +108,11 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 			diags.ErrToDiagnostic("Resolve IP Error", fmt.Errorf("failed to resolve public IP addresses, due to: %w", err)))
 		return
 	}
-	newState.PublicIPAddress.Set(ips[0].String())
 
-	ipStrings := []string{}
-	for _, ip := range ips {
-		ipStrings = append(ipStrings, ip.String())
-	}
-	newState.PublicIPAddresses.SetStrings(ipStrings)
+	newState.PublicIPAddress.Set(resolver.ipsStrings()[0])
+	newState.PublicIPAddresses.SetStrings(resolver.ipsStrings())
+	newState.PublicIPV4Addresses.SetStrings(resolver.v4Strings())
+	newState.PublicIPV6Addresses.SetStrings(resolver.v6Strings())
 
 	res.State, err = state.Marshal(newState)
 	if err != nil {
@@ -141,6 +144,20 @@ func (s *environmentStateV1) Schema() *tfprotov6.Schema {
 					},
 					Computed: true,
 				},
+				{
+					Name: "public_ipv4_addresses",
+					Type: tftypes.List{
+						ElementType: tftypes.String,
+					},
+					Computed: true,
+				},
+				{
+					Name: "public_ipv6_addresses",
+					Type: tftypes.List{
+						ElementType: tftypes.String,
+					},
+					Computed: true,
+				},
 			},
 		},
 	}
@@ -160,9 +177,11 @@ func (s *environmentStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"id":                  s.ID,
-		"public_ip_address":   s.PublicIPAddress,
-		"public_ip_addresses": s.PublicIPAddresses,
+		"id":                    s.ID,
+		"public_ip_address":     s.PublicIPAddress,
+		"public_ip_addresses":   s.PublicIPAddresses,
+		"public_ipv4_addresses": s.PublicIPV4Addresses,
+		"public_ipv6_addresses": s.PublicIPV6Addresses,
 	})
 
 	return err
@@ -171,17 +190,21 @@ func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *environmentStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                  s.ID.TFType(),
-		"public_ip_address":   s.PublicIPAddress.TFType(),
-		"public_ip_addresses": s.PublicIPAddresses.TFType(),
+		"id":                    s.ID.TFType(),
+		"public_ip_address":     s.PublicIPAddress.TFType(),
+		"public_ip_addresses":   s.PublicIPAddresses.TFType(),
+		"public_ipv4_addresses": s.PublicIPV4Addresses.TFType(),
+		"public_ipv6_addresses": s.PublicIPV6Addresses.TFType(),
 	}}
 }
 
 // Terraform5Value is the file state tftypes.Value.
 func (s *environmentStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":                  s.ID.TFValue(),
-		"public_ip_address":   s.PublicIPAddress.TFValue(),
-		"public_ip_addresses": s.PublicIPAddresses.TFValue(),
+		"id":                    s.ID.TFValue(),
+		"public_ip_address":     s.PublicIPAddress.TFValue(),
+		"public_ip_addresses":   s.PublicIPAddresses.TFValue(),
+		"public_ipv4_addresses": s.PublicIPV4Addresses.TFValue(),
+		"public_ipv6_addresses": s.PublicIPV6Addresses.TFValue(),
 	})
 }

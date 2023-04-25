@@ -11,14 +11,14 @@ resource "aws_security_group" "consul_sg" {
     to_port   = 22
     protocol  = "tcp"
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
   }
 
   ingress {
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
     description      = "value"
@@ -33,7 +33,7 @@ resource "aws_security_group" "consul_sg" {
 
   ingress {
     cidr_blocks = flatten([
-      formatlist("%s/32", data.enos_environment.localhost.public_ip_addresses),
+      formatlist("%s/32", data.enos_environment.localhost.public_ipv4_addresses),
       join(",", data.aws_vpc.infra.cidr_block_associations.*.cidr_block),
     ])
 
