@@ -108,6 +108,17 @@ func (em *embeddedTransportSSHv1) Terraform5Type() tftypes.Type {
 }
 
 func (em *embeddedTransportSSHv1) Terraform5Value() tftypes.Value {
+	// If the values are empty it means that the transport configuration is unknown
+	if len(em.Values) == 0 {
+		return tftypes.NewValue(tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+			"user":             tftypes.String,
+			"host":             tftypes.String,
+			"private_key":      tftypes.String,
+			"private_key_path": tftypes.String,
+			"passphrase":       tftypes.String,
+			"passphrase_path":  tftypes.String,
+		}}, tftypes.UnknownValue)
+	}
 	return terraform5Value(em.Values)
 }
 

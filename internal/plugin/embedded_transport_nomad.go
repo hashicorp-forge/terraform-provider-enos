@@ -79,6 +79,15 @@ func (em *embeddedTransportNomadv1) Terraform5Type() tftypes.Type {
 }
 
 func (em *embeddedTransportNomadv1) Terraform5Value() tftypes.Value {
+	// If the values are empty it means that the transport configuration is unknown
+	if len(em.Values) == 0 {
+		return tftypes.NewValue(tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+			"host":          tftypes.String,
+			"secret_id":     tftypes.String,
+			"allocation_id": tftypes.String,
+			"task_name":     tftypes.String,
+		}}, tftypes.UnknownValue)
+	}
 	return terraform5Value(em.Values)
 }
 

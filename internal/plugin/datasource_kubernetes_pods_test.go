@@ -37,8 +37,15 @@ func TestAccDataSourceKubernetesPods(t *testing.T) {
 	}
 
 	cfg := template.Must(template.New("enos_data_kubernetes_pods").Parse(`data "enos_kubernetes_pods" "bogus" {
-  kubeconfig_base64 = "{{ .KubeConfigBase64.Value }}"
-  context_name      = "{{ .ContextName.Value }}"
+  kubeconfig_base64  = "{{ .KubeConfigBase64.Value }}"
+  context_name       = "{{ .ContextName.Value }}"
+  namespace          = "{{ .Namespace.Value }}"
+  {{ if  .ExpectedPodCount.Value -}}
+  expected_pod_count = {{ .ExpectedPodCount.Value }}
+  {{ end }}
+  {{ if .WaitTimeout.Value }}
+  wait_timeout       = "{{ .WaitTimeout.Value }}"
+  {{ end }}
 }
 
 output "pods" {
@@ -93,7 +100,7 @@ output "transports_1_container" {
 	pods1 := []kubernetes.PodInfo{
 		{
 			Name:       "pod1",
-			Namespace:  "bla",
+			Namespace:  "yoyo",
 			Containers: []string{"foo"},
 		},
 		{
@@ -106,14 +113,21 @@ output "transports_1_container" {
 	state1 := newKubernetesPodStateV1()
 	state1.KubeConfigBase64.Set(kubeConfig)
 	state1.ContextName.Set("kind-bogus")
+	state1.Namespace.Set("yoyo")
+	state1.ExpectedPodCount.Set(2)
+	state1.WaitTimeout.Set("2m")
 	checkFunc1 := resource.ComposeTestCheckFunc(
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "id", regexp.MustCompile(`^static$`)),
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "kubeconfig_base64", regexp.MustCompile(kubeConfig)),
 		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "context_name", regexp.MustCompile(`^kind-bogus$`)),
-		resource.TestMatchOutput("pods", regexp.MustCompile(`.*pod1.*bla.*foo.*pod2.*yoyo.*bar.*`)),
+		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "namespace", regexp.MustCompile("yoyo")),
+		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "expected_pod_count", regexp.MustCompile("2")),
+		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "wait_timeout", regexp.MustCompile("2m")),
+		resource.TestMatchResourceAttr("data.enos_kubernetes_pods.bogus", "context_name", regexp.MustCompile(`^kind-bogus$`)),
+		resource.TestMatchOutput("pods", regexp.MustCompile(`.*pod1.*yoyo.*foo.*pod2.*yoyo.*bar.*`)),
 		resource.TestCheckOutput("transports_0_kubeconfig", kubeConfig),
 		resource.TestCheckOutput("transports_0_context_name", "kind-bogus"),
-		resource.TestCheckOutput("transports_0_namespace", "bla"),
+		resource.TestCheckOutput("transports_0_namespace", "yoyo"),
 		resource.TestCheckOutput("transports_0_pod", "pod1"),
 		resource.TestCheckOutput("transports_0_container", "foo"),
 		resource.TestCheckOutput("transports_1_kubeconfig", kubeConfig),
@@ -126,6 +140,7 @@ output "transports_1_container" {
 	state2 := newKubernetesPodStateV1()
 	state2.KubeConfigBase64.Set(kubeConfig)
 	state2.ContextName.Set("kind-not-present-context")
+	state2.Namespace.Set("yoyo")
 	notPresentError := regexp.MustCompile(`context: \[kind-not-present-context] not present`)
 
 	state3 := newKubernetesPodStateV1()

@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.2.0"
   required_providers {
     enos = {
       source  = "app.terraform.io/hashicorp-qti/ENOS_PROVIDER_NAME"
@@ -27,10 +28,16 @@ variable "replica_count" {
   description = "The expected number of pods that were created"
 }
 
+variable "namespace" {
+  description = "The namespace to the pods where deployed in"
+  type        = string
+}
+
 data "enos_kubernetes_pods" "ci_test_pods" {
   kubeconfig_base64 = var.kubeconfig_base64
   context_name      = var.context_name
   label_selectors   = var.pod_label_selectors
+  namespace         = var.namespace
 }
 
 locals {

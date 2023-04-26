@@ -74,6 +74,7 @@ scenario "kind_cluster" {
       kubeconfig_base64 = step.create_cluster.kubeconfig_base64
       context_name      = step.create_cluster.context_name
       replica_count     = local.pod_replica_count
+      namespace         = step.deploy_helm_chart.namespace
       pod_label_selectors = [
         "app.kubernetes.io/instance=ci-test",
         "app.kubernetes.io/name=ci-test"

@@ -431,6 +431,8 @@ The following is the schema for the `enos_kubernetes_pods` datasource:
 |namespace|\[optional\] - A namespace to limit the query. If not provided all namespaces will be queried|
 |label_selectors|\[optional\] - A list(string) of label selectors to use when querying the cluster for pods|
 |field_selectors|\[optional\] - A list(string) of field selectors to use when querying the cluster for pods|
+|expected_pod_count|\[optional\] - The number of pods that are expected to be found matching the query|
+|wait_timeout|[\Optional\] - The amount of time to wait for the pods found in the query to be in the 'Running' state. If not provided a default of 1m will be used.|
 |pods|\[output\] - a list of kubernetes `PodInfo` object, see description above |
 |transports|\[output\] - a list of Kubernetes transport blocks that can be used as the transport configuration for another resource that requires a Kubernetes transport block. The list will contain one item per pod + container that was returned when querying the pods |
 

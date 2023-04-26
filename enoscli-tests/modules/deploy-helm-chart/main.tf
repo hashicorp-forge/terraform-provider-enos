@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 0.15.3"
+  required_version = ">= 1.2.0"
 }
 
 provider "helm" {
@@ -68,4 +68,8 @@ variable "repository" {
 variable "tag" {
   type        = string
   description = "The tag of the docker image to deploy"
+}
+
+output "namespace" {
+  value = helm_release.ci-test.namespace
 }

@@ -284,15 +284,23 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 	t.Helper()
 
 	provider := newProvider()
-	assert.NoError(t, provider.config.Transport.SetTransportState(newEmbeddedTransportK8Sv1(), newEmbeddedTransportSSH(), newEmbeddedTransportNomadv1()))
-	if k8S, ok := provider.config.Transport.K8S(); ok {
-		configureK8STransportFromEnvironment(k8S)
+
+	k8sTransport := newEmbeddedTransportK8Sv1()
+	configureK8STransportFromEnvironment(k8sTransport)
+	if k8sTransport.IsConfigured() {
+		assert.NoError(t, provider.config.Transport.SetTransportState(k8sTransport))
 	}
-	if ssh, ok := provider.config.Transport.SSH(); ok {
-		configureSSHTransportFromEnvironment(ssh)
+
+	sshTransport := newEmbeddedTransportSSH()
+	configureSSHTransportFromEnvironment(sshTransport)
+	if sshTransport.IsConfigured() {
+		assert.NoError(t, provider.config.Transport.SetTransportState(sshTransport))
 	}
-	if nomad, ok := provider.config.Transport.Nomad(); ok {
-		configureNomadTransportFromEnvironment(nomad)
+
+	nomadTransport := newEmbeddedTransportNomadv1()
+	configureNomadTransportFromEnvironment(nomadTransport)
+	if nomadTransport.IsConfigured() {
+		assert.NoError(t, provider.config.Transport.SetTransportState(nomadTransport))
 	}
 
 	var datasourceOverrides []datarouter.DataSource

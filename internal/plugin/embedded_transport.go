@@ -251,16 +251,16 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 		if !tType.isKnown() {
 			return fmt.Errorf("failed to unmarshall unknown transport config: %s", key)
 		}
+		transport, err := tType.createTransport()
+		if err != nil {
+			return err
+		}
 		if val.IsKnown() {
-			transport, err := tType.createTransport()
-			if err != nil {
-				return err
-			}
 			if err := transport.FromTerraform5Value(val); err != nil {
 				return err
 			}
-			em.transports[tType] = transport
 		}
+		em.transports[tType] = transport
 	}
 
 	return nil
@@ -275,19 +275,16 @@ func (em *embeddedTransportV1) Terraform5Type() tftypes.Type {
 // the value unmarshalled via FromTerraform5Value. Do not try to add or remove attributes, Terraform
 // does not like that.
 func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
-	values := map[string]tftypes.Value{}
-	attributeTypes := map[string]tftypes.Type{}
-
-	for tType, transport := range em.transports {
-		if transport.IsConfigured() {
-			value := transport.Terraform5Value()
-			values[tType.String()] = value
-			attributeTypes[tType.String()] = value.Type()
-		}
+	if len(em.transports) == 0 {
+		return tftypes.NewValue(em.Terraform5Type(), nil)
 	}
 
-	if len(values) == 0 {
-		return tftypes.NewValue(em.Terraform5Type(), nil)
+	values := map[string]tftypes.Value{}
+	attributeTypes := map[string]tftypes.Type{}
+	for tType, transport := range em.transports {
+		value := transport.Terraform5Value()
+		values[tType.String()] = value
+		attributeTypes[tType.String()] = value.Type()
 	}
 
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: attributeTypes}, values)
@@ -516,6 +513,12 @@ func addAttributesForReplace(priorState, proposedState transportState, attrs []*
 }
 
 func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Value, transportType string) error {
+	// If we're verifying the configuration we must have some values. This error indicates that
+	// someone configured the transport with null or an empty map/object which is not allowed, i.e.:
+	// transport = { kubernetes = {} } or transport = { nomad = null }
+	if len(values) == 0 {
+		return fmt.Errorf("%s transport configuration cannot be empty", transportType)
+	}
 	// Because the transport type is a dynamic psuedo type we have to manually ensure
 	// that the user hasn't set any unknown attributes.
 	isKnownAttribute := func(attr string) error {

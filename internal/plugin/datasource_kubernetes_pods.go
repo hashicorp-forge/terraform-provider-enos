@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
@@ -12,6 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
+
+const defaultWaitTimeout = time.Minute
 
 type podInfoGetter func(ctx context.Context, state kubernetesPodsStateV1) ([]kubernetes.PodInfo, error)
 
@@ -24,11 +27,27 @@ var defaultPodInfoGetter podInfoGetter = func(ctx context.Context, state kuberne
 		return nil, fmt.Errorf("failed to create a Kubernetes Client, due to: %w", err)
 	}
 
-	pods, err := client.QueryPodInfos(ctx, kubernetes.QueryPodInfosRequest{
+	request := kubernetes.QueryPodInfosRequest{
 		Namespace:     state.Namespace.Value(),
 		LabelSelector: strings.Join(state.LabelSelectors.StringValue(), ","),
 		FieldSelector: strings.Join(state.FieldSelectors.StringValue(), ","),
-	})
+	}
+
+	if count, ok := state.ExpectedPodCount.Get(); ok {
+		request.ExpectedPodCount = count
+	}
+
+	if timeout, ok := state.WaitTimeout.Get(); ok {
+		timeout, err := time.ParseDuration(timeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse 'wait_timeout': %s", timeout)
+		}
+		request.WaitTimeout = timeout
+	} else {
+		request.WaitTimeout = defaultWaitTimeout
+	}
+
+	pods, err := client.QueryPodInfos(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pods, due to: %w", err)
 	}
@@ -52,6 +71,8 @@ type kubernetesPodsStateV1 struct {
 	FieldSelectors   *tfStringSlice
 	Pods             *tfObjectSlice
 	Transports       *tfObjectSlice
+	ExpectedPodCount *tfNum
+	WaitTimeout      *tfString
 
 	failureHandlers
 }
@@ -91,6 +112,8 @@ func newKubernetesPodStateV1() *kubernetesPodsStateV1 {
 		Namespace:        newTfString(),
 		LabelSelectors:   newTfStringSlice(),
 		FieldSelectors:   newTfStringSlice(),
+		ExpectedPodCount: newTfNum(),
+		WaitTimeout:      newTfString(),
 		Pods:             pods,
 		Transports:       transports,
 		failureHandlers:  failureHandlers{},
@@ -251,6 +274,18 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 					Optional:    true,
 				},
 				{
+					Name:        "expected_pod_count",
+					Description: "The number of pods that are expected to be found matching the query.",
+					Type:        tftypes.Number,
+					Optional:    true,
+				},
+				{
+					Name:        "wait_timeout",
+					Description: "The amount of time to wait for the pods found in the query to be in the 'Running' state. If not provided a default of 1m will be used.",
+					Type:        tftypes.String,
+					Optional:    true,
+				},
+				{
 					Name:        "pods",
 					Description: "A list of PodInfo objects for all the pods that match the search.",
 					Type:        s.Pods.TFType(),
@@ -295,6 +330,19 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 		return ValidationError("invalid kubeconfig, kubeconfig should be a valid base64 encoded kubeconfig string", "kubeconfig_base64")
 	}
 
+	if timeout, ok := s.WaitTimeout.Get(); ok {
+		_, err := time.ParseDuration(timeout)
+		if err != nil {
+			return ValidationError(fmt.Sprintf("failed to parse duration [%s]", timeout), "wait_timeout")
+		}
+	}
+
+	if count, ok := s.ExpectedPodCount.Get(); ok {
+		if count <= 0 {
+			return ValidationError("expected pod count must be greater than 0", "expected_pod_count")
+		}
+	}
+
 	// check if the context is exists in the provided kubeconfig
 	if _, ok := kubeConfig.Contexts[contextName]; !ok {
 		return ValidationError(fmt.Sprintf("context: [%s] not present in the provided kubeconfig", contextName), "context_name")
@@ -306,14 +354,16 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
-		"id":                s.ID,
-		"kubeconfig_base64": s.KubeConfigBase64,
-		"context_name":      s.ContextName,
-		"namespace":         s.Namespace,
-		"label_selectors":   s.LabelSelectors,
-		"field_selectors":   s.FieldSelectors,
-		"pods":              s.Pods,
-		"transports":        s.Transports,
+		"id":                 s.ID,
+		"kubeconfig_base64":  s.KubeConfigBase64,
+		"context_name":       s.ContextName,
+		"namespace":          s.Namespace,
+		"label_selectors":    s.LabelSelectors,
+		"field_selectors":    s.FieldSelectors,
+		"expected_pod_count": s.ExpectedPodCount,
+		"wait_timeout":       s.WaitTimeout,
+		"pods":               s.Pods,
+		"transports":         s.Transports,
 	})
 
 	return err
@@ -323,27 +373,31 @@ func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 func (s *kubernetesPodsStateV1) Terraform5Type() tftypes.Type {
 	// TODO: Add each state attribute
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                s.ID.TFType(),
-		"kubeconfig_base64": s.KubeConfigBase64.TFType(),
-		"context_name":      s.ContextName.TFType(),
-		"namespace":         s.Namespace.TFType(),
-		"label_selectors":   s.LabelSelectors.TFType(),
-		"field_selectors":   s.FieldSelectors.TFType(),
-		"pods":              s.Pods.TFType(),
-		"transports":        s.Transports.TFType(),
+		"id":                 s.ID.TFType(),
+		"kubeconfig_base64":  s.KubeConfigBase64.TFType(),
+		"context_name":       s.ContextName.TFType(),
+		"namespace":          s.Namespace.TFType(),
+		"label_selectors":    s.LabelSelectors.TFType(),
+		"field_selectors":    s.FieldSelectors.TFType(),
+		"expected_pod_count": s.ExpectedPodCount.TFType(),
+		"wait_timeout":       s.WaitTimeout.TFType(),
+		"pods":               s.Pods.TFType(),
+		"transports":         s.Transports.TFType(),
 	}}
 }
 
 // Terraform5Value is the file state tftypes.Value.
 func (s *kubernetesPodsStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":                s.ID.TFValue(),
-		"kubeconfig_base64": s.KubeConfigBase64.TFValue(),
-		"context_name":      s.ContextName.TFValue(),
-		"namespace":         s.Namespace.TFValue(),
-		"label_selectors":   s.LabelSelectors.TFValue(),
-		"field_selectors":   s.FieldSelectors.TFValue(),
-		"pods":              s.Pods.TFValue(),
-		"transports":        s.Transports.TFValue(),
+		"id":                 s.ID.TFValue(),
+		"kubeconfig_base64":  s.KubeConfigBase64.TFValue(),
+		"context_name":       s.ContextName.TFValue(),
+		"namespace":          s.Namespace.TFValue(),
+		"label_selectors":    s.LabelSelectors.TFValue(),
+		"field_selectors":    s.FieldSelectors.TFValue(),
+		"expected_pod_count": s.ExpectedPodCount.TFValue(),
+		"wait_timeout":       s.WaitTimeout.TFValue(),
+		"pods":               s.Pods.TFValue(),
+		"transports":         s.Transports.TFValue(),
 	})
 }

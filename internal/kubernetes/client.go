@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +21,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
+
+	"github.com/hashicorp/enos-provider/internal/retry"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -89,6 +92,10 @@ type QueryPodInfosRequest struct {
 	Namespace     string
 	LabelSelector string
 	FieldSelector string
+	// ExpectedPodCount the expected number of pods that should be returned from the query
+	ExpectedPodCount int
+	// WaitTimeout the amount of time to wait for the pods to be in the 'RUNNING' state
+	WaitTimeout time.Duration
 }
 
 type PodInfo struct {
@@ -199,27 +206,78 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 		namespace = defaultNamespace
 	}
 
-	podList, err := c.clientset.
-		CoreV1().
-		Pods(namespace).
-		List(ctx, metav1.ListOptions{
-			LabelSelector: req.LabelSelector,
-			FieldSelector: req.FieldSelector,
-		})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get pods names, due to: %w", err)
+	queryFunc := func(queryCtx context.Context) (interface{}, error) {
+		podList, err := c.clientset.
+			CoreV1().
+			Pods(namespace).
+			List(ctx, metav1.ListOptions{
+				LabelSelector: req.LabelSelector,
+				FieldSelector: req.FieldSelector,
+			})
+		if err != nil {
+			return nil, fmt.Errorf("failed to query pods for request: %#v, due to: %w", req, err)
+		}
+		if podList == nil || len(podList.Items) == 0 {
+			return nil, fmt.Errorf("failed to find any pods for request: %#v", req)
+		}
+
+		if req.ExpectedPodCount > 0 {
+			if len(podList.Items) != req.ExpectedPodCount {
+				return nil, fmt.Errorf("expected to find: [%d] pods found: [%d]", req.ExpectedPodCount, len(podList.Items))
+			}
+		}
+
+		for _, pod := range podList.Items {
+			if pod.Status.Phase != v1.PodRunning {
+				return nil, fmt.Errorf("expected pod 'Phase' to be [%s], was: [%s], for pod: [%s]",
+					v1.PodRunning, pod.Status.Phase, pod.Name)
+			}
+		}
+
+		return podList.Items, nil
 	}
 
-	var pods []PodInfo
-	for _, pod := range podList.Items {
-		pods = append(pods, PodInfo{
+	var err error
+	var result interface{}
+	if req.WaitTimeout > 0 {
+		retrier, err := retry.NewRetrier(
+			retry.WithRetrierFunc(queryFunc),
+			retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
+			retry.WithMaxRetries(10), // we will rely on the timeout context below to end the retires
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query pods, due to: %w", err)
+		}
+
+		queryCtx, cancel := context.WithTimeout(ctx, req.WaitTimeout)
+		defer cancel()
+
+		result, err = retry.Retry(queryCtx, retrier)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query pods, due to: %w", err)
+		}
+	} else {
+		result, err = queryFunc(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query pods, due to: %w", err)
+		}
+	}
+
+	pods, ok := result.([]v1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("failed to process pod query result")
+	}
+
+	var podInfos []PodInfo
+	for _, pod := range pods {
+		podInfos = append(podInfos, PodInfo{
 			Name:       pod.Name,
 			Namespace:  pod.Namespace,
 			Containers: getContainers(pod),
 		})
 	}
 
-	return pods, err
+	return podInfos, err
 }
 
 func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error) {

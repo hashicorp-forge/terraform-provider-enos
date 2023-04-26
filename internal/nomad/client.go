@@ -26,7 +26,7 @@ type GetTaskLogsResponse struct {
 var _ remoteflight.GetLogsResponse = (*GetTaskLogsResponse)(nil)
 
 // GetAppName implements remoteflight.GetLogsResponse.GetAppName
-func (r GetTaskLogsResponse) GetAppName() string {
+func (r *GetTaskLogsResponse) GetAppName() string {
 	return r.Task
 }
 

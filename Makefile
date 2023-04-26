@@ -6,7 +6,7 @@ PROVIDER_NAME?=enos
 PROVIDER_BIN_NAME=terraform-provider-enos
 PROVIDER_BIN_OS?=$$(go env GOOS)
 PROVIDER_BIN_ARCH?=$$(go env GOARCH)
-PROVIDER_BIN_VERSION=$$(cat VERSION)
+PROVIDER_BIN_VERSION?=$$(cat VERSION)
 PROVIDER_BUILD_TAGS?=-tags osusergo,netgo
 PROVIDER_LD_FLAGS?=-ldflags="-extldflags=-static"
 
@@ -83,12 +83,12 @@ test-race-detector:
 .PHONY: test-k8s
 test-k8s: K8S_TEST_DIR = $(ENOS_CLI_TEST_DIR)/k8s
 test-k8s:
-	rm -rf $(ENOS_CLI_TEST_DIR); mkdir -p $(ENOS_CLI_TEST_DIR); \
-	cp -r enoscli-tests $(TEST_BLD_DIR); \
-    LC_ALL=C grep -lr "ENOS_PROVIDER_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_NAME/$(PROVIDER_NAME)/g" ; \
-    LC_ALL=C grep -lr "ENOS_PROVIDER_VERSION" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_VERSION/$(PROVIDER_BIN_VERSION)/g" ; \
-    enos scenario launch -d $(K8S_TEST_DIR) kind_cluster; \
-    enos scenario output -d $(K8S_TEST_DIR) kind_cluster; \
+	rm -rf $(ENOS_CLI_TEST_DIR); mkdir -p $(ENOS_CLI_TEST_DIR) && \
+	cp -r enoscli-tests $(TEST_BLD_DIR) && \
+    LC_ALL=C grep -lr "ENOS_PROVIDER_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_NAME/$(PROVIDER_NAME)/g" && \
+    LC_ALL=C grep -lr "ENOS_PROVIDER_VERSION" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_VERSION/$(PROVIDER_BIN_VERSION)/g" && \
+    enos scenario launch -d $(K8S_TEST_DIR) kind_cluster && \
+    enos scenario output -d $(K8S_TEST_DIR) kind_cluster && \
     enos scenario destroy -d $(K8S_TEST_DIR) kind_cluster
 
 # run the k8s enoscli tests for the dev release
