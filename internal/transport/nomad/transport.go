@@ -9,14 +9,14 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-// transport a Nomad based transport implementation
+// transport a Nomad based transport implementation.
 type transport struct {
 	client       nomad.Client
 	allocationID string
 	taskName     string
 }
 
-// TransportOpts are the options required in order to create the nomad transport
+// TransportOpts are the options required in order to create the nomad transport.
 type TransportOpts struct {
 	Host         string
 	SecretID     string
@@ -77,5 +77,6 @@ func (t *transport) Stream(ctx context.Context, command it.Command) (stdout io.R
 
 func (t *transport) Close() error {
 	t.client.Close()
+
 	return nil
 }

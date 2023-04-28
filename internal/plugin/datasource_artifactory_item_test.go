@@ -15,6 +15,8 @@ import (
 // TestAccDataSourceArtifacotoryItem is an integration test that uses the
 // actual HashiCorp artifactory service to resolve items based on the search
 // criteria.
+//
+//nolint:paralleltest// because our resource handles it
 func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 	state := newArtifactoryItemStateV1()
 	_, okacc := os.LookupEnv("TF_ACC")
@@ -26,6 +28,7 @@ func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 	if !(okacc && okuser && oktoken && okver && okrev) {
 		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACATORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
 		t.Skip()
+
 		return
 	}
 

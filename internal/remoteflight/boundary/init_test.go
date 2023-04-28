@@ -6,8 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestInitRequestString tests that the init request becomes a valid string
+// TestInitRequestString tests that the init request becomes a valid string.
 func TestInitRequestString(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		expected string
 		opts     []InitRequestOpt
@@ -21,7 +22,9 @@ func TestInitRequestString(t *testing.T) {
 			},
 		},
 	} {
+		test := test
 		t.Run(test.expected, func(t *testing.T) {
+			t.Parallel()
 			req := NewInitRequest(test.opts...)
 			require.NoError(t, req.Validate())
 			require.Equal(t, test.expected, req.String())
@@ -29,8 +32,9 @@ func TestInitRequestString(t *testing.T) {
 	}
 }
 
-// TestInitRequestValidate tests the init request validation
+// TestInitRequestValidate tests the init request validation.
 func TestInitRequestValidate(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		desc string
 		opts []InitRequestOpt
@@ -61,7 +65,9 @@ func TestInitRequestValidate(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			req := NewInitRequest(test.opts...)
 			if test.pass {
 				require.NoError(t, req.Validate())

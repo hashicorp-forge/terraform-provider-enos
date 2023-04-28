@@ -9,6 +9,8 @@ import (
 )
 
 func TestParseConsulVersionInRange(t *testing.T) {
+	t.Parallel()
+
 	r, err := semver.ParseRange(">= 1.10.3")
 	require.NoError(t, err)
 
@@ -23,7 +25,9 @@ func TestParseConsulVersionInRange(t *testing.T) {
 		{"Consul v1.11.0-beta2+ent", true},
 		{"Consul v1.10.3", true},
 	} {
+		test := test
 		t.Run(test.version, func(t *testing.T) {
+			t.Parallel()
 			version, err := parseConsulVersion(test.version)
 			require.NoError(t, err)
 
@@ -37,6 +41,8 @@ func TestParseConsulVersionInRange(t *testing.T) {
 }
 
 func TestParseConsulVersion(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		version string
 		major   uint64
@@ -52,7 +58,9 @@ func TestParseConsulVersion(t *testing.T) {
 		{"Consul v1.11.0-beta2+ent", 1, 11, 0, "ent", "beta2"},
 		{"Consul v1.10.3", 1, 10, 3, "", ""},
 	} {
+		test := test
 		t.Run(test.version, func(t *testing.T) {
+			t.Parallel()
 			version, err := parseConsulVersion(test.version)
 			require.NoError(t, err)
 

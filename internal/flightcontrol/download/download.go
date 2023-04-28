@@ -10,7 +10,7 @@ import (
 	"net/url"
 )
 
-// Request is a download request
+// Request is a download request.
 type Request struct {
 	URL          *url.URL
 	HTTPMethod   string
@@ -20,10 +20,10 @@ type Request struct {
 	AuthPassword string
 }
 
-// RequestOpt are functional options for a new Request
+// RequestOpt are functional options for a new Request.
 type RequestOpt func(*Request) (*Request, error)
 
-// WithRequestDestination sets the destination
+// WithRequestDestination sets the destination.
 func WithRequestDestination(dst io.WriteCloser) RequestOpt {
 	return func(req *Request) (*Request, error) {
 		req.Destination = dst
@@ -31,40 +31,44 @@ func WithRequestDestination(dst io.WriteCloser) RequestOpt {
 	}
 }
 
-// WithRequestURL sets the source download URL
+// WithRequestURL sets the source download URL.
 func WithRequestURL(u string) RequestOpt {
 	return func(req *Request) (*Request, error) {
 		var err error
 		req.URL, err = url.Parse(u)
+
 		return req, err
 	}
 }
 
-// WithRequestSHA256 sets the required SHA 256 sum
+// WithRequestSHA256 sets the required SHA 256 sum.
 func WithRequestSHA256(sha string) RequestOpt {
 	return func(req *Request) (*Request, error) {
 		req.SHA256 = sha
+
 		return req, nil
 	}
 }
 
-// WithRequestAuthUser sets the basic auth user
+// WithRequestAuthUser sets the basic auth user.
 func WithRequestAuthUser(user string) RequestOpt {
 	return func(req *Request) (*Request, error) {
 		req.AuthUser = user
+
 		return req, nil
 	}
 }
 
-// WithRequestAuthPassword sets the basic auth password
+// WithRequestAuthPassword sets the basic auth password.
 func WithRequestAuthPassword(password string) RequestOpt {
 	return func(req *Request) (*Request, error) {
 		req.AuthPassword = password
+
 		return req, nil
 	}
 }
 
-// NewRequest takes N RequestOpt args and returns a new request
+// NewRequest takes N RequestOpt args and returns a new request.
 func NewRequest(opts ...RequestOpt) (*Request, error) {
 	r := &Request{
 		HTTPMethod: http.MethodGet,
@@ -105,7 +109,7 @@ func Download(ctx context.Context, req *Request) error {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			return fmt.Errorf("reading download query response body: %w", err)

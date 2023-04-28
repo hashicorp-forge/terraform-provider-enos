@@ -14,10 +14,10 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-// CopyWriter a function that can write the stdin for a copy request
+// CopyWriter a function that can write the stdin for a copy request.
 type CopyWriter func(errorC chan error)
 
-// TarCopyWriter creates a new CopyWriter that uses tar to copy a file
+// TarCopyWriter creates a new CopyWriter that uses tar to copy a file.
 func TarCopyWriter(src Copyable, dst string, stdin io.WriteCloser) CopyWriter {
 	return func(errorC chan error) {
 		defer stdin.Close()
@@ -41,23 +41,24 @@ func TarCopyWriter(src Copyable, dst string, stdin io.WriteCloser) CopyWriter {
 }
 
 // ExecError An exec error is a wrapper error that all transport implementations should return if the
-// exec failed with an exit code
+// exec failed with an exit code.
 type ExecError struct {
 	merr     *multierror.Error
 	exitCode int
 }
 
-// NewExecError creates a new ExecError with the provided exitCode and wrapped error
+// NewExecError creates a new ExecError with the provided exitCode and wrapped error.
 func NewExecError(err error, exitCode int) error {
 	merr := &multierror.Error{}
 	merr = multierror.Append(merr, err)
+
 	return &ExecError{
 		merr:     merr,
 		exitCode: exitCode,
 	}
 }
 
-// Error returns the wrapped error
+// Error returns the wrapped error.
 func (e *ExecError) Error() string {
 	if len(e.merr.Errors) == 1 {
 		return e.merr.Unwrap().Error()
@@ -70,6 +71,7 @@ func (e *ExecError) Unwrap() error {
 	if len(e.merr.Errors) == 1 {
 		return e.merr.Unwrap()
 	}
+
 	return e.merr.ErrorOrNil()
 }
 
@@ -81,7 +83,7 @@ func (e *ExecError) ExitCode() int {
 	return e.exitCode
 }
 
-// ExecRequest can be used to execute a remote command
+// ExecRequest can be used to execute a remote command.
 type ExecRequest interface {
 	// Exec executes a remote command
 	Exec(ctx context.Context) *ExecResponse
@@ -89,7 +91,7 @@ type ExecRequest interface {
 	Streams() *ExecStreams
 }
 
-// ExecStreams The IO streams associated with an ExecRequest
+// ExecStreams The IO streams associated with an ExecRequest.
 type ExecStreams struct {
 	stdoutReader io.Reader
 	stdoutWriter io.WriteCloser
@@ -146,7 +148,7 @@ func (e *ExecStreams) StdinWriter() io.WriteCloser {
 }
 
 // Close closes all the streams and returns the aggregate error if any error occurred while closing
-// any of the streams
+// any of the streams.
 func (e *ExecStreams) Close() error {
 	merr := &multierror.Error{}
 
@@ -159,7 +161,7 @@ func (e *ExecStreams) Close() error {
 	return merr.ErrorOrNil()
 }
 
-// ExecResponse a Response that a transport exec request should return
+// ExecResponse a Response that a transport exec request should return.
 type ExecResponse struct {
 	Stdout  io.Reader
 	Stderr  io.Reader
@@ -234,7 +236,7 @@ func (e *ExecResponse) WaitForResults() (stdout, stderr string, err error) {
 	return stdout, stderr, err
 }
 
-// Copy executes a copy request
+// Copy executes a copy request.
 func Copy(ctx context.Context, copyWriter CopyWriter, dst string, request ExecRequest) error {
 	writeErrC := make(chan error, 1)
 
@@ -263,6 +265,7 @@ func Copy(ctx context.Context, copyWriter CopyWriter, dst string, request ExecRe
 			// here and append the exec error first then the other errors.
 			allErrors := &multierror.Error{}
 			allErrors = multierror.Append(allErrors, execErr, merr)
+
 			return allErrors.ErrorOrNil()
 		}
 	}
@@ -270,7 +273,7 @@ func Copy(ctx context.Context, copyWriter CopyWriter, dst string, request ExecRe
 	return merr.ErrorOrNil()
 }
 
-// Stream executes a streaming remote request
+// Stream executes a streaming remote request.
 func Stream(ctx context.Context, request ExecRequest) (stdout io.Reader, stderr io.Reader, errC chan error) {
 	response := request.Exec(ctx)
 
@@ -281,7 +284,7 @@ func Stream(ctx context.Context, request ExecRequest) (stdout io.Reader, stderr 
 	return stdout, stderr, errC
 }
 
-// Run executes a remote exec and blocks waiting for the results
+// Run executes a remote exec and blocks waiting for the results.
 func Run(ctx context.Context, request ExecRequest) (stdout string, stderr string, err error) {
 	return request.Exec(ctx).WaitForResults()
 }

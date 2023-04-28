@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// transportRenderFunc can be used to render the embedded transport in a resource template
+// transportRenderFunc can be used to render the embedded transport in a resource template.
 var transportRenderFunc = map[string]any{
 	"renderTransport": func(v1 *embeddedTransportV1) (string, error) {
 		return v1.render()
@@ -37,7 +37,7 @@ func readTestFile(path string) (string, error) {
 	if err != nil {
 		return res, err
 	}
-	defer handle.Close() // nolint: staticcheck
+	defer handle.Close()
 
 	buf := bytes.Buffer{}
 	_, err = buf.ReadFrom(handle)
@@ -84,6 +84,7 @@ var startEnv = func() map[string]string {
 }()
 
 func resetEnv(t *testing.T) {
+	t.Helper()
 	unsetAllEnosEnv(t)
 
 	for key, val := range startEnv {
@@ -100,6 +101,8 @@ func unsetAllEnosEnv(t *testing.T) {
 }
 
 func unsetSSHEnv(t *testing.T) {
+	t.Helper()
+
 	for _, eVar := range []string{
 		"ENOS_TRANSPORT_USER",
 		"ENOS_TRANSPORT_HOST",
@@ -113,6 +116,8 @@ func unsetSSHEnv(t *testing.T) {
 }
 
 func unsetK8SEnv(t *testing.T) {
+	t.Helper()
+
 	for _, eVar := range []string{
 		"ENOS_KUBECONFIG",
 		"ENOS_K8S_CONTEXT_NAME",
@@ -125,6 +130,8 @@ func unsetK8SEnv(t *testing.T) {
 }
 
 func unsetNomadEnv(t *testing.T) {
+	t.Helper()
+
 	for _, eVar := range []string{
 		"ENOS_NOMAD_HOST",
 		"ENOS_NOMAD_SECRET_ID",
@@ -136,6 +143,7 @@ func unsetNomadEnv(t *testing.T) {
 }
 
 func unsetProviderEnv(t *testing.T) {
+	t.Helper()
 	assert.NoError(t, os.Unsetenv(enosDebugDataRootDirEnvVarKey))
 }
 
@@ -183,6 +191,7 @@ func setENosNomadEnv(t *testing.T, et *embeddedTransportV1) {
 
 func setEnvVars(t *testing.T, vars map[string]*tfString) {
 	t.Helper()
+
 	for key, val := range vars {
 		v, ok := val.Get()
 		if ok {
@@ -205,6 +214,7 @@ func ensureEnosTransportEnvVars(t *testing.T) (map[string]string, bool) {
 	if !(okacc && okuser && okhost && okpath) {
 		t.Log(`skipping because TF_ACC, ENOS_TRANSPORT_USER, ENOS_TRANSPORT_HOST, and ENOS_TRANSPORT_PRIVATE_KEY_PATH environment variables need to be set`)
 		t.Skip()
+
 		return vars, false
 	}
 
@@ -311,6 +321,7 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 	}
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
+		//nolint:unparam// we always return nil here but we have to adhere to an interface that can return an error
 		"enos": func() (tfprotov6.ProviderServer, error) {
 			return server.New(
 				server.RegisterProvider(provider),

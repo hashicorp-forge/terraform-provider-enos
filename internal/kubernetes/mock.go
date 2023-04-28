@@ -6,7 +6,7 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-// MockClient a mock Kubernetes Client
+// MockClient a mock Kubernetes Client.
 type MockClient struct {
 	NewExecRequestFunc func(opts ExecRequestOpts) it.ExecRequest
 	QueryPodInfosFunc  func(ctx context.Context, req QueryPodInfosRequest) ([]PodInfo, error)

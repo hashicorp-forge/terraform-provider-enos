@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tfsdklog"
 )
 
-// Logger provides an interface to the terraform-plugin-log to make it easier to use
+// Logger provides an interface to the terraform-plugin-log to make it easier to use.
 type Logger interface {
 	// With creates a new logger which will include the provided key/value in each log message
 	With(key string, value interface{}) Logger
@@ -29,6 +29,7 @@ type logger struct {
 
 func (l *logger) With(key string, value interface{}) Logger {
 	l.ctx = tfsdklog.SetField(l.ctx, key, value)
+
 	return l
 }
 
@@ -36,6 +37,7 @@ func (l *logger) WithValues(values map[string]interface{}) Logger {
 	for key, value := range values {
 		l.ctx = tfsdklog.SetField(l.ctx, key, value)
 	}
+
 	return l
 }
 

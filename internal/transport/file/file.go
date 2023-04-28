@@ -14,7 +14,7 @@ type copyableFile struct {
 
 var _ it.Copyable = (*copyableFile)(nil)
 
-// Open takes a path and return a Copyable
+// Open takes a path and return a Copyable.
 func Open(path string) (it.Copyable, error) {
 	var err error
 	f := &copyableFile{}

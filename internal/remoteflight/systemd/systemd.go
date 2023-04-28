@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// StatusCode is a systemd exit code from a status check
+// StatusCode is a systemd exit code from a status check.
 type StatusCode int
 
 const (
@@ -23,10 +23,10 @@ const (
 	StatusUnknown  StatusCode = 9
 )
 
-// serviceInfoRegex is the regex used to parse the systemctl services output into a slice of ServiceInfo
+// serviceInfoRegex is the regex used to parse the systemctl services output into a slice of ServiceInfo.
 var serviceInfoRegex = regexp.MustCompile(`^(?P<unit>\S+)\.service\s+(?P<load>\S+)\s+(?P<active>\S+)\s+(?P<sub>\S+)\s+(?P<description>\S.*)$`)
 
-// KnownServices are list of known HashiCorp services
+// KnownServices are list of known HashiCorp services.
 var KnownServices = []string{"boundary", "consul", "vault"}
 
 type GetLogsRequest struct {
@@ -51,7 +51,7 @@ type ServiceInfo struct {
 
 var _ remoteflight.GetLogsResponse = (*GetLogsResponse)(nil)
 
-// GetAppName implements remoteflight.GetLogsResponse
+// GetAppName implements remoteflight.GetLogsResponse.
 func (s GetLogsResponse) GetAppName() string {
 	return s.Unit
 }
@@ -64,7 +64,7 @@ func (s GetLogsResponse) GetLogs() []byte {
 	return s.Logs
 }
 
-// Client an interface for a sysetmd client
+// Client an interface for a sysetmd client.
 type Client interface {
 	// ListServices gets the list of systemd services installed
 	ListServices(ctx context.Context) ([]ServiceInfo, error)
@@ -150,7 +150,7 @@ func (c *client) CreateUnitFile(ctx context.Context, req *CreateUnitFileRequest)
 	return remoteflight.CopyFile(ctx, c.transport, remoteflight.NewCopyFileRequest(copyOpts...))
 }
 
-// ListServices gets the list of systemd services installed
+// ListServices gets the list of systemd services installed.
 func (c *client) ListServices(ctx context.Context) ([]ServiceInfo, error) {
 	res, err := c.RunSystemctlCommand(ctx, NewRunSystemctlCommand(
 		WithSystemctlCommandSubCommand(SystemctlSubCommandListUnits),
@@ -164,7 +164,7 @@ func (c *client) ListServices(ctx context.Context) ([]ServiceInfo, error) {
 	return parseServiceInfos(res.Stdout), nil
 }
 
-// RunSystemctlCommand runs a systemctl command request
+// RunSystemctlCommand runs a systemctl command request.
 func (c *client) RunSystemctlCommand(ctx context.Context, req *SystemctlCommandReq) (*SystemctlCommandRes, error) {
 	res := &SystemctlCommandRes{}
 	cmd, err := req.String()
@@ -239,7 +239,7 @@ func (c *client) RestartService(ctx context.Context, unit string) error {
 	return c.StartService(ctx, unit)
 }
 
-// ServiceStatus returns the systemd status of the systemd service (until we have a better way)
+// ServiceStatus returns the systemd status of the systemd service (until we have a better way).
 func (c *client) ServiceStatus(ctx context.Context, unit string) StatusCode {
 	res, err := c.RunSystemctlCommand(ctx, NewRunSystemctlCommand(
 		WithSystemctlCommandUnitName(unit),
@@ -255,6 +255,7 @@ func (c *client) ServiceStatus(ctx context.Context, unit string) StatusCode {
 	if res.Status != 0 {
 		statusCode = StatusCode(res.Status)
 	}
+
 	return statusCode
 }
 
@@ -263,7 +264,7 @@ func (c *client) IsActiveService(ctx context.Context, unit string) bool {
 	return status == StatusActive
 }
 
-// parseServiceInfos parses the systemctl services output into a slice of ServiceInfos
+// parseServiceInfos parses the systemctl services output into a slice of ServiceInfos.
 func parseServiceInfos(services string) []ServiceInfo {
 	serviceInfos := []ServiceInfo{}
 	for _, line := range strings.Split(services, "\n") {
@@ -285,5 +286,6 @@ func parseServiceInfos(services string) []ServiceInfo {
 			Description: result["description"],
 		})
 	}
+
 	return serviceInfos
 }

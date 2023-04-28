@@ -33,7 +33,7 @@ const (
 	defaultNamespace = "default"
 )
 
-// GetPodInfoRequest a request for getting pod info
+// GetPodInfoRequest a request for getting pod info.
 type GetPodInfoRequest struct {
 	// Namespace the namespace that the pod is in
 	Namespace string
@@ -41,7 +41,7 @@ type GetPodInfoRequest struct {
 	Name string
 }
 
-// Client A wrapper around the k8s clientset that provides an api that the provider can use
+// Client A wrapper around the k8s clientset that provides an api that the provider can use.
 type Client interface {
 	// NewExecRequest creates a new exec request for the given opts
 	NewExecRequest(opts ExecRequestOpts) it.ExecRequest
@@ -73,7 +73,7 @@ func NewClient(cfg ClientCfg) (Client, error) {
 	}, nil
 }
 
-// execRequest A kubernetes based exec request
+// execRequest A kubernetes based exec request.
 type execRequest struct {
 	client  *client
 	opts    ExecRequestOpts
@@ -121,7 +121,7 @@ type GetPodLogsResponse struct {
 
 var _ remoteflight.GetLogsResponse = (*GetPodLogsResponse)(nil)
 
-// GetAppName implements remoteflight.GetLogsResponse.GetAppName
+// GetAppName implements remoteflight.GetLogsResponse.GetAppName.
 func (p GetPodLogsResponse) GetAppName() string {
 	return p.Container
 }
@@ -268,13 +268,13 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 		return nil, fmt.Errorf("failed to process pod query result")
 	}
 
-	var podInfos []PodInfo
-	for _, pod := range pods {
-		podInfos = append(podInfos, PodInfo{
-			Name:       pod.Name,
-			Namespace:  pod.Namespace,
-			Containers: getContainers(pod),
-		})
+	podInfos := make([]PodInfo, len(pods))
+	for i := range pods {
+		podInfos[i] = PodInfo{
+			Name:       pods[i].Name,
+			Namespace:  pods[i].Namespace,
+			Containers: getContainers(pods[i]),
+		}
 	}
 
 	return podInfos, err
@@ -406,7 +406,7 @@ func (c *client) createExecutor(execRequest execRequest) (remotecommand.Executor
 
 // GetKubeConfigPath given a kubeConfigPath that might be empty gets a kubeconfig path, by returning
 // the provided value if is not empty, or the value of the kubeConfigEnv if set, or the default
-// kubeconfig path in the users' home dir (~/.kube/config)
+// kubeconfig path in the users' home dir (~/.kube/config).
 func GetKubeConfigPath(kubeConfigPath string) (string, error) {
 	if kubeConfigPath != "" {
 		return kubeConfigPath, nil
@@ -434,9 +434,14 @@ func GetKubeConfigPath(kubeConfigPath string) (string, error) {
 }
 
 func getContainers(pod v1.Pod) []string {
-	var containers []string
-	for _, container := range pod.Spec.Containers {
-		containers = append(containers, container.Name)
+	if pod.Spec.Containers == nil {
+		return nil
 	}
+
+	containers := make([]string, len(pod.Spec.Containers))
+	for i := range pod.Spec.Containers {
+		containers[i] = pod.Spec.Containers[i].Name
+	}
+
 	return containers
 }

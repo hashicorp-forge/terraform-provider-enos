@@ -12,13 +12,13 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-// Command is a cli.Command
+// Command is a cli.Command.
 type Command struct {
 	ui   cli.Ui
 	args *CommandArgs
 }
 
-// NewCommand takes a user interface and returns a new cli.Command
+// NewCommand takes a user interface and returns a new cli.Command.
 func NewCommand(ui cli.Ui) (*Command, error) {
 	return &Command{
 		ui:   ui,
@@ -26,7 +26,7 @@ func NewCommand(ui cli.Ui) (*Command, error) {
 	}, nil
 }
 
-// CommandArgs are the download commands arguments
+// CommandArgs are the download commands arguments.
 type CommandArgs struct {
 	flags        *flag.FlagSet
 	destination  string
@@ -39,12 +39,12 @@ type CommandArgs struct {
 	replace      bool
 }
 
-// Synopsis is the cli.Command synopsis
+// Synopsis is the cli.Command synopsis.
 func (c *Command) Synopsis() string {
 	return "Download a file"
 }
 
-// Help is the cli.Command help
+// Help is the cli.Command help.
 func (c *Command) Help() string {
 	help := `
 Usage: enos-flight-control download --url https://some/remote/file.txt --destination /local/path/file.txt --mode 0755 --timeout 5m --sha256 02b3...
@@ -63,10 +63,11 @@ Options:
   --replace        Replace the destination file if it exists
 
 `
+
 	return strings.TrimSpace(help)
 }
 
-// Run is the main cli.Command execution function
+// Run is the main cli.Command execution function.
 func (c *Command) Run(args []string) int {
 	err := c.args.Parse(args)
 	if err != nil {
@@ -83,7 +84,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// Parse parses the raw args and maps them to the CommandArgs
+// Parse parses the raw args and maps them to the CommandArgs.
 func (a *CommandArgs) Parse(args []string) error {
 	a.flags = flag.NewFlagSet("download", flag.ContinueOnError)
 	a.flags.StringVar(&a.destination, "destination", "", "where to write the resulting file")
@@ -103,7 +104,7 @@ func (a *CommandArgs) Parse(args []string) error {
 	return nil
 }
 
-// Download downloads the file and writes it to the destination
+// Download downloads the file and writes it to the destination.
 func (c *Command) Download() error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.args.timeout)
 	defer cancel()

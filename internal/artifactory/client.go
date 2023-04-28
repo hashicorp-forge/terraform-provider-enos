@@ -81,7 +81,7 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 		"query": query,
 	})
 
-	areq, err := http.NewRequestWithContext(ctx, "POST", search.String(), strings.NewReader(query))
+	areq, err := http.NewRequestWithContext(ctx, http.MethodPost, search.String(), strings.NewReader(query))
 	if err != nil {
 		return res, fmt.Errorf("generating artifactory search request: %w", err)
 	}
@@ -99,7 +99,7 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 		return res, fmt.Errorf("reading artifactory search query response body: %w", err)
 	}
 
-	if ares.StatusCode != 200 {
+	if ares.StatusCode != http.StatusOK {
 		return res, fmt.Errorf("executing artifactory search query: %s - %s", ares.Status, string(body))
 	}
 

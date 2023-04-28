@@ -13,24 +13,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// SealStatus the seal status for Vault
+// SealStatus the seal status for Vault.
 type SealStatus int
 
-// InitStatus the init status for Vault
+// InitStatus the init status for Vault.
 type InitStatus int
 
-// Vault status exit codes
+// Vault status exit codes.
 const (
 	UnSealed      SealStatus = 0
 	Error         SealStatus = 1
 	Sealed        SealStatus = 2
 	StatusUnknown SealStatus = 9
 
-	// Inactive - Vault not running
+	// Inactive - Vault not running.
 	Inactive InitStatus = 0
-	// Uninitialized - Vault active and uninitialized
+	// Uninitialized - Vault active and uninitialized.
 	Uninitialized InitStatus = 1
-	// Initialized - Vault active and initialized
+	// Initialized - Vault active and initialized.
 	Initialized InitStatus = 2
 )
 
@@ -45,6 +45,7 @@ func (s SealStatus) String() string {
 	case StatusUnknown:
 		return "StatusUnknown"
 	}
+
 	return "StatusUnknown"
 }
 
@@ -73,10 +74,11 @@ func (i InitStatus) String() string {
 	case Initialized:
 		return "Initialized"
 	}
+
 	return "StatusUnknown"
 }
 
-// State contains the information output from the vault status command
+// State contains the information output from the vault status command.
 type State struct {
 	SealType    string `json:"type"`
 	Initialized bool   `json:"initialized"`
@@ -105,6 +107,7 @@ func CheckIsUnsealed() StateCheck {
 		if s.Sealed {
 			return fmt.Errorf("expected Vault to be unsealed, state: %#v", s)
 		}
+
 		return nil
 	}
 }
@@ -114,6 +117,7 @@ func CheckIsActive() StateCheck {
 		if s.InitStatus == Inactive {
 			return fmt.Errorf("expected Vault to be active, state: %#v", s)
 		}
+
 		return nil
 	}
 }
@@ -123,30 +127,32 @@ func CheckIsInitialized() StateCheck {
 		if !s.Initialized {
 			return fmt.Errorf("expected Vault to be initialized, state: %#v", s)
 		}
+
 		return nil
 	}
 }
 
-// CheckSealStatusKnown returns true if the seal status is either Sealed or Unsealed
+// CheckSealStatusKnown returns true if the seal status is either Sealed or Unsealed.
 func CheckSealStatusKnown() StateCheck {
 	return func(s State) error {
 		if s.SealStatus == StatusUnknown {
 			return fmt.Errorf("expected Vault seal status to be known, state: %#v", s)
 		}
+
 		return nil
 	}
 }
 
-// StatusRequest is a vault status request
+// StatusRequest is a vault status request.
 type StatusRequest struct {
 	*CLIRequest
 }
 
-// StatusRequestOpt is a functional option for a config create request
+// StatusRequestOpt is a functional option for a config create request.
 type StatusRequestOpt func(*StatusRequest) *StatusRequest
 
 // NewStatusRequest takes functional options and returns a new
-// systemd unit request
+// systemd unit request.
 func NewStatusRequest(opts ...StatusRequestOpt) *StatusRequest {
 	c := &StatusRequest{
 		&CLIRequest{},
@@ -159,7 +165,7 @@ func NewStatusRequest(opts ...StatusRequestOpt) *StatusRequest {
 	return c
 }
 
-// WithStatusRequestBinPath sets the vault binary path
+// WithStatusRequestBinPath sets the vault binary path.
 func WithStatusRequestBinPath(path string) StatusRequestOpt {
 	return func(u *StatusRequest) *StatusRequest {
 		u.BinPath = path
@@ -167,7 +173,7 @@ func WithStatusRequestBinPath(path string) StatusRequestOpt {
 	}
 }
 
-// WithStatusRequestVaultAddr sets the vault address
+// WithStatusRequestVaultAddr sets the vault address.
 func WithStatusRequestVaultAddr(addr string) StatusRequestOpt {
 	return func(u *StatusRequest) *StatusRequest {
 		u.VaultAddr = addr
@@ -175,7 +181,7 @@ func WithStatusRequestVaultAddr(addr string) StatusRequestOpt {
 	}
 }
 
-// GetState returns the vault state
+// GetState returns the vault state.
 func GetState(ctx context.Context, ssh it.Transport, req *StatusRequest) (*State, error) {
 	if req.BinPath == "" {
 		return nil, fmt.Errorf("you must supply a vault bin path")
@@ -233,6 +239,7 @@ func createStdErrMessage(stderr string) string {
 	if stderr == "" {
 		return ""
 	}
+
 	return fmt.Sprintf("stderr: [%s]", stderr)
 }
 
@@ -275,6 +282,7 @@ func WaitForState(ctx context.Context, ssh it.Transport, req *StatusRequest, che
 					"instance": req.VaultAddr,
 					"state":    fmt.Sprintf("%+v", state),
 				})
+
 				return state, nil
 			} else {
 				tflog.Error(ctx, "status check failed", map[string]interface{}{"error": err.Error()})

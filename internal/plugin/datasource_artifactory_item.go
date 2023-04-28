@@ -215,6 +215,7 @@ func (s *artifactoryItemStateV1) Validate(ctx context.Context) error {
 			return ValidationError("the host must be a valid URL", "host")
 		}
 	}
+
 	return nil
 }
 
@@ -265,7 +266,7 @@ func (s *artifactoryItemStateV1) Terraform5Value() tftypes.Value {
 	})
 }
 
-// Search queries the aritfactory API and parses the results
+// Search queries the aritfactory API and parses the results.
 func (s *artifactoryItemStateV1) Search(ctx context.Context) error {
 	select {
 	case <-ctx.Done():

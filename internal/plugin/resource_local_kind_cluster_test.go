@@ -22,8 +22,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceKindCluster tests the kind_cluster resource
+// TestAccResourceKindCluster tests the kind_cluster resource.
 func TestAccResourceKindClusterValidAttributes(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("kind_cluster").Parse(`resource "enos_local_kind_cluster" "{{.ID.Value}}" {
 		{{if .Name.Value}}
 		name = "{{.Name.Value}}"
@@ -63,6 +65,7 @@ func TestAccResourceKindClusterValidAttributes(t *testing.T) {
 		false,
 	})
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(tt *testing.T) {
 			buf := bytes.Buffer{}
@@ -88,9 +91,11 @@ func TestAccResourceKindClusterValidAttributes(t *testing.T) {
 
 // TestResourceFileTransportInvalidAttributes ensures that we can gracefully
 // handle invalid attributes in the transport configuration. Since it's a dynamic
-// psuedo type we cannot rely on Terraform's built-in validation.
+// pseudo type we cannot rely on Terraform's built-in validation.
+//
+//nolint:paralleltest// because our resource handles it
 func TestResourceKindClusterInvalidAttributes(t *testing.T) {
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			{
@@ -104,6 +109,8 @@ func TestResourceKindClusterInvalidAttributes(t *testing.T) {
 }
 
 func TestClusterBuild(t *testing.T) {
+	t.Parallel()
+
 	if _, accOk := os.LookupEnv("TF_ACC"); !accOk {
 		t.Skip("Skipping test 'TestClusterBuild', because 'TF_ACC' not set")
 	}

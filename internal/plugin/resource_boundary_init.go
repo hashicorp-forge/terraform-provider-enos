@@ -75,6 +75,7 @@ func newBoundaryInit() *boundaryInit {
 func newBoundaryInitStateV1() *boundaryInitStateV1 {
 	transport := newEmbeddedTransport()
 	handlers := failureHandlers{TransportDebugFailureHandler(transport)}
+
 	return &boundaryInitStateV1{
 		ID:         newTfString(),
 		Transport:  transport,
@@ -248,7 +249,7 @@ func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req resource.App
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
@@ -464,7 +465,7 @@ func (s *boundaryInitStateV1) Validate(ctx context.Context) error {
 	default:
 	}
 
-	// TOOD: These validation checks are technically not required since the attributes are required,
+	// TODO: These validation checks are technically not required since the attributes are required,
 	// therefore Terraform will handle the validation
 	if _, ok := s.BinPath.Get(); !ok {
 		return ValidationError("you must provide the Boundary bin path", "bin_path")
@@ -619,7 +620,7 @@ func (s *boundaryInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-// Init initializes a Boundary cluster
+// Init initializes a Boundary cluster.
 func (s *boundaryInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
 	if err := req.Validate(); err != nil {
@@ -665,7 +666,7 @@ func (s *boundaryInitStateV1) Init(ctx context.Context, client it.Transport) err
 	return err
 }
 
-// buildInitRequest builds an InitRequest with options set
+// buildInitRequest builds an InitRequest with options set.
 func (s *boundaryInitStateV1) buildInitRequest() *boundary.InitRequest {
 	// defaults
 	binName := "boundary"

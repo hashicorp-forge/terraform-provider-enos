@@ -129,6 +129,7 @@ func WithProperties(props map[string]string) SearchAQLOpt {
 		for k, v := range props {
 			req.Properties[k] = v
 		}
+
 		return req
 	}
 }

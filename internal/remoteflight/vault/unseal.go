@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// UnsealRequest is a Vault unseal request
+// UnsealRequest is a Vault unseal request.
 type UnsealRequest struct {
 	*CLIRequest
 	*UnsealArguments
@@ -22,10 +22,10 @@ type UnsealArguments struct {
 	UnsealKeys []string `json:"unseal_keys"`
 }
 
-// SealType is the Vault seal type
+// SealType is the Vault seal type.
 type SealType string
 
-// SealTypes are the possible Vault seal types
+// SealTypes are the possible Vault seal types.
 const (
 	SealTypeShamir        = "shamir"
 	SealTypeAliCloud      = "alicloudkms"
@@ -37,11 +37,11 @@ const (
 	SealTypeTransit       = "transit"
 )
 
-// UnsealRequestOpt is a functional option for a unseal request
+// UnsealRequestOpt is a functional option for a unseal request.
 type UnsealRequestOpt func(*UnsealRequest) *UnsealRequest
 
 // NewUnsealRequest takes functional options and returns a new
-// unseal request
+// unseal request.
 func NewUnsealRequest(opts ...UnsealRequestOpt) *UnsealRequest {
 	c := &UnsealRequest{
 		&CLIRequest{},
@@ -58,7 +58,7 @@ func NewUnsealRequest(opts ...UnsealRequestOpt) *UnsealRequest {
 	return c
 }
 
-// WithUnsealRequestBinPath sets the Vault binary path
+// WithUnsealRequestBinPath sets the Vault binary path.
 func WithUnsealRequestBinPath(path string) UnsealRequestOpt {
 	return func(u *UnsealRequest) *UnsealRequest {
 		u.BinPath = path
@@ -66,7 +66,7 @@ func WithUnsealRequestBinPath(path string) UnsealRequestOpt {
 	}
 }
 
-// WithUnsealRequestVaultAddr sets the Vault address
+// WithUnsealRequestVaultAddr sets the Vault address.
 func WithUnsealRequestVaultAddr(addr string) UnsealRequestOpt {
 	return func(u *UnsealRequest) *UnsealRequest {
 		u.VaultAddr = addr
@@ -74,7 +74,7 @@ func WithUnsealRequestVaultAddr(addr string) UnsealRequestOpt {
 	}
 }
 
-// WithUnsealRequestSealType sets the Vault seal type
+// WithUnsealRequestSealType sets the Vault seal type.
 func WithUnsealRequestSealType(typ SealType) UnsealRequestOpt {
 	return func(u *UnsealRequest) *UnsealRequest {
 		u.SealType = typ
@@ -82,7 +82,7 @@ func WithUnsealRequestSealType(typ SealType) UnsealRequestOpt {
 	}
 }
 
-// WithUnsealRequestUnsealKeys sets the Vault unseal keys
+// WithUnsealRequestUnsealKeys sets the Vault unseal keys.
 func WithUnsealRequestUnsealKeys(unsealKeys []string) UnsealRequestOpt {
 	return func(u *UnsealRequest) *UnsealRequest {
 		u.UnsealKeys = unsealKeys
@@ -91,7 +91,7 @@ func WithUnsealRequestUnsealKeys(unsealKeys []string) UnsealRequestOpt {
 }
 
 // Unseal checks the current steal status, and if needed unseals the Vault in
-// different ways depending on seal type
+// different ways depending on seal type.
 func Unseal(ctx context.Context, ssh it.Transport, req *UnsealRequest) error {
 	binPath := req.BinPath
 	if binPath == "" {
@@ -145,7 +145,8 @@ func Unseal(ctx context.Context, ssh it.Transport, req *UnsealRequest) error {
 		default:
 			return fmt.Errorf("unknown seal type specified")
 		}
-
+	case StatusUnknown:
+		return fmt.Errorf("the Vault service returned an unknown code")
 	default:
 		return fmt.Errorf("the Vault service returned an unknown code")
 	}

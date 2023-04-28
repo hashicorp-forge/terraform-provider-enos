@@ -7,6 +7,8 @@ import (
 )
 
 func TestGetTaskLogsResponse_GetLogFileName(t *testing.T) {
+	t.Parallel()
+
 	r := &GetTaskLogsResponse{
 		Namespace:  "taco-truck",
 		Allocation: "make.taco[0]",

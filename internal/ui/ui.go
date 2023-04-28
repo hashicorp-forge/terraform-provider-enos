@@ -147,6 +147,7 @@ func (b *bufferedWriter) String() string {
 	defer b.m.Unlock()
 
 	unread := b.buf.Bytes()
+
 	return string(unread)
 }
 

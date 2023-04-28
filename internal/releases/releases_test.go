@@ -46,8 +46,10 @@ func TestBundleURL(t *testing.T) {
 			"https://releases.hashicorp.com/vault/1.7.0+ent/vault_1.7.0+ent_freebsd_386.zip",
 		},
 	} {
+		test := test
 		rel := test.Rel
 		t.Run(fmt.Sprintf("%s_%s_%s_%s_%s", rel.Product, rel.Version, rel.Edition, rel.Platform, rel.Arch), func(t *testing.T) {
+			t.Parallel()
 			require.Equal(t, test.Expected, rel.BundleURL())
 		})
 	}
@@ -156,8 +158,10 @@ func TestSHA256(t *testing.T) {
 			"0c7e49ecc0b00202a515f2e819664850aad0ff617991aec03589b725a0540880",
 		},
 	} {
+		test := test
 		rel := test.Rel
 		t.Run(fmt.Sprintf("%s_%s_%s", rel.Edition, rel.Platform, rel.Arch), func(t *testing.T) {
+			t.Parallel()
 			if rel.Edition == "ent" {
 				rel.GetSHA256Sums = func(*Release) (string, error) {
 					return testEntSHASums, nil
@@ -175,6 +179,8 @@ func TestSHA256(t *testing.T) {
 }
 
 func TestAccDefaultGetSHA256Sums(t *testing.T) {
+	t.Parallel()
+
 	_, okacc := os.LookupEnv("TF_ACC")
 	if !okacc {
 		t.Log("skipping because TF_ACC is required to run acceptance tests")

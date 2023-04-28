@@ -24,6 +24,7 @@ func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 	if !(okacc && okuser && oktoken && okver && okrev) {
 		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACTORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
 		t.Skip()
+
 		return vars, false
 	}
 
@@ -31,6 +32,8 @@ func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 }
 
 func TestAccSearchAQL(t *testing.T) {
+	t.Parallel()
+
 	vars, _ := EnsureArtifactoryEnvVars(t)
 
 	client := NewClient(
@@ -126,7 +129,10 @@ func TestAccSearchAQL(t *testing.T) {
 			},
 		},
 	} {
+		test := test
 		t.Run(test.Name, func(t *testing.T) {
+			t.Parallel()
+
 			test.Args = append(test.Args, WithLimit("1"))
 			req := NewSearchAQLRequest(test.Args...)
 			res, err := client.SearchAQL(context.Background(), req)

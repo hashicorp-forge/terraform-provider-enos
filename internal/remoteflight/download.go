@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// DownloadRequest performs a remote flight control download
+// DownloadRequest performs a remote flight control download.
 type DownloadRequest struct {
 	FlightControlPath string
 	URL               string
@@ -26,13 +26,13 @@ type DownloadRequest struct {
 	RetryOpts         []retry.RetrierOpt
 }
 
-// DownloadResponse is a flight control download response
+// DownloadResponse is a flight control download response.
 type DownloadResponse struct{}
 
-// DownloadOpt is a functional option for an download request
+// DownloadOpt is a functional option for an download request.
 type DownloadOpt func(*DownloadRequest) *DownloadRequest
 
-// NewDownloadRequest takes functional options and returns a new download request
+// NewDownloadRequest takes functional options and returns a new download request.
 func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 	var err error
 	dr := &DownloadRequest{
@@ -59,7 +59,7 @@ func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 }
 
 // WithDownloadRequestFlightControlPath sets the location of the enos-flight-contro
-// binary
+// binary.
 func WithDownloadRequestFlightControlPath(path string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.FlightControlPath = path
@@ -67,7 +67,7 @@ func WithDownloadRequestFlightControlPath(path string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestURL sets the download drL
+// WithDownloadRequestURL sets the download drL.
 func WithDownloadRequestURL(url string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.URL = url
@@ -75,7 +75,7 @@ func WithDownloadRequestURL(url string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestHTTPMethod sets the download HTTP method
+// WithDownloadRequestHTTPMethod sets the download HTTP method.
 func WithDownloadRequestHTTPMethod(meth string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.HTTPMethod = meth
@@ -83,7 +83,7 @@ func WithDownloadRequestHTTPMethod(meth string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestDestination sets destination path of the downloaded file
+// WithDownloadRequestDestination sets destination path of the downloaded file.
 func WithDownloadRequestDestination(dest string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.Destination = dest
@@ -91,7 +91,7 @@ func WithDownloadRequestDestination(dest string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestMode sets the mode for the downloaded file
+// WithDownloadRequestMode sets the mode for the downloaded file.
 func WithDownloadRequestMode(mode string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.Mode = mode
@@ -99,7 +99,7 @@ func WithDownloadRequestMode(mode string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestAuthUser sets basic auth user
+// WithDownloadRequestAuthUser sets basic auth user.
 func WithDownloadRequestAuthUser(user string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.AuthUser = user
@@ -107,7 +107,7 @@ func WithDownloadRequestAuthUser(user string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestAuthPassword sets basic auth password
+// WithDownloadRequestAuthPassword sets basic auth password.
 func WithDownloadRequestAuthPassword(password string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.AuthPassword = password
@@ -115,7 +115,7 @@ func WithDownloadRequestAuthPassword(password string) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestSHA256 sets required SHA256 sum
+// WithDownloadRequestSHA256 sets required SHA256 sum.
 func WithDownloadRequestSHA256(sha string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.SHA256 = sha
@@ -124,7 +124,7 @@ func WithDownloadRequestSHA256(sha string) DownloadOpt {
 }
 
 // WithDownloadRequestUseSudo determines if the download command should be run with
-// sudo
+// sudo.
 func WithDownloadRequestUseSudo(useSudo bool) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.Sudo = useSudo
@@ -133,7 +133,7 @@ func WithDownloadRequestUseSudo(useSudo bool) DownloadOpt {
 }
 
 // WithDownloadRequestReplace determines if the download command should replace
-// existing files
+// existing files.
 func WithDownloadRequestReplace(replace bool) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.Replace = replace
@@ -141,7 +141,7 @@ func WithDownloadRequestReplace(replace bool) DownloadOpt {
 	}
 }
 
-// WithDownloadRequestRetryOptions sets retry options for dowload operation
+// WithDownloadRequestRetryOptions sets retry options for dowload operation.
 func WithDownloadRequestRetryOptions(opts ...retry.RetrierOpt) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
 		dr.RetryOpts = opts
@@ -149,7 +149,7 @@ func WithDownloadRequestRetryOptions(opts ...retry.RetrierOpt) DownloadOpt {
 	}
 }
 
-// Download downloads a file on a remote machine with enos-flight-control, retrying if necessary
+// Download downloads a file on a remote machine with enos-flight-control, retrying if necessary.
 func Download(ctx context.Context, client transport.Transport, dr *DownloadRequest) (*DownloadResponse, error) {
 	res := &DownloadResponse{}
 

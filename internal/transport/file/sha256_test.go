@@ -10,6 +10,7 @@ func TestSHA256(t *testing.T) {
 	t.Parallel()
 
 	t.Run("with file", func(t *testing.T) {
+		t.Parallel()
 		f, err := Open("./fixtures/sha256.txt")
 		require.NoError(t, err)
 
@@ -21,6 +22,7 @@ func TestSHA256(t *testing.T) {
 	})
 
 	t.Run("with string", func(t *testing.T) {
+		t.Parallel()
 		r := NewReader("sha256 content\n")
 
 		sum, err := SHA256(r)

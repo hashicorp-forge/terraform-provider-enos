@@ -14,10 +14,10 @@ type cmd struct {
 
 var _ it.Command = (*cmd)(nil)
 
-// Opt is a functional option
+// Opt is a functional option.
 type Opt func(*cmd)
 
-// New takes zero or more functional options and return a new command
+// New takes zero or more functional options and return a new command.
 func New(command string, opts ...Opt) it.Command {
 	c := &cmd{
 		cmd: command,
@@ -31,7 +31,7 @@ func New(command string, opts ...Opt) it.Command {
 	return c
 }
 
-// WithEnvVars sets the environment variables
+// WithEnvVars sets the environment variables.
 func WithEnvVars(vars map[string]string) func(*cmd) {
 	return func(c *cmd) {
 		for key, val := range vars {
@@ -40,7 +40,7 @@ func WithEnvVars(vars map[string]string) func(*cmd) {
 	}
 }
 
-// WithEnvVar sets the environment variable
+// WithEnvVar sets the environment variable.
 func WithEnvVar(key, value string) func(*cmd) {
 	return func(c *cmd) {
 		c.env[key] = value

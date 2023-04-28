@@ -182,26 +182,26 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 		return
 	}
 
-	var podResults []*tfObject
+	podResults := make([]*tfObject, len(pods))
 	var transportResults []*tfObject
-	for _, result := range pods {
+	for i := range pods {
 		pod := newTfObject()
 		podName := newTfString()
-		podName.Set(result.Name)
+		podName.Set(pods[i].Name)
 		podNamespace := newTfString()
-		podNamespace.Set(result.Namespace)
+		podNamespace.Set(pods[i].Namespace)
 
 		containers := newTfStringSlice()
-		containers.SetStrings(result.Containers)
+		containers.SetStrings(pods[i].Containers)
 
 		pod.Set(map[string]interface{}{
 			"name":       podName,
 			"namespace":  podNamespace,
 			"containers": containers,
 		})
-		podResults = append(podResults, pod)
+		podResults[i] = pod
 
-		for _, c := range result.Containers {
+		for _, c := range pods[i].Containers {
 			transport := newTfObject()
 			kubeConfigBase64 := newTfString()
 			kubeConfigBase64.Set(podState.KubeConfigBase64.Val)
@@ -220,7 +220,6 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 
 			transportResults = append(transportResults, transport)
 		}
-
 	}
 	podState.Pods.Set(podResults)
 	podState.Transports.Set(transportResults)
@@ -231,7 +230,7 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 	}
 }
 
-// Schema the kubernetesPodsStateV1 Schema
+// Schema the kubernetesPodsStateV1 Schema.
 func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,

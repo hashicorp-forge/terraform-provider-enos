@@ -12,8 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceConsulStart tests the consul_start resource
+// TestAccResourceConsulStart tests the consul_start resource.
 func TestAccResourceConsulStart(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("enos_consul_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_consul_start" "{{.ID.Value}}" {
@@ -105,6 +107,7 @@ func TestAccResourceConsulStart(t *testing.T) {
 		false,
 	})
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}

@@ -48,6 +48,7 @@ func newFile() *file {
 func newFileState() *fileStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+
 	return &fileStateV1{
 		ID:              newTfString(),
 		Src:             newTfString(),
@@ -152,7 +153,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 			return
 		}
-		defer src.Close() // nolint: staticcheck
+		defer src.Close()
 
 		// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
 		sum, err := tfile.SHA256(src)
@@ -161,6 +162,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 				"Invalid Configuration",
 				fmt.Errorf("unable to obtain file SHA256 sum for %s, due to: %w", srcType, err),
 			))
+
 			return
 		}
 		proposedState.Sum.Set(sum)
@@ -196,7 +198,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResour
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 		return
 	}
-	defer src.Close() //nolint: staticcheck
+	defer src.Close()
 
 	_, okprior := priorState.ID.Get()
 	// If we're missing a prior ID we haven't created it yet. If the prior and
@@ -207,7 +209,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResour
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 			return
 		}
-		defer client.Close() //nolint: staticcheck
+		defer client.Close()
 
 		// Get our copy args
 		opts := []remoteflight.CopyFileRequestOpt{
@@ -302,7 +304,7 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 	}
 
 	if okSrc && okCnt {
-		return ValidationError("you must provide only of of the source location or file content")
+		return ValidationError("you must provide only of the source location or file content")
 	}
 
 	if okSrc {
@@ -310,7 +312,7 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 		if err != nil {
 			return ValidationError("unable to open source file", "source")
 		}
-		defer f.Close() // nolint: staticcheck
+		defer f.Close()
 	}
 
 	if okCnt && cnt == "" {
@@ -373,12 +375,12 @@ func (fs *fileStateV1) Terraform5Value() tftypes.Value {
 	})
 }
 
-// EmbeddedTransport is a pointer to the state's embedded transport
+// EmbeddedTransport is a pointer to the state's embedded transport.
 func (fs *fileStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return fs.Transport
 }
 
-// openSourceOrContent returns a stream of the source content
+// openSourceOrContent returns a stream of the source content.
 func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 	var err error
 	var src it.Copyable

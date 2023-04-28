@@ -64,6 +64,7 @@ func newBundleInstall() *bundleInstall {
 func newBundleInstallStateV1() *bundleInstallStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+
 	return &bundleInstallStateV1{
 		ID:          newTfString(),
 		Path:        newTfString(),
@@ -192,7 +193,7 @@ func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req resource.Ap
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	if !priorState.equaltTo(plannedState) {
 		err = plannedState.Install(ctx, client)
@@ -240,7 +241,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 	}
 	opts = append(opts, remoteflight.WithPackageInstallGetter(getter))
 
-	// Now that that we know how we're going to get the package, configure the installation
+	// Now that we know how we're going to get the package, configure the installation
 	// options for the getter and installer.
 	switch getter {
 	case remoteflight.PackageInstallGetterCopy:
@@ -389,6 +390,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 	}
 
 	_, err = remoteflight.PackageInstall(ctx, client, remoteflight.NewPackageInstallRequest(opts...))
+
 	return err
 }
 

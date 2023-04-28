@@ -13,6 +13,8 @@ import (
 )
 
 func TestCreateZipArchiveFilePermissions(t *testing.T) {
+	t.Parallel()
+
 	modes := []fs.FileMode{
 		fs.FileMode(0o666),
 		fs.FileMode(0o523),
@@ -20,10 +22,8 @@ func TestCreateZipArchiveFilePermissions(t *testing.T) {
 		fs.FileMode(0o712),
 	}
 
-	dir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
+	var err error
 	artifacts := NewArtifacts("test")
 
 	for _, mode := range modes {
@@ -45,5 +45,4 @@ func TestCreateZipArchiveFilePermissions(t *testing.T) {
 
 		assert.Equal(t, mode.String(), zip.File[0].FileHeader.Mode().String())
 	}
-	t.Log(dir)
 }

@@ -35,6 +35,7 @@ func newTFCUploadCmd() *cobra.Command {
 	_ = tfcUploadCmd.MarkFlagRequired("gpg-identity-name")
 	_ = tfcUploadCmd.MarkFlagRequired("org")
 	_ = tfcUploadCmd.MarkFlagRequired("token")
+
 	return tfcUploadCmd
 }
 

@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// transportClientFactory Factory function for creating transport clients, can be overridden in tests
+// transportClientFactory Factory function for creating transport clients, can be overridden in tests.
 type transportClientFactory = func(ctx context.Context, transport transportState) (it.Transport, error)
 
 var defaultTransportClientFactory = func(ctx context.Context, transport transportState) (it.Transport, error) {
@@ -38,8 +38,11 @@ func (t TransportType) String() string {
 		return "kubernetes"
 	case NOMAD:
 		return "nomad"
+	case UNKNOWN:
+		return "unknown"
+	default:
+		return "undefined"
 	}
-	return "unknown"
 }
 
 func (t TransportType) createTransport() (transportState, error) {
@@ -50,16 +53,22 @@ func (t TransportType) createTransport() (transportState, error) {
 		return newEmbeddedTransportK8Sv1(), nil
 	case NOMAD:
 		return newEmbeddedTransportNomadv1(), nil
+	case UNKNOWN:
+		return nil, fmt.Errorf("cannot create a UNKNOWN transport")
+	default:
+		return nil, fmt.Errorf("cannot create an undefined transport")
 	}
-	return nil, fmt.Errorf("failed to create transport for unknown transport type: %s", t.String())
 }
 
 func (t TransportType) isKnown() bool {
 	switch t {
 	case SSH, K8S, NOMAD:
 		return true
+	case UNKNOWN:
+		return false
+	default:
+		return false
 	}
-	return false
 }
 
 func transportTypeFrom(typeString string) TransportType {
@@ -71,6 +80,7 @@ func transportTypeFrom(typeString string) TransportType {
 	case "nomad":
 		return NOMAD
 	}
+
 	return UNKNOWN
 }
 
@@ -79,10 +89,12 @@ var TransportTypes = []TransportType{SSH, K8S, NOMAD}
 type Transports map[TransportType]transportState
 
 func (t Transports) types() []TransportType {
-	var types []TransportType
+	types := make([]TransportType, len(t))
 
+	count := 0
 	for tType := range t {
-		types = append(types, tType)
+		types[count] = tType
+		count++
 	}
 
 	return types
@@ -114,23 +126,23 @@ var transportTmpl = template.Must(template.New("transport").Parse(`
 transport = {
   {{range $config := .}}
   {{$config}}
-  {{end}} 
+  {{end}}
 }`))
 
 // embeddedTransportV1 represents the embedded transport state for all
-// resources and data source. It is intended to be used as ouput from the
+// resources and data source. It is intended to be used as output from the
 // transport data source and used as the transport input for all resources.
 type embeddedTransportV1 struct {
 	mu            sync.Mutex
 	transports    Transports
 	clientFactory transportClientFactory
 
-	// resolvedTransport the transport state that was resolved after applying defaults from the the
+	// resolvedTransport the transport state that was resolved after applying defaults from the
 	// provider configuration
 	resolvedTransport transportState
 }
 
-// transportState interface defining the api of a transport
+// transportState interface defining the api of a transport.
 type transportState interface {
 	state.Serializable
 
@@ -186,6 +198,7 @@ func (em *embeddedTransportV1) SSH() (*embeddedTransportSSHv1, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return ssh, true
 }
 
@@ -198,6 +211,7 @@ func (em *embeddedTransportV1) K8S() (*embeddedTransportK8Sv1, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return k8s, true
 }
 
@@ -210,6 +224,7 @@ func (em *embeddedTransportV1) Nomad() (*embeddedTransportNomadv1, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return nomad, true
 }
 
@@ -221,6 +236,7 @@ func (em *embeddedTransportV1) SetTransportState(states ...transportState) error
 		}
 		em.transports[transportType] = state
 	}
+
 	return nil
 }
 
@@ -266,7 +282,7 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 	return nil
 }
 
-// Terraform5Type is the tftypes.Type
+// Terraform5Type is the tftypes.Type.
 func (em *embeddedTransportV1) Terraform5Type() tftypes.Type {
 	return tftypes.DynamicPseudoType
 }
@@ -324,7 +340,7 @@ func (em *embeddedTransportV1) CopyValues() map[TransportType]map[string]tftypes
 
 // Attributes returns all the attributes of the transport state. This includes those that where
 // configured by the user (via terraform configuration) and those that received their values
-// via defaults
+// via defaults.
 func (em *embeddedTransportV1) Attributes() map[TransportType]map[string]TFType {
 	attributes := map[TransportType]map[string]TFType{}
 
@@ -366,6 +382,7 @@ func (em *embeddedTransportV1) Client(ctx context.Context) (it.Transport, error)
 	if err != nil {
 		return nil, err
 	}
+
 	return em.clientFactory(ctx, transport)
 }
 
@@ -396,6 +413,7 @@ func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) (tra
 				err := configured.ApplyDefaults(defaultsTransport.Attributes())
 				return configured, err
 			}
+
 			return configured, nil
 		}
 	}
@@ -420,6 +438,7 @@ func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) (tra
 		if err := em.SetTransportState(transport); err != nil {
 			return nil, err
 		}
+
 		return transport, nil
 	}
 
@@ -446,9 +465,9 @@ func (em *embeddedTransportV1) Debug() string {
 		return fmt.Sprintf("%s\n", em.resolvedTransport.debug())
 	}
 
-	var debug []string
-	for _, transport := range em.transports {
-		debug = append(debug, fmt.Sprintf("%s\n", transport.debug()))
+	debug := make([]string, len(em.transports))
+	for i := range em.transports {
+		debug[i] = fmt.Sprintf("%s\n", em.transports[i].debug())
 	}
 
 	return strings.Join(debug, "\n\n")
@@ -476,13 +495,15 @@ func (em *embeddedTransportV1) render() (string, error) {
 		return "", nil
 	}
 
-	var cfgs []string
-	for _, state := range em.transports {
-		cfg, err := state.render()
+	cfgs := make([]string, len(em.transports))
+	count := 0
+	for i := range em.transports {
+		cfg, err := em.transports[i].render()
 		if err != nil {
 			return "", err
 		}
-		cfgs = append(cfgs, cfg)
+		cfgs[count] = cfg
+		count++
 	}
 
 	buf := bytes.Buffer{}
@@ -509,6 +530,7 @@ func addAttributesForReplace(priorState, proposedState transportState, attrs []*
 			}))
 		}
 	}
+
 	return attrs
 }
 
@@ -519,7 +541,7 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 	if len(values) == 0 {
 		return fmt.Errorf("%s transport configuration cannot be empty", transportType)
 	}
-	// Because the transport type is a dynamic psuedo type we have to manually ensure
+	// Because the transport type is a dynamic pseudo type we have to manually ensure
 	// that the user hasn't set any unknown attributes.
 	isKnownAttribute := func(attr string) error {
 		for _, known := range knownAttributes {
@@ -539,6 +561,7 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -547,6 +570,7 @@ func copyValues(values map[string]tftypes.Value) map[string]tftypes.Value {
 	for key, value := range values {
 		newVals[key] = value
 	}
+
 	return newVals
 }
 
@@ -577,6 +601,7 @@ func applyDefaults(defaults, attributes map[string]TFType) error {
 			return fmt.Errorf("failed to apply default to attribute: [%s], since it is missing", name)
 		}
 	}
+
 	return nil
 }
 
@@ -592,6 +617,7 @@ func isTransportConfigured(state transportState) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -604,5 +630,6 @@ func checkK8STransportNotConfigured(state StateWithTransport, resourceName strin
 			resourceName,
 		)
 	}
+
 	return nil
 }

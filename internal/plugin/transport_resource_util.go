@@ -62,6 +62,7 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 				Summary:  "upgrade error",
 				Detail:   fmt.Sprintf("unable to map version 1 to the current state, due to: %s", err.Error()),
 			})
+
 			return
 		}
 
@@ -129,6 +130,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 			Summary:  "Plan Error",
 			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
 		})
+
 		return nil
 	}
 
@@ -150,6 +152,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 			"Transport Error",
 			fmt.Errorf("failed to get proposed transport config, due to: %w", err),
 		))
+
 		return nil
 	}
 	configuredTransport, err := proposedTransport.ApplyDefaults(providerConfig.Transport)
@@ -180,6 +183,7 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, 
 			"Serialization Error",
 			fmt.Errorf("failed unmarshal planned state, due to: %s", err),
 		))
+
 		return
 	}
 
@@ -201,6 +205,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 			"Apply Error",
 			fmt.Errorf("failed to get provider config, due to: %s", err),
 		))
+
 		return nil
 	}
 
@@ -212,6 +217,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 			"Apply Error",
 			fmt.Errorf("failed to copy provider config, due to: %s", err),
 		))
+
 		return nil
 	}
 
@@ -229,6 +235,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 			"Apply Error",
 			fmt.Errorf("failed to copy embedded transport, due to: %s", err),
 		))
+
 		return nil
 	}
 
@@ -238,6 +245,7 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 			"Transport Error",
 			fmt.Errorf("failed to apply transport defaults, due to: %w", err),
 		))
+
 		return nil
 	}
 	etP.setResolvedTransport(configuredTransport)

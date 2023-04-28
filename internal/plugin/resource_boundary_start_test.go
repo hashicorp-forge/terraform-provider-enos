@@ -12,8 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceBoundaryStart tests the boundary_start resource
+// TestAccResourceBoundaryStart tests the boundary_start resource.
 func TestAccResourceBoundaryStart(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("enos_boundary_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_boundary_start" "{{.ID.Value}}" {
@@ -57,6 +59,7 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 		false,
 	})
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}

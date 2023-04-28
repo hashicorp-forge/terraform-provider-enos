@@ -65,17 +65,17 @@ var (
 )
 
 var (
-	// ErrPackageInstallGetterUnknown means the package get has not been set
+	// ErrPackageInstallGetterUnknown means the package get has not been set.
 	ErrPackageInstallGetterUnknown = fmt.Errorf("package install get is unknown")
-	// ErrPackageInstallGetterUnsupported means the package get is unsupported not been set
+	// ErrPackageInstallGetterUnsupported means the package get is unsupported not been set.
 	ErrPackageInstallGetterUnsupported = fmt.Errorf("package install get is unsupported")
-	// ErrPackageInstallInstallerUnknown means the package method has not been set
+	// ErrPackageInstallInstallerUnknown means the package method has not been set.
 	ErrPackageInstallInstallerUnknown = fmt.Errorf("package install method is unknown")
-	// ErrPackageInstallInstallerUnsupported means the package method is unsupported
+	// ErrPackageInstallInstallerUnsupported means the package method is unsupported.
 	ErrPackageInstallInstallerUnsupported = fmt.Errorf("package install method is unsupported")
 )
 
-// PackageInstallInstaller is how a package is going to be installed
+// PackageInstallInstaller is how a package is going to be installed.
 type PackageInstallInstaller struct {
 	Type              string
 	CompatibleGetters []*PackageInstallGetter
@@ -83,7 +83,7 @@ type PackageInstallInstaller struct {
 }
 
 // Compatible determines if the install get artifact is compatible with
-// with the install method
+// the install method.
 func (m *PackageInstallInstaller) Compatible(get *PackageInstallGetter) bool {
 	for _, cs := range m.CompatibleGetters {
 		if get.Type == cs.Type {
@@ -94,13 +94,13 @@ func (m *PackageInstallInstaller) Compatible(get *PackageInstallGetter) bool {
 	return false
 }
 
-// PackageInstallGetter is where the package is coming from
+// PackageInstallGetter is where the package is coming from.
 type PackageInstallGetter struct {
 	Type string
 	Get  func(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error
 }
 
-// PackageInstallRequest is a request to install a package on a target machine
+// PackageInstallRequest is a request to install a package on a target machine.
 type PackageInstallRequest struct {
 	Installer         *PackageInstallInstaller
 	Getter            *PackageInstallGetter
@@ -113,13 +113,13 @@ type PackageInstallRequest struct {
 	DestionationPath  string        // Final destination of artifact
 }
 
-// PackageInstallResponse is the response of the script run
+// PackageInstallResponse is the response of the script run.
 type PackageInstallResponse struct{}
 
-// PackageInstallRequestOpt is a functional option for running a script
+// PackageInstallRequestOpt is a functional option for running a script.
 type PackageInstallRequestOpt func(*PackageInstallRequest) *PackageInstallRequest
 
-// PackageInstallInstallerForFile attemps to determine a suitable package
+// PackageInstallInstallerForFile attempts to determine a suitable package
 // installation method given the file name.
 func PackageInstallInstallerForFile(name string) *PackageInstallInstaller {
 	switch filepath.Ext(filepath.Base(name)) {
@@ -134,7 +134,7 @@ func PackageInstallInstallerForFile(name string) *PackageInstallInstaller {
 	}
 }
 
-// NewPackageInstallRequest takes functional options and returns a new script run req
+// NewPackageInstallRequest takes functional options and returns a new script run req.
 func NewPackageInstallRequest(opts ...PackageInstallRequestOpt) *PackageInstallRequest {
 	ir := &PackageInstallRequest{
 		UnzipOpts:         []UnzipOpt{},
@@ -150,7 +150,7 @@ func NewPackageInstallRequest(opts ...PackageInstallRequestOpt) *PackageInstallR
 	return ir
 }
 
-// WithPackageInstallInstaller sets the package installer
+// WithPackageInstallInstaller sets the package installer.
 func WithPackageInstallInstaller(method *PackageInstallInstaller) PackageInstallRequestOpt {
 	return func(ir *PackageInstallRequest) *PackageInstallRequest {
 		ir.Installer = method
@@ -158,7 +158,7 @@ func WithPackageInstallInstaller(method *PackageInstallInstaller) PackageInstall
 	}
 }
 
-// WithPackageInstallGetter sets the package install get
+// WithPackageInstallGetter sets the package install get.
 func WithPackageInstallGetter(get *PackageInstallGetter) PackageInstallRequestOpt {
 	return func(ir *PackageInstallRequest) *PackageInstallRequest {
 		ir.Getter = get
@@ -166,7 +166,7 @@ func WithPackageInstallGetter(get *PackageInstallGetter) PackageInstallRequestOp
 	}
 }
 
-// WithPackageInstallUnzipOpts sets the package unzip options
+// WithPackageInstallUnzipOpts sets the package unzip options.
 func WithPackageInstallUnzipOpts(opts ...UnzipOpt) PackageInstallRequestOpt {
 	return func(ir *PackageInstallRequest) *PackageInstallRequest {
 		ir.UnzipOpts = opts
@@ -174,7 +174,7 @@ func WithPackageInstallUnzipOpts(opts ...UnzipOpt) PackageInstallRequestOpt {
 	}
 }
 
-// WithPackageInstallDownloadOpts sets the package download options
+// WithPackageInstallDownloadOpts sets the package download options.
 func WithPackageInstallDownloadOpts(opts ...DownloadOpt) PackageInstallRequestOpt {
 	return func(ir *PackageInstallRequest) *PackageInstallRequest {
 		ir.DownloadOpts = opts
@@ -199,7 +199,7 @@ func WithPackageInstallDestination(path string) PackageInstallRequestOpt {
 	}
 }
 
-// WithPackageInstallTemporaryDirectory sets the temporary directory
+// WithPackageInstallTemporaryDirectory sets the temporary directory.
 func WithPackageInstallTemporaryDirectory(dir string) PackageInstallRequestOpt {
 	return func(ir *PackageInstallRequest) *PackageInstallRequest {
 		ir.TempDir = dir

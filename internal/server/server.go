@@ -8,17 +8,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-// Server is our gRPC ProviderServer
+// Server is our gRPC ProviderServer.
 type Server struct {
 	provider       Provider
 	resourceRouter resourcerouter.Router
 	dataRouter     datarouter.Router
 }
 
-// Opt is a functional option for the provider server
+// Opt is a functional option for the provider server.
 type Opt func(Server) Server
 
-// New takes zero or more functional options and return a new Server
+// New takes zero or more functional options and return a new Server.
 func New(opts ...Opt) Server {
 	s := Server{}
 	for _, opt := range opts {
@@ -28,7 +28,7 @@ func New(opts ...Opt) Server {
 	return s
 }
 
-// RegisterProvider is a functional option that registers the Provider meta server
+// RegisterProvider is a functional option that registers the Provider meta server.
 func RegisterProvider(provider Provider) func(Server) Server {
 	return func(server Server) Server {
 		server.provider = provider
@@ -37,7 +37,7 @@ func RegisterProvider(provider Provider) func(Server) Server {
 	}
 }
 
-// RegisterDataRouter is a functional option that registers the data source router
+// RegisterDataRouter is a functional option that registers the data source router.
 func RegisterDataRouter(router datarouter.Router) func(Server) Server {
 	return func(server Server) Server {
 		server.dataRouter = router
@@ -46,7 +46,7 @@ func RegisterDataRouter(router datarouter.Router) func(Server) Server {
 	}
 }
 
-// RegisterResourceRouter is a functional option that registers the resource router
+// RegisterResourceRouter is a functional option that registers the resource router.
 func RegisterResourceRouter(router resourcerouter.Router) func(Server) Server {
 	return func(server Server) Server {
 		server.resourceRouter = router

@@ -10,12 +10,12 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// InitRequest is a Boundary init request
+// InitRequest is a Boundary init request.
 type InitRequest struct {
 	*CLIRequest
 }
 
-// InitResponse is the Boundary init response
+// InitResponse is the Boundary init response.
 type InitResponse struct {
 	AuthMethod    AuthMethod    `json:"auth_method"`
 	HostResources HostResources `json:"host_resources"`
@@ -25,7 +25,7 @@ type InitResponse struct {
 	Target        Target        `json:"target"`
 }
 
-// AuthMethod is the Boundary init generated authentication method
+// AuthMethod is the Boundary init generated authentication method.
 type AuthMethod struct {
 	AuthMethodID   string `json:"auth_method_id"`
 	AuthMethodName string `json:"auth_method_name"`
@@ -36,7 +36,7 @@ type AuthMethod struct {
 	UserName       string `json:"user_name"`
 }
 
-// HostResources are the Boundary init generated host resources
+// HostResources are the Boundary init generated host resources.
 type HostResources struct {
 	HostCatalogID   string `json:"host_catalog_id"`
 	HostSetID       string `json:"host_set_id"`
@@ -48,27 +48,27 @@ type HostResources struct {
 	HostName        string `json:"host_name"`
 }
 
-// LoginRole is the Boundary init generated login role
+// LoginRole is the Boundary init generated login role.
 type LoginRole struct {
 	ScopeID string `json:"scope_id"`
 	Name    string `json:"name"`
 }
 
-// OrgScope is the Boundary init generated organization scope
+// OrgScope is the Boundary init generated organization scope.
 type OrgScope struct {
 	ScopeID string `json:"scope_id"`
 	Type    string `json:"type"`
 	Name    string `json:"name"`
 }
 
-// ProjectScope is the Boundary init generated project scope
+// ProjectScope is the Boundary init generated project scope.
 type ProjectScope struct {
 	ScopeID string `json:"scope_id"`
 	Type    string `json:"type"`
 	Name    string `json:"name"`
 }
 
-// Target is the Boundary init generated target
+// Target is the Boundary init generated target.
 type Target struct {
 	TargetID               string `json:"target_id"`
 	DefaultPort            int    `json:"default_port"`
@@ -79,13 +79,13 @@ type Target struct {
 	Name                   string `json:"name"`
 }
 
-// InitRequestOpt is a functional option for an init request
+// InitRequestOpt is a functional option for an init request.
 type (
 	InitRequestOpt func(*InitRequest) *InitRequest
 )
 
 // NewInitRequest takes functional options and returns a new
-// init request
+// init request.
 func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	c := &InitRequest{
 		&CLIRequest{},
@@ -98,7 +98,7 @@ func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	return c
 }
 
-// WithInitRequestBinName sets the Boundary binary name
+// WithInitRequestBinName sets the Boundary binary name.
 func WithInitRequestBinName(name string) InitRequestOpt {
 	return func(i *InitRequest) *InitRequest {
 		i.BinName = name
@@ -106,7 +106,7 @@ func WithInitRequestBinName(name string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestBinPath sets the Boundary binary path
+// WithInitRequestBinPath sets the Boundary binary path.
 func WithInitRequestBinPath(path string) InitRequestOpt {
 	return func(i *InitRequest) *InitRequest {
 		i.BinPath = path
@@ -114,7 +114,7 @@ func WithInitRequestBinPath(path string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestConfigPath sets the Boundary config path
+// WithInitRequestConfigPath sets the Boundary config path.
 func WithInitRequestConfigPath(path string) InitRequestOpt {
 	return func(i *InitRequest) *InitRequest {
 		i.ConfigPath = path
@@ -129,7 +129,7 @@ func WithInitRequestLicense(license string) InitRequestOpt {
 	}
 }
 
-// Validate validates that the init request has the required fields
+// Validate validates that the init request has the required fields.
 func (r *InitRequest) Validate() error {
 	if r.BinPath == "" {
 		return fmt.Errorf("no binary path has been supplied")
@@ -141,17 +141,18 @@ func (r *InitRequest) Validate() error {
 	return nil
 }
 
-// String returns the init request as an init command
+// String returns the init request as an init command.
 func (r *InitRequest) String() string {
 	cmd := &strings.Builder{}
 	cmd.WriteString(fmt.Sprintf("%s/%s database init -format json", r.BinPath, r.BinName))
 	// TODO: add the other init options for upgrades
 	cmd.WriteString(fmt.Sprintf(" -config=%s/boundary.hcl", r.ConfigPath))
+
 	return cmd.String()
 }
 
 // Init calls boundary init to initialize the database and Boundary cluster,
-// providing default credentials to use upon completion
+// providing default credentials to use upon completion.
 func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
 	envVars := map[string]string{}

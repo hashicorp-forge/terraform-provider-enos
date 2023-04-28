@@ -43,7 +43,7 @@ type remoteExecStateV1 struct {
 
 var _ state.State = (*remoteExecStateV1)(nil)
 
-// remoteExecStateFactory a factory that can be used to override the default state creation, useful in tests
+// remoteExecStateFactory a factory that can be used to override the default state creation, useful in tests.
 type remoteExecStateFactory = func() *remoteExecStateV1
 
 func newRemoteExec() *remoteExec {
@@ -60,6 +60,7 @@ func newRemoteExecStateV1() *remoteExecStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{}),
 	}
+
 	return &remoteExecStateV1{
 		ID:              newTfString(),
 		Env:             newTfStringMap(),
@@ -141,6 +142,7 @@ func (r *remoteExec) PlanResourceChange(ctx context.Context, req resource.PlanRe
 				"Invalid Configuration",
 				fmt.Errorf("failed to read all scripts, due to: %w", err),
 			))
+
 			return
 		}
 		proposedState.Sum.Set(sha256)
@@ -209,7 +211,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 			return
 		}
-		defer client.Close() //nolint: staticcheck
+		defer client.Close()
 
 		ui, err := r.ExecuteCommands(ctx, plannedState, client)
 		plannedState.Stdout.Set(ui.StdoutString())
@@ -219,6 +221,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 				"Execution Error",
 				fmt.Errorf("failed to execute commands due to: %w%s", err, formatOutputIfExists(ui)),
 			))
+
 			return
 		}
 	}
@@ -314,7 +317,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 
 			exec := func(cmd string) error {
 				source := tfile.NewReader(cmd)
-				defer source.Close() // nolint: staticcheck
+				defer source.Close()
 
 				return r.copyAndRun(ctx, ui, client, source, "inline", env)
 			}
@@ -331,7 +334,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 				if err != nil {
 					return fmt.Errorf("failed to open script file: [%s], due to: %w", path, err)
 				}
-				defer script.Close() // nolint: staticcheck
+				defer script.Close()
 
 				return r.copyAndRun(ctx, ui, client, script, "script", env)
 			}
@@ -422,7 +425,7 @@ func (s *remoteExecStateV1) Validate(ctx context.Context) error {
 					"scripts",
 				)
 			}
-			defer f.Close() // nolint: staticcheck
+			defer f.Close()
 		}
 	}
 
@@ -526,5 +529,6 @@ func formatOutputIfExists(ui ui.UI) string {
 	if len(output) > 0 {
 		return fmt.Sprintf("\n\noutput:\n%s", output)
 	}
+
 	return ""
 }

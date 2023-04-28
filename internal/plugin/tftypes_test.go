@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// TestTFBoolGetAndValue tests that tfBool type returns the correct values
+// TestTFBoolGetAndValue tests that tfBool type returns the correct values.
 func TestTFBoolGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -49,7 +49,9 @@ func TestTFBoolGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
 			val, ok := test.in.Get()
 			require.Equal(t, test.val, val)
@@ -58,8 +60,9 @@ func TestTFBoolGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFBoolSet tests that a tfBool returns the value that is set
+// TestTFBoolSet tests that a tfBool returns the value that is set.
 func TestTFBoolSet(t *testing.T) {
+	t.Parallel()
 	for _, b := range []bool{true, false} {
 		tb := &tfBool{}
 		tb.Set(b)
@@ -71,7 +74,7 @@ func TestTFBoolSet(t *testing.T) {
 	}
 }
 
-// TestTFNumGetAndValue tests that the tfNum returns the correct values
+// TestTFNumGetAndValue tests that the tfNum returns the correct values.
 func TestTFNumGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -103,7 +106,9 @@ func TestTFNumGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
 			val, ok := test.in.Get()
 			require.Equal(t, test.val, val)
@@ -112,7 +117,7 @@ func TestTFNumGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFStringGetAndValue tests that the tfString returns the correct values
+// TestTFStringGetAndValue tests that the tfString returns the correct values.
 func TestTFStringGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -144,7 +149,9 @@ func TestTFStringGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
 			val, ok := test.in.Get()
 			require.Equal(t, test.val, val)
@@ -153,9 +160,10 @@ func TestTFStringGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFStringSliceGetAndValue tests that the tfStringSlice type returns the correct values
+// TestTFStringSliceGetAndValue tests that the tfStringSlice type returns the correct values.
 func TestTFStringSliceGetAndValue(t *testing.T) {
 	t.Parallel()
+
 	for _, test := range []struct {
 		desc  string
 		in    *tfStringSlice
@@ -197,7 +205,9 @@ func TestTFStringSliceGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
 			val, ok := test.in.GetStrings()
 			require.Equal(t, test.val, val)
@@ -206,7 +216,7 @@ func TestTFStringSliceGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFStringMapGetAndValue tests that the tfStringMap type returns the correct values
+// TestTFStringMapGetAndValue tests that the tfStringMap type returns the correct values.
 func TestTFStringMapGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -250,7 +260,9 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
 			val, ok := test.in.GetStrings()
 			require.Equal(t, test.val, val)
@@ -259,7 +271,7 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFObjectGetAndValue tests that the tfObject type returns the correct values
+// TestTFObjectGetAndValue tests that the tfObject type returns the correct values.
 func TestTFObjectGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -275,6 +287,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 				obj := newTfObject()
 				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				obj.Unknown = true
+
 				return obj
 			},
 			tftypes.NewValue(tftypes.Object{
@@ -292,6 +305,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 				obj := newTfObject()
 				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				obj.Null = true
+
 				return obj
 			},
 			tftypes.NewValue(tftypes.Object{
@@ -308,6 +322,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 			func() *tfObject {
 				obj := newTfObject()
 				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+
 				return obj
 			},
 			tftypes.NewValue(tftypes.Object{
@@ -327,6 +342,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 			func() *tfObject {
 				obj := newTfObject()
 				obj.Set(map[string]interface{}{"foo": &tfString{Unknown: true}, "bar": &tfBool{Val: false}})
+
 				return obj
 			},
 			tftypes.NewValue(tftypes.Object{
@@ -342,7 +358,9 @@ func TestTFObjectGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			obj := test.in()
 			require.True(t, obj.TFValue().Equal(test.value))
 			val, ok := obj.GetObject()
@@ -352,7 +370,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 	}
 }
 
-// TestTFObjectSliceGetAndValue tests that the tfObjectSlice type returns the correct values
+// TestTFObjectSliceGetAndValue tests that the tfObjectSlice type returns the correct values.
 func TestTFObjectSliceGetAndValue(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -371,6 +389,7 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
 				objs.Unknown = true
+
 				return objs
 			},
 			tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{
@@ -391,6 +410,7 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
 				objs.Null = true
+
 				return objs
 			},
 			tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{
@@ -410,6 +430,7 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
+
 				return objs
 			},
 			tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{
@@ -437,6 +458,7 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
+
 				return objs
 			},
 			tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{
@@ -457,7 +479,9 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
 			objs := test.in()
 			if !objs.TFValue().Equal(test.value) {
 				t.Log(spew.Sdump(objs.TFValue()))

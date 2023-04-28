@@ -12,8 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceVaultInit tests the vault_init resource
+// TestAccResourceVaultInit tests the vault_init resource.
 func TestAccResourceVaultInit(t *testing.T) {
+	t.Parallel()
 	cfg := template.Must(template.New("enos_vault_init").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_vault_init" "{{.ID.Value}}" {
@@ -113,6 +114,7 @@ func TestAccResourceVaultInit(t *testing.T) {
 		false,
 	})
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}

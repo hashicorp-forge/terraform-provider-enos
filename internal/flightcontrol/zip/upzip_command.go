@@ -13,13 +13,13 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-// UnzipCommand is the unzip command
+// UnzipCommand is the unzip command.
 type UnzipCommand struct {
 	ui   cli.Ui
 	args *UnzipCommandArgs
 }
 
-// NewUnzipCommand takes a user interface and returns a new cli.Command
+// NewUnzipCommand takes a user interface and returns a new cli.Command.
 func NewUnzipCommand(ui cli.Ui) (*UnzipCommand, error) {
 	return &UnzipCommand{
 		ui:   ui,
@@ -27,7 +27,7 @@ func NewUnzipCommand(ui cli.Ui) (*UnzipCommand, error) {
 	}, nil
 }
 
-// UnzipCommandArgs are the unzip command's arguments
+// UnzipCommandArgs are the unzip command's arguments.
 type UnzipCommandArgs struct {
 	flags           *flag.FlagSet
 	source          string
@@ -38,12 +38,12 @@ type UnzipCommandArgs struct {
 	replace         bool
 }
 
-// Synopsis is the cli.Command synopsis
+// Synopsis is the cli.Command synopsis.
 func (c *UnzipCommand) Synopsis() string {
 	return "Unzip an archive"
 }
 
-// Help is the cli.Command help
+// Help is the cli.Command help.
 func (c *UnzipCommand) Help() string {
 	help := `
 Usage: enos-flight-control unzip --source /some/file.zip --destination /some/directory --create true
@@ -60,27 +60,30 @@ Options:
   --replace              Replace any existing files with matching path
 
 `
+
 	return strings.TrimSpace(help)
 }
 
-// Run is the cli.Command main execution function
+// Run is the cli.Command main execution function.
 func (c *UnzipCommand) Run(args []string) int {
 	err := c.args.Parse(args)
 	if err != nil {
 		c.ui.Error(err.Error())
+
 		return 1
 	}
 
 	err = c.Unzip()
 	if err != nil {
 		c.ui.Error(err.Error())
+
 		return 1
 	}
 
 	return 0
 }
 
-// Parse parses the arguments and maps them to the UnzipCommandArgs
+// Parse parses the arguments and maps them to the UnzipCommandArgs.
 func (a *UnzipCommandArgs) Parse(args []string) error {
 	a.flags = flag.NewFlagSet("unzip", flag.ContinueOnError)
 	a.flags.StringVar(&a.source, "source", "", "the source destination directory")
@@ -98,7 +101,7 @@ func (a *UnzipCommandArgs) Parse(args []string) error {
 	return nil
 }
 
-// Unzip performs the unzip request
+// Unzip performs the unzip request.
 func (c *UnzipCommand) Unzip() error {
 	// Make sure we've got a zip file
 	archive, err := zip.OpenReader(c.args.source)

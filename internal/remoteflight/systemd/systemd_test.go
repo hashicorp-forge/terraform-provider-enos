@@ -8,6 +8,8 @@ import (
 )
 
 func TestGetSSHLogsResponse_GetLogFileName(t *testing.T) {
+	t.Parallel()
+
 	s := GetLogsResponse{
 		Unit: "taco-truck",
 		Host: "10.0.0.1",
@@ -19,6 +21,8 @@ func TestGetSSHLogsResponse_GetLogFileName(t *testing.T) {
 }
 
 func Test_parseServiceInfos(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		services string
 	}
@@ -67,7 +71,10 @@ cron.service                                   loaded    active   running Regula
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := parseServiceInfos(tt.args.services); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseServiceInfos() = %v, want %v", got, tt.want)
 			}

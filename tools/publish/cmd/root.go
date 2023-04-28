@@ -22,7 +22,7 @@ func newRootCommand() *cobra.Command {
 		Long:             `publish is a CLI tool intended to take the output of build and uploads it to a remote mirror in S3 or copy created artifact to another S3 mirror, that Terraform can use to install the provider. This allows us to distribute the provider using an S3 network mirror.`,
 	}
 
-	rootCmd.PersistentFlags().DurationVar(&rootCfg.requestTimeout, "timeout", time.Duration(15*time.Minute), "maximum allowed time to run")
+	rootCmd.PersistentFlags().DurationVar(&rootCfg.requestTimeout, "timeout", 15*time.Minute, "maximum allowed time to run")
 	rootCmd.PersistentFlags().StringVar(&rootCfg.logLevel, "log-level", "info", "the log level (error, warn, info, debug, trace)")
 
 	return rootCmd

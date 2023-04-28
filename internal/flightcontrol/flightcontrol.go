@@ -48,7 +48,7 @@ func SupportedTargets() (map[string][]string, error) {
 	return targets, nil
 }
 
-// SupportedTarget checks to see is a target is supported
+// SupportedTarget checks to see is a target is supported.
 func SupportedTarget(platform, arch string) (bool, error) {
 	supportedTargets, err := SupportedTargets()
 	if err != nil {
@@ -69,7 +69,7 @@ func SupportedTarget(platform, arch string) (bool, error) {
 	return false, nil
 }
 
-// ReadTargetFile takes a platform and arch and attempts to read the file
+// ReadTargetFile takes a platform and arch and attempts to read the file.
 func ReadTargetFile(platform, arch string) ([]byte, error) {
 	return Binaries.ReadFile(fmt.Sprintf("binaries/enos-flight-control_%s_%s", platform, arch))
 }

@@ -13,8 +13,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceBundleInstall tests the bundle_install resource
+// TestAccResourceBundleInstall tests the bundle_install resource.
 func TestAccResourceBundleInstall(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("enos_bundle_install").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
@@ -181,6 +183,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		}
 	}
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}

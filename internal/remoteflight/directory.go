@@ -8,42 +8,45 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// CreateDirectoryRequest creates a directory on remote host
+// CreateDirectoryRequest creates a directory on remote host.
 type CreateDirectoryRequest struct {
 	DirName  string
 	DirOwner string
 }
 
-// CreateDirectoryRequestOpt is a functional option for creating directory
+// CreateDirectoryRequestOpt is a functional option for creating directory.
 type CreateDirectoryRequestOpt func(*CreateDirectoryRequest) *CreateDirectoryRequest
 
-// NewCreateDirectoryRequest takes functional options and returns a new directory
+// NewCreateDirectoryRequest takes functional options and returns a new directory.
 func NewCreateDirectoryRequest(opts ...CreateDirectoryRequestOpt) *CreateDirectoryRequest {
 	cdir := &CreateDirectoryRequest{}
 
 	for _, opt := range opts {
 		cdir = opt(cdir)
 	}
+
 	return cdir
 }
 
-// WithDirName sets directory name
+// WithDirName sets directory name.
 func WithDirName(directory string) CreateDirectoryRequestOpt {
 	return func(cdir *CreateDirectoryRequest) *CreateDirectoryRequest {
 		cdir.DirName = directory
+
 		return cdir
 	}
 }
 
-// WithDirChown sets directory name
+// WithDirChown sets directory name.
 func WithDirChown(owner string) CreateDirectoryRequestOpt {
 	return func(cdir *CreateDirectoryRequest) *CreateDirectoryRequest {
 		cdir.DirOwner = owner
+
 		return cdir
 	}
 }
 
-// CreateDirectory creates the directory and sets owner permissions
+// CreateDirectory creates the directory and sets owner permissions.
 func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirectoryRequest) error {
 	if dir == nil {
 		return fmt.Errorf("no directory or owner provided")
@@ -68,5 +71,6 @@ func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirect
 			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
 		}
 	}
+
 	return nil
 }

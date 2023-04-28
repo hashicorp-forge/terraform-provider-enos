@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// SystemctlCommandReq is a sysmtemctl command request
+// SystemctlCommandReq is a sysmtemctl command request.
 type SystemctlCommandReq struct {
 	User       bool                // enable user mode
 	Name       string              // unit name
@@ -17,17 +17,17 @@ type SystemctlCommandReq struct {
 	Env        map[string]string   // any environment variables that need to be set
 }
 
-// SystemctlCommandRes is the command response
+// SystemctlCommandRes is the command response.
 type SystemctlCommandRes struct {
 	Stdout string
 	Stderr string
 	Status int
 }
 
-// UnitType is the systemd unit type to operate on
+// UnitType is the systemd unit type to operate on.
 type UnitType int
 
-// SystemdUnitTypes are the system unit types
+// SystemdUnitTypes are the system unit types.
 const (
 	UnitTypeNotSet UnitType = iota
 	UnitTypeService
@@ -72,10 +72,10 @@ func (u UnitType) String() string {
 	}
 }
 
-// SystemctlSubCommand is the systemctl sub command to use
+// SystemctlSubCommand is the systemctl sub command to use.
 type SystemctlSubCommand int
 
-// SystemctlSubCommands are the systemctl sub commands
+// SystemctlSubCommands are the systemctl sub commands.
 const (
 	SystemctlSubCommandNotSet SystemctlSubCommand = iota
 	SystemctlSubCommandDaemonReload
@@ -90,11 +90,11 @@ const (
 	SystemctlSubCommandRestart
 )
 
-// RunSystemctlCommandOpt is a functional option for an systemd unit request
+// RunSystemctlCommandOpt is a functional option for an systemd unit request.
 type RunSystemctlCommandOpt func(*SystemctlCommandReq) *SystemctlCommandReq
 
 // NewRunSystemctlCommand takes functional options and returns a new
-// systemd command
+// systemd command.
 func NewRunSystemctlCommand(opts ...RunSystemctlCommandOpt) *SystemctlCommandReq {
 	c := &SystemctlCommandReq{
 		Type: UnitTypeService,
@@ -107,7 +107,7 @@ func NewRunSystemctlCommand(opts ...RunSystemctlCommandOpt) *SystemctlCommandReq
 	return c
 }
 
-// WithSystemctlCommandUser sets command to --user mode
+// WithSystemctlCommandUser sets command to --user mode.
 func WithSystemctlCommandUser() RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.User = true
@@ -115,7 +115,7 @@ func WithSystemctlCommandUser() RunSystemctlCommandOpt {
 	}
 }
 
-// WithSystemctlCommandUnitName sets the command unit name
+// WithSystemctlCommandUnitName sets the command unit name.
 func WithSystemctlCommandUnitName(unit string) RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.Name = unit
@@ -123,7 +123,7 @@ func WithSystemctlCommandUnitName(unit string) RunSystemctlCommandOpt {
 	}
 }
 
-// WithSystemctlCommandUnitType sets the command unit type
+// WithSystemctlCommandUnitType sets the command unit type.
 func WithSystemctlCommandUnitType(typ UnitType) RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.Type = typ
@@ -131,7 +131,7 @@ func WithSystemctlCommandUnitType(typ UnitType) RunSystemctlCommandOpt {
 	}
 }
 
-// WithSystemctlCommandSubCommand sets the systemctl sub-command
+// WithSystemctlCommandSubCommand sets the systemctl sub-command.
 func WithSystemctlCommandSubCommand(cmd SystemctlSubCommand) RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.SubCommand = cmd
@@ -139,7 +139,7 @@ func WithSystemctlCommandSubCommand(cmd SystemctlSubCommand) RunSystemctlCommand
 	}
 }
 
-// WithSystemctlCommandPattern sets any optional pattern to pass in
+// WithSystemctlCommandPattern sets any optional pattern to pass in.
 func WithSystemctlCommandPattern(pattern string) RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.Pattern = pattern
@@ -147,7 +147,7 @@ func WithSystemctlCommandPattern(pattern string) RunSystemctlCommandOpt {
 	}
 }
 
-// WithSystemctlCommandOptions sets any optional options to pass in
+// WithSystemctlCommandOptions sets any optional options to pass in.
 func WithSystemctlCommandOptions(options string) RunSystemctlCommandOpt {
 	return func(c *SystemctlCommandReq) *SystemctlCommandReq {
 		c.Options = options
@@ -155,7 +155,7 @@ func WithSystemctlCommandOptions(options string) RunSystemctlCommandOpt {
 	}
 }
 
-// String returns the command request as a systemctl string
+// String returns the command request as a systemctl string.
 func (c *SystemctlCommandReq) String() (string, error) {
 	cmd := &strings.Builder{}
 	cmd.WriteString("sudo systemctl ")
@@ -199,6 +199,8 @@ func (c *SystemctlCommandReq) String() (string, error) {
 		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
 	case SystemctlSubCommandDaemonReload:
 		cmd.WriteString("daemon-reload")
+	case SystemctlSubCommandNotSet:
+		return "", fmt.Errorf("sub command is not set")
 	default:
 		return "", fmt.Errorf("unknown command: %d", c.SubCommand)
 	}

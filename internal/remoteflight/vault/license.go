@@ -11,18 +11,18 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// SetLegacyLicenseRequest is the legacy license set request
+// SetLegacyLicenseRequest is the legacy license set request.
 type SetLegacyLicenseRequest struct {
 	*CLIRequest
 	LicensePath    string
 	LicenseContent string
 }
 
-// SetLegacyLicenseRequestOpt is a functional option for a legacy license request
+// SetLegacyLicenseRequestOpt is a functional option for a legacy license request.
 type SetLegacyLicenseRequestOpt func(*SetLegacyLicenseRequest) *SetLegacyLicenseRequest
 
 // NewSetLegacyLicenseRequest takes functional options and returns a new
-// systemd unit request
+// systemd unit request.
 func NewSetLegacyLicenseRequest(opts ...SetLegacyLicenseRequestOpt) *SetLegacyLicenseRequest {
 	s := &SetLegacyLicenseRequest{
 		CLIRequest: &CLIRequest{},
@@ -35,7 +35,7 @@ func NewSetLegacyLicenseRequest(opts ...SetLegacyLicenseRequestOpt) *SetLegacyLi
 	return s
 }
 
-// WithSetLegacyLicenseRequestBinPath sets the vault binary path
+// WithSetLegacyLicenseRequestBinPath sets the vault binary path.
 func WithSetLegacyLicenseRequestBinPath(path string) SetLegacyLicenseRequestOpt {
 	return func(u *SetLegacyLicenseRequest) *SetLegacyLicenseRequest {
 		u.BinPath = path
@@ -43,7 +43,7 @@ func WithSetLegacyLicenseRequestBinPath(path string) SetLegacyLicenseRequestOpt 
 	}
 }
 
-// WithSetLegacyLicenseRequestVaultAddr sets the vault address
+// WithSetLegacyLicenseRequestVaultAddr sets the vault address.
 func WithSetLegacyLicenseRequestVaultAddr(addr string) SetLegacyLicenseRequestOpt {
 	return func(u *SetLegacyLicenseRequest) *SetLegacyLicenseRequest {
 		u.VaultAddr = addr
@@ -51,7 +51,7 @@ func WithSetLegacyLicenseRequestVaultAddr(addr string) SetLegacyLicenseRequestOp
 	}
 }
 
-// WithSetLegacyLicenseRequestLicensePath sets the vault license path
+// WithSetLegacyLicenseRequestLicensePath sets the vault license path.
 func WithSetLegacyLicenseRequestLicensePath(path string) SetLegacyLicenseRequestOpt {
 	return func(u *SetLegacyLicenseRequest) *SetLegacyLicenseRequest {
 		u.LicensePath = path
@@ -59,7 +59,7 @@ func WithSetLegacyLicenseRequestLicensePath(path string) SetLegacyLicenseRequest
 	}
 }
 
-// WithSetLegacyLicenseRequestLicenseContent sets the vault license content
+// WithSetLegacyLicenseRequestLicenseContent sets the vault license content.
 func WithSetLegacyLicenseRequestLicenseContent(content string) SetLegacyLicenseRequestOpt {
 	return func(u *SetLegacyLicenseRequest) *SetLegacyLicenseRequest {
 		u.LicenseContent = content
@@ -67,7 +67,7 @@ func WithSetLegacyLicenseRequestLicenseContent(content string) SetLegacyLicenseR
 	}
 }
 
-// WithSetLegacyLicenseRequestToken sets the vault license token
+// WithSetLegacyLicenseRequestToken sets the vault license token.
 func WithSetLegacyLicenseRequestToken(token string) SetLegacyLicenseRequestOpt {
 	return func(u *SetLegacyLicenseRequest) *SetLegacyLicenseRequest {
 		u.Token = token

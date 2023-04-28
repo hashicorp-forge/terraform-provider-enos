@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-// Temp is the struct we'll pass into our resource template
+// Temp is the struct we'll pass into our resource template.
 type Temp struct {
 	Struct    string // resourceName
 	StructCap string // ResourceName
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	tmplF, err := os.Open(tmplPath)
-	defer tmplF.Close() // nolint: staticcheck
+	defer tmplF.Close() //nolint: staticcheck
 	if err != nil {
 		exit(err)
 	}
@@ -105,7 +105,7 @@ func main() {
 
 	fmt.Printf("writing to %s\n", destPath)
 	dest, err := os.Create(destPath)
-	defer dest.Close() // nolint: staticcheck
+	defer dest.Close() //nolint: staticcheck
 	if err != nil {
 		exit(err)
 	}

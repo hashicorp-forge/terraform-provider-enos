@@ -98,6 +98,7 @@ func (em *embeddedTransportK8Sv1) Terraform5Value() tftypes.Value {
 			"container":         tftypes.String,
 		}}, tftypes.UnknownValue)
 	}
+
 	return terraform5Value(em.Values)
 }
 
@@ -127,6 +128,7 @@ func (em *embeddedTransportK8Sv1) FromTerraform5Value(val tftypes.Value) (err er
 			"transport", "kubernetes",
 		)
 	}
+
 	return verifyConfiguration(k8sAttributes, em.Values, "kubernetes")
 }
 
@@ -143,6 +145,7 @@ func (em *embeddedTransportK8Sv1) Validate(ctx context.Context) error {
 			)
 		}
 	}
+
 	return nil
 }
 
@@ -177,7 +180,7 @@ func (em *embeddedTransportK8Sv1) Type() TransportType {
 	return K8S
 }
 
-// render renders the transport to terraform
+// render renders the transport to terraform.
 func (em *embeddedTransportK8Sv1) render() (string, error) {
 	buf := bytes.Buffer{}
 	if err := k8sTransportTmpl.Execute(&buf, em.Attributes()); err != nil {
@@ -196,8 +199,8 @@ func (em *embeddedTransportK8Sv1) debug() string {
 		}
 	}
 
-	var vals []string
-	for _, name := range k8sAttributes {
+	vals := make([]string, len(k8sAttributes))
+	for i, name := range k8sAttributes {
 		val := "null"
 		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
 			if name == "kubeconfig_base64" {
@@ -206,7 +209,7 @@ func (em *embeddedTransportK8Sv1) debug() string {
 				val = value.String()
 			}
 		}
-		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
 	return fmt.Sprintf("Kubernetes Transport Config:\n%s", strings.Join(vals, "\n"))

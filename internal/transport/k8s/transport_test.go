@@ -12,13 +12,16 @@ import (
 )
 
 func Test_KubernetesTransport(t *testing.T) {
+	t.Parallel()
+
 	suite.Run(t, test.NewTransportTestSuite(func(t *testing.T) it.Transport {
+		t.Helper()
 		return createTransportOrSkipTest(t)
 	}))
 }
 
 // createTransportOrSkipTest creates the transport or skips the test if any of the required options
-// are missing
+// are missing.
 func createTransportOrSkipTest(t *testing.T) it.Transport {
 	t.Helper()
 	opts := TransportOpts{}

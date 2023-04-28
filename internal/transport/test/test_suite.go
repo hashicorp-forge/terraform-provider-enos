@@ -21,16 +21,17 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-// TransportTestSuite a test suite that can be used to test any transport
+// TransportTestSuite a test suite that can be used to test any transport.
 type TransportTestSuite struct {
 	suite.Suite
 	transportFn func(t *testing.T) it.Transport
 }
 
 func NewTransportTestSuite(transportFn func(t *testing.T) it.Transport) *TransportTestSuite {
-	t := new(TransportTestSuite)
-	t.transportFn = transportFn
-	return t
+	s := new(TransportTestSuite)
+	s.transportFn = transportFn
+
+	return s
 }
 
 func (s *TransportTestSuite) TestRun() {

@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// NewLocal takes a terraform provider name and returns a new local mirror
+// NewLocal takes a terraform provider name and returns a new local mirror.
 func NewLocal(name, binname string, opts ...NewLocalOpt) *Local {
 	l := &Local{
 		providerName: name,
@@ -36,19 +36,20 @@ func NewLocal(name, binname string, opts ...NewLocalOpt) *Local {
 	return l
 }
 
-// NewLocalOpt accepts optional arguments for Local
+// NewLocalOpt accepts optional arguments for Local.
 type NewLocalOpt func(*Local) *Local
 
-// WithLocalBinaryRename renames the binary during creation
+// WithLocalBinaryRename renames the binary during creation.
 func WithLocalBinaryRename(name string) NewLocalOpt {
 	return func(l *Local) *Local {
 		l.binaryRename = name
 		l.artifacts = NewArtifacts(name)
+
 		return l
 	}
 }
 
-// Local is a local provider artifact mirror
+// Local is a local provider artifact mirror.
 type Local struct {
 	providerName string
 	binaryName   string
@@ -58,7 +59,7 @@ type Local struct {
 	log          *zap.SugaredLogger
 }
 
-// Initialize initializes the mirror
+// Initialize initializes the mirror.
 func (l *Local) Initialize() error {
 	l.log.Debug("intializing")
 
@@ -79,7 +80,7 @@ func (l *Local) Initialize() error {
 	return err
 }
 
-// Close removes all of the mirrors files
+// Close removes all of the mirrors files.
 func (l *Local) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -87,7 +88,7 @@ func (l *Local) Close() error {
 	return os.RemoveAll(l.artifacts.dir)
 }
 
-// SetLogLevel sets the log level
+// SetLogLevel sets the log level.
 func (l *Local) SetLogLevel(level zapcore.Level) error {
 	cfg := zap.NewDevelopmentConfig()
 	cfg.Level.SetLevel(level)
@@ -102,12 +103,12 @@ func (l *Local) SetLogLevel(level zapcore.Level) error {
 	return nil
 }
 
-// LoadRemoteIndex fetches a remote index and loads it
+// LoadRemoteIndex fetches a remote index and loads it.
 func (l *Local) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	return l.artifacts.LoadRemoteIndex(ctx, s3Client, bucket, providerID)
 }
 
-// HasVersion checks if t the version exists in the bucket
+// HasVersion checks if t the version exists in the bucket.
 func (l *Local) HasVersion(ctx context.Context, version string) (bool, error) {
 	return l.artifacts.HasVersion(ctx, version)
 }
@@ -118,7 +119,7 @@ func (l *Local) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.C
 	return l.artifacts.CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx, srcBucketName, destS3Client, destBucketName, binaryName, providerID, version)
 }
 
-// AddReleaseVersionToIndex adds a version to the release index
+// AddReleaseVersionToIndex adds a version to the release index.
 func (l *Local) AddReleaseVersionToIndex(ctx context.Context, version string) {
 	l.artifacts.AddReleaseVersionToIndex(version)
 }
@@ -129,7 +130,7 @@ func (l *Local) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, 
 	return l.artifacts.PublishToRemoteBucket(ctx, s3Client, bucket, providerID)
 }
 
-// WriteMetadata writes metadata JSON files of the mirror artifacts
+// WriteMetadata writes metadata JSON files of the mirror artifacts.
 func (l *Local) WriteMetadata() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -137,7 +138,7 @@ func (l *Local) WriteMetadata() error {
 	return l.artifacts.WriteMetadata()
 }
 
-// WriteSHA256Sums writes a detached signature of the source file to the outfile
+// WriteSHA256Sums writes a detached signature of the source file to the outfile.
 func (l *Local) WriteSHA256Sums(ctx context.Context, name string, sign bool) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -145,24 +146,27 @@ func (l *Local) WriteSHA256Sums(ctx context.Context, name string, sign bool) err
 	return l.artifacts.WriteSHA256SUMS(ctx, name, sign)
 }
 
-// PublishToTFC publishes artifact version to TFC org
+// PublishToTFC publishes artifact version to TFC org.
 func (l *Local) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	return l.artifacts.PublishToTFC(ctx, tfcreq)
 }
 
-// DownloadFromTFC downloads the artifacts for a given version to a direcotry
+// DownloadFromTFC downloads the artifacts for a given version to a directory.
 func (l *Local) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	return l.artifacts.DownloadFromTFC(ctx, tfcreq)
 }
 
-// ExtractProviderBinaries extracts the artifacts to an output directory
+// ExtractProviderBinaries extracts the artifacts to an output directory.
 func (l *Local) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCPromoteReq) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	return l.artifacts.ExtractProviderBinaries(ctx, tfcreq)
 }
 

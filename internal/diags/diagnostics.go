@@ -13,13 +13,14 @@ func HasErrors(diags []*tfprotov6.Diagnostic) bool {
 }
 
 // GetErrorDiagnostic Gets the first Diagnostic from the provided Diagnostics that is of severity
-// Error
+// Error.
 func GetErrorDiagnostic(diags []*tfprotov6.Diagnostic) *tfprotov6.Diagnostic {
 	for _, diag := range diags {
 		if diag.Severity == tfprotov6.DiagnosticSeverityError {
 			return diag
 		}
 	}
+
 	return nil
 }
 

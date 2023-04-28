@@ -147,6 +147,7 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 			"Kind Cluster Error",
 			fmt.Errorf("failed to read local kind cluster state, due to: %w", err),
 		))
+
 		return
 	}
 
@@ -250,6 +251,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req resource
 				Summary:  "Failed to Destroy Kind Cluster",
 				Detail:   err.Error(),
 			})
+
 			return
 		}
 	case req.IsCreate():
@@ -391,6 +393,7 @@ func (s *localKindClusterStateV1) FromTerraform5Value(val tftypes.Value) error {
 	}); err != nil {
 		return err
 	}
+
 	return nil
 }
 

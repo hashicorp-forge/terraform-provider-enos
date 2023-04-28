@@ -41,6 +41,7 @@ func newTFCPromoteCmd() *cobra.Command {
 	_ = tfcPromoteCmd.MarkFlagRequired("gpg-identity-name")
 	_ = tfcPromoteCmd.MarkFlagRequired("org")
 	_ = tfcPromoteCmd.MarkFlagRequired("token")
+
 	return tfcPromoteCmd
 }
 

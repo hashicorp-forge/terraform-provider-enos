@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// NewIndex returns a new Index
+// NewIndex returns a new Index.
 func NewIndex() *Index {
 	return &Index{
 		mu:       sync.Mutex{},
@@ -16,13 +16,13 @@ func NewIndex() *Index {
 }
 
 // Index is our root index.json which tracks which versions are available in the
-// the mirror
+// mirror.
 type Index struct {
 	mu       sync.Mutex
 	Versions map[string]*IndexValue `json:"versions"`
 }
 
-// AsJSON takes an io.Writes and writes itself as JSON to it
+// AsJSON takes an io.Writes and writes itself as JSON to it.
 func (i *Index) AsJSON(to io.Writer) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()

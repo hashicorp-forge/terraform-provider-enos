@@ -13,8 +13,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceLocalExec tests the local_exec resource
+// TestAccResourceLocalExec tests the local_exec resource.
 func TestAccResourceLocalExec(t *testing.T) {
+	t.Parallel()
+
 	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "{{.ID.Value}}" {
         {{if .Content.Value}}
         content = <<EOF
@@ -85,7 +87,9 @@ EOF
 		resource.ComposeTestCheckFunc(),
 		true,
 	})
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)
@@ -139,6 +143,7 @@ EOF
 	})
 }
 
+//nolint:paralleltest// because our resource handles it
 func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 	tempDir := t.TempDir() // Note: this dir is automatically deleted after the test is run
 	f, err := os.CreateTemp(tempDir, "reapply_test.txt")
@@ -146,7 +151,7 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 
 	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "reapply_test" {
         content = "echo \"hello\" >> {{ .File }}"
-        
+
         environment = {
         {{range $name, $val := .Env}}
             "{{$name}}": "{{$val}}",
@@ -191,7 +196,7 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 		PlanOnly: false,
 	}
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			apply1,

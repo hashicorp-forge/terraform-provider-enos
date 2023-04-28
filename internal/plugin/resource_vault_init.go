@@ -68,6 +68,7 @@ func newVaultInitStateV1() *vaultInitStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
+
 	return &vaultInitStateV1{
 		ID:        newTfString(),
 		BinPath:   newTfString(),
@@ -228,7 +229,7 @@ func (r *vaultInit) ApplyResourceChange(ctx context.Context, req resource.ApplyR
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	if !reflect.DeepEqual(priorState, plannedState) {
 		err = plannedState.Init(ctx, client)
@@ -489,7 +490,7 @@ func (s *vaultInitStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-// Init initializes a vault cluster
+// Init initializes a vault cluster.
 func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error {
 	req := s.buildInitRequest()
 	err := req.Validate()

@@ -8,18 +8,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
+//nolint:paralleltest// because our resource handles it
 func TestAccDataSourceEnvironment(t *testing.T) {
 	_, okacc := os.LookupEnv("TF_ACC")
 
 	if !okacc {
 		t.Log(`skipping data "enos_environment" test because TF_ACC isn't set`)
 		t.Skip()
+
 		return
 	}
 
 	cfg := `data "enos_environment" "localhost" { }`
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			{

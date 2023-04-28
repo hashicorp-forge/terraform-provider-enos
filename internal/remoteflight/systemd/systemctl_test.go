@@ -7,6 +7,8 @@ import (
 )
 
 func TestSystemctlCommandString(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		expected   string
 		cmd        *SystemctlCommandReq
@@ -162,7 +164,10 @@ func TestSystemctlCommandString(t *testing.T) {
 			false,
 		},
 	} {
+		test := test
 		t.Run(test.expected, func(t *testing.T) {
+			t.Parallel()
+
 			out, err := test.cmd.String()
 			if test.shouldFail {
 				require.Error(t, err)

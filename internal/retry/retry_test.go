@@ -15,8 +15,10 @@ var (
 	errorUnspecified = errors.New("this is not one of the specified errors")
 )
 
-// Test that when the first succeeds we don't retry
+// Test that when the first succeeds we don't retry.
 func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -45,8 +47,10 @@ func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
 	assert.Equal(t, attempt, 1)
 }
 
-// Test that when the first attempt fails, we retry
+// Test that when the first attempt fails, we retry.
 func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -78,8 +82,9 @@ func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 	assert.Equal(t, attempt, 2)
 }
 
-// Test that we do not exceed the max number of retries
+// Test that we do not exceed the max number of retries.
 func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	var attempt int
@@ -106,8 +111,9 @@ func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
 	assert.Equal(t, attempt, maxRetries)
 }
 
-// Test that if OnlyRetryErrors are passed, only those errors trigger retry
+// Test that if OnlyRetryErrors are passed, only those errors trigger retry.
 func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -138,8 +144,9 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 	assert.Equal(t, err, errorUnspecified)
 }
 
-// Test that if Timeout is set on the context, Retry times out accordingly
+// Test that if Timeout is set on the context, Retry times out accordingly.
 func TestRetry_Timeout(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
@@ -162,8 +169,9 @@ func TestRetry_Timeout(t *testing.T) {
 	assert.Equal(t, err.Error(), "context deadline exceeded")
 }
 
-// Test that the retry function returns the value that we expect
+// Test that the retry function returns the value that we expect.
 func TestRetry_CorrectValueReturned(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -172,6 +180,7 @@ func TestRetry_CorrectValueReturned(t *testing.T) {
 		var err error
 
 		valueToReturn = 1
+
 		return valueToReturn, err
 	}
 
@@ -184,8 +193,10 @@ func TestRetry_CorrectValueReturned(t *testing.T) {
 	assert.Equal(t, 1, res.(int))
 }
 
-// Test that IntervalExponential returns the mathematically correct value
+// Test that IntervalExponential returns the mathematically correct value.
 func TestRetry_IntervalExponential(t *testing.T) {
+	t.Parallel()
+
 	for _, testObj := range []struct {
 		inputNum       int
 		expectedResult time.Duration
@@ -205,8 +216,9 @@ func TestRetry_IntervalExponential(t *testing.T) {
 	}
 }
 
-// Test that IntervalFibonacci returns the mathematically correct value
+// Test that IntervalFibonacci returns the mathematically correct value.
 func TestRetry_IntervalFibonacci(t *testing.T) {
+	t.Parallel()
 	for _, testObj := range []struct {
 		inputNum       int
 		expectedResult time.Duration

@@ -11,27 +11,27 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// StatusCode are Consul status exit codes
+// StatusCode are Consul status exit codes.
 type StatusCode int
 
-// Consul status exit codes
+// Consul status exit codes.
 const (
 	StatusRunning StatusCode = 0
 	StatusError   StatusCode = 1
-	// StatusUnknown is returned if a non-consul status error code is encountered
+	// StatusUnknown is returned if a non-consul status error code is encountered.
 	StatusUnknown StatusCode = 9
 )
 
-// StatusRequest is a consul status request
+// StatusRequest is a consul status request.
 type StatusRequest struct {
 	*CLIRequest
 }
 
-// StatusRequestOpt is a functional option for a config create request
+// StatusRequestOpt is a functional option for a config create request.
 type StatusRequestOpt func(*StatusRequest) *StatusRequest
 
 // NewStatusRequest takes functional options and returns a new
-// systemd unit request
+// systemd unit request.
 func NewStatusRequest(opts ...StatusRequestOpt) *StatusRequest {
 	c := &StatusRequest{
 		&CLIRequest{},
@@ -44,7 +44,7 @@ func NewStatusRequest(opts ...StatusRequestOpt) *StatusRequest {
 	return c
 }
 
-// WithStatusRequestBinPath sets the consul binary path
+// WithStatusRequestBinPath sets the consul binary path.
 func WithStatusRequestBinPath(path string) StatusRequestOpt {
 	return func(u *StatusRequest) *StatusRequest {
 		u.BinPath = path
@@ -52,7 +52,7 @@ func WithStatusRequestBinPath(path string) StatusRequestOpt {
 	}
 }
 
-// Status returns the consul status code
+// Status returns the consul status code.
 func Status(ctx context.Context, ssh it.Transport, req *StatusRequest) (StatusCode, error) {
 	if req.BinPath == "" {
 		return StatusUnknown, fmt.Errorf("you must supply a consul bin path")
@@ -74,6 +74,7 @@ func Status(ctx context.Context, ssh it.Transport, req *StatusRequest) (StatusCo
 		statusCode = StatusCode(exitError.ExitCode())
 	}
 
+	//nolint:exhaustive// we catch all cases with default
 	switch statusCode {
 	case StatusRunning:
 		return statusCode, nil

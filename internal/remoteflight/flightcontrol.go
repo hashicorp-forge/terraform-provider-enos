@@ -12,21 +12,21 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// DefaultFlightControlPath is the default location of our binary
+// DefaultFlightControlPath is the default location of our binary.
 const DefaultFlightControlPath = "/opt/qti/bin/enos-flight-control"
 
-// InstallFlightControlRequest is a flight control install request
+// InstallFlightControlRequest is a flight control install request.
 type InstallFlightControlRequest struct {
 	Path string
 }
 
-// InstallFlightControlResponse is a flight control install response
+// InstallFlightControlResponse is a flight control install response.
 type InstallFlightControlResponse struct{}
 
-// InstallFlightControlOpt is a functional option for an install request
+// InstallFlightControlOpt is a functional option for an install request.
 type InstallFlightControlOpt func(*InstallFlightControlRequest) *InstallFlightControlRequest
 
-// NewInstallFlightControlRequest takes functional options and returns a new install request
+// NewInstallFlightControlRequest takes functional options and returns a new install request.
 func NewInstallFlightControlRequest(opts ...InstallFlightControlOpt) *InstallFlightControlRequest {
 	ir := &InstallFlightControlRequest{
 		Path: DefaultFlightControlPath,
@@ -39,7 +39,7 @@ func NewInstallFlightControlRequest(opts ...InstallFlightControlOpt) *InstallFli
 	return ir
 }
 
-// WithInstallFlightControlRequestPath sets the install path
+// WithInstallFlightControlRequestPath sets the install path.
 func WithInstallFlightControlRequestPath(path string) InstallFlightControlOpt {
 	return func(ir *InstallFlightControlRequest) *InstallFlightControlRequest {
 		ir.Path = path

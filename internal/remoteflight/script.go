@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/ui"
 )
 
-// RunScriptRequest copies a file to the remote host
+// RunScriptRequest copies a file to the remote host.
 type RunScriptRequest struct {
 	Env             map[string]string
 	NoCleanup       bool
@@ -21,16 +21,16 @@ type RunScriptRequest struct {
 	CopyFileRequest *CopyFileRequest
 }
 
-// RunScriptResponse is the response of the script run
+// RunScriptResponse is the response of the script run.
 type RunScriptResponse struct {
 	Stdout string
 	Stderr string
 }
 
-// RunScriptRequestOpt is a functional option for running a script
+// RunScriptRequestOpt is a functional option for running a script.
 type RunScriptRequestOpt func(*RunScriptRequest) *RunScriptRequest
 
-// NewRunScriptRequest takes functional options and returns a new script run req
+// NewRunScriptRequest takes functional options and returns a new script run req.
 func NewRunScriptRequest(opts ...RunScriptRequestOpt) *RunScriptRequest {
 	cf := &RunScriptRequest{
 		Env:       map[string]string{},
@@ -54,17 +54,18 @@ func NewRunScriptRequest(opts ...RunScriptRequestOpt) *RunScriptRequest {
 	return cf
 }
 
-// WithRunScriptEnv sets the environment variables
+// WithRunScriptEnv sets the environment variables.
 func WithRunScriptEnv(env map[string]string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		for k, v := range env {
 			cf.Env[k] = v
 		}
+
 		return cf
 	}
 }
 
-// WithRunScriptNoCleanup disable the auto cleanup
+// WithRunScriptNoCleanup disable the auto cleanup.
 func WithRunScriptNoCleanup() RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.NoCleanup = true
@@ -72,7 +73,7 @@ func WithRunScriptNoCleanup() RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptUseSudo runs the script with sudo
+// WithRunScriptUseSudo runs the script with sudo.
 func WithRunScriptUseSudo() RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.Sudo = true
@@ -80,7 +81,7 @@ func WithRunScriptUseSudo() RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptContent sets content to be copied
+// WithRunScriptContent sets content to be copied.
 func WithRunScriptContent(content it.Copyable) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.CopyFileRequest.Content = content
@@ -88,7 +89,7 @@ func WithRunScriptContent(content it.Copyable) RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptTmpDir sets temporary directory to use
+// WithRunScriptTmpDir sets temporary directory to use.
 func WithRunScriptTmpDir(dir string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.CopyFileRequest.TmpDir = dir
@@ -96,7 +97,7 @@ func WithRunScriptTmpDir(dir string) RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptChmod sets permissions
+// WithRunScriptChmod sets permissions.
 func WithRunScriptChmod(chmod string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.CopyFileRequest.Chmod = chmod
@@ -104,7 +105,7 @@ func WithRunScriptChmod(chmod string) RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptChown sets ownership
+// WithRunScriptChown sets ownership.
 func WithRunScriptChown(chown string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.CopyFileRequest.Chown = chown
@@ -112,7 +113,7 @@ func WithRunScriptChown(chown string) RunScriptRequestOpt {
 	}
 }
 
-// WithRunScriptDestination sets file destination
+// WithRunScriptDestination sets file destination.
 func WithRunScriptDestination(destination string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
 		cf.CopyFileRequest.Destination = destination

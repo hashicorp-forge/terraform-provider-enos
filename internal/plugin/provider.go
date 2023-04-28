@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// env var for setting the debug_data_root_dir
+// env var for setting the debug_data_root_dir.
 const enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR"
 
 var (
@@ -22,7 +22,7 @@ var (
 	_ state.Serializable = (*config)(nil)
 )
 
-// newProvider returns a new instance of the plugin provider server
+// newProvider returns a new instance of the plugin provider server.
 func newProvider() *Provider {
 	return &Provider{
 		mu:     sync.Mutex{},
@@ -50,7 +50,7 @@ func newProviderConfig() *config {
 	}
 }
 
-// Schema is the provider user configuration schema
+// Schema is the provider user configuration schema.
 func (p *Provider) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
@@ -71,12 +71,12 @@ If the directory is not configured, diagnostic files will not be saved locally.`
 	}
 }
 
-// MetaSchema is the schema for the providers metadata
+// MetaSchema is the schema for the providers metadata.
 func (p *Provider) MetaSchema() *tfprotov6.Schema {
 	return nil
 }
 
-// Validate is called to give a provider a chance to validate the configuration
+// Validate is called to give a provider a chance to validate the configuration.
 func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProviderConfigRequest) (*tfprotov6.ValidateProviderConfigResponse, error) {
 	res := &tfprotov6.ValidateProviderConfigResponse{
 		Diagnostics:    []*tfprotov6.Diagnostic{},
@@ -104,13 +104,15 @@ func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProvider
 				return res, nil
 			}
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
+
 			return res, nil
 		}
 		if !info.IsDir() {
 			res.Diagnostics = append(res.Diagnostics,
 				diags.ErrToDiagnostic("Validation Error",
-					ValidationError("configured diagnostics dir is not a directory",
-						"debug_data_root_dir")))
+					ValidationError("configured diagnostics dir is not a directory", "debug_data_root_dir"),
+				))
+
 			return res, nil
 		}
 	}
@@ -155,6 +157,7 @@ func (p *Provider) Configure(ctx context.Context, req *tfprotov6.ConfigureProvid
 				}
 			}
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Provider Config Error", err))
+
 			return res, nil
 		}
 	}
@@ -168,7 +171,7 @@ func (p *Provider) Stop(ctx context.Context, req *tfprotov6.StopProviderRequest)
 	return &tfprotov6.StopProviderResponse{}, nil
 }
 
-// Config returns the providers configuration as a Terraform5Value
+// Config returns the providers configuration as a Terraform5Value.
 func (p *Provider) Config() tftypes.Value {
 	return p.config.Terraform5Value()
 }
@@ -205,7 +208,7 @@ func (c *config) FromTerraform5Value(val tftypes.Value) error {
 	return err
 }
 
-// Terraform5Type is the provider as a tftypes.Type
+// Terraform5Type is the provider as a tftypes.Type.
 func (c *config) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"transport":           c.Transport.Terraform5Type(),
@@ -213,7 +216,7 @@ func (c *config) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Value is the provider as a tftypes.Value
+// Terraform5Value is the provider as a tftypes.Value.
 func (c *config) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
 		"transport":           c.Transport.Terraform5Value(),
@@ -222,7 +225,7 @@ func (c *config) Terraform5Value() tftypes.Value {
 }
 
 // Copy returns a copy of the provider configuration.  We always return a copy
-// so that parallel resources don't race for the pointer
+// so that parallel resources don't race for the pointer.
 func (c *config) Copy() (*config, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

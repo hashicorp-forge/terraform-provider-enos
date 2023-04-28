@@ -88,6 +88,7 @@ func (em *embeddedTransportNomadv1) Terraform5Value() tftypes.Value {
 			"task_name":     tftypes.String,
 		}}, tftypes.UnknownValue)
 	}
+
 	return terraform5Value(em.Values)
 }
 
@@ -116,6 +117,7 @@ func (em *embeddedTransportNomadv1) FromTerraform5Value(val tftypes.Value) (err 
 			"transport", "nomad",
 		)
 	}
+
 	return verifyConfiguration(nomadAttributes, em.Values, "nomad")
 }
 
@@ -132,6 +134,7 @@ func (em *embeddedTransportNomadv1) Validate(ctx context.Context) error {
 			)
 		}
 	}
+
 	return nil
 }
 
@@ -183,8 +186,8 @@ func (em *embeddedTransportNomadv1) debug() string {
 		}
 	}
 
-	var vals []string
-	for _, name := range nomadAttributes {
+	vals := make([]string, len(nomadAttributes))
+	for i, name := range nomadAttributes {
 		val := "null"
 		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
 			if name == "secret_id" {
@@ -193,13 +196,13 @@ func (em *embeddedTransportNomadv1) debug() string {
 				val = value.String()
 			}
 		}
-		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
 	return fmt.Sprintf("Nomad Transport Config:\n%s", strings.Join(vals, "\n"))
 }
 
-// nomadClient creates a nomad client for this transport
+// nomadClient creates a nomad client for this transport.
 func (em *embeddedTransportNomadv1) nomadClient() (nomadapi.Client, error) {
 	client, err := em.nomadClientFactory(nomadapi.ClientCfg{
 		Host:     em.Host.Val,

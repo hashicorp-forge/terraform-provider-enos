@@ -17,7 +17,7 @@ type transport struct {
 	container string
 }
 
-// TransportOpts are the options required in order to create the k8s transport
+// TransportOpts are the options required in order to create the k8s transport.
 type TransportOpts struct {
 	KubeConfigBase64 string
 	ContextName      string

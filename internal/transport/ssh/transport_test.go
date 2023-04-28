@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// TestSSH tests the SSH transport
+// TestSSH tests the SSH transport.
 func TestSSH(t *testing.T) {
 	t.Parallel()
 
@@ -32,67 +33,71 @@ func TestSSH(t *testing.T) {
 		WithPassphrasePath(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH")),
 	)
 	require.NoError(t, err)
-	defer require.NoError(t, c.Close())
+	t.Cleanup(func() {
+		require.NoError(t, c.Close())
+	})
 
 	t.Run("copy", func(t *testing.T) {
-		f, err := os.Create("/tmp/ssh_test")
+		t.Parallel()
+		dir := t.TempDir()
+		path := filepath.Join(dir, "ssh_test_copy")
+		f, err := os.Create(path)
 		require.NoError(t, err)
-		defer os.Remove("/tmp/ssh_test")
+		defer f.Close()
 
 		_, err = f.WriteString("new content")
 		require.NoError(t, err)
 
-		src, err := file.Open("/tmp/ssh_test")
+		src, err := file.Open(path)
 		require.NoError(t, err)
+		defer src.Close()
 
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
 		defer cancel()
 
-		err = c.Copy(ctx, src, "/tmp/ssh_test")
+		err = c.Copy(ctx, src, "/tmp/ssh_test_copy")
 		require.NoError(t, err)
 
-		_, _, err = c.Run(ctx, command.New("rm /tmp/ssh_test"))
+		_, _, err = c.Run(ctx, command.New("rm /tmp/ssh_test_copy"))
 		require.NoError(t, err)
-
-		require.NoError(t, c.Close())
 	})
 
 	t.Run("run", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
 		defer cancel()
 
-		_, _, err := c.Run(ctx, command.New("printf 'content' > /tmp/run"))
+		_, _, err := c.Run(ctx, command.New("printf 'content' > /tmp/ssh_test_run"))
 		require.NoError(t, err)
 
-		stdout, _, err := c.Run(ctx, command.New("cat /tmp/run"))
+		stdout, _, err := c.Run(ctx, command.New("cat /tmp/ssh_test_run"))
 		require.NoError(t, err)
 		require.Equal(t, "content", stdout)
 
-		_, _, err = c.Run(ctx, command.New("rm /tmp/run"))
+		_, _, err = c.Run(ctx, command.New("rm /tmp/ssh_test_run"))
 		require.NoError(t, err)
 
-		_, _, err = c.Run(ctx, command.New("cat /tmp/run"))
+		_, _, err = c.Run(ctx, command.New("cat /tmp/ssh_test_run"))
 		require.Error(t, err)
-
-		require.NoError(t, c.Close())
 	})
 
-	t.Run("run_exit_1", func(tt *testing.T) {
+	t.Run("run_exit_1", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
 		defer cancel()
 
-		_, _, err := c.Run(ctx, command.New("printf 'exit 1' > /tmp/run; chmod +x /tmp/run; /tmp/run"))
+		_, _, err := c.Run(ctx, command.New("printf 'exit 1' > /tmp/run_exit_1; chmod +x /tmp/run_exit_1; /tmp/run_exit_1"))
 		var exitErr *it.ExecError
-		assert.ErrorAs(tt, err, &exitErr)
-		assert.Equal(tt, 1, exitErr.ExitCode())
+		assert.ErrorAs(t, err, &exitErr)
+		assert.Equal(t, 1, exitErr.ExitCode())
 
-		_, _, err = c.Run(ctx, command.New("rm /tmp/run"))
-		require.NoError(tt, err)
-
-		require.NoError(tt, c.Close())
+		_, _, err = c.Run(ctx, command.New("rm /tmp/run_exit_1"))
+		require.NoError(t, err)
 	})
 
 	t.Run("nohup", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
 		defer cancel()
 

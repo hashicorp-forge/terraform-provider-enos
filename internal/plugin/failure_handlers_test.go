@@ -31,6 +31,7 @@ func (m mockSystemdClient) GetLogs(ctx context.Context, req systemd.GetLogsReque
 	if !ok {
 		return nil, fmt.Errorf("unit not installed")
 	}
+
 	return systemd.GetLogsResponse{
 		Unit: req.Unit,
 		Host: req.Host,
@@ -266,7 +267,9 @@ func TestTransportDebugFailureHandler(t *testing.T) {
 	})
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			transport := newEmbeddedTransport()
 			transport.resolvedTransport = tt.transport
 			handler := TransportDebugFailureHandler(transport)
@@ -382,7 +385,9 @@ Error: Failed to find consul`)
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			embeddedTransport := newEmbeddedTransport()
 			embeddedTransport.resolvedTransport = tt.transport
 			services := []string{"chicken", "sshd", "fish"}
@@ -418,6 +423,7 @@ Application Logs:`)
 }
 
 func TestGetLogsFailureHandlerNotConfigured(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	logs := []byte(`Preparing to make tacos
 Found cheese

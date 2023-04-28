@@ -38,6 +38,8 @@ var (
 )
 
 func TestAccResourceKindLoadImage(t *testing.T) {
+	t.Parallel()
+
 	loadImageState := newLocalKindLoadImageStateV1()
 	loadImageState.Image.Set(image)
 	loadImageState.Tag.Set(tag)
@@ -90,6 +92,7 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 		apply: true,
 	}
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range []struct {
 		tmpl                            testAccResourceTemplate
 		state                           localKindLoadImageStateV1
@@ -126,6 +129,7 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 			regexp.MustCompile(`Validation Error`),
 		},
 	} {
+		test := test
 		t.Run(test.tmpl.name, func(tt *testing.T) {
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)
@@ -149,7 +153,7 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 
 			providers := testProviders(t, providerOverrides{resources: []resourcerouter.Resource{kindLoadImage}})
 
-			resource.Test(tt, resource.TestCase{
+			resource.ParallelTest(tt, resource.TestCase{
 				ProtoV6ProviderFactories: providers,
 				Steps:                    []resource.TestStep{step},
 			})
@@ -222,6 +226,7 @@ func (m *MockKindClient) LoadImageArchive(req kind.LoadImageArchiveRequest) (kin
 			},
 		}},
 	}
+
 	return loadImageArchiveResponse, nil
 }
 

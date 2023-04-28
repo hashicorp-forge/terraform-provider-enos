@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-// Server returns a default instance of our ProviderServer
+// Server returns a default instance of our ProviderServer.
 func Server() tfprotov6.ProviderServer {
 	return server.New(
 		server.RegisterProvider(newProvider()),
@@ -32,7 +32,7 @@ func WithDefaultDataRouter(overrides ...dr.DataSource) func(server.Server) serve
 
 // helpers
 
-// defaultDataSources returns a slice of all the data sources that the provider supports
+// defaultDataSources returns a slice of all the data sources that the provider supports.
 func defaultDataSources() []dr.DataSource {
 	return []dr.DataSource{
 		newEnvironment(),
@@ -41,7 +41,7 @@ func defaultDataSources() []dr.DataSource {
 	}
 }
 
-// defaultResources returns a slice of all the resources that the provider supports
+// defaultResources returns a slice of all the resources that the provider supports.
 func defaultResources() []rr.Resource {
 	return []rr.Resource{
 		newFile(),
@@ -60,23 +60,34 @@ func defaultResources() []rr.Resource {
 }
 
 func buildResourceRouter(resourceOverrides ...rr.Resource) rr.Router {
-	var opts []rr.RouterOpt
-	for _, resource := range defaultResources() {
-		opts = append(opts, rr.RegisterResource(resource))
+	defaultResources := defaultResources()
+	opts := make([]rr.RouterOpt, len(defaultResources)+len(resourceOverrides))
+	count := 0
+
+	for i := range defaultResources {
+		opts[count] = rr.RegisterResource(defaultResources[i])
+		count++
 	}
-	for _, resource := range resourceOverrides {
-		opts = append(opts, rr.RegisterResource(resource))
+	for i := range resourceOverrides {
+		opts[count] = rr.RegisterResource(resourceOverrides[i])
+		count++
 	}
+
 	return rr.New(opts...)
 }
 
 func buildDataRouter(dataSourceOverrides ...dr.DataSource) dr.Router {
-	var opts []dr.RouterOpt
-	for _, datasource := range defaultDataSources() {
-		opts = append(opts, dr.RegisterDataSource(datasource))
+	defaultDataSources := defaultDataSources()
+	opts := make([]dr.RouterOpt, len(defaultDataSources)+len(dataSourceOverrides))
+	count := 0
+
+	for i := range defaultDataSources {
+		opts[count] = dr.RegisterDataSource(defaultDataSources[i])
+		count++
 	}
-	for _, datasource := range dataSourceOverrides {
-		opts = append(opts, dr.RegisterDataSource(datasource))
+	for i := range dataSourceOverrides {
+		opts[count] = dr.RegisterDataSource(dataSourceOverrides[i])
+		count++
 	}
 
 	return dr.New(opts...)

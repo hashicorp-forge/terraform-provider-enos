@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +14,8 @@ import (
 )
 
 func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	provider := newProvider()
 	diagnosticsDir := newTfString()
 	diagnosticsDir.Set("/this/is/where/the/diagnostics/be/at")
@@ -52,6 +53,7 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, dir, newDir)
 }
 
+//nolint:paralleltest// because our test modifies the environment
 func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	debugDir := t.TempDir()
 
@@ -64,7 +66,7 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	val, err := state.Marshal(cfg)
 	assert.NoError(t, err)
 
-	assert.NoError(t, os.Setenv(enosDebugDataRootDirEnvVarKey, debugDir))
+	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
 	provider := newProvider()
 	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{
@@ -81,6 +83,7 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	resetEnv(t)
 }
 
+//nolint:paralleltest// because our test modifies the environment
 func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 	debugDir := t.TempDir()
 
@@ -94,7 +97,7 @@ func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 	val, err := state.Marshal(cfg)
 	assert.NoError(t, err)
 
-	assert.NoError(t, os.Setenv(enosDebugDataRootDirEnvVarKey, debugDir))
+	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
 	provider := newProvider()
 	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{

@@ -36,7 +36,7 @@ type DataSourceServerAdapter interface {
 	ReadDataSource(context.Context, tfprotov6.ReadDataSourceRequest, *tfprotov6.ReadDataSourceResponse)
 }
 
-// DataSource is the DataSource
+// DataSource is the DataSource.
 type DataSource interface {
 	DataSourceServerAdapter
 	Name() string
@@ -44,15 +44,15 @@ type DataSource interface {
 	SetProviderConfig(tftypes.Value) error
 }
 
-// RouterOpt is a functional option for the data router
+// RouterOpt is a functional option for the data router.
 type RouterOpt func(Router) Router
 
-// Router routes requests to the various data resources
+// Router routes requests to the various data resources.
 type Router struct {
 	dataSources map[string]DataSource
 }
 
-// ValidateDataResourceConfig validates the data sources config
+// ValidateDataResourceConfig validates the data sources config.
 func (r Router) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest, meta tftypes.Value) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
 	res := &tfprotov6.ValidateDataResourceConfigResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
@@ -68,10 +68,11 @@ func (r Router) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.V
 	}
 
 	ds.ValidateDataResourceConfig(ctx, *req, res)
+
 	return res, nil
 }
 
-// ReadDataSource refreshes the data sources state
+// ReadDataSource refreshes the data sources state.
 func (r Router) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest, meta tftypes.Value) (*tfprotov6.ReadDataSourceResponse, error) {
 	res := &tfprotov6.ReadDataSourceResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
@@ -88,12 +89,13 @@ func (r Router) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourc
 	}
 
 	ds.ReadDataSource(ctx, *req, res)
+
 	return res, nil
 }
 
-// New takes zero or more functional options and return a new DataSource router
+// New takes zero or more functional options and return a new DataSource router.
 func New(opts ...RouterOpt) Router {
-	r := new()
+	r := newRouter()
 	for _, opt := range opts {
 		r = opt(r)
 	}
@@ -101,13 +103,13 @@ func New(opts ...RouterOpt) Router {
 	return r
 }
 
-func new() Router {
+func newRouter() Router {
 	return Router{
 		dataSources: map[string]DataSource{},
 	}
 }
 
-// RegisterDataSource registers a DataSource with the Router
+// RegisterDataSource registers a DataSource with the Router.
 func RegisterDataSource(data DataSource) func(Router) Router {
 	return func(router Router) Router {
 		router.dataSources[data.Name()] = data
@@ -116,7 +118,7 @@ func RegisterDataSource(data DataSource) func(Router) Router {
 	}
 }
 
-// Schemas returns the data router schemas
+// Schemas returns the data router schemas.
 func (r Router) Schemas() map[string]*tfprotov6.Schema {
 	schemas := map[string]*tfprotov6.Schema{}
 	for name, dataSource := range r.dataSources {

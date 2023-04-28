@@ -9,17 +9,17 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// ValidateFileRequest  is a Consul Config Validation request
+// ValidateFileRequest  is a Consul Config Validation request.
 type ValidateFileRequest struct {
 	*CLIRequest
 	FilePath string
 }
 
-// ValidateFileRequestOpt is a functional option for a Consul validate command
+// ValidateFileRequestOpt is a functional option for a Consul validate command.
 type ValidateFileRequestOpt func(*ValidateFileRequest) *ValidateFileRequest
 
 // NewValidateFileRequest takes functional options and returns a new
-// config validate request
+// config validate request.
 func NewValidateFileRequest(opts ...ValidateFileRequestOpt) *ValidateFileRequest {
 	s := &ValidateFileRequest{
 		CLIRequest: &CLIRequest{},
@@ -32,7 +32,7 @@ func NewValidateFileRequest(opts ...ValidateFileRequestOpt) *ValidateFileRequest
 	return s
 }
 
-// WithValidateConfigBinPath sets the Consul binary path
+// WithValidateConfigBinPath sets the Consul binary path.
 func WithValidateConfigBinPath(path string) ValidateFileRequestOpt {
 	return func(u *ValidateFileRequest) *ValidateFileRequest {
 		u.BinPath = path
@@ -40,7 +40,7 @@ func WithValidateConfigBinPath(path string) ValidateFileRequestOpt {
 	}
 }
 
-// WithValidateFilePath sets the Consul config path
+// WithValidateFilePath sets the Consul config path.
 func WithValidateFilePath(path string) ValidateFileRequestOpt {
 	return func(u *ValidateFileRequest) *ValidateFileRequest {
 		u.FilePath = path
@@ -48,15 +48,15 @@ func WithValidateFilePath(path string) ValidateFileRequestOpt {
 	}
 }
 
-// ValidateConsulConfig validates the consul config using the consul validate command
+// ValidateConsulConfig validates the consul config using the consul validate command.
 func ValidateConsulConfig(ctx context.Context, ssh it.Transport, req *ValidateFileRequest) error {
 	_, stderr, err := ssh.Run(ctx, command.New(
 		fmt.Sprintf("%s validate %s", req.BinPath, req.FilePath),
-	),
-	)
+	))
 	if err != nil {
 		return remoteflight.WrapErrorWith(err, stderr)
 	}
+
 	return nil
 }
 
@@ -68,8 +68,7 @@ func ValidateConsulLicense(ctx context.Context, ssh it.Transport, req *ValidateF
 
 	_, stderr, err := ssh.Run(ctx, command.New(
 		fmt.Sprintf("%s license inspect %s", req.BinPath, req.FilePath),
-	),
-	)
+	))
 	if err != nil {
 		return remoteflight.WrapErrorWith(err, stderr)
 	}

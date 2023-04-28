@@ -84,7 +84,7 @@ func (c *client) readFile(ctx context.Context, path string) (string, error) {
 	}
 
 	handle, err := os.Open(abs)
-	defer handle.Close() // nolint: staticcheck
+	defer handle.Close() //nolint: staticcheck
 	if err != nil {
 		return res, err
 	}
@@ -112,8 +112,9 @@ func (c *client) init(ctx context.Context) error {
 	c.keepaliveErrC = make(chan error, 1)
 
 	c.clientConfig = &xssh.ClientConfig{
-		Config:          xssh.Config{},
-		User:            c.transportCfg.user,
+		Config: xssh.Config{},
+		User:   c.transportCfg.user,
+		//nolint:gosec// it's okay to ignore our host key
 		HostKeyCallback: xssh.InsecureIgnoreHostKey(),
 		Auth:            []xssh.AuthMethod{},
 	}
@@ -184,7 +185,7 @@ func (c *client) Connect(ctx context.Context) error {
 	// we'll fire off dial attempts every 3 seconds and get the first client
 	// that succeeds.
 
-	dialTimeout, cancel := context.WithTimeout(ctx, time.Duration(60*time.Second))
+	dialTimeout, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	dialTicker := time.NewTicker(3 * time.Second)
 
@@ -196,6 +197,7 @@ func (c *client) Connect(ctx context.Context) error {
 		if err == nil {
 			dialTicker.Stop()
 			clientC <- client
+
 			return
 		}
 		dialErrs <- err
@@ -224,7 +226,7 @@ func (c *client) Connect(ctx context.Context) error {
 	waitForClientConnection := func() (*xssh.Client, error) {
 		defer dialTicker.Stop()
 		for {
-			// Always make sure we haven't hit our timeouts before we attemp another
+			// Always make sure we haven't hit our timeouts before we attempt another
 			// dial.
 			select {
 			case <-ctx.Done():
@@ -358,7 +360,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	}
 
 	// ensure that the session is accepting requests
-	requestTimeout, cancel := context.WithTimeout(ctx, time.Duration(15*time.Second))
+	requestTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	requestTicker := time.NewTicker(2 * time.Second)
 	requestErrs := make(chan error, 7)
@@ -373,7 +375,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		requestErrs <- fmt.Errorf("sending test SSH session request %w", err)
 	}
 
-	drainErrors := func(err error) error {
+	drainErrors := func() error {
 		merr := &multierror.Error{}
 		merr = multierror.Append(merr, err)
 
@@ -390,21 +392,21 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	go sendRequest()
 
 	for {
-		// Always make sure we haven't hit our timeouts before we attemp another
+		// Always make sure we haven't hit our timeouts before we attempt another
 		// dial.
 		select {
 		case <-ctx.Done():
-			return session, cleanup, wrapErr(drainErrors(nil), ctx.Err().Error())
+			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(nil), "15 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "15 second request timeout exceeded")
 		default:
 		}
 
 		select {
 		case <-ctx.Done():
-			return session, cleanup, wrapErr(drainErrors(nil), ctx.Err().Error())
+			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(nil), "15 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "15 second request timeout exceeded")
 		case <-requestTicker.C:
 			go sendRequest()
 		case <-requestSuccess:

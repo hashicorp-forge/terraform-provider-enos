@@ -144,6 +144,7 @@ func (l *localExec) PlanResourceChange(ctx context.Context, req resource.PlanRes
 				"Invalid Configuration",
 				fmt.Errorf("failed to read all scripts, due to: %w", err),
 			))
+
 			return
 		}
 		proposedState.Sum.Set(sha256)
@@ -230,6 +231,7 @@ func (l *localExec) ApplyResourceChange(ctx context.Context, req resource.ApplyR
 				"Execution Error",
 				fmt.Errorf("failed to execute commands due to: %w%s", err, formatOutputIfExists(ui)),
 			))
+
 			return
 		}
 	}
@@ -391,6 +393,7 @@ func (l *localExec) copyAndRun(ctx context.Context, source io.Reader, ui ui.UI, 
 		)
 	}
 
+	//nolint:gosec// we know that we're executing user controlled code
 	cmd := exec.CommandContext(ctx, "bash", destination.Name())
 	cmd.Stdout = ui.Stdout()
 	cmd.Stderr = ui.Stderr()
@@ -439,7 +442,7 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 				"scripts",
 			)
 		}
-		defer f.Close() // nolint: staticcheck
+		defer f.Close()
 	}
 
 	return nil

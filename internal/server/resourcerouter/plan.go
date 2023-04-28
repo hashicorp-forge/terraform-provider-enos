@@ -12,7 +12,7 @@ import (
 
 // PlanResourceChangeRequest An adapter type that mirrors the type tfproto6.PlanResourceChangeRequest
 // exposing the prior and proposed states as unmarshalled tftypes.Value values rather than
-// tfprotov6.DynamicValue values
+// tfprotov6.DynamicValue values.
 type PlanResourceChangeRequest struct {
 	TypeName         string
 	PriorState       tftypes.Value
@@ -45,7 +45,7 @@ func (p *PlanResourceChangeRequest) fromTFProto6(req *tfprotov6.PlanResourceChan
 
 // PlanResourceChangeResponse An adapter type that mirrors the type tfproto6.PlanResourceChangeResponse
 // exposing the resultant plan as an unmarshalled state.State type rather than a marshalled
-// tfprotov6.DynamicValue
+// tfprotov6.DynamicValue.
 type PlanResourceChangeResponse struct {
 	PlannedState                state.State
 	RequiresReplace             []*tftypes.AttributePath
@@ -76,7 +76,7 @@ func (p PlanResourceChangeResponse) ToTFProto6Response() *tfprotov6.PlanResource
 	return resp
 }
 
-// PlanResourceChange proposes a new resource state
+// PlanResourceChange proposes a new resource state.
 func (r Router) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.PlanResourceChangeResponse, error) {
 	resource, ok := r.resources[req.TypeName]
 	if !ok {

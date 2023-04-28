@@ -8,20 +8,20 @@ import (
 	"os"
 )
 
-// ImageInfo information about a docker image
+// ImageInfo information about a docker image.
 type ImageInfo struct {
 	Repository string
 	Tags       []TagInfo
 }
 
-// TagInfo information about an image tag
+// TagInfo information about an image tag.
 type TagInfo struct {
 	Tag string
 	// ID docker image ID
 	ID string
 }
 
-// ImageRef the repo and tag for one image
+// ImageRef the repo and tag for one image.
 type ImageRef struct {
 	Repository string
 	Tag        string
@@ -38,12 +38,13 @@ func (i *ImageInfo) String() string {
 var repositoriesFile = "repositories"
 
 // TODO: do we need this function
-// GetImageRefs creates a slice of all the image refs, where an image ref is Repository:Tag
+// GetImageRefs creates a slice of all the image refs, where an image ref is Repository:Tag.
 func (i *ImageInfo) GetImageRefs() []string {
-	var refs []string
-	for _, tag := range i.Tags {
-		refs = append(refs, fmt.Sprintf("%s:%s", i.Repository, tag))
+	refs := make([]string, len(i.Tags))
+	for idx, tag := range i.Tags {
+		refs[idx] = fmt.Sprintf("%s:%s", i.Repository, tag)
 	}
+
 	return refs
 }
 
@@ -62,6 +63,7 @@ func GetImageInfos(archivePath string) ([]ImageInfo, error) {
 			if err == io.EOF {
 				return nil, fmt.Errorf("failed to find docker file manifest")
 			}
+
 			return nil, fmt.Errorf("failed to read archive contents due to: %w", err)
 		}
 		fileInfo := header.FileInfo()

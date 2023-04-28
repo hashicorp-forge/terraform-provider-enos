@@ -33,6 +33,7 @@ func TestAccDataSourceKubernetesPods(t *testing.T) {
 	if !okacc {
 		t.Log(`skipping data "enos_kubernetes_pods" test because TF_ACC isn't set`)
 		t.Skip()
+
 		return
 	}
 
@@ -148,6 +149,7 @@ output "transports_1_container" {
 	state3.ContextName.Set("some-context")
 	invalidKubeConfigErr := regexp.MustCompile(`invalid kubeconfig`)
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range []struct {
 		name         string
 		config       *kubernetesPodsStateV1
@@ -159,6 +161,7 @@ output "transports_1_container" {
 		{"missing_context", state2, emptyResult, nil, notPresentError},
 		{"invalid_kubeconfig", state3, emptyResult, nil, invalidKubeConfigErr},
 	} {
+		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			buf := bytes.Buffer{}
 			require.NoError(t, cfg.Execute(&buf, test.config))
@@ -175,7 +178,7 @@ output "transports_1_container" {
 				step.Check = checkFunc1
 			}
 
-			resource.Test(tt, resource.TestCase{
+			resource.ParallelTest(tt, resource.TestCase{
 				ProtoV6ProviderFactories: testProvider(test.queryResults),
 				Steps:                    []resource.TestStep{step},
 			})
@@ -195,6 +198,7 @@ func testProvider(queryResults []kubernetes.PodInfo) map[string]func() (tfprotov
 		)))
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
+		//nolint:unparam// we always return nil here but we have to adhere to an interface that can return an error
 		"enos": func() (tfprotov6.ProviderServer, error) {
 			return s, nil
 		},

@@ -49,6 +49,7 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
+
 	return &vaultUnsealStateV1{
 		ID:              newTfString(),
 		BinPath:         newTfString(),
@@ -175,7 +176,7 @@ func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req resource.Appl
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
@@ -307,6 +308,7 @@ func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) er
 	if err != nil {
 		return fmt.Errorf("failed to unseal Vault, due to: %w", err)
 	}
+
 	return err
 }
 

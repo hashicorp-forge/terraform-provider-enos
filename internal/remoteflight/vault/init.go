@@ -12,13 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// InitRequest is the init request
+// InitRequest is the init request.
 type InitRequest struct {
 	*CLIRequest
 	*InitArguments
 }
 
-// InitArguments are the possible arguments to pass to the init command
+// InitArguments are the possible arguments to pass to the init command.
 type InitArguments struct {
 	KeyShares         int
 	KeyThreshold      int
@@ -32,7 +32,7 @@ type InitArguments struct {
 	StoredShares      int
 }
 
-// InitResponse is the init response
+// InitResponse is the init response.
 type InitResponse struct {
 	UnsealKeysB64         []string    `json:"unseal_keys_b64"`
 	UnsealKeysHex         []string    `json:"unseal_keys_hex"`
@@ -45,11 +45,11 @@ type InitResponse struct {
 	RootToken             string      `json:"root_token"`
 }
 
-// InitRequestOpt is a functional option for a config create request
+// InitRequestOpt is a functional option for a config create request.
 type InitRequestOpt func(*InitRequest) *InitRequest
 
 // NewInitRequest takes functional options and returns a new
-// systemd unit request
+// systemd unit request.
 func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	c := &InitRequest{
 		&CLIRequest{},
@@ -71,7 +71,7 @@ func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	return c
 }
 
-// WithInitRequestBinPath sets the vault binary path
+// WithInitRequestBinPath sets the vault binary path.
 func WithInitRequestBinPath(path string) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.BinPath = path
@@ -79,7 +79,7 @@ func WithInitRequestBinPath(path string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestVaultAddr sets the vault address
+// WithInitRequestVaultAddr sets the vault address.
 func WithInitRequestVaultAddr(addr string) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.VaultAddr = addr
@@ -87,7 +87,7 @@ func WithInitRequestVaultAddr(addr string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestKeyShares sets the init request key shares
+// WithInitRequestKeyShares sets the init request key shares.
 func WithInitRequestKeyShares(shares int) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.KeyShares = shares
@@ -95,7 +95,7 @@ func WithInitRequestKeyShares(shares int) InitRequestOpt {
 	}
 }
 
-// WithInitRequestKeyThreshold sets the init key request threshold
+// WithInitRequestKeyThreshold sets the init key request threshold.
 func WithInitRequestKeyThreshold(thres int) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.KeyThreshold = thres
@@ -103,7 +103,7 @@ func WithInitRequestKeyThreshold(thres int) InitRequestOpt {
 	}
 }
 
-// WithInitRequestPGPKeys sets the init pgp keys
+// WithInitRequestPGPKeys sets the init pgp keys.
 func WithInitRequestPGPKeys(keys []string) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.PGPKeys = keys
@@ -111,7 +111,7 @@ func WithInitRequestPGPKeys(keys []string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestRecoveryShares sets the init recovery shares
+// WithInitRequestRecoveryShares sets the init recovery shares.
 func WithInitRequestRecoveryShares(shares int) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.RecoveryShares = shares
@@ -119,7 +119,7 @@ func WithInitRequestRecoveryShares(shares int) InitRequestOpt {
 	}
 }
 
-// WithInitRequestRecoveryThreshold sets the init recovery threshold
+// WithInitRequestRecoveryThreshold sets the init recovery threshold.
 func WithInitRequestRecoveryThreshold(thres int) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.RecoveryThreshold = thres
@@ -127,7 +127,7 @@ func WithInitRequestRecoveryThreshold(thres int) InitRequestOpt {
 	}
 }
 
-// WithInitRequestRecoveryPGPKeys sets the recovery pgp keys
+// WithInitRequestRecoveryPGPKeys sets the recovery pgp keys.
 func WithInitRequestRecoveryPGPKeys(keys []string) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.RecoveryPGPKeys = keys
@@ -135,7 +135,7 @@ func WithInitRequestRecoveryPGPKeys(keys []string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestRootTokenPGPKey sets the root token pgp key
+// WithInitRequestRootTokenPGPKey sets the root token pgp key.
 func WithInitRequestRootTokenPGPKey(key string) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.RootTokenPGPKey = key
@@ -143,7 +143,7 @@ func WithInitRequestRootTokenPGPKey(key string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestConsulAuto enables consul service discovery mode
+// WithInitRequestConsulAuto enables consul service discovery mode.
 func WithInitRequestConsulAuto(auto bool) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.ConsulAuto = auto
@@ -160,7 +160,7 @@ func WithInitRequestConsulService(service string) InitRequestOpt {
 	}
 }
 
-// WithInitRequestStoredShares sets the request stored shares
+// WithInitRequestStoredShares sets the request stored shares.
 func WithInitRequestStoredShares(shares int) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
 		u.StoredShares = shares
@@ -168,7 +168,7 @@ func WithInitRequestStoredShares(shares int) InitRequestOpt {
 	}
 }
 
-// Validate validates that the init requests has required fields
+// Validate validates that the init requests has required fields.
 func (r *InitRequest) Validate() error {
 	if r.BinPath == "" {
 		return fmt.Errorf("no binary path has been supplied")
@@ -187,7 +187,7 @@ func (r *InitRequest) Validate() error {
 	return nil
 }
 
-// String returns the init request as an init command
+// String returns the init request as an init command.
 func (r *InitRequest) String() string {
 	cmd := &strings.Builder{}
 	cmd.WriteString(fmt.Sprintf("%s operator init -format=json", r.BinPath))
@@ -225,7 +225,7 @@ func (r *InitRequest) String() string {
 	return cmd.String()
 }
 
-// Init Initializes a vault cluster
+// Init Initializes a vault cluster.
 func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
 

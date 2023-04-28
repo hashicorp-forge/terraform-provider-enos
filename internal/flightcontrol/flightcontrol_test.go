@@ -67,7 +67,9 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 			Supported:    false,
 		},
 	} {
+		test := test
 		t.Run(fmt.Sprintf("%s_%s", test.Platform, test.Architecture), func(t *testing.T) {
+			t.Parallel()
 			supported, err := SupportedTarget(test.Platform, test.Architecture)
 			assert.Equal(t, test.Supported, supported)
 			require.NoError(t, err)
@@ -76,6 +78,7 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 }
 
 func TestSupportedTargets(t *testing.T) {
+	t.Parallel()
 	targets, err := SupportedTargets()
 	require.NoError(t, err)
 	require.EqualValues(t, map[string][]string{

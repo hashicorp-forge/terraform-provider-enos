@@ -32,6 +32,7 @@ func newTFCDownloadCmd() *cobra.Command {
 	_ = tfcDownloadCmd.MarkFlagRequired("binary-name")
 	_ = tfcDownloadCmd.MarkFlagRequired("org")
 	_ = tfcDownloadCmd.MarkFlagRequired("token")
+
 	return tfcDownloadCmd
 }
 

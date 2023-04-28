@@ -31,7 +31,7 @@ const (
 
 var EmptyClusterInfo = ClusterInfo{}
 
-// Client a kind client for managing kind clusters
+// Client a kind client for managing kind clusters.
 type Client interface {
 	// CreateCluster creates a kind cluster and adds the context to the kubeconfig
 	CreateCluster(request CreateKindClusterRequest) (ClusterInfo, error)
@@ -44,7 +44,7 @@ type Client interface {
 	LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 }
 
-// localClient a kind client for managing local kind clusters
+// localClient a kind client for managing local kind clusters.
 type localClient struct {
 	logger log.Logger
 }
@@ -75,12 +75,12 @@ type LoadImageRequest struct {
 	Tag         string
 }
 
-// GetImageRef gets the image ref for the request, i.e. name:tag
+// GetImageRef gets the image ref for the request, i.e. name:tag.
 func (l LoadImageRequest) GetImageRef() string {
 	return fmt.Sprintf("%s:%s", l.ImageName, l.Tag)
 }
 
-// LoadedImageResult info about what cluster nodes an image was loaded on
+// LoadedImageResult info about what cluster nodes an image was loaded on.
 type LoadedImageResult struct {
 	// Images the images that were loaded. Each image is loaded on each node
 	Images []docker.ImageInfo
@@ -88,7 +88,7 @@ type LoadedImageResult struct {
 	Nodes []string
 }
 
-// ID generates an id, by hashing the loaded image IDs, falls back to a random id if hashing fails
+// ID generates an id, by hashing the loaded image IDs, falls back to a random id if hashing fails.
 func (l *LoadedImageResult) ID() string {
 	h := fnv.New32a()
 
@@ -100,6 +100,7 @@ func (l *LoadedImageResult) ID() string {
 			}
 		}
 	}
+
 	return strconv.Itoa(int(h.Sum32()))
 }
 
@@ -112,7 +113,7 @@ func NewLocalClient(logger log.Logger) Client {
 	return &localClient{logger: logger}
 }
 
-// CreateCluster creates a new kind cluster locally and returns the cluster info if successful
+// CreateCluster creates a new kind cluster locally and returns the cluster info if successful.
 func (c *localClient) CreateCluster(request CreateKindClusterRequest) (ClusterInfo, error) {
 	if len(strings.TrimSpace(request.Name)) == 0 {
 		return EmptyClusterInfo, fmt.Errorf("cannot create a cluster with an empty cluster 'name'")
@@ -153,7 +154,7 @@ func (c *localClient) CreateCluster(request CreateKindClusterRequest) (ClusterIn
 	return GetClusterInfo(request.Name)
 }
 
-// GetClusterInfo gets the cluster info for a local kind cluster
+// GetClusterInfo gets the cluster info for a local kind cluster.
 func GetClusterInfo(name string) (ClusterInfo, error) {
 	provider := cluster.NewProvider(cluster.ProviderWithLogger(cmd.NewLogger()))
 	kubeConfig, err := provider.KubeConfig(name, false)
@@ -177,7 +178,7 @@ func GetClusterInfo(name string) (ClusterInfo, error) {
 	}, nil
 }
 
-// DeleteCluster Deletes a local kind cluster
+// DeleteCluster Deletes a local kind cluster.
 func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 	if len(strings.TrimSpace(request.Name)) == 0 {
 		return fmt.Errorf("cannot delete cluster without cluster 'name'")
@@ -203,15 +204,16 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 		"name":            request.Name,
 		"kubeconfig_path": kubeConfigPath,
 	})
+
 	return nil
 }
 
-// LoadImageArchive Loads an image archive file into all nodes of a kind cluster as per the request
+// LoadImageArchive Loads an image archive file into all nodes of a kind cluster as per the request.
 func (c *localClient) LoadImageArchive(req LoadImageArchiveRequest) (LoadedImageResult, error) {
 	return c.loadImageArchive(req.ImageArchive, req.ClusterName)
 }
 
-// LoadImage Loads an image into all nodes of a kind cluster as per the request
+// LoadImage Loads an image into all nodes of a kind cluster as per the request.
 func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error) {
 	dir, err := os.MkdirTemp("", req.GetImageRef())
 	if err != nil {
@@ -236,7 +238,7 @@ func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 	return c.loadImageArchive(imageTar, req.ClusterName)
 }
 
-// loadImageArchive loads the provided image archive onto all nodes of the provided cluster
+// loadImageArchive loads the provided image archive onto all nodes of the provided cluster.
 func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImageResult, error) {
 	result := LoadedImageResult{Nodes: []string{}}
 

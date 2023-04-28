@@ -39,6 +39,8 @@ var (
 )
 
 func TestEmbeddedTransportMarshalRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	transport := transportconfig{}.ssh(sshConfig).k8s(k8sConfig).nomad(nomadConfig).build(t)
 
 	marshaled, err := state.Marshal(transport)
@@ -128,6 +130,7 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 		nomadValue("allocation_id", "ddf76bc4").
 		nomadValue("task_name", nil)
 
+	//nolint:paralleltest
 	for _, test := range []struct {
 		name                    string
 		config                  transportconfig
@@ -145,6 +148,7 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 		{"partial_k8s_configured", partialK8STransport, partialK8SAttributesExpected, partialK8SConfiguredExpected},
 		{"partial_nomad_configured", partialNomadTransport, partialNomadAttributesExpected, partialNomadConfiguredExpected},
 	} {
+		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			expectedAttributeValues := test.expectedAttributeValues
 			expectedValues := test.expectedValues
@@ -241,6 +245,7 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 		sshValue("host", "20.6.30.2").
 		nomadValue("host", "http://127.0.0.1:4646")
 
+	//nolint:paralleltest
 	for _, test := range []struct {
 		name              string
 		config            transportconfig
@@ -259,6 +264,7 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 		{"no_defaults_multiple_transports", configMultipleTransports, emptyDefaultsTransport, transportconfig{}, true},
 		{"no_defaults_no_transport", configNoTransport, emptyDefaultsTransport, transportconfig{}, true},
 	} {
+		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			// Apply our provider defaults to our transport
 			transport := test.config.build(tt)
@@ -329,6 +335,7 @@ func TestProviderEmbeddedTransportValidate(t *testing.T) {
 		"host": "http://127.0.0.1:4646",
 	})
 
+	//nolint:paralleltest// build() handles it
 	for _, test := range []struct {
 		name    string
 		config  transportconfig
@@ -368,6 +375,7 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 	k8sOnlyConfig := transportconfig{}.k8s(k8sConfig)
 	nomadOnlyConfig := transportconfig{}.nomad(nomadConfig)
 
+	//nolint:paralleltest// because build() handles it
 	for _, test := range []struct {
 		name   string
 		config transportconfig
@@ -425,7 +433,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 	k8sOnlyConfig := transportconfig{}.k8s(k8sConfig)
 	nomadOnlyConfig := transportconfig{}.nomad(nomadConfig)
 	noTransportConfig := transportconfig{}
-
+	//nolint:paralleltest// build() handles it
 	for _, test := range []struct {
 		name            string
 		config          transportconfig
@@ -443,6 +451,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 		{"only_nomad_config", nomadOnlyConfig, false, false, true, true},
 		{"no_configured_transport", noTransportConfig, true, false, false, false},
 	} {
+		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			transport := test.config.build(tt)
 			if ssh, ok := transport.SSH(); ok {
@@ -450,6 +459,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 					if !test.wantSSHClient {
 						t.Error("An ssh client should not have been created but was")
 					}
+
 					return nil, nil
 				}
 			}
@@ -458,6 +468,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 					if !test.wantK8SClient {
 						t.Error("A k8s client should not have been created but was")
 					}
+
 					return nil, nil
 				}
 			}
@@ -466,6 +477,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 					if !test.wantNomadClient {
 						t.Error("A nomad client should not have been created but was")
 					}
+
 					return nil, nil
 				}
 			}
@@ -481,7 +493,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 	}
 }
 
-// helpers
+// helpers.
 type transportconfig map[TransportType]configmap
 
 func (tc transportconfig) k8s(config configmap) transportconfig {
@@ -494,6 +506,7 @@ func (tc transportconfig) k8sValue(key string, value interface{}) transportconfi
 		tc[K8S] = configmap{}
 	}
 	tc[K8S][key] = value
+
 	return tc
 }
 
@@ -507,6 +520,7 @@ func (tc transportconfig) sshValue(key string, value interface{}) transportconfi
 		tc[SSH] = configmap{}
 	}
 	tc[SSH][key] = value
+
 	return tc
 }
 
@@ -520,6 +534,7 @@ func (tc transportconfig) nomadValue(key string, value interface{}) transportcon
 		tc[NOMAD] = configmap{}
 	}
 	tc[NOMAD][key] = value
+
 	return tc
 }
 
@@ -527,6 +542,7 @@ func (tc transportconfig) build(t *testing.T) *embeddedTransportV1 {
 	t.Helper()
 	transport := newEmbeddedTransport()
 	require.NoError(t, transport.FromTerraform5Value(tc.toTFValue(t)))
+
 	return transport
 }
 
@@ -537,6 +553,7 @@ func (c configmap) copy() configmap {
 	for k, v := range c {
 		newConfigmap[k] = v
 	}
+
 	return newConfigmap
 }
 
@@ -558,64 +575,68 @@ func (tc transportconfig) toTFValue(t *testing.T) tftypes.Value {
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: types}, values)
 }
 
-func assertTransportCfg(tt *testing.T, transport *embeddedTransportV1, config transportconfig) {
+func assertTransportCfg(t *testing.T, transport *embeddedTransportV1, config transportconfig) {
+	t.Helper()
+
 	for tType, tConfig := range config {
 		if len(tConfig) > 0 {
 			for attr, value := range tConfig {
 				switch tType {
 				case SSH:
 					ssh, ok := transport.SSH()
-					assert.True(tt, ok)
+					assert.True(t, ok)
 					switch attr {
 					case "host":
-						assert.Equal(tt, value, ssh.Host.Val)
+						assert.Equal(t, value, ssh.Host.Val)
 					case "user":
-						assert.Equal(tt, value, ssh.User.Val)
+						assert.Equal(t, value, ssh.User.Val)
 					case "private_key":
-						assert.Equal(tt, value, ssh.PrivateKey.Val)
+						assert.Equal(t, value, ssh.PrivateKey.Val)
 					case "private_key_path":
-						assert.Equal(tt, value, ssh.PrivateKeyPath.Val)
+						assert.Equal(t, value, ssh.PrivateKeyPath.Val)
 					case "passphrase":
-						assert.Equal(tt, value, ssh.Passphrase.Val)
+						assert.Equal(t, value, ssh.Passphrase.Val)
 					case "passphrase_path":
-						assert.Equal(tt, value, ssh.PassphrasePath.Val)
+						assert.Equal(t, value, ssh.PassphrasePath.Val)
 					default:
-						tt.Fatalf("unknown SSH attr: %s", attr)
+						t.Fatalf("unknown SSH attr: %s", attr)
 					}
 				case K8S:
 					k8s, ok := transport.K8S()
-					assert.True(tt, ok)
+					assert.True(t, ok)
 					switch attr {
 					case "kubeconfig_base64":
-						assert.Equal(tt, value, k8s.KubeConfigBase64.Val)
+						assert.Equal(t, value, k8s.KubeConfigBase64.Val)
 					case "context_name":
-						assert.Equal(tt, value, k8s.ContextName.Val)
+						assert.Equal(t, value, k8s.ContextName.Val)
 					case "namespace":
-						assert.Equal(tt, value, k8s.Namespace.Val)
+						assert.Equal(t, value, k8s.Namespace.Val)
 					case "pod":
-						assert.Equal(tt, value, k8s.Pod.Val)
+						assert.Equal(t, value, k8s.Pod.Val)
 					case "container":
-						assert.Equal(tt, value, k8s.Container.Val)
+						assert.Equal(t, value, k8s.Container.Val)
 					default:
-						tt.Fatalf("unknown K8S attr: %s", attr)
+						t.Fatalf("unknown K8S attr: %s", attr)
 					}
 				case NOMAD:
 					nomad, ok := transport.Nomad()
-					assert.True(tt, ok)
+					assert.True(t, ok)
 					switch attr {
 					case "host":
-						assert.Equal(tt, value, nomad.Host.Val)
+						assert.Equal(t, value, nomad.Host.Val)
 					case "secret_id":
-						assert.Equal(tt, value, nomad.SecretID.Val)
+						assert.Equal(t, value, nomad.SecretID.Val)
 					case "allocation_id":
-						assert.Equal(tt, value, nomad.AllocationID.Val)
+						assert.Equal(t, value, nomad.AllocationID.Val)
 					case "task_name":
-						assert.Equal(tt, value, nomad.TaskName.Val)
+						assert.Equal(t, value, nomad.TaskName.Val)
 					default:
-						tt.Fatalf("unknown Nomad attr: %s", attr)
+						t.Fatalf("unknown Nomad attr: %s", attr)
 					}
+				case UNKNOWN:
+					t.Fatalf("unknown transport type: %s", tType.String())
 				default:
-					tt.Fatalf("unknown transport type: %s", tType.String())
+					t.Fatalf("undefined transport type: %s", tType.String())
 				}
 			}
 		}

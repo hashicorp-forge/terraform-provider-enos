@@ -172,11 +172,10 @@ func withHTTPSBodyResolver(host string) ipResolver {
 
 		baseErr := fmt.Sprintf("host(%s)", host)
 
-		req, err := http.NewRequest("GET", host, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, host, nil)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", baseErr, err)
 		}
-		req = req.WithContext(ctx)
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -193,7 +192,7 @@ func withHTTPSBodyResolver(host string) ipResolver {
 	}
 }
 
-// addIPs takes a slice of IPs and adds them to the ip set
+// addIPs takes a slice of IPs and adds them to the ip set.
 func (r *publicIPResolver) addIPs(ips []net.IP) {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -232,6 +231,7 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 		if err != nil {
 			r.addIPs(ips)
 		}
+
 		return err
 	default:
 	}

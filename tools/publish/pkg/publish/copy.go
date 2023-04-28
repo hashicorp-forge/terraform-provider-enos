@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// CopyReq to be copied
+// CopyReq to be copied.
 type CopyReq struct {
 	Version          string
 	SrcBucketName    string
@@ -25,7 +25,7 @@ type CopyReq struct {
 	log              zapcore.Level
 }
 
-// Copy will copy the artifact from source to destination S3 bucket
+// Copy will copy the artifact from source to destination S3 bucket.
 func Copy(ctx context.Context, req *CopyReq) error {
 	// Make sure the source and destination buckets exist
 	_, err := req.SrcS3Client.HeadBucket(ctx, &s3.HeadBucketInput{
@@ -102,7 +102,7 @@ func Copy(ctx context.Context, req *CopyReq) error {
 		return err
 	}
 
-	// Add the version we copied to our desitnation mirror release index and
+	// Add the version we copied to our destination mirror release index and
 	// upload it.
 	destMirror.AddReleaseVersionToIndex(ctx, req.Version)
 

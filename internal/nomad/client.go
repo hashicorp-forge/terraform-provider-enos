@@ -25,7 +25,7 @@ type GetTaskLogsResponse struct {
 
 var _ remoteflight.GetLogsResponse = (*GetTaskLogsResponse)(nil)
 
-// GetAppName implements remoteflight.GetLogsResponse.GetAppName
+// GetAppName implements remoteflight.GetLogsResponse.GetAppName.
 func (r *GetTaskLogsResponse) GetAppName() string {
 	return r.Task
 }
@@ -53,7 +53,7 @@ func (r *GetTaskLogsResponse) GetLogs() []byte {
 	return r.Logs
 }
 
-// Client a wrapper around the Nomad API client, providing useful functions that the provider can use
+// Client a wrapper around the Nomad API client, providing useful functions that the provider can use.
 type Client interface {
 	// GetAllocation gets an allocation that matches the provided prefix
 	GetAllocation(allocPrefix string) (*api.Allocation, error)
@@ -69,18 +69,18 @@ type Client interface {
 	Close()
 }
 
-// client a wrapper for the Nomad API Client
+// client a wrapper for the Nomad API Client.
 type client struct {
 	apiClient *api.Client
 }
 
-// ClientCfg the configuration required for the Client
+// ClientCfg the configuration required for the Client.
 type ClientCfg struct {
 	Host     string
 	SecretID string
 }
 
-// ExecRequestOpts exec options for a Nomad exec request
+// ExecRequestOpts exec options for a Nomad exec request.
 type ExecRequestOpts struct {
 	AllocationID string
 	TaskName     string
@@ -88,7 +88,7 @@ type ExecRequestOpts struct {
 	StdIn        bool
 }
 
-// execRequest Nomad based implementation of an it.ExecRequest
+// execRequest Nomad based implementation of an it.ExecRequest.
 type execRequest struct {
 	client  *client
 	opts    ExecRequestOpts
@@ -126,7 +126,7 @@ func NewClient(cfg ClientCfg) (Client, error) {
 //	GetAllocation("4a212111") and
 //	GetAllocation("4a212111-7d45-6ad4-0ad8-abe2d8661248")
 //
-// will both return the same result, so long as there are not more than one alloc with the prefix: 4a212111
+// will both return the same result, so long as there are not more than one alloc with the prefix: 4a212111.
 func (c *client) GetAllocation(allocPrefix string) (*api.Allocation, error) {
 	allocs, _, err := c.apiClient.Allocations().PrefixList(allocPrefix)
 	if err != nil {
@@ -152,7 +152,7 @@ func (c *client) GetAllocationInfo(allocID string) (*api.Allocation, error) {
 	return info, nil
 }
 
-// Exec performs a Nomad based remote exec
+// Exec performs a Nomad based remote exec.
 func (c *client) Exec(ctx context.Context, opts ExecRequestOpts, streams *it.ExecStreams) *it.ExecResponse {
 	response := it.NewExecResponse()
 
@@ -248,6 +248,7 @@ ReadFrames:
 			return nil, fmt.Errorf("failed to read logs, due to: %w", err)
 		}
 	}
+
 	return &GetTaskLogsResponse{
 		Namespace:  alloc.Namespace,
 		Allocation: alloc.Name,
@@ -260,7 +261,7 @@ func (c *client) Close() {
 	c.apiClient.Close()
 }
 
-// createClient creates the Nomad API client
+// createClient creates the Nomad API client.
 func createClient(opts ClientCfg) (*api.Client, error) {
 	config := &api.Config{
 		Address: opts.Host,
@@ -274,5 +275,6 @@ func createClient(opts ClientCfg) (*api.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the nomad client due to: %w", err)
 	}
+
 	return client, nil
 }

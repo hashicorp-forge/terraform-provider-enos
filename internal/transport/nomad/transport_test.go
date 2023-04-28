@@ -11,20 +11,25 @@ import (
 )
 
 func Test_NomadTransport(t *testing.T) {
+	t.Parallel()
+
 	suite.Run(t, test.NewTransportTestSuite(func(t *testing.T) it.Transport {
+		t.Helper()
 		return createTransportOrSkipTest(t)
 	}))
 }
 
 // createTransportOrSkipTest creates the transport or skips the test if any of the required options
-// are missing
+// are missing.
 func createTransportOrSkipTest(t *testing.T) it.Transport {
 	t.Helper()
+
 	opts := TransportOpts{}
 
 	host, ok := os.LookupEnv("ENOS_NOMAD_HOST")
 	if !ok {
 		t.Skip("Skipping test, since \"ENOS_NOMAD_HOST\" env var not specified")
+
 		return nil
 	}
 	opts.Host = host
@@ -32,6 +37,7 @@ func createTransportOrSkipTest(t *testing.T) it.Transport {
 	allocationID, ok := os.LookupEnv("ENOS_NOMAD_ALLOCATION_ID")
 	if !ok {
 		t.Skip("Skipping test, since \"ENOS_NOMAD_ALLOCATION_ID\" env var not specified")
+
 		return nil
 	}
 	opts.AllocationID = allocationID

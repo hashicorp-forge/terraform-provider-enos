@@ -254,6 +254,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 							Repository: info.Repository,
 							Tag:        tagInfo.Tag,
 						}
+
 						break
 					}
 				}
@@ -271,6 +272,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 				"tag":           plannedState.Tag.Value(),
 				"loaded_images": fmt.Sprintf("%#v", result),
 			})
+
 			return
 		}
 
@@ -380,6 +382,7 @@ func (k *localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error
 	if err != nil {
 		return fmt.Errorf("failed to convert Terraform value to kind image state, due to: %w", err)
 	}
+
 	return nil
 }
 
@@ -433,5 +436,6 @@ func (l *loadedImagesStateV1) FromTerraform5Value(val tftypes.Value) error {
 			"loaded_images",
 		)
 	}
+
 	return nil
 }

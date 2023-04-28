@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// User is a user
+// User is a user.
 type User struct {
 	Name    string
 	HomeDir string
@@ -18,10 +18,10 @@ type User struct {
 	UID     string
 }
 
-// UserOpt is a functional option for an user request
+// UserOpt is a functional option for an user request.
 type UserOpt func(*User) *User
 
-// NewUser takes functional options and returns a new user
+// NewUser takes functional options and returns a new user.
 func NewUser(opts ...UserOpt) *User {
 	u := &User{}
 
@@ -32,7 +32,7 @@ func NewUser(opts ...UserOpt) *User {
 	return u
 }
 
-// WithUserName sets the user name
+// WithUserName sets the user name.
 func WithUserName(name string) UserOpt {
 	return func(u *User) *User {
 		u.Name = name
@@ -40,7 +40,7 @@ func WithUserName(name string) UserOpt {
 	}
 }
 
-// WithUserHomeDir sets the home dir
+// WithUserHomeDir sets the home dir.
 func WithUserHomeDir(dir string) UserOpt {
 	return func(u *User) *User {
 		u.HomeDir = dir
@@ -48,7 +48,7 @@ func WithUserHomeDir(dir string) UserOpt {
 	}
 }
 
-// WithUserShell sets the user shell
+// WithUserShell sets the user shell.
 func WithUserShell(shell string) UserOpt {
 	return func(u *User) *User {
 		u.Shell = shell
@@ -56,7 +56,7 @@ func WithUserShell(shell string) UserOpt {
 	}
 }
 
-// WithUserGID sets the user gid
+// WithUserGID sets the user gid.
 func WithUserGID(gid string) UserOpt {
 	return func(u *User) *User {
 		u.GID = gid
@@ -64,7 +64,7 @@ func WithUserGID(gid string) UserOpt {
 	}
 }
 
-// WithUserUID sets the user uid
+// WithUserUID sets the user uid.
 func WithUserUID(uid string) UserOpt {
 	return func(u *User) *User {
 		u.UID = uid
@@ -140,7 +140,7 @@ func CreateUser(ctx context.Context, ssh it.Transport, user *User) error {
 func FindOrCreateUser(ctx context.Context, ssh it.Transport, user *User) (*User, error) {
 	user, err := FindUser(ctx, ssh, user.Name)
 	if err == nil {
-		return user, err
+		return user, nil
 	}
 
 	err = CreateUser(ctx, ssh, user)

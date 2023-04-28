@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// CopyFileRequest copies a file to the remote host
+// CopyFileRequest copies a file to the remote host.
 type CopyFileRequest struct {
 	Content     it.Copyable
 	TmpDir      string
@@ -22,19 +22,19 @@ type CopyFileRequest struct {
 	RetryOpts   []retry.RetrierOpt
 }
 
-// DeleteFileRequest deletes a file on the remote host
+// DeleteFileRequest deletes a file on the remote host.
 type DeleteFileRequest struct {
 	Path      string
 	RetryOpts []retry.RetrierOpt
 }
 
-// CopyFileRequestOpt is a functional option for file copy
+// CopyFileRequestOpt is a functional option for file copy.
 type CopyFileRequestOpt func(*CopyFileRequest) *CopyFileRequest
 
-// DeleteFileRequestOpt is a functional option for file deletion
+// DeleteFileRequestOpt is a functional option for file deletion.
 type DeleteFileRequestOpt func(*DeleteFileRequest) *DeleteFileRequest
 
-// NewCopyFileRequest takes functional options and returns a new file copy request
+// NewCopyFileRequest takes functional options and returns a new file copy request.
 func NewCopyFileRequest(opts ...CopyFileRequestOpt) *CopyFileRequest {
 	cf := &CopyFileRequest{
 		TmpDir: "/tmp",
@@ -51,7 +51,7 @@ func NewCopyFileRequest(opts ...CopyFileRequestOpt) *CopyFileRequest {
 	return cf
 }
 
-// NewDeleteFileRequest takes functional options and returns a new file deletion request
+// NewDeleteFileRequest takes functional options and returns a new file deletion request.
 func NewDeleteFileRequest(opts ...DeleteFileRequestOpt) *DeleteFileRequest {
 	cf := &DeleteFileRequest{
 		RetryOpts: []retry.RetrierOpt{
@@ -67,7 +67,7 @@ func NewDeleteFileRequest(opts ...DeleteFileRequestOpt) *DeleteFileRequest {
 	return cf
 }
 
-// WithCopyFileContent sets content to be copied
+// WithCopyFileContent sets content to be copied.
 func WithCopyFileContent(content it.Copyable) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.Content = content
@@ -75,7 +75,7 @@ func WithCopyFileContent(content it.Copyable) CopyFileRequestOpt {
 	}
 }
 
-// WithCopyFileTmpDir sets temporary directory to use
+// WithCopyFileTmpDir sets temporary directory to use.
 func WithCopyFileTmpDir(dir string) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.TmpDir = dir
@@ -83,7 +83,7 @@ func WithCopyFileTmpDir(dir string) CopyFileRequestOpt {
 	}
 }
 
-// WithCopyFileChmod sets permissions
+// WithCopyFileChmod sets permissions.
 func WithCopyFileChmod(chmod string) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.Chmod = chmod
@@ -91,7 +91,7 @@ func WithCopyFileChmod(chmod string) CopyFileRequestOpt {
 	}
 }
 
-// WithCopyFileChown sets ownership
+// WithCopyFileChown sets ownership.
 func WithCopyFileChown(chown string) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.Chown = chown
@@ -99,7 +99,7 @@ func WithCopyFileChown(chown string) CopyFileRequestOpt {
 	}
 }
 
-// WithCopyFileDestination sets file destination
+// WithCopyFileDestination sets file destination.
 func WithCopyFileDestination(destination string) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.Destination = destination
@@ -107,7 +107,7 @@ func WithCopyFileDestination(destination string) CopyFileRequestOpt {
 	}
 }
 
-// WithCopyFileRetryOptions sets retry options for file copy operations
+// WithCopyFileRetryOptions sets retry options for file copy operations.
 func WithCopyFileRetryOptions(opts ...retry.RetrierOpt) CopyFileRequestOpt {
 	return func(cf *CopyFileRequest) *CopyFileRequest {
 		cf.RetryOpts = opts
@@ -115,7 +115,7 @@ func WithCopyFileRetryOptions(opts ...retry.RetrierOpt) CopyFileRequestOpt {
 	}
 }
 
-// WithDeleteFileRetryOptions sets retry options for file delete operations
+// WithDeleteFileRetryOptions sets retry options for file delete operations.
 func WithDeleteFileRetryOptions(opts ...retry.RetrierOpt) DeleteFileRequestOpt {
 	return func(cf *DeleteFileRequest) *DeleteFileRequest {
 		cf.RetryOpts = opts
@@ -123,7 +123,7 @@ func WithDeleteFileRetryOptions(opts ...retry.RetrierOpt) DeleteFileRequestOpt {
 	}
 }
 
-// WithDeleteFilePath sets which file to delete for file delete operations
+// WithDeleteFilePath sets which file to delete for file delete operations.
 func WithDeleteFilePath(path string) DeleteFileRequestOpt {
 	return func(cf *DeleteFileRequest) *DeleteFileRequest {
 		cf.Path = path
@@ -200,7 +200,7 @@ func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) e
 	return nil
 }
 
-// DeleteFile deletes a file on the remote host, retrying if necessary
+// DeleteFile deletes a file on the remote host, retrying if necessary.
 func DeleteFile(ctx context.Context, client it.Transport, req *DeleteFileRequest) error {
 	if req == nil {
 		return fmt.Errorf("no file delete request provided")

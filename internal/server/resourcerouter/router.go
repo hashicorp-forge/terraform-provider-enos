@@ -40,7 +40,7 @@ type ResourceServerAdapter interface {
 	ImportResourceState(context.Context, tfprotov6.ImportResourceStateRequest, *tfprotov6.ImportResourceStateResponse)
 }
 
-// Resource represents a Terraform resource
+// Resource represents a Terraform resource.
 type Resource interface {
 	ResourceServerAdapter
 	Name() string
@@ -48,12 +48,12 @@ type Resource interface {
 	SetProviderConfig(tftypes.Value) error
 }
 
-// RouterOpt is a functional option for the router constructor
+// RouterOpt is a functional option for the router constructor.
 type RouterOpt func(Router) Router
 
-// New takes zero or more functional options and returns a new Router
+// New takes zero or more functional options and returns a new Router.
 func New(opts ...RouterOpt) Router {
-	r := new()
+	r := newRouter()
 	for _, opt := range opts {
 		r = opt(r)
 	}
@@ -62,7 +62,7 @@ func New(opts ...RouterOpt) Router {
 }
 
 // RegisterResource is a functional option that register a new Resource with
-// the Router
+// the Router.
 func RegisterResource(resource Resource) func(Router) Router {
 	return func(router Router) Router {
 		router.resources[resource.Name()] = resource
@@ -71,18 +71,18 @@ func RegisterResource(resource Resource) func(Router) Router {
 	}
 }
 
-func new() Router {
+func newRouter() Router {
 	return Router{
 		resources: map[string]Resource{},
 	}
 }
 
-// Router routes the requests the resource servers
+// Router routes the requests the resource servers.
 type Router struct {
 	resources map[string]Resource
 }
 
-// ValidateResourceConfig validates the resource's config
+// ValidateResourceConfig validates the resource's config.
 func (r Router) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest, providerConfig tftypes.Value) (*tfprotov6.ValidateResourceConfigResponse, error) {
 	res := &tfprotov6.ValidateResourceConfigResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
@@ -97,10 +97,11 @@ func (r Router) ValidateResourceConfig(ctx context.Context, req *tfprotov6.Valid
 		return nil, newErrSetProviderConfig(err)
 	}
 	resource.ValidateResourceConfig(ctx, *req, res)
+
 	return res, nil
 }
 
-// UpgradeResourceState upgrades the state when migrating from an old version to a new version
+// UpgradeResourceState upgrades the state when migrating from an old version to a new version.
 func (r Router) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest, providerConfig tftypes.Value) (*tfprotov6.UpgradeResourceStateResponse, error) {
 	res := &tfprotov6.UpgradeResourceStateResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
@@ -117,10 +118,11 @@ func (r Router) UpgradeResourceState(ctx context.Context, req *tfprotov6.Upgrade
 	}
 
 	resource.UpgradeResourceState(ctx, *req, res)
+
 	return res, nil
 }
 
-// ReadResource refreshes the resource's state
+// ReadResource refreshes the resource's state.
 func (r Router) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest, providerConfig tftypes.Value) (*tfprotov6.ReadResourceResponse, error) {
 	res := &tfprotov6.ReadResourceResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
@@ -137,10 +139,11 @@ func (r Router) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceReq
 	}
 
 	resource.ReadResource(ctx, *req, res)
+
 	return res, nil
 }
 
-// ImportResourceState fetches the resource from an ID and adds it to the state
+// ImportResourceState fetches the resource from an ID and adds it to the state.
 func (r Router) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest, providerConfig tftypes.Value) (*tfprotov6.ImportResourceStateResponse, error) {
 	res := &tfprotov6.ImportResourceStateResponse{
 		ImportedResources: []*tfprotov6.ImportedResource{},
@@ -158,10 +161,11 @@ func (r Router) ImportResourceState(ctx context.Context, req *tfprotov6.ImportRe
 	}
 
 	resource.ImportResourceState(ctx, *req, res)
+
 	return res, nil
 }
 
-// Schemas returns the data router schemas
+// Schemas returns the data router schemas.
 func (r Router) Schemas() map[string]*tfprotov6.Schema {
 	schemas := map[string]*tfprotov6.Schema{}
 	for name, resource := range r.resources {

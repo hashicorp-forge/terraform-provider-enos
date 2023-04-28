@@ -12,7 +12,7 @@ import (
 
 // ApplyResourceChangeRequest An adapter type that mirrors the type tfproto6.ApplyResourceChangeRequest
 // exposing the prior and planned states as unmarshalled tftypes.Value values rather than
-// tfprotov6.DynamicValue values
+// tfprotov6.DynamicValue values.
 type ApplyResourceChangeRequest struct {
 	TypeName       string
 	PriorState     tftypes.Value
@@ -22,22 +22,22 @@ type ApplyResourceChangeRequest struct {
 	ProviderMeta   *tfprotov6.DynamicValue
 }
 
-// IsDelete if true this request represents a delete request
+// IsDelete if true this request represents a delete request.
 func (a *ApplyResourceChangeRequest) IsDelete() bool {
 	return !a.PriorState.IsNull() && a.PlannedState.IsNull()
 }
 
-// IsCreate if true this request represents a create request
+// IsCreate if true this request represents a create request.
 func (a *ApplyResourceChangeRequest) IsCreate() bool {
 	return a.PriorState.IsNull() && !a.PlannedState.IsNull()
 }
 
-// IsUpdate if true this request represents an update request
+// IsUpdate if true this request represents an update request.
 func (a *ApplyResourceChangeRequest) IsUpdate() bool {
 	return !a.IsDelete() && !a.IsCreate()
 }
 
-// fromTFProto6 converts a tfproto6 request to the adapter request type
+// fromTFProto6 converts a tfproto6 request to the adapter request type.
 func (a *ApplyResourceChangeRequest) fromTFProto6(req *tfprotov6.ApplyResourceChangeRequest, tfType tftypes.Type) error {
 	priorState, err := req.PriorState.Unmarshal(tfType)
 	if err != nil {
@@ -61,7 +61,7 @@ func (a *ApplyResourceChangeRequest) fromTFProto6(req *tfprotov6.ApplyResourceCh
 
 // ApplyResourceChangeResponse An adapter type that mirrors the type tfproto6.ApplyResourceChangeResponse
 // exposing the resultant new state as an unmarshalled state.State type rather than a marshalled
-// tfprotov6.DynamicValue
+// tfprotov6.DynamicValue.
 type ApplyResourceChangeResponse struct {
 	NewState                    state.State
 	Private                     []byte
@@ -90,7 +90,7 @@ func (a ApplyResourceChangeResponse) ToTFProto6Response(isDelete bool) *tfprotov
 }
 
 // ApplyResourceChange applies the newly planned resource state and executes any configured failure
-// handlers
+// handlers.
 func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest, providerConfig tftypes.Value) (*tfprotov6.ApplyResourceChangeResponse, error) {
 	resource, ok := r.resources[req.TypeName]
 	if !ok {

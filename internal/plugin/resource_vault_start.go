@@ -91,6 +91,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
+
 	return &vaultStartStateV1{
 		ID:      newTfString(),
 		BinPath: newTfString(),
@@ -247,7 +248,7 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req resource.Apply
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
@@ -427,7 +428,7 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-// FromTerraform5Value unmarshals the value to the struct
+// FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
 	if val.IsNull() {
 		return AttributePathError(fmt.Errorf("serialization error, config block is missing"), s.AttributePaths...)
@@ -476,7 +477,7 @@ func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
 	return err
 }
 
-// Terraform5Type is the tftypes.Type
+// Terraform5Type is the tftypes.Type.
 func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"type":       s.Type.TFType(),
@@ -484,7 +485,7 @@ func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 	}}
 }
 
-// Terraform5Value is the tftypes.Value
+// Terraform5Value is the tftypes.Value.
 func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
@@ -513,7 +514,7 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	} else {
 		// MarshalMsgPack is deprecated but it's by far the easiest way to inspect
 		// the serialized value of the raw attribute.
-		// nolint staticcheck
+		//nolint:staticcheck
 		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
 		if err != nil {
 			panic(fmt.Sprintf("unable to marshal the vault config block to the wire format: %s", err.Error()))
@@ -568,7 +569,7 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 	})
 }
 
-// FromTerraform5Value unmarshals the value to the struct
+// FromTerraform5Value unmarshals the value to the struct.
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
 		"cluster_name": c.ClusterName,
@@ -607,7 +608,7 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	return nil
 }
 
-// ToHCLConfig returns the vault config in the remoteflight HCLConfig format
+// ToHCLConfig returns the vault config in the remoteflight HCLConfig format.
 func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	hclBuilder := hcl.NewBuilder()
 
@@ -652,6 +653,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 				AppendAttribute("auto_join_scheme", "http")
 		}
 	}
+
 	return hclBuilder, nil
 }
 
@@ -747,7 +749,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			unitName = unit
 		}
 
-		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Vault - A tool for managing secrets",
@@ -759,6 +760,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 				"StartLimitBurst":       "3",
 			},
 			"Service": {
+				"Type":                  "notify",
 				"EnvironmentFile":       envFilePath,
 				"User":                  "vault",
 				"Group":                 "vault",
@@ -778,9 +780,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 				"Restart":               "on-failure",
 				"RestartSec":            "5",
 				"TimeoutStopSec":        "30",
-				"StartLimitInterval":    "60",
-				"StartLimitIntervalSec": "60",
-				"StartLimitBurst":       "10",
 				"LimitNOFILE":           "65536",
 				"LimitMEMLOCK":          "infinity",
 			},

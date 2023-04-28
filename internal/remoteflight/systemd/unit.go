@@ -6,11 +6,11 @@ import (
 )
 
 // Unit is a map structure representing any systemd unit. The first keys
-// represent stanzas and the the values of each stanza is a map of filed names
+// represent stanzas and the values of each stanza is a map of filed names
 // and values.
 type Unit map[string]map[string]string
 
-// Iniable is an interface for a type that can be converted into a systemd unit
+// Iniable is an interface for a type that can be converted into a systemd unit.
 type Iniable interface {
 	ToIni() (string, error)
 }
@@ -40,7 +40,7 @@ func (s Unit) ToIni() (string, error) {
 	return strings.TrimSpace(unit.String()), nil
 }
 
-// CreateUnitFileRequest is a systemd unit file creator
+// CreateUnitFileRequest is a systemd unit file creator.
 type CreateUnitFileRequest struct {
 	Unit     Iniable
 	UnitPath string
@@ -48,11 +48,11 @@ type CreateUnitFileRequest struct {
 	Chown    string
 }
 
-// CreateUnitFileOpt is a functional option for an systemd unit request
+// CreateUnitFileOpt is a functional option for an systemd unit request.
 type CreateUnitFileOpt func(*CreateUnitFileRequest) *CreateUnitFileRequest
 
 // NewCreateUnitFileRequest takes functional options and returns a new
-// systemd unit request
+// systemd unit request.
 func NewCreateUnitFileRequest(opts ...CreateUnitFileOpt) *CreateUnitFileRequest {
 	c := &CreateUnitFileRequest{}
 
@@ -63,7 +63,7 @@ func NewCreateUnitFileRequest(opts ...CreateUnitFileOpt) *CreateUnitFileRequest 
 	return c
 }
 
-// WithUnitUnitPath sets the unit name
+// WithUnitUnitPath sets the unit name.
 func WithUnitUnitPath(path string) CreateUnitFileOpt {
 	return func(u *CreateUnitFileRequest) *CreateUnitFileRequest {
 		u.UnitPath = path
@@ -71,7 +71,7 @@ func WithUnitUnitPath(path string) CreateUnitFileOpt {
 	}
 }
 
-// WithUnitFile sets systemd unit to use
+// WithUnitFile sets systemd unit to use.
 func WithUnitFile(unit Iniable) CreateUnitFileOpt {
 	return func(u *CreateUnitFileRequest) *CreateUnitFileRequest {
 		u.Unit = unit
@@ -79,7 +79,7 @@ func WithUnitFile(unit Iniable) CreateUnitFileOpt {
 	}
 }
 
-// WithUnitChmod sets systemd unit permissions
+// WithUnitChmod sets systemd unit permissions.
 func WithUnitChmod(chmod string) CreateUnitFileOpt {
 	return func(u *CreateUnitFileRequest) *CreateUnitFileRequest {
 		u.Chmod = chmod
@@ -87,7 +87,7 @@ func WithUnitChmod(chmod string) CreateUnitFileOpt {
 	}
 }
 
-// WithUnitChown sets systemd unit ownership
+// WithUnitChown sets systemd unit ownership.
 func WithUnitChown(chown string) CreateUnitFileOpt {
 	return func(u *CreateUnitFileRequest) *CreateUnitFileRequest {
 		u.Chown = chown

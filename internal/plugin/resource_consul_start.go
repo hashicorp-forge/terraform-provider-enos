@@ -68,6 +68,7 @@ func newConsulStartStateV1() *consulStartStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"consul"}),
 	}
+
 	return &consulStartStateV1{
 		ID:        newTfString(),
 		BinPath:   newTfString(),
@@ -208,7 +209,7 @@ func (r *consulStart) ApplyResourceChange(ctx context.Context, req resource.Appl
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
@@ -436,7 +437,7 @@ func (c *consulConfig) Terraform5Value() tftypes.Value {
 	})
 }
 
-// FromTerraform5Value unmarshals the value to the struct
+// FromTerraform5Value unmarshals the value to the struct.
 func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
 		"data_dir":         c.DataDir,
@@ -450,10 +451,11 @@ func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// ToHCLConfig returns the consul config in the remoteflight HCLConfig format
+// ToHCLConfig returns the consul config in the remoteflight HCLConfig format.
 func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	hlcBuilder := hcl.NewBuilder()
 
@@ -523,7 +525,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		unitName = unit
 	}
 
-	//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 	unit := systemd.Unit{
 		"Unit": {
 			"Description":           "HashiCorp Consul - A service mesh solution",
@@ -603,7 +604,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		return fmt.Errorf("failed to create the consul configuration file, due to: %w", err)
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(1*time.Minute))
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	// Create the consul data directory

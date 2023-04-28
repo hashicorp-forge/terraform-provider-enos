@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 )
 
-// UnzipRequest performs a remote flight control unzip
+// UnzipRequest performs a remote flight control unzip.
 type UnzipRequest struct {
 	FlightControlPath          string
 	SourcePath                 string
@@ -20,13 +20,13 @@ type UnzipRequest struct {
 	Replace                    bool
 }
 
-// UnzipResponse is a flight control unzip response
+// UnzipResponse is a flight control unzip response.
 type UnzipResponse struct{}
 
-// UnzipOpt is a functional option for an unzip request
+// UnzipOpt is a functional option for an unzip request.
 type UnzipOpt func(*UnzipRequest) *UnzipRequest
 
-// NewUnzipRequest takes functional options and returns a new unzip request
+// NewUnzipRequest takes functional options and returns a new unzip request.
 func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
 	var err error
 	ur := &UnzipRequest{
@@ -49,7 +49,7 @@ func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
 }
 
 // WithUnzipRequestFlightControlPath sets the location of the enos-flight-contro
-// binary
+// binary.
 func WithUnzipRequestFlightControlPath(path string) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.FlightControlPath = path
@@ -57,7 +57,7 @@ func WithUnzipRequestFlightControlPath(path string) UnzipOpt {
 	}
 }
 
-// WithUnzipRequestSourcePath sets the zip archive source path
+// WithUnzipRequestSourcePath sets the zip archive source path.
 func WithUnzipRequestSourcePath(path string) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.SourcePath = path
@@ -65,7 +65,7 @@ func WithUnzipRequestSourcePath(path string) UnzipOpt {
 	}
 }
 
-// WithUnzipRequestDestinationDir sets the unzip directory
+// WithUnzipRequestDestinationDir sets the unzip directory.
 func WithUnzipRequestDestinationDir(dir string) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.DestinationDirectory = dir
@@ -73,7 +73,7 @@ func WithUnzipRequestDestinationDir(dir string) UnzipOpt {
 	}
 }
 
-// WithUnzipRequestFileMode sets the mode for files that are expanded
+// WithUnzipRequestFileMode sets the mode for files that are expanded.
 func WithUnzipRequestFileMode(mode string) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.FileMode = mode
@@ -82,7 +82,7 @@ func WithUnzipRequestFileMode(mode string) UnzipOpt {
 }
 
 // WithUnzipRequestDestinationDirMode sets the mode for destination directory
-// if it is created
+// if it is created.
 func WithUnzipRequestDestinationDirMode(mode string) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.DestinationDirectoryMode = mode
@@ -91,7 +91,7 @@ func WithUnzipRequestDestinationDirMode(mode string) UnzipOpt {
 }
 
 // WithUnzipRequestCreateDestinationDir determines if the destination directory
-// should be created
+// should be created.
 func WithUnzipRequestCreateDestinationDir(create bool) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.CreateDestinationDirectory = create
@@ -100,7 +100,7 @@ func WithUnzipRequestCreateDestinationDir(create bool) UnzipOpt {
 }
 
 // WithUnzipRequestUseSudo determines if the unzip command should be run with
-// sudo
+// sudo.
 func WithUnzipRequestUseSudo(useSudo bool) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.Sudo = useSudo
@@ -109,7 +109,7 @@ func WithUnzipRequestUseSudo(useSudo bool) UnzipOpt {
 }
 
 // WithUnzipRequestReplace determines if the unzip command should overwrite
-// the destination file if it exists
+// the destination file if it exists.
 func WithUnzipRequestReplace(replace bool) UnzipOpt {
 	return func(ur *UnzipRequest) *UnzipRequest {
 		ur.Replace = replace
@@ -117,7 +117,7 @@ func WithUnzipRequestReplace(replace bool) UnzipOpt {
 	}
 }
 
-// Unzip unzips an archive on a remote machine with enos-flight-control
+// Unzip unzips an archive on a remote machine with enos-flight-control.
 func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*UnzipResponse, error) {
 	res := &UnzipResponse{}
 

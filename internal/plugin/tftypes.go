@@ -814,6 +814,7 @@ func (b *tfObject) FromTFValue(val tftypes.Value) error {
 						return err
 					}
 					res[key] = objVal
+
 					continue
 				}
 

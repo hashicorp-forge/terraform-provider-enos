@@ -119,6 +119,7 @@ func (em *embeddedTransportSSHv1) Terraform5Value() tftypes.Value {
 			"passphrase_path":  tftypes.String,
 		}}, tftypes.UnknownValue)
 	}
+
 	return terraform5Value(em.Values)
 }
 
@@ -149,6 +150,7 @@ func (em *embeddedTransportSSHv1) FromTerraform5Value(val tftypes.Value) (err er
 			"transport", "ssh",
 		)
 	}
+
 	return verifyConfiguration(sshAttributes, em.Values, "ssh")
 }
 
@@ -189,6 +191,7 @@ func (em *embeddedTransportSSHv1) GetAttributesForReplace() []string {
 	if _, ok := em.Values["host"]; ok {
 		return []string{"host"}
 	}
+
 	return []string{}
 }
 
@@ -196,7 +199,7 @@ func (em *embeddedTransportSSHv1) Type() TransportType {
 	return SSH
 }
 
-// render renders the transport to terraform
+// render renders the transport to terraform.
 func (em *embeddedTransportSSHv1) render() (string, error) {
 	buf := bytes.Buffer{}
 	if err := sshTransportTmpl.Execute(&buf, em.Attributes()); err != nil {
@@ -215,8 +218,8 @@ func (em *embeddedTransportSSHv1) debug() string {
 		}
 	}
 
-	var vals []string
-	for _, name := range sshAttributes {
+	vals := make([]string, len(sshAttributes))
+	for i, name := range sshAttributes {
 		val := "null"
 		if value, ok := attributes[name]; ok && !value.TFValue().IsNull() {
 			if name == "passphrase" {
@@ -225,13 +228,13 @@ func (em *embeddedTransportSSHv1) debug() string {
 				val = value.String()
 			}
 		}
-		vals = append(vals, fmt.Sprintf("%*s : %s", maxWidth, name, val))
+		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
 	return fmt.Sprintf("SSH Transport Config:\n%s", strings.Join(vals, "\n"))
 }
 
-// systemdClient creates a new systemd client for this transport
+// systemdClient creates a new systemd client for this transport.
 func (em *embeddedTransportSSHv1) systemdClient(ctx context.Context, logger log.Logger) (systemd.Client, error) {
 	client, err := em.Client(ctx)
 	if err != nil {

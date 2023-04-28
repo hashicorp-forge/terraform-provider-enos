@@ -25,7 +25,7 @@ import (
 )
 
 // NewArtifacts takes the name of the terraform provider and returns a new
-// Artifacts
+// Artifacts.
 func NewArtifacts(name string) *Artifacts {
 	return &Artifacts{
 		providerName: name,
@@ -49,7 +49,7 @@ type Artifacts struct {
 }
 
 // TFCRelease is a collection of TFC release zip binary, platform, architecture,
-// and sha256sum
+// and sha256sum.
 type TFCRelease struct {
 	Platform    string
 	Arch        string
@@ -104,12 +104,12 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	return zipper.Close()
 }
 
-// HashZipArchive returns the h1 style Terraform hash of the zip archive
+// HashZipArchive returns the h1 style Terraform hash of the zip archive.
 func (a *Artifacts) HashZipArchive(path string) (string, error) {
 	return dirhash.HashZip(path, dirhash.Hash1)
 }
 
-// SHA256Sum returns the SHA256 sum of a file for a given path
+// SHA256Sum returns the SHA256 sum of a file for a given path.
 func (a *Artifacts) SHA256Sum(path string) (string, error) {
 	f, err := file.Open(path)
 	if err != nil {
@@ -165,7 +165,7 @@ func (a *Artifacts) AddBinary(version, platform, arch, binaryPath string) error 
 }
 
 // InsertTFCRelease takes a version, and release and inserts it into the
-// tfcMetadata
+// tfcMetadata.
 func (a *Artifacts) InsertTFCRelease(version string, release *TFCRelease) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -227,7 +227,7 @@ func (a *Artifacts) WriteMetadata() error {
 	return nil
 }
 
-// WriteSHA256SUMS writes the release SHA256SUMS file as required by the TFC
+// WriteSHA256SUMS writes the release SHA256SUMS file as required by the TFC.
 func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, sign bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -283,10 +283,11 @@ func (a *Artifacts) WriteDetachedSignature(ctx context.Context, source, out, nam
 		"out_file", out,
 		"ident_name", name,
 	)
+
 	return exec.CommandContext(ctx, "gpg", "--detach-sign", "--local-user", name, source).Run()
 }
 
-// PublishToTFC publishes the artifact version to TFC org
+// PublishToTFC publishes the artifact version to TFC org.
 func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -318,10 +319,11 @@ func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) erro
 			return err
 		}
 	}
+
 	return err
 }
 
-// DownloadFromTFC downloads the artifacts for a given version to a directory
+// DownloadFromTFC downloads the artifacts for a given version to a directory.
 func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -384,10 +386,11 @@ func (a *Artifacts) DownloadFromTFC(ctx context.Context, tfcreq *TFCDownloadReq)
 			return fmt.Errorf("download failed: unxpected SHA 256 sum: expected (%s) received (%s)", filesha, downloadedsha)
 		}
 	}
+
 	return err
 }
 
-// ExtractProviderBinaries extracts the downloaded artifacts to an output directory
+// ExtractProviderBinaries extracts the downloaded artifacts to an output directory.
 func (a *Artifacts) ExtractProviderBinaries(ctx context.Context, tfcreq *TFCPromoteReq) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -496,6 +499,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	})
 	if err != nil {
 		a.log.Warn("index.json does not exist, this could be the first time we're running in this bucket")
+		//nolint:nilerr// it's okay to return nil if the index doesn't exist
 		return nil
 	}
 
@@ -575,7 +579,7 @@ func (a *Artifacts) HasVersion(ctx context.Context, version string) (bool, error
 }
 
 // CopyReleaseArtifactsBetweenRemoteBucketsForVersion copies artifacts from
-// a remote s3 mirror to another remote mirror
+// a remote s3 mirror to another remote mirror.
 func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx context.Context, srcBucketName string, destS3Client *s3.Client, destBucketName, providerName, providerID, version string) error {
 	a.log.Infow("copying release artifacts between remote buckets", "source bucket", srcBucketName, "destination bucket", destBucketName)
 
@@ -610,19 +614,18 @@ func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx conte
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil
 }
 
-// AddReleaseVersionToIndex adds the release version to the mirror index
+// AddReleaseVersionToIndex adds the release version to the mirror index.
 func (a *Artifacts) AddReleaseVersionToIndex(version string) {
 	a.idx.Versions[version] = &IndexValue{}
 }
 
 // PublishToRemoteBucket publishes the artifacts in the local mirror to the
-// the remote S3 Bucket.
+// remote S3 Bucket.
 func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, bucket, providerID string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()

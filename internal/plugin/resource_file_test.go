@@ -34,6 +34,8 @@ type testAccResourceTransportTemplate struct {
 // TestAccResourceFileResourceTransport tests both the basic enos_file resource interface
 // but also the embedded transport interface. As the embedded transport isn't
 // an actual resource we're doing it here.
+//
+//nolint:paralleltest// because we modify the environment
 func TestAccResourceFileResourceTransport(t *testing.T) {
 	defer resetEnv(t)
 
@@ -57,15 +59,15 @@ EOF
 			{{if .Src.Value}}
 			source = "{{.Src.Value}}"
 			{{end}}
-	
+
 			{{if .Content.Value}}
 			content = <<EOF
 	{{.Content.Value}}"
 	EOF
 			{{end}}
-	
+
 			destination = "{{.Dst.Value}}"
-	
+
 			{{ renderTransport .Transport }}
 		}`))
 
@@ -248,7 +250,7 @@ EOF
 				ExpectNonEmptyPlan: true,
 			}
 
-			resource.ParallelTest(t, resource.TestCase{
+			resource.Test(t, resource.TestCase{
 				ProtoV6ProviderFactories: testProviders(t),
 				Steps:                    []resource.TestStep{step},
 			})
@@ -264,8 +266,10 @@ EOF
 				setEnosK8SEnv(t, test.transport)
 			case NOMAD:
 				setENosNomadEnv(t, test.transport)
-			default:
+			case UNKNOWN:
 				t.Errorf("unknown transport type: %s", test.transportUsed)
+			default:
+				t.Errorf("undefined transport type: %s", test.transportUsed)
 			}
 			defer resetEnv(t)
 
@@ -389,7 +393,7 @@ EOF
 
 // TestResourceFileTransportInvalidAttributes ensures that we can gracefully
 // handle invalid attributes in the transport configuration. Since it's a dynamic
-// psuedo type we cannot rely on Terraform's built-in validation.
+// pseudo type we cannot rely on Terraform's built-in validation.
 func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	t.Parallel()
 
@@ -438,6 +442,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 	}
 }`
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range []struct {
 		name       string
 		cfg        string
@@ -448,7 +453,7 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 		{"nomad_transport", nomadCfg, regexp.MustCompile(`bogus_arg`)},
 	} {
 		t.Run(test.name, func(tt *testing.T) {
-			resource.Test(tt, resource.TestCase{
+			resource.ParallelTest(tt, resource.TestCase{
 				ProtoV6ProviderFactories: testProviders(tt),
 				Steps: []resource.TestStep{
 					{
@@ -464,6 +469,8 @@ func TestResourceFileTransportInvalidAttributes(t *testing.T) {
 }
 
 func TestResourceFileMarshalRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	fileState := newFileState()
 	ssh := newEmbeddedTransportSSH()
 	ssh.Values = testMapPropertiesToStruct([]testProperty{
@@ -535,6 +542,8 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 }
 
 func TestSetProviderConfig(t *testing.T) {
+	t.Parallel()
+
 	p := newProviderConfig()
 	f := newFile()
 

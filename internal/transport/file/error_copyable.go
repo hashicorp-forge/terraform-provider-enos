@@ -6,7 +6,7 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-// errorCopyable implement Copyable and throws an error on read and seek methods
+// errorCopyable implement Copyable and throws an error on read and seek methods.
 type errorCopyable struct {
 	err error
 }

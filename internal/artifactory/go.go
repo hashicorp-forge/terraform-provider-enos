@@ -11,10 +11,10 @@ var supportedVaultTargets = map[string][]string{
 	"windows": {"386", "amd64"},
 }
 
-// supportedEditions is our currently supported Vault editions
+// supportedEditions is our currently supported Vault editions.
 var supportedVaultEditions = []string{"oss", "ent", "ent.hsm", "ent.fips1402", "ent.hsm.fips1402"}
 
-// SupportedVaultArch validates that the given platform and arch are supported
+// SupportedVaultArch validates that the given platform and arch are supported.
 func SupportedVaultArch(platform, arch string) bool {
 	archs, ok := supportedVaultTargets[platform]
 	if !ok {
@@ -30,13 +30,13 @@ func SupportedVaultArch(platform, arch string) bool {
 	return false
 }
 
-// SupportedVaultPlatform validates that the given platform is supported
+// SupportedVaultPlatform validates that the given platform is supported.
 func SupportedVaultPlatform(platform string) bool {
 	_, ok := supportedVaultTargets[platform]
 	return ok
 }
 
-// SupportedVaultEdition validates that the given edition is a valid for Vault
+// SupportedVaultEdition validates that the given edition is a valid for Vault.
 func SupportedVaultEdition(ed string) bool {
 	for _, edition := range supportedVaultEditions {
 		if ed == edition {

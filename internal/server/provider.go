@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// Provider is our Provider meta server
+// Provider is our Provider meta server.
 type Provider interface {
 	Schema() *tfprotov6.Schema
 	MetaSchema() *tfprotov6.Schema

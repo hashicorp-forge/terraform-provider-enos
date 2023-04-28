@@ -10,7 +10,7 @@ import (
 
 type mockTransport struct{}
 
-// New creates a new Mock Transport client, that does nothing, useful for testing
+// New creates a new Mock Transport client, that does nothing, useful for testing.
 func New() it.Transport {
 	return &mockTransport{}
 }

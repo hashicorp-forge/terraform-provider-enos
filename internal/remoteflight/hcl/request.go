@@ -9,7 +9,7 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// CreateHCLConfigFileRequest is an HCL config create request
+// CreateHCLConfigFileRequest is an HCL config create request.
 type CreateHCLConfigFileRequest struct {
 	HCLConfig *Builder
 	FilePath  string
@@ -17,11 +17,11 @@ type CreateHCLConfigFileRequest struct {
 	Chown     string
 }
 
-// CreateHCLConfigFileOpt is a functional option for a config create request
+// CreateHCLConfigFileOpt is a functional option for a config create request.
 type CreateHCLConfigFileOpt func(*CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest
 
 // NewCreateHCLConfigFileRequest takes functional options and returns a new
-// config file request
+// config file request.
 func NewCreateHCLConfigFileRequest(opts ...CreateHCLConfigFileOpt) *CreateHCLConfigFileRequest {
 	c := &CreateHCLConfigFileRequest{}
 
@@ -32,7 +32,7 @@ func NewCreateHCLConfigFileRequest(opts ...CreateHCLConfigFileOpt) *CreateHCLCon
 	return c
 }
 
-// WithHCLConfigFilePath sets the config file path
+// WithHCLConfigFilePath sets the config file path.
 func WithHCLConfigFilePath(path string) CreateHCLConfigFileOpt {
 	return func(u *CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest {
 		u.FilePath = path
@@ -40,7 +40,7 @@ func WithHCLConfigFilePath(path string) CreateHCLConfigFileOpt {
 	}
 }
 
-// WithHCLConfigFile sets the config file to use
+// WithHCLConfigFile sets the config file to use.
 func WithHCLConfigFile(unit *Builder) CreateHCLConfigFileOpt {
 	return func(u *CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest {
 		u.HCLConfig = unit
@@ -48,7 +48,7 @@ func WithHCLConfigFile(unit *Builder) CreateHCLConfigFileOpt {
 	}
 }
 
-// WithHCLConfigChmod sets config file permissions
+// WithHCLConfigChmod sets config file permissions.
 func WithHCLConfigChmod(chmod string) CreateHCLConfigFileOpt {
 	return func(u *CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest {
 		u.Chmod = chmod
@@ -56,7 +56,7 @@ func WithHCLConfigChmod(chmod string) CreateHCLConfigFileOpt {
 	}
 }
 
-// WithHCLConfigChown sets config file ownership
+// WithHCLConfigChown sets config file ownership.
 func WithHCLConfigChown(chown string) CreateHCLConfigFileOpt {
 	return func(u *CreateHCLConfigFileRequest) *CreateHCLConfigFileRequest {
 		u.Chown = chown

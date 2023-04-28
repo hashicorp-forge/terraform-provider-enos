@@ -18,7 +18,7 @@ import (
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
-// Opt is a functional option for the SSH transport
+// Opt is a functional option for the SSH transport.
 type Opt func(*transport)
 
 type transport struct {
@@ -28,7 +28,7 @@ type transport struct {
 
 var _ it.Transport = (*transport)(nil)
 
-// New takes zero or more functional options and return a new transport
+// New takes zero or more functional options and return a new transport.
 func New(opts ...Opt) (it.Transport, error) {
 	t := &transport{
 		client: &client{
@@ -46,63 +46,63 @@ func New(opts ...Opt) (it.Transport, error) {
 	return t, t.client.init(t.ctx)
 }
 
-// WithUser sets the user
+// WithUser sets the user.
 func WithUser(u string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.user = u
 	}
 }
 
-// WithHost sets the host
+// WithHost sets the host.
 func WithHost(h string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.host = h
 	}
 }
 
-// WithKey sets the key
+// WithKey sets the key.
 func WithKey(k string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.key = k
 	}
 }
 
-// WithKeyPath sets the key path
+// WithKeyPath sets the key path.
 func WithKeyPath(p string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.keyPath = p
 	}
 }
 
-// WithPassphrase sets the key passphrase
+// WithPassphrase sets the key passphrase.
 func WithPassphrase(p string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.passphrase = p
 	}
 }
 
-// WithPassphrasePath sets the key passphrase path
+// WithPassphrasePath sets the key passphrase path.
 func WithPassphrasePath(p string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.passphrasePath = p
 	}
 }
 
-// WithPassword sets the password
+// WithPassword sets the password.
 func WithPassword(p string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.password = p
 	}
 }
 
-// WithPort sets the port
+// WithPort sets the port.
 func WithPort(p string) func(*transport) {
 	return func(t *transport) {
 		t.client.transportCfg.port = p
 	}
 }
 
-// WithContext sets the context to use when initializing the resources
+// WithContext sets the context to use when initializing the resources.
 func WithContext(ctx context.Context) func(*transport) {
 	return func(t *transport) {
 		t.ctx = ctx
@@ -183,7 +183,6 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 		if err != nil {
 			errC <- fmt.Errorf("writing end of file: %w", err)
 			return
-
 		}
 
 		err = checkSCPStdout()
@@ -299,7 +298,7 @@ func (t *transport) Stream(ctx context.Context, cmd it.Command) (stdout, stderr 
 	return stdout, stderr, errC
 }
 
-// handleExecErr checks if the error is an xssh.ExitError and if so transforms it into a transport.ExecErr
+// handleExecErr checks if the error is an xssh.ExitError and if so transforms it into a transport.ExecErr.
 func handleExecErr(execErr error) error {
 	if execErr != nil {
 		var e *xssh.ExitError
@@ -307,10 +306,11 @@ func handleExecErr(execErr error) error {
 			execErr = it.NewExecError(execErr, e.ExitStatus())
 		}
 	}
+
 	return execErr
 }
 
-// Run runs the command and returns STDOUT, STDERR and and the first error encountered
+// Run runs the command and returns STDOUT, STDERR and the first error encountered.
 func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, error) {
 	var err error
 
@@ -356,7 +356,7 @@ func (t *transport) Run(ctx context.Context, cmd it.Command) (string, string, er
 	return sout, serr, handleExecErr(err)
 }
 
-// Close closes any underlying connections
+// Close closes any underlying connections.
 func (t *transport) Close() error {
 	if t.client == nil {
 		return nil

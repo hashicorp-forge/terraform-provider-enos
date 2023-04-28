@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// TFCUploadReq is a collection of provider upload request
+// TFCUploadReq is a collection of provider upload request.
 type TFCUploadReq struct {
 	DistDir         string
 	BinaryRename    string
@@ -28,7 +28,7 @@ type TFCUploadReq struct {
 	TFCToken        string
 }
 
-// TFCDownloadReq is a collection of provider download request
+// TFCDownloadReq is a collection of provider download request.
 type TFCDownloadReq struct {
 	DownloadDir     string
 	ProviderVersion string
@@ -38,7 +38,7 @@ type TFCDownloadReq struct {
 	TFCToken        string
 }
 
-// TFCPromoteReq is a collection of provider promote request
+// TFCPromoteReq is a collection of provider promote request.
 type TFCPromoteReq struct {
 	ProviderVersion  string
 	DownloadsDir     string
@@ -53,7 +53,7 @@ type TFCPromoteReq struct {
 	TFCToken         string
 }
 
-// TFCClient is a collection of http client request params
+// TFCClient is a collection of http client request params.
 type TFCClient struct {
 	token   string
 	baseURL string
@@ -61,10 +61,10 @@ type TFCClient struct {
 	log     *zap.SugaredLogger
 }
 
-// TFCClientOpt takes TFC client options
+// TFCClientOpt takes TFC client options.
 type TFCClientOpt func(*TFCClient)
 
-// NewTFCClient creates and returns a new instance of TFCClient
+// NewTFCClient creates and returns a new instance of TFCClient.
 func NewTFCClient(opts ...TFCClientOpt) (*TFCClient, error) {
 	client := &TFCClient{
 		log: zap.NewExample().Sugar(),
@@ -90,14 +90,14 @@ func NewTFCClient(opts ...TFCClientOpt) (*TFCClient, error) {
 	return client, nil
 }
 
-// WithTFCLog sets the logging
+// WithTFCLog sets the logging.
 func WithTFCLog(log *zap.SugaredLogger) TFCClientOpt {
 	return func(client *TFCClient) {
 		client.log = log
 	}
 }
 
-// WithTFCOrg sets the base url
+// WithTFCOrg sets the base url.
 func WithTFCOrg(org string) TFCClientOpt {
 	return func(client *TFCClient) {
 		b := &url.URL{
@@ -110,12 +110,12 @@ func WithTFCOrg(org string) TFCClientOpt {
 	}
 }
 
-// WithTFCToken sets the TFC token
+// WithTFCToken sets the TFC token.
 func WithTFCToken(token string) TFCClientOpt {
 	return func(client *TFCClient) { client.token = token }
 }
 
-// TFCProvider is a collection of TFC provider registry namespace
+// TFCProvider is a collection of TFC provider registry namespace.
 type TFCProvider struct {
 	Name         string
 	Namespace    string
@@ -124,7 +124,7 @@ type TFCProvider struct {
 	URL          string
 }
 
-// TFCProviderVersion is a collection of TFC provider's version
+// TFCProviderVersion is a collection of TFC provider's version.
 type TFCProviderVersion struct {
 	Version        string
 	RegistryType   string
@@ -136,7 +136,7 @@ type TFCProviderVersion struct {
 	SHASumsSigURL  string
 }
 
-// TFCProviderPlatform struct is a collection of provider platform data
+// TFCProviderPlatform struct is a collection of provider platform data.
 type TFCProviderPlatform struct {
 	PlatformID             string
 	Version                string
@@ -151,7 +151,7 @@ type TFCProviderPlatform struct {
 	PlatformBinaryURL      string
 }
 
-// errTFCAPI in an API reponse error
+// errTFCAPI in an API response error.
 type errTFCAPI struct {
 	err    error
 	msg    string
@@ -162,7 +162,7 @@ type errTFCAPI struct {
 	} `json:"errors"`
 }
 
-// Returns the TFCAPI's error title and status
+// Returns the TFCAPI's error title and status.
 func (e *errTFCAPI) String() string {
 	msg := strings.Builder{}
 	msg.WriteString(fmt.Sprintln(e.msg))
@@ -287,14 +287,14 @@ type findVersionRes struct {
 	Data *providerData `json:"data"`
 }
 
-// providerData is a collection of provider's data payload
+// providerData is a collection of provider's data payload.
 type providerData struct {
 	Type       string              `json:"type,omitempty"`
 	Attributes *providerAttributes `json:"attributes,omitempty"`
 	Links      *providerLinks      `json:"links,omitempty"`
 }
 
-// providerAttributes is a collection of provider's attibutes
+// providerAttributes is a collection of provider's attibutes.
 type providerAttributes struct {
 	Name           string `json:"name,omitempty"`
 	Namespace      string `json:"namespace,omitempty"`
@@ -305,7 +305,7 @@ type providerAttributes struct {
 	SHASigUploaded bool   `json:"shasums-sig-uploaded,omitempty"`
 }
 
-// providerLinks is a collection of provider's links
+// providerLinks is a collection of provider's links.
 type providerLinks struct {
 	Self               string `json:"self,omitempty"`
 	ShasumsUpload      string `json:"shasums-upload,omitempty"`
@@ -329,12 +329,12 @@ func newcreatePlatformReq() *createPlatformReq {
 	}
 }
 
-// createPlatformReq is a data payload for create provider platform request
+// createPlatformReq is a data payload for create provider platform request.
 type createPlatformReq struct {
 	Data *createPlatformReqData `json:"data,omitempty"`
 }
 
-// createPlatformReqData is a collection create provider platform's request data payload
+// createPlatformReqData is a collection create provider platform's request data payload.
 type createPlatformReqData struct {
 	PlatformID string                      `json:"id,omitempty"`
 	Type       string                      `json:"type,omitempty"`
@@ -342,7 +342,7 @@ type createPlatformReqData struct {
 	Links      *createPlatformReqDataLinks `json:"links,omitempty"`
 }
 
-// createPlatformReqDataAttrs is a collection create provider platform's request data attributes
+// createPlatformReqDataAttrs is a collection create provider platform's request data attributes.
 type createPlatformReqDataAttrs struct {
 	OS             string `json:"os,omitempty"`
 	Arch           string `json:"arch,omitempty"`
@@ -351,7 +351,7 @@ type createPlatformReqDataAttrs struct {
 	BinaryUploaded bool   `json:"provider-binary-uploaded,omitempty"`
 }
 
-// createPlatformReqDataLinks is a collection provider's platform binary URLs
+// createPlatformReqDataLinks is a collection provider's platform binary URLs.
 type createPlatformReqDataLinks struct {
 	ProviderBinaryDownload string `json:"provider-binary-download,omitempty"`
 	ProviderBinaryUpload   string `json:"provider-binary-upload,omitempty"`
@@ -366,12 +366,12 @@ func newCreatePlatformRes() *createPlatformRes {
 	}
 }
 
-// createPlatformRes is a data payload response for create provider platform
+// createPlatformRes is a data payload response for create provider platform.
 type createPlatformRes struct {
 	Data *createPlatformResData `json:"data,omitempty"`
 }
 
-// createPlatformResData is a collection of create provider platform's response data
+// createPlatformResData is a collection of create provider platform's response data.
 type createPlatformResData struct {
 	PlatformID string                  `json:"id,omitempty"`
 	Type       string                  `json:"type,omitempty"`
@@ -379,7 +379,7 @@ type createPlatformResData struct {
 	Links      *createPlatformResLinks `json:"links,omitempty"`
 }
 
-// createPlatformResAttrs is a collection of create provider platform's response attributes
+// createPlatformResAttrs is a collection of create provider platform's response attributes.
 type createPlatformResAttrs struct {
 	OS             string `json:"os,omitempty"`
 	Arch           string `json:"arch,omitempty"`
@@ -388,7 +388,7 @@ type createPlatformResAttrs struct {
 	BinaryUploaded bool   `json:"provider-binary-uploaded,omitempty"`
 }
 
-// createPlatformResLinks is a collection provider's platform binary URLs
+// createPlatformResLinks is a collection provider's platform binary URLs.
 type createPlatformResLinks struct {
 	ProviderBinaryDownload string `json:"provider-binary-download,omitempty"`
 	ProviderBinaryUpload   string `json:"provider-binary-upload,omitempty"`
@@ -401,12 +401,12 @@ type platformData struct {
 	Links      *platformLinks      `json:"links,omitempty"`
 }
 
-// providersPlatformData is a data payload for provider platform
+// providersPlatformData is a data payload for provider platform.
 type providersPlatformData struct {
 	Data []*platformData `json:"data,omitempty"`
 }
 
-// platformAttributes is a collection provider's platform attributes
+// platformAttributes is a collection provider's platform attributes.
 type platformAttributes struct {
 	OS             string `json:"os,omitempty"`
 	Arch           string `json:"arch,omitempty"`
@@ -415,13 +415,13 @@ type platformAttributes struct {
 	BinaryUploaded bool   `json:"provider-binary-uploaded,omitempty"`
 }
 
-// platformLinks is a collection provider's platform binary URLs
+// platformLinks is a collection provider's platform binary URLs.
 type platformLinks struct {
 	ProviderBinaryDownload string `json:"provider-binary-download,omitempty"`
 	ProviderBinaryUpload   string `json:"provider-binary-upload,omitempty"`
 }
 
-// TFCRequest is a TFC API request
+// TFCRequest is a TFC API request.
 type TFCRequest struct {
 	Scheme     string // "https"
 	Host       string // "app.terraform.io"
@@ -430,10 +430,10 @@ type TFCRequest struct {
 	Body       io.Reader
 }
 
-// TFCRequestOpt are functional options for a new Request
+// TFCRequestOpt are functional options for a new Request.
 type TFCRequestOpt func(*TFCRequest) (*TFCRequest, error)
 
-// WithRequestBody sets the request body
+// WithRequestBody sets the request body.
 func WithRequestBody(body io.Reader) TFCRequestOpt {
 	return func(req *TFCRequest) (*TFCRequest, error) {
 		req.Body = body
@@ -441,7 +441,7 @@ func WithRequestBody(body io.Reader) TFCRequestOpt {
 	}
 }
 
-// NewTFCRequest takes TFCRequestOpt args and returns a new TFC API request
+// NewTFCRequest takes TFCRequestOpt args and returns a new TFC API request.
 func NewTFCRequest(opts ...TFCRequestOpt) (*TFCRequest, error) {
 	tfcreq := &TFCRequest{
 		Scheme: "https",
@@ -454,6 +454,7 @@ func NewTFCRequest(opts ...TFCRequestOpt) (*TFCRequest, error) {
 			return tfcreq, err
 		}
 	}
+
 	return tfcreq, nil
 }
 
@@ -479,10 +480,11 @@ func (c *TFCClient) DoRequest(ctx context.Context, tfcReq *TFCRequest) (*http.Re
 	if err != nil {
 		return resp, fmt.Errorf("error sending http request: %w", err)
 	}
+
 	return resp, nil
 }
 
-// FindOrCreateProvider - FindProvider - CreateProvider
+// FindOrCreateProvider - FindProvider - CreateProvider.
 func (c *TFCClient) FindOrCreateProvider(ctx context.Context, namespace, providerName string) error {
 	_, err := c.FindPrivateProvider(ctx, namespace, providerName)
 	tfcErr := &errTFCAPI{}
@@ -494,13 +496,15 @@ func (c *TFCClient) FindOrCreateProvider(ctx context.Context, namespace, provide
 				"namespace", namespace,
 				"URL", c.baseURL,
 			)
+
 			return c.CreatePrivateProvider(ctx, namespace, providerName)
 		}
 	}
+
 	return err
 }
 
-// FindPrivateProvider searches for existing private provider
+// FindPrivateProvider searches for existing private provider.
 func (c *TFCClient) FindPrivateProvider(
 	ctx context.Context,
 	namespace string,
@@ -515,7 +519,7 @@ func (c *TFCClient) FindPrivateProvider(
 	provider := &TFCProvider{Org: c.org}
 	req, _ := NewTFCRequest()
 	req.ReqPath = fmt.Sprintf("api/v2/organizations/%s/registry-providers/private/%s/%s", c.org, namespace, providerName)
-	req.HTTPMethod = "GET"
+	req.HTTPMethod = http.MethodGet
 
 	//  https://app.terraform.io/api/v2/organizations/<ORG>/registry-providers/private/<NAMESPACE>/<NAME>"
 	tfcAPIResp, err := c.DoRequest(ctx, req)
@@ -553,7 +557,7 @@ func (c *TFCClient) FindPrivateProvider(
 	return provider, nil
 }
 
-// CreatePrivateProvider creates a private provider
+// CreatePrivateProvider creates a private provider.
 func (c *TFCClient) CreatePrivateProvider(
 	ctx context.Context,
 	namespace string,
@@ -612,10 +616,11 @@ func (c *TFCClient) CreatePrivateProvider(
 		"namespace", providerBody.Data.Attributes.Namespace,
 		"URL", providerBody.Data.Links.Self,
 	)
+
 	return err
 }
 
-// FindOrCreateVersion - FindProviderVersion - CreateProviderVersion
+// FindOrCreateVersion - FindProviderVersion - CreateProviderVersion.
 func (c *TFCClient) FindOrCreateVersion(
 	ctx context.Context,
 	namespace string,
@@ -631,10 +636,11 @@ func (c *TFCClient) FindOrCreateVersion(
 			return c.CreateProviderVersion(ctx, namespace, providerName, providerVersion, gpgKeyID, sha256sumsPath)
 		}
 	}
+
 	return nil
 }
 
-// FindProviderVersion searches for existing private provider version
+// FindProviderVersion searches for existing private provider version.
 func (c *TFCClient) FindProviderVersion(
 	ctx context.Context,
 	namespace string,
@@ -651,7 +657,7 @@ func (c *TFCClient) FindProviderVersion(
 	providerversion := &TFCProviderVersion{Version: providerVersion}
 	req, _ := NewTFCRequest()
 	req.ReqPath = fmt.Sprintf("api/v2/organizations/%s/registry-providers/private/%s/%s/versions/%s", c.org, namespace, providerName, providerVersion)
-	req.HTTPMethod = "GET"
+	req.HTTPMethod = http.MethodGet
 
 	//  https://app.terraform.io/api/v2/organizations/<ORG>/registry-providers/private/<NAMESPACE>/<NAME>/versions/<VERSION>"
 	tfcAPIResp, err := c.DoRequest(ctx, req)
@@ -715,10 +721,11 @@ func (c *TFCClient) FindProviderVersion(
 			"link", providerversion.SHASumsURL,
 		)
 	}
+
 	return providerversion, nil
 }
 
-// CreateProviderVersion creates a private provider version
+// CreateProviderVersion creates a private provider version.
 func (c *TFCClient) CreateProviderVersion(
 	ctx context.Context,
 	namespace string,
@@ -796,10 +803,11 @@ func (c *TFCClient) CreateProviderVersion(
 	if err != nil {
 		return fmt.Errorf("failed to upload shasums sig file for version created: %w", err)
 	}
+
 	return err
 }
 
-// FindOrCreatePlatform - FindProviderPlatform - CreateProviderPlatforms
+// FindOrCreatePlatform - FindProviderPlatform - CreateProviderPlatforms.
 func (c *TFCClient) FindOrCreatePlatform(
 	ctx context.Context,
 	namespace string,
@@ -814,10 +822,11 @@ func (c *TFCClient) FindOrCreatePlatform(
 	if len(platforms) == 0 {
 		return c.CreateProviderPlatforms(ctx, namespace, providerName, providerVersion, release)
 	}
+
 	return nil
 }
 
-// FindProviderPlatform searches for platforms supported by a private provider version
+// FindProviderPlatform searches for platforms supported by a private provider version.
 func (c *TFCClient) FindProviderPlatform(
 	ctx context.Context,
 	namespace string,
@@ -833,7 +842,7 @@ func (c *TFCClient) FindProviderPlatform(
 
 	req, _ := NewTFCRequest()
 	req.ReqPath = fmt.Sprintf("api/v2/organizations/%s/registry-providers/private/%s/%s/versions/%s/platforms", c.org, namespace, providerName, providerVersion)
-	req.HTTPMethod = "GET"
+	req.HTTPMethod = http.MethodGet
 
 	//  https://app.terraform.io/api/v2/organizations/<ORG>/registry-providers/private/<NAMESPACE>/<NAME>/versions/<VERSION>/platforms"
 	tfcAPIResp, err := c.DoRequest(ctx, req)
@@ -888,10 +897,11 @@ func (c *TFCClient) FindProviderPlatform(
 		)
 		platforms = append(platforms, platform)
 	}
+
 	return platforms, nil
 }
 
-// CreateProviderPlatforms creates platforms for a provider version
+// CreateProviderPlatforms creates platforms for a provider version.
 func (c *TFCClient) CreateProviderPlatforms(
 	ctx context.Context,
 	namespace string,
@@ -978,10 +988,11 @@ func (c *TFCClient) CreateProviderPlatforms(
 			}
 		}
 	}
+
 	return nil
 }
 
-// uploadFile uploads a file to the URL
+// uploadFile uploads a file to the URL.
 func (c *TFCClient) uploadFile(ctx context.Context, path, uploadURL string) error {
 	c.log.Infow(
 		"uploading file",
@@ -1005,7 +1016,7 @@ func (c *TFCClient) uploadFile(ctx context.Context, path, uploadURL string) erro
 	}
 	postURL := u.String()
 
-	req, err := http.NewRequestWithContext(ctx, "PUT", postURL, f)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, postURL, f)
 	if err != nil {
 		return err
 	}
@@ -1019,10 +1030,11 @@ func (c *TFCClient) uploadFile(ctx context.Context, path, uploadURL string) erro
 	if resp.StatusCode != http.StatusOK {
 		return newTFCAPIError("uploading file", withErrTFCAPIResponse(resp))
 	}
+
 	return nil
 }
 
-// downloadFile downloads a file from the URL
+// downloadFile downloads a file from the URL.
 func (c *TFCClient) downloadFile(ctx context.Context, downloadDir, filename, downloadURL string) error {
 	c.log.Infow(
 		"downloading file",
@@ -1037,7 +1049,7 @@ func (c *TFCClient) downloadFile(ctx context.Context, downloadDir, filename, dow
 	getURL := u.String()
 
 	buf := bytes.Buffer{}
-	req, err := http.NewRequestWithContext(ctx, "GET", getURL, &buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getURL, &buf)
 	if err != nil {
 		return err
 	}
@@ -1066,5 +1078,6 @@ func (c *TFCClient) downloadFile(ctx context.Context, downloadDir, filename, dow
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

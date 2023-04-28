@@ -15,9 +15,10 @@ import (
 // TestAddGoBinariesFrom verifies that we can load binaries that are created
 // by our build make targets.
 func TestAddGoBinariesFrom(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	t.Parallel()
+
+	dir := t.TempDir()
+	var err error
 
 	for _, bin := range []string{
 		"terraform-provider-enos_0.3.24_darwin_amd64",
@@ -47,11 +48,12 @@ func TestAddGoBinariesFrom(t *testing.T) {
 	}
 }
 
-// TestAddGoBinariesFromWithRename verifies that we can load and rename binaries
+// TestAddGoBinariesFromWithRename verifies that we can load and rename binaries.
 func TestAddGoBinariesFromWithRename(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	t.Parallel()
+
+	dir := t.TempDir()
+	var err error
 
 	for _, bin := range []string{
 		"terraform-provider-enos_0.3.24_darwin_amd64",
@@ -91,15 +93,14 @@ func TestAddGoBinariesFromWithRename(t *testing.T) {
 // rename process that is used during our upload to dev -> promote to prod
 // pipeline.
 func TestProviderBinariesRoundTrip(t *testing.T) {
-	// where our source "binaries" live
-	distDir, err := os.MkdirTemp("", "dist")
-	require.NoError(t, err)
-	defer os.RemoveAll(distDir)
+	t.Parallel()
 
+	var err error
+
+	// where our source "binaries" live
+	distDir := t.TempDir()
 	// where our unzipped "binaries" live before promotion
-	promoteDir, err := os.MkdirTemp("", "promote")
-	require.NoError(t, err)
-	defer os.RemoveAll(promoteDir)
+	promoteDir := t.TempDir()
 
 	// Create fake source binaries
 	for _, bin := range []string{

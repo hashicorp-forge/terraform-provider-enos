@@ -132,6 +132,10 @@ fmt-check-enos:
 lint:
 	golangci-lint run -v --out-format=$(LINT_OUT_FORMAT)
 
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run -v --out-format=$(LINT_OUT_FORMAT) --fix
+
 .PHONY: clean
 clean:
 	rm -rf dist bin .terraform*

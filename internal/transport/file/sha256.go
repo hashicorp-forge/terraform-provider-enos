@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// SHA256 takes a file path and returns the SHA256 sum
+// SHA256 takes a file path and returns the SHA256 sum.
 func SHA256(src io.Reader) (string, error) {
 	var err error
 	buf := bytes.Buffer{}

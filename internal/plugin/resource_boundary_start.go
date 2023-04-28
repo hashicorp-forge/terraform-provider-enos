@@ -58,6 +58,7 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"boundary"}),
 	}
+
 	return &boundaryStartStateV1{
 		ID:              newTfString(),
 		BinName:         newTfString(),
@@ -177,7 +178,7 @@ func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req resource.Ap
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Transport Error", err))
 		return
 	}
-	defer client.Close() //nolint: staticcheck
+	defer client.Close()
 
 	// If our priorState ID is blank then we're creating the resource
 	if _, ok := priorState.ID.Get(); !ok {
@@ -348,7 +349,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 	var err error
 
 	// defaults
-	//nolint:typecheck // False positive lint error: binName declared but not used. binName is used below in the unit file
+
 	binName := "boundary"
 	if name, ok := s.BinName.Get(); ok {
 		binName = name
@@ -371,7 +372,6 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 
 	var envVars []string
 
-	//nolint:typecheck // False positive lint error: configFilePath declared but not used. configFilePath is used below in the unit file
 	configFilePath := filepath.Join(configPath, configName)
 	licensePath := filepath.Join(configPath, "boundary.lic")
 	envFilePath := "/etc/boundary/boundary.env"
@@ -422,7 +422,6 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 			unitName = unit
 		}
 
-		//nolint:typecheck // Temporarily ignore typecheck linting error: missing type in composite literal
 		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Boundary",

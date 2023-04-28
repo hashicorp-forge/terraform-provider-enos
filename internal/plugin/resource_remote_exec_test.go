@@ -25,8 +25,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccResourceRemoteExec tests the remote_exec resource
+// TestAccResourceRemoteExec tests the remote_exec resource.
 func TestAccResourceRemoteExec(t *testing.T) {
+	t.Parallel()
 	cfg := template.Must(template.New("enos_remote_exec").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
@@ -156,13 +157,14 @@ EOF
 				})
 			}
 
-			resource.Test(t, resource.TestCase{
+			resource.ParallelTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: testProviders(t),
 				Steps:                    steps,
 			})
 		})
 	}
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}
@@ -190,6 +192,7 @@ EOF
 }
 
 func TestBadTransportConfig(t *testing.T) {
+	t.Parallel()
 	cfg := template.Must(template.New("enos_remote_exec").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
@@ -250,6 +253,7 @@ func TestBadTransportConfig(t *testing.T) {
 		},
 	}
 
+	//nolint:paralleltest// because our resource handles it
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}
@@ -278,6 +282,7 @@ func TestBadTransportConfig(t *testing.T) {
 }
 
 func TestChangedEnvVars(t *testing.T) {
+	t.Parallel()
 	cfg1 := template.Must(template.New("enos_remote_exec").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_remote_exec" "{{.ID.Value}}" {
@@ -366,12 +371,14 @@ func TestChangedEnvVars(t *testing.T) {
 }
 
 func TestInlineWithPipedCommandAndEnvVars(t *testing.T) {
+	t.Parallel()
 	host, hostOk := os.LookupEnv("ENOS_TRANSPORT_HOST")
 	privateKeyPath, keyOk := os.LookupEnv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
 	if !hostOk || !keyOk {
 		t.Skip("Test skipped since either ENOS_TRANSPORT_HOST and ENOS_TRANSPORT_PRIVATE_KEY_PATH environment variables are not set")
 	}
 
+	//nolint:gosec// we're okay to use hardcoded tokens in tests
 	token := "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NvciI6IiIsImFkZHIiOiJodHRwOi8vMTAuMTMuMTIuMjE1OjgyMDAiLCJleHAiOjE2NzA1MTc1MTIsImlhdCI6MTY3MDUxNTcxMiwianRpIjoiaHZzLnEySmFXSzR4SER3algwVDZxQWJ3MkltYiIsIm5iZiI6MTY3MDUxNTcwNywidHlwZSI6IndyYXBwaW5nIn0.AXahR22v_CEESZBCk6N8YMYnoKSgjcEl-HI9-8n0pKXkQ9qXK50di8YcGiVspuMMdjPOZsEWy7N3KLXAKq4H7008AalNaqtuYPdR3f34dXo7c1DScepN1sURKZLV8xMbcsgnDa_4h_1ROmHVnObrOCoy2nZ-vsDB6CXHuxgTc7x5x-dM"
 	tokens := fmt.Sprintf(`Key                              Value
 ---                              -----
@@ -384,6 +391,7 @@ wrapping_token_creation_path:    sys/replication/performance/primary/secondary-t
 	client, err := ssh.New(ssh.WithHost(host), ssh.WithKeyPath(privateKeyPath), ssh.WithUser("ubuntu"))
 	assert.NoError(t, err)
 
+	//nolint:gosec// we're okay to use hardcoded tokens in tests
 	tokensFile := "/tmp/tokens"
 	assert.NoError(t, client.Copy(context.Background(), tfile.NewReader(tokens), tokensFile))
 

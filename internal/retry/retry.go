@@ -30,9 +30,8 @@ func Retry(ctx context.Context, req Retryable) (interface{}, error) {
 		}
 
 		res, err = req.Run(ctx)
-
 		if err == nil {
-			return res, err
+			return res, nil
 		}
 
 		if !req.ShouldRetry() {
@@ -143,6 +142,7 @@ func (r *Retrier) Run(ctx context.Context) (interface{}, error) {
 	var res interface{}
 
 	res, r.lastErr = r.Func(ctx)
+
 	return res, r.lastErr
 }
 
@@ -164,8 +164,10 @@ func (r *Retrier) ShouldRetry() bool {
 				return true
 			}
 		}
+
 		return false
 	}
+
 	return true
 }
 
@@ -177,6 +179,7 @@ func IntervalExponential(base time.Duration) RetryInterval {
 		if attempt == 0 {
 			return 0
 		}
+
 		return time.Duration(math.Pow(2, float64(attempt))) * base
 	}
 }
@@ -195,6 +198,7 @@ func IntervalFibonacci(base time.Duration) RetryInterval {
 		for i := 2; i <= attempt; i++ {
 			fibSequence[i] = fibSequence[i-1] + fibSequence[i-2]
 		}
+
 		return time.Duration(fibSequence[attempt]) * base
 	}
 }

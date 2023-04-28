@@ -16,22 +16,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// FailureHandler A function that can can be used to handle state plan/apply failures and enhance
-// the error diagnostic
+// FailureHandler A function that can be used to handle state plan/apply failures and enhance
+// the error diagnostic.
 type FailureHandler func(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value)
 
 // failureHandlers simple wrapper for a slice of failure handlers, can be used to chain the execution
 // of multiple failure handlers.
 type failureHandlers []FailureHandler
 
-// HandleFailure cycles through all the failure handlers and handles a failure
+// HandleFailure cycles through all the failure handlers and handles a failure.
 func (f failureHandlers) HandleFailure(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
 	for _, h := range f {
 		h(ctx, errDiag, providerConfig)
 	}
 }
 
-// TransportDebugFailureHandler adds the transport configuration to the provided diagnostic
+// TransportDebugFailureHandler adds the transport configuration to the provided diagnostic.
 func TransportDebugFailureHandler(et *embeddedTransportV1) FailureHandler {
 	return func(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
 		errDiag.Detail = fmt.Sprintf("%s\n\n%s", errDiag.Detail, et.Debug())
@@ -53,6 +53,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			logger.Error("failed to get data dir", map[string]interface{}{
 				"error": err,
 			})
+
 			return
 		}
 
@@ -93,6 +94,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			logger.Error("failed to get logs, unknown transport type", map[string]interface{}{
 				"transport_type": transport.Type().String(),
 			})
+
 			return
 		}
 
@@ -121,6 +123,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 				logger.Error("failed to save logs to file", map[string]interface{}{
 					"error": err,
 				})
+
 				continue
 			}
 			errDiag.Detail = fmt.Sprintf("%s\n  %s: %s", errDiag.Detail, appName, logFile)
@@ -188,9 +191,8 @@ func getK8sLogs(ctx context.Context, transport *embeddedTransportK8Sv1) ([]remot
 	return []remoteflight.GetLogsResponse{resp}, nil
 }
 
-// filterServices filters the list of installed services
+// filterServices filters the list of installed services.
 func filterServices(services []string, installedServices []systemd.ServiceInfo) []string {
-	var listofLogServices []string
 	logServices := map[string]string{}
 
 	for _, service := range installedServices {
@@ -200,9 +202,14 @@ func filterServices(services []string, installedServices []systemd.ServiceInfo) 
 			}
 		}
 	}
-	for unit := range logServices {
-		listofLogServices = append(listofLogServices, unit)
+
+	listofLogServices := make([]string, len(logServices))
+	count := 0
+	for name := range logServices {
+		listofLogServices[count] = logServices[name]
+		count++
 	}
+
 	return listofLogServices
 }
 
@@ -232,6 +239,7 @@ func getSystemdLogs(ctx context.Context, logger log.Logger, transport *embeddedT
 			responses = append(responses, resp)
 		}
 	}
+
 	return responses, merr.ErrorOrNil()
 }
 
@@ -249,5 +257,6 @@ func getNomadLogs(ctx context.Context, transport *embeddedTransportNomadv1) ([]r
 	if err != nil {
 		return nil, fmt.Errorf("failed to get logs for task: [%s], due to:%w", transport.TaskName.Val, err)
 	}
+
 	return []remoteflight.GetLogsResponse{resp}, nil
 }

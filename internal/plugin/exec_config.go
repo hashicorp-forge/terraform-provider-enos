@@ -12,7 +12,7 @@ import (
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// execConfig User provided configuration for an exec Resource
+// execConfig User provided configuration for an exec Resource.
 type execConfig struct {
 	Env     *tfStringMap
 	Content *tfString
@@ -20,7 +20,7 @@ type execConfig struct {
 	Scripts *tfStringSlice
 }
 
-// computeSHA256 Computes the SHA256 sum for an execConfig
+// computeSHA256 Computes the SHA256 sum for an execConfig.
 func (e execConfig) computeSHA256(ctx context.Context) (string, error) {
 	select {
 	case <-ctx.Done():
@@ -71,7 +71,7 @@ func (e execConfig) computeSHA256(ctx context.Context) (string, error) {
 					"scripts",
 				)
 			}
-			defer file.Close() // nolint: staticcheck
+			defer file.Close()
 
 			sha, err = tfile.SHA256(file)
 			if err != nil {
