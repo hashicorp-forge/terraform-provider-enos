@@ -33,5 +33,6 @@ func main() {
 	if err != nil {
 		ui.Error(err.Error())
 	}
+
 	os.Exit(code)
 }

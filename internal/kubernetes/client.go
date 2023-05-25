@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	cv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -25,6 +26,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/retry"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	istrings "github.com/hashicorp/enos-provider/internal/strings"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 )
 
@@ -53,6 +55,8 @@ type Client interface {
 	GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error)
 	// GetLogs gets the logs for the provided QueryPodInfosRequest
 	GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error)
+	// ListPods returns all pods matching the given request
+	ListPods(ctx context.Context, req *ListPodsRequest) (*ListPodsResponse, error)
 }
 
 type ClientCfg struct {
@@ -102,6 +106,7 @@ type PodInfo struct {
 	Name       string
 	Namespace  string
 	Containers []string
+	Pod        *v1.Pod
 }
 
 type GetPodLogsRequest struct {
@@ -111,6 +116,8 @@ type GetPodLogsRequest struct {
 	Container   string
 }
 
+var _ remoteflight.GetLogsResponse = (*GetPodLogsResponse)(nil)
+
 type GetPodLogsResponse struct {
 	ContextName string
 	Namespace   string
@@ -119,7 +126,82 @@ type GetPodLogsResponse struct {
 	Logs        []byte
 }
 
-var _ remoteflight.GetLogsResponse = (*GetPodLogsResponse)(nil)
+// ListPodsRequest is a request to list the pods matching the search criteria.
+type ListPodsRequest struct {
+	// The kubernetes namespace to query
+	Namespace string
+	// Label selectors to filter by
+	LabelSelectors []string
+	// Field selectors to filter by
+	FieldSelectors []string
+	// How we'll retry the request
+	*retry.Retrier
+	// Options we'll apply to the retrier
+	RetryOpts []retry.RetrierOpt
+}
+
+// ListPodsResponse is ListPods response.
+type ListPodsResponse struct {
+	Pods *Pods
+}
+
+// Pods is an alias for a v1.PodList so we can attach methods to it.
+type Pods v1.PodList
+
+// ListPodsRequestOpt is a functional option for NewListPodsRequest.
+type ListPodsRequestOpt func(*ListPodsRequest)
+
+// NewListPodsRequest takes NewListPodsRequestOpt's and returns a new instance of ListPodsRequest.
+func NewListPodsRequest(opts ...ListPodsRequestOpt) *ListPodsRequest {
+	req := &ListPodsRequest{
+		Namespace: defaultNamespace,
+		Retrier: &retry.Retrier{
+			MaxRetries:     retry.MaxRetriesUnlimited,
+			RetryInterval:  retry.IntervalExponential(2 * time.Second),
+			OnlyRetryError: []error{},
+		},
+	}
+
+	for _, opt := range opts {
+		opt(req)
+	}
+
+	for _, opt := range req.RetryOpts {
+		opt(req.Retrier)
+	}
+
+	return req
+}
+
+// WithListPodsRequestNamespace allows the caller to define namespace for the ListPods request.
+func WithListPodsRequestNamespace(name string) ListPodsRequestOpt {
+	return func(req *ListPodsRequest) {
+		req.Namespace = name
+	}
+}
+
+// WithListPodsRequestFieldSelectors allows the caller to define field selectors for the ListPods
+// request.
+func WithListPodsRequestFieldSelectors(selectors []string) ListPodsRequestOpt {
+	return func(req *ListPodsRequest) {
+		req.FieldSelectors = selectors
+	}
+}
+
+// WithListPodsRequestLabelSelectors allows the caller to define label selectors for the ListPods
+// request.
+func WithListPodsRequestLabelSelectors(selectors []string) ListPodsRequestOpt {
+	return func(req *ListPodsRequest) {
+		req.LabelSelectors = selectors
+	}
+}
+
+// WithListPodsRequestRetryOpts allows the caller to define retry options for the ListPods request.
+func WithListPodsRequestRetryOpts(opts ...retry.RetrierOpt) ListPodsRequestOpt {
+	return func(req *ListPodsRequest) {
+		req.RetryOpts = opts
+	}
+}
 
 // GetAppName implements remoteflight.GetLogsResponse.GetAppName.
 func (p GetPodLogsResponse) GetAppName() string {
@@ -274,6 +356,7 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 			Name:       pods[i].Name,
 			Namespace:  pods[i].Namespace,
 			Containers: getContainers(pods[i]),
+			Pod:        &pods[i],
 		}
 	}
 
@@ -302,6 +385,7 @@ func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInf
 		Name:       req.Name,
 		Namespace:  namespace,
 		Containers: getContainers(*pod),
+		Pod:        pod,
 	}, nil
 }
 
@@ -347,6 +431,49 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 		Container:   req.Container,
 		Logs:        buf.Bytes(),
 	}, nil
+}
+
+// ListPods queries Kubernetes using search criteria for the given ListPodsRequest and returns a
+// list of pods.
+func (c *client) ListPods(ctx context.Context, req *ListPodsRequest) (*ListPodsResponse, error) {
+	res := &ListPodsResponse{}
+
+	namespace := req.Namespace
+	if strings.TrimSpace(namespace) == "" {
+		namespace = defaultNamespace
+	}
+
+	listOpts := metav1.ListOptions{}
+	if len(req.LabelSelectors) > 0 {
+		listOpts.LabelSelector = strings.Join(req.LabelSelectors, ",")
+	}
+	if len(req.FieldSelectors) > 0 {
+		listOpts.FieldSelector = strings.Join(req.FieldSelectors, ",")
+	}
+
+	req.Retrier.Func = func(queryCtx context.Context) (any, error) {
+		return c.clientset.CoreV1().Pods(namespace).List(ctx, listOpts)
+	}
+
+	result, err := retry.Retry(ctx, req.Retrier)
+	if err != nil {
+		return res, fmt.Errorf("listing pods: %w", err)
+	}
+
+	pods, ok := result.(*v1.PodList)
+	if !ok {
+		return res, fmt.Errorf("listing pods: unexpected response type: %v", result)
+	}
+
+	p := Pods(*pods)
+	res.Pods = &p
+
+	return res, nil
+}
+
+// CoreV1 returns the clients CoreV1 client.
+func (c *client) CoreV1() cv1.CoreV1Interface {
+	return c.clientset.CoreV1()
 }
 
 // DecodeAndLoadKubeConfig decodes a base64 encoded kubeconfig and attempts to load the Config.
@@ -444,4 +571,184 @@ func getContainers(pod v1.Pod) []string {
 	}
 
 	return containers
+}
+
+// String returns the list of pods as a string.
+func (r *ListPodsResponse) String() string {
+	if r == nil || r.Pods == nil || r.Pods.Items == nil || len(r.Pods.Items) < 1 {
+		return ""
+	}
+
+	return r.Pods.String()
+}
+
+// String returns the pods list as a human readable string.
+func (p *Pods) String() string {
+	if p == nil || p.Items == nil || len(p.Items) < 1 {
+		return ""
+	}
+
+	out := new(strings.Builder)
+
+	for i := range p.Items {
+		i := i
+		out.WriteString(fmt.Sprintf("%s\n", p.Items[i].ObjectMeta.Name))
+		out.WriteString(fmt.Sprintf("  Name: %s\n", p.Items[i].ObjectMeta.Name))
+		out.WriteString(fmt.Sprintf("  Namespace: %s\n", p.Items[i].ObjectMeta.Namespace))
+		out.WriteString(fmt.Sprintf("  Node Name: %s\n", p.Items[i].Spec.NodeName))
+		out.WriteString(fmt.Sprintf("  Hostname: %s\n", p.Items[i].Spec.Hostname))
+		out.WriteString(fmt.Sprintf("  Subdomain: %s\n", p.Items[i].Spec.Subdomain))
+		out.WriteString(fmt.Sprintf("  Resource Version: %s\n", p.Items[i].ObjectMeta.ResourceVersion))
+		out.WriteString(fmt.Sprintf("  Generation: %d\n", p.Items[i].ObjectMeta.Generation))
+		out.WriteString(fmt.Sprintf("  Creation Timestamp: %q\n", p.Items[i].ObjectMeta.CreationTimestamp))
+
+		if p.Items[i].Spec.OS != nil {
+			out.WriteString(fmt.Sprintf("  OS: %s\n", p.Items[i].Spec.OS.Name))
+		}
+
+		out.WriteString(fmt.Sprintf("  Phase: %s\n", p.Items[i].Status.Phase))
+		out.WriteString(fmt.Sprintf("  Message: %s\n", p.Items[i].Status.Message))
+		out.WriteString(fmt.Sprintf("  Reason: %s\n", p.Items[i].Status.Reason))
+		out.WriteString(fmt.Sprintf("  Scheduler Name: %s\n", p.Items[i].Spec.SchedulerName))
+		out.WriteString(fmt.Sprintf("  IP: %s\n", p.Items[i].Status.PodIP))
+
+		labels := p.Items[i].ObjectMeta.GetLabels()
+		if len(labels) > 0 {
+			out.WriteString(fmt.Sprintln("  Labels:"))
+			for k, v := range labels {
+				out.WriteString(fmt.Sprintf("    %s=%s\n", k, v))
+			}
+		}
+
+		for ic := range p.Items[i].Spec.InitContainers {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Init Containers:"))
+			}
+			out.WriteString(istrings.Indent("    ", containerToString(p.Items[i].Spec.InitContainers[ic])))
+		}
+
+		for ic := range p.Items[i].Status.InitContainerStatuses {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Init Container Status:"))
+			}
+			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.InitContainerStatuses[ic])))
+		}
+
+		for ic := range p.Items[i].Spec.Containers {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Containers:"))
+			}
+			out.WriteString(istrings.Indent("    ", containerToString(p.Items[i].Spec.Containers[ic])))
+		}
+
+		for ic := range p.Items[i].Status.ContainerStatuses {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Container Status:"))
+			}
+			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.ContainerStatuses[ic])))
+		}
+
+		for ic := range p.Items[i].Spec.EphemeralContainers {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Ephemeral Containers:"))
+			}
+
+			// EphemeralContainerCommon has all the same fields as Container. We'll convert it
+			// to use our stringer.
+			bytes, err := p.Items[i].Spec.EphemeralContainers[ic].EphemeralContainerCommon.Marshal()
+			if err != nil {
+				continue
+			}
+			container := &v1.Container{}
+			err = container.Unmarshal(bytes)
+			if err != nil {
+				continue
+			}
+
+			out.WriteString(istrings.Indent("    ", containerToString(*container)))
+		}
+
+		for ic := range p.Items[i].Status.EphemeralContainerStatuses {
+			ic := ic
+			if ic == 0 {
+				out.WriteString(fmt.Sprintln("  Ephemeral Container Status:"))
+			}
+			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.EphemeralContainerStatuses[ic])))
+		}
+	}
+
+	return out.String()
+}
+
+func containerToString(container v1.Container) string {
+	out := new(strings.Builder)
+	out.WriteString(fmt.Sprintf("%s\n", container.Name))
+	out.WriteString(fmt.Sprintf("  Name: %s\n", container.Name))
+	out.WriteString(fmt.Sprintf("  Image: %s\n", container.Image))
+	out.WriteString(fmt.Sprintf("  Command: %s\n", strings.Join(container.Command, " ")))
+	out.WriteString(fmt.Sprintln("  Args:"))
+	for c := range container.Args {
+		c := c
+		out.WriteString(istrings.Indent("    ", container.Args[c]))
+	}
+	out.WriteString(fmt.Sprintln(""))
+	out.WriteString(fmt.Sprintln("  Ports:"))
+	for c := range container.Ports {
+		c := c
+		out.WriteString(fmt.Sprintf("    %s:\n", container.Ports[c].Name))
+		out.WriteString(fmt.Sprintf("      Host Port: %d\n", container.Ports[c].HostPort))
+		out.WriteString(fmt.Sprintf("      Container Port: %d\n", container.Ports[c].ContainerPort))
+		out.WriteString(fmt.Sprintf("      Protocol: %s\n", container.Ports[c].Protocol))
+		out.WriteString(fmt.Sprintf("      Host IP: %s\n", container.Ports[c].HostIP))
+	}
+	out.WriteString(fmt.Sprintln("  Environment:"))
+	for c := range container.Env {
+		c := c
+		name := container.Env[c].Name
+		value := container.Env[c].Value
+		if source := container.Env[c].ValueFrom; source != nil {
+			sourceStr := ""
+			if source.FieldRef != nil {
+				sourceStr = fmt.Sprintf("%s:%s", source.FieldRef.APIVersion, source.FieldRef.FieldPath)
+			}
+			if source.ResourceFieldRef != nil {
+				sourceStr = fmt.Sprintf("%s:%s", source.ResourceFieldRef.ContainerName, source.ResourceFieldRef.Resource)
+			}
+			if source.ConfigMapKeyRef != nil {
+				sourceStr = fmt.Sprintf("%s:%s", source.ConfigMapKeyRef.LocalObjectReference.Name, source.ConfigMapKeyRef.Key)
+			}
+			if source.SecretKeyRef != nil {
+				sourceStr = fmt.Sprintf("%s:%s", source.SecretKeyRef.LocalObjectReference.Name, source.SecretKeyRef.Key)
+			}
+			if value == "" {
+				value = fmt.Sprintf("(%s)", sourceStr)
+			} else {
+				value = fmt.Sprintf("%s (%s)", value, sourceStr)
+			}
+		}
+		if name == "VAULT_LICENSE" {
+			value = "[redacted]"
+		}
+		out.WriteString(fmt.Sprintf("    %s=%s\n", name, value))
+	}
+
+	return out.String()
+}
+
+func contianerStatusToString(status v1.ContainerStatus) string {
+	out := new(strings.Builder)
+	out.WriteString(fmt.Sprintf("%s\n", status.Name))
+	out.WriteString(fmt.Sprintf("  Name: %s\n", status.Name))
+	out.WriteString(fmt.Sprintf("  Image: %s\n", status.Image))
+	out.WriteString(fmt.Sprintf("  Image ID: %s\n", status.ImageID))
+	out.WriteString(fmt.Sprintf("  Container ID: %s\n", status.ContainerID))
+	out.WriteString(fmt.Sprintf("  Ready: %t\n", status.Ready))
+	out.WriteString(fmt.Sprintf("  Restart Count: %d\n", status.RestartCount))
+
+	return out.String()
 }

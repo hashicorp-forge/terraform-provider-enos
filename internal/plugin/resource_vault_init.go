@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
+	istrings "github.com/hashicorp/enos-provider/internal/strings"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -24,10 +25,11 @@ type vaultInit struct {
 var _ resource.Resource = (*vaultInit)(nil)
 
 type vaultInitStateV1 struct {
-	ID        *tfString
-	BinPath   *tfString
-	VaultAddr *tfString
-	Transport *embeddedTransportV1
+	ID              *tfString
+	BinPath         *tfString
+	SystemdUnitName *tfString // when using systemd to manage service
+	VaultAddr       *tfString
+	Transport       *embeddedTransportV1
 	// inputs
 	KeyShares         *tfNum
 	KeyThreshold      *tfNum
@@ -70,10 +72,11 @@ func newVaultInitStateV1() *vaultInitStateV1 {
 	}
 
 	return &vaultInitStateV1{
-		ID:        newTfString(),
-		BinPath:   newTfString(),
-		VaultAddr: newTfString(),
-		Transport: transport,
+		ID:              newTfString(),
+		BinPath:         newTfString(),
+		VaultAddr:       newTfString(),
+		SystemdUnitName: newTfString(),
+		Transport:       transport,
 		// inputs
 		KeyShares:         newTfNum(),
 		KeyThreshold:      newTfNum(),
@@ -257,6 +260,12 @@ func (s *vaultInitStateV1) Schema() *tfprotov6.Schema {
 					Required: true,
 				},
 				{
+					Name:        "unit_name",
+					Description: "The sysmted unit name if using systemd as a process manager",
+					Type:        tftypes.String,
+					Optional:    true,
+				},
+				{
 					Name:     "vault_addr",
 					Type:     tftypes.String,
 					Required: true,
@@ -390,6 +399,7 @@ func (s *vaultInitStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"id":         s.ID,
 		"bin_path":   s.BinPath,
 		"vault_addr": s.VaultAddr,
+		"unit_name":  s.SystemdUnitName,
 		// inputs
 		"key_shares":         s.KeyShares,
 		"key_threshold":      s.KeyThreshold,
@@ -428,8 +438,9 @@ func (s *vaultInitStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":         s.ID.TFType(),
 		"bin_path":   s.BinPath.TFType(),
-		"vault_addr": s.VaultAddr.TFType(),
+		"unit_name":  s.SystemdUnitName.TFType(),
 		"transport":  s.Transport.Terraform5Type(),
+		"vault_addr": s.VaultAddr.TFType(),
 		// inputs
 		"key_shares":         s.KeyShares.TFType(),
 		"key_threshold":      s.KeyThreshold.TFType(),
@@ -459,8 +470,9 @@ func (s *vaultInitStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":         s.ID.TFValue(),
 		"bin_path":   s.BinPath.TFValue(),
-		"vault_addr": s.VaultAddr.TFValue(),
 		"transport":  s.Transport.Terraform5Value(),
+		"unit_name":  s.SystemdUnitName.TFValue(),
+		"vault_addr": s.VaultAddr.TFValue(),
 		// inputs
 		"key_shares":         s.KeyShares.TFValue(),
 		"key_threshold":      s.KeyThreshold.TFValue(),
@@ -495,25 +507,29 @@ func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error 
 	req := s.buildInitRequest()
 	err := req.Validate()
 	if err != nil {
-		return fmt.Errorf("failed to initialize vault, init request validation failed, due to: %w", err)
+		return fmt.Errorf("failed to initialize vault because init request validation failed: %w", err)
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-
-	// Added resiliency, since it not necessarily the case that the start resource was executed before this.
-	// The start resource does this wait as well, at the end of the start execution.
-	_, err = vault.WaitForState(timeoutCtx, client, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath.Value()),
-		vault.WithStatusRequestVaultAddr(s.VaultAddr.Value()),
-	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
-	if err != nil {
-		return fmt.Errorf("failed to wait for Vault to be running before initializing, due to: %w", err)
-	}
 
 	res, err := vault.Init(ctx, client, req)
 	if err != nil {
-		return fmt.Errorf("failed to initialize Vault cluster, due to: %w", err)
+		err = fmt.Errorf("failed to initialize the vault cluster: %w", err)
+		if res.PriorState != nil {
+			err = fmt.Errorf(
+				"%w\nVault State before running '%s'\n%s",
+				err, req.String(), istrings.Indent("  ", res.PriorState.String()),
+			)
+		}
+		if res.PostState != nil {
+			err = fmt.Errorf(
+				"%w\nVault State after running '%s'\n%s",
+				err, req.String(), istrings.Indent("  ", res.PriorState.String()),
+			)
+		}
+
+		return err
 	}
 
 	// Migrate the init response to the state
@@ -555,55 +571,67 @@ func (s *vaultInitStateV1) Init(ctx context.Context, client it.Transport) error 
 }
 
 func (s *vaultInitStateV1) buildInitRequest() *vault.InitRequest {
-	opts := []vault.InitRequestOpt{}
+	stateOpts := []vault.StateRequestOpt{
+		vault.WithStateRequestFlightControlUseHomeDir(),
+	}
 
 	if binPath, ok := s.BinPath.Get(); ok {
-		opts = append(opts, vault.WithInitRequestBinPath(binPath))
+		stateOpts = append(stateOpts, vault.WithStateRequestBinPath(binPath))
 	}
 
 	if vaultAddr, ok := s.VaultAddr.Get(); ok {
-		opts = append(opts, vault.WithInitRequestVaultAddr(vaultAddr))
+		stateOpts = append(stateOpts, vault.WithStateRequestVaultAddr(vaultAddr))
+	}
+
+	unitName := "vault"
+	if unit, ok := s.SystemdUnitName.Get(); ok {
+		unitName = unit
+	}
+	stateOpts = append(stateOpts, vault.WithStateRequestSystemdUnitName(unitName))
+
+	initOpts := []vault.InitRequestOpt{
+		vault.WithInitRequestStateRequestOpts(stateOpts...),
 	}
 
 	if keyShares, ok := s.KeyShares.Get(); ok {
-		opts = append(opts, vault.WithInitRequestKeyShares(keyShares))
+		initOpts = append(initOpts, vault.WithInitRequestKeyShares(keyShares))
 	}
 
 	if keyThreshold, ok := s.KeyThreshold.Get(); ok {
-		opts = append(opts, vault.WithInitRequestKeyThreshold(keyThreshold))
+		initOpts = append(initOpts, vault.WithInitRequestKeyThreshold(keyThreshold))
 	}
 
 	if pgpKeys, ok := s.PGPKeys.GetStrings(); ok {
-		opts = append(opts, vault.WithInitRequestPGPKeys(pgpKeys))
+		initOpts = append(initOpts, vault.WithInitRequestPGPKeys(pgpKeys))
 	}
 
 	if rootTokenPGPKey, ok := s.RootTokenPGPKey.Get(); ok {
-		opts = append(opts, vault.WithInitRequestRootTokenPGPKey(rootTokenPGPKey))
+		initOpts = append(initOpts, vault.WithInitRequestRootTokenPGPKey(rootTokenPGPKey))
 	}
 
 	if recoveryShares, ok := s.RecoveryShares.Get(); ok {
-		opts = append(opts, vault.WithInitRequestRecoveryShares(recoveryShares))
+		initOpts = append(initOpts, vault.WithInitRequestRecoveryShares(recoveryShares))
 	}
 
 	if recoveryThreshold, ok := s.RecoveryThreshold.Get(); ok {
-		opts = append(opts, vault.WithInitRequestRecoveryThreshold(recoveryThreshold))
+		initOpts = append(initOpts, vault.WithInitRequestRecoveryThreshold(recoveryThreshold))
 	}
 
 	if recoveryPGPKeys, ok := s.RecoveryPGPKeys.GetStrings(); ok {
-		opts = append(opts, vault.WithInitRequestRecoveryPGPKeys(recoveryPGPKeys))
+		initOpts = append(initOpts, vault.WithInitRequestRecoveryPGPKeys(recoveryPGPKeys))
 	}
 
 	if storedShares, ok := s.StoredShares.Get(); ok {
-		opts = append(opts, vault.WithInitRequestStoredShares(storedShares))
+		initOpts = append(initOpts, vault.WithInitRequestStoredShares(storedShares))
 	}
 
 	if consulAuto, ok := s.ConsulAuto.Get(); ok {
-		opts = append(opts, vault.WithInitRequestConsulAuto(consulAuto))
+		initOpts = append(initOpts, vault.WithInitRequestConsulAuto(consulAuto))
 	}
 
 	if consulSvc, ok := s.ConsulService.Get(); ok {
-		opts = append(opts, vault.WithInitRequestConsulService(consulSvc))
+		initOpts = append(initOpts, vault.WithInitRequestConsulService(consulSvc))
 	}
 
-	return vault.NewInitRequest(opts...)
+	return vault.NewInitRequest(initOpts...)
 }

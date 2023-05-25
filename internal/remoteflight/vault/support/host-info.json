@@ -1,0 +1,23 @@
+{
+  "request_id": "b7ce3e1e-83e2-0d65-c22f-f3ac7835479b",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "host": {
+      "bootTime": 1683754328,
+      "hostid": "0315c1dd-5d8b-4dc5-b960-678a0e7de257",
+      "hostname": "ip-10-13-10-150.us-west-1.compute.internal",
+      "kernelArch": "x86_64",
+      "kernelVersion": "4.18.0-193.105.1.el8_2.x86_64",
+      "os": "linux",
+      "platform": "redhat",
+      "platformFamily": "rhel",
+      "platformVersion": "8.2",
+      "procs": 94,
+      "uptime": 716,
+      "virtualizationRole": "guest",
+      "virtualizationSystem": "xen"
+    }
+  }
+}

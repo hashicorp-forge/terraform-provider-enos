@@ -42,6 +42,10 @@ func NewTransport(opts TransportOpts) (it.Transport, error) {
 	}, nil
 }
 
+func (t *transport) Type() it.TransportType {
+	return it.TransportType("nomad")
+}
+
 func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) error {
 	select {
 	case <-ctx.Done():

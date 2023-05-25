@@ -92,7 +92,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			responses, err = getK8sLogs(ctx, transport)
 		default:
 			logger.Error("failed to get logs, unknown transport type", map[string]interface{}{
-				"transport_type": transport.Type().String(),
+				"transport_type": string(transport.Type()),
 			})
 
 			return
@@ -229,7 +229,7 @@ func getSystemdLogs(ctx context.Context, logger log.Logger, transport *embeddedT
 	merr := &multierror.Error{}
 
 	for _, service := range logServices {
-		resp, err := sysd.GetLogs(ctx, systemd.GetLogsRequest{
+		resp, err := sysd.GetUnitJournal(ctx, &systemd.GetUnitJournalRequest{
 			Unit: service,
 			Host: transport.Host.Val,
 		})

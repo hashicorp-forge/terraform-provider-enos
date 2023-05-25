@@ -171,6 +171,47 @@ jobs:
           rm -rf ./.enos
           rm -rf $HOME/.terraform.d
 
+  scenario-vault-k8s:
+    name: "Enos vault k8s scenario"
+    runs-on: ubuntu-latest
+    env:
+      ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs
+      ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: enos
+    steps:
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+        with:
+          ref: ${{ github.head_ref }}   # checkout the correct branch name
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          # the terraform wrapper will break terraform execution in enos because
+          # it changes the output to text when we expect it to be JSON.
+          terraform_wrapper: false
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token:
+            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - uses: ./.github/actions/build-provider
+        with:
+          target: linux/amd64
+      - name: "Run Enos Scenario"
+        run: enos scenario run k8s edition:oss --timeout 60m0s
+      - name: Ensure scenario has been destroyed
+        if: ${{ always() }}
+        run: enos scenario destroy k8s edition:oss --timeout 60m0s
+      - name: Clean up Enos runtime directories
+        if: ${{ always() }}
+        run: |
+          rm -rf /tmp/enos*
+          rm -rf ./support
+          rm -rf ./.enos
+          rm -rf $HOME/.terraform.d
+
   static-analysis:
     name: "Static analysis"
     runs-on: ubuntu-latest

@@ -1,0 +1,38 @@
+{
+  "request_id": "731c3f64-7f6d-c05b-6b9b-6603da7cd1e5",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "nodes": [
+      {
+        "active_node": false,
+        "api_address": "http://10.13.10.114:8200",
+        "cluster_address": "https://10.13.10.114:8201",
+        "hostname": "ip-10-13-10-114.us-west-1.compute.internal",
+        "last_echo": "2023-05-10T21:45:31.911061598Z",
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      },
+      {
+        "active_node": false,
+        "api_address": "http://10.13.10.150:8200",
+        "cluster_address": "https://10.13.10.150:8201",
+        "hostname": "ip-10-13-10-150.us-west-1.compute.internal",
+        "last_echo": "2023-05-10T21:45:31.79673629Z",
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      },
+      {
+        "active_node": true,
+        "api_address": "http://10.13.10.239:8200",
+        "cluster_address": "https://10.13.10.239:8201",
+        "hostname": "ip-10-13-10-239.us-west-1.compute.internal",
+        "last_echo": null,
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      }
+    ]
+  },
+  "warnings": null
+}

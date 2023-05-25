@@ -49,8 +49,8 @@ func WithValidateFilePath(path string) ValidateFileRequestOpt {
 }
 
 // ValidateConsulConfig validates the consul config using the consul validate command.
-func ValidateConsulConfig(ctx context.Context, ssh it.Transport, req *ValidateFileRequest) error {
-	_, stderr, err := ssh.Run(ctx, command.New(
+func ValidateConsulConfig(ctx context.Context, tr it.Transport, req *ValidateFileRequest) error {
+	_, stderr, err := tr.Run(ctx, command.New(
 		fmt.Sprintf("%s validate %s", req.BinPath, req.FilePath),
 	))
 	if err != nil {
@@ -61,12 +61,12 @@ func ValidateConsulConfig(ctx context.Context, ssh it.Transport, req *ValidateFi
 }
 
 // ValidateConsulLicense validates the consul license using file path or env variable.
-func ValidateConsulLicense(ctx context.Context, ssh it.Transport, req *ValidateFileRequest) error {
+func ValidateConsulLicense(ctx context.Context, tr it.Transport, req *ValidateFileRequest) error {
 	if req.FilePath == "" {
 		return fmt.Errorf("you must provide a license file path ")
 	}
 
-	_, stderr, err := ssh.Run(ctx, command.New(
+	_, stderr, err := tr.Run(ctx, command.New(
 		fmt.Sprintf("%s license inspect %s", req.BinPath, req.FilePath),
 	))
 	if err != nil {

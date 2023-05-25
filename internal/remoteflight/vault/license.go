@@ -76,7 +76,7 @@ func WithSetLegacyLicenseRequestToken(token string) SetLegacyLicenseRequestOpt {
 }
 
 // SetLegacyLicense sets the vault license using the /sys/license endpoint.
-func SetLegacyLicense(ctx context.Context, ssh it.Transport, req *SetLegacyLicenseRequest) error {
+func SetLegacyLicense(ctx context.Context, tr it.Transport, req *SetLegacyLicenseRequest) error {
 	if req.LicensePath == "" && req.LicenseContent == "" {
 		return fmt.Errorf("you must provide a license path or content")
 	}
@@ -94,7 +94,7 @@ func SetLegacyLicense(ctx context.Context, ssh it.Transport, req *SetLegacyLicen
 		req.LicenseContent = string(body)
 	}
 
-	_, stderr, err := ssh.Run(ctx, command.New(
+	_, stderr, err := tr.Run(ctx, command.New(
 		fmt.Sprintf("%s write /sys/license text='%s'", req.BinPath, req.LicenseContent),
 		command.WithEnvVars(map[string]string{
 			"VAULT_ADDR":  req.VaultAddr,

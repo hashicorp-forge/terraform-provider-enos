@@ -96,7 +96,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 		"kms_key_id": "some-key-id",
 	})
 	vaultStart.License.Set("some-license-key")
-	vaultStart.SystemdUnitName.Set("vault")
+	vaultStart.SystemdUnitName.Set("vaulter")
 	vaultStart.Username.Set("vault")
 	ssh := newEmbeddedTransportSSH()
 	ssh.User.Set("ubuntu")
@@ -125,7 +125,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.license", regexp.MustCompile(`^some-license-key$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.unit_name", regexp.MustCompile(`^vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.username", regexp.MustCompile(`^vault$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.username", regexp.MustCompile(`^vaulter$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),

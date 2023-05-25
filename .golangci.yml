@@ -62,18 +62,6 @@ linters-settings:
     ignore-generated-header: true
     severity: warning
 
-  staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.20"
-
-  stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.20"
-
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.20"
-
 linters:
   enable-all: true
   disable:

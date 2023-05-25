@@ -1,0 +1,13 @@
+{
+  "type": "shamir",
+  "initialized": false,
+  "sealed": true,
+  "t": 0,
+  "n": 0,
+  "progress": 0,
+  "nonce": "",
+  "version": "1.10.11",
+  "migration": false,
+  "recovery_seal": false,
+  "storage_type": "raft"
+}

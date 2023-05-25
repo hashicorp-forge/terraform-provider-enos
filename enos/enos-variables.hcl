@@ -15,3 +15,27 @@ variable "tfc_api_token" {
   type        = string
   sensitive   = true
 }
+
+variable "image_repository" {
+  description = "The repository for the docker image to load, i.e. hashicorp/vault"
+  type        = string
+  default     = null
+}
+
+variable "image_tag" {
+  description = "The docker hub image tag"
+  type        = string
+  default     = "latest"
+}
+
+variable "log_level" {
+  description = "The server log level for Vault logs. Supported values (in order of detail) are trace, debug, info, warn, and err."
+  type        = string
+  default     = "info"
+}
+
+variable "instance_count" {
+  description = "How many instances to create for the Vault cluster"
+  type        = number
+  default     = 3
+}

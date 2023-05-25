@@ -28,3 +28,17 @@ terraform "default" {
     }
   }
 }
+
+terraform "k8s" {
+  required_version = ">= 1.2.0"
+
+  required_providers {
+    enos = {
+      source = "app.terraform.io/hashicorp-qti/enos"
+    }
+
+    helm = {
+      source = "hashicorp/helm"
+    }
+  }
+}

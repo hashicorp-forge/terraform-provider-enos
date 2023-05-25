@@ -163,6 +163,15 @@ func TestSystemctlCommandString(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"sudo systemctl show vault.service",
+			&SystemctlCommandReq{
+				Name:       "vault",
+				Type:       UnitTypeService,
+				SubCommand: SystemctlSubCommandShow,
+			},
+			false,
+		},
 	} {
 		test := test
 		t.Run(test.expected, func(t *testing.T) {

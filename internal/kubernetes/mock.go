@@ -12,6 +12,7 @@ type MockClient struct {
 	QueryPodInfosFunc  func(ctx context.Context, req QueryPodInfosRequest) ([]PodInfo, error)
 	GetPodInfoFunc     func(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error)
 	GetLogsFunc        func(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error)
+	ListPodsFunc       func(ctx context.Context, req *ListPodsRequest) (*ListPodsResponse, error)
 }
 
 func (m *MockClient) NewExecRequest(opts ExecRequestOpts) it.ExecRequest {
@@ -28,6 +29,10 @@ func (m *MockClient) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*Po
 
 func (m *MockClient) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error) {
 	return m.GetLogsFunc(ctx, req)
+}
+
+func (m *MockClient) ListPods(ctx context.Context, req *ListPodsRequest) (*ListPodsResponse, error) {
+	return m.ListPodsFunc(ctx, req)
 }
 
 // NewMockGetLogsFunc creates a GetLogsFunc that returns the provided logs when called.

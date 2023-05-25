@@ -26,13 +26,13 @@ type mockSystemdClient struct {
 	logs map[string][]byte
 }
 
-func (m mockSystemdClient) GetLogs(ctx context.Context, req systemd.GetLogsRequest) (remoteflight.GetLogsResponse, error) {
+func (m mockSystemdClient) GetUnitJournal(ctx context.Context, req *systemd.GetUnitJournalRequest) (remoteflight.GetLogsResponse, error) {
 	logs, ok := m.logs[req.Unit]
 	if !ok {
 		return nil, fmt.Errorf("unit not installed")
 	}
 
-	return systemd.GetLogsResponse{
+	return &systemd.GetUnitJournalResponse{
 		Unit: req.Unit,
 		Host: req.Host,
 		Logs: logs,
@@ -95,12 +95,12 @@ func (m mockSystemdClient) RestartService(ctx context.Context, unit string) erro
 	panic("implement me")
 }
 
-func (m mockSystemdClient) ServiceStatus(ctx context.Context, unit string) systemd.StatusCode {
+func (m mockSystemdClient) ServiceStatus(ctx context.Context, unit string) systemd.SystemctlStatusCode {
 	// intentionally not implemented
 	panic("implement me")
 }
 
-func (m mockSystemdClient) IsActiveService(ctx context.Context, unit string) bool {
+func (m mockSystemdClient) ShowProperties(ctx context.Context, unit string) (systemd.UnitProperties, error) {
 	// intentionally not implemented
 	panic("implement me")
 }

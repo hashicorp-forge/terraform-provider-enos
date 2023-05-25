@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	state "github.com/hashicorp/enos-provider/internal/server/state"
+	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +29,7 @@ type testAccResourceTransportTemplate struct {
 	check            resource.TestCheckFunc
 	transport        *embeddedTransportV1
 	resourceTemplate *template.Template
-	transportUsed    TransportType
+	transportUsed    it.TransportType
 }
 
 // TestAccResourceFileResourceTransport tests both the basic enos_file resource interface

@@ -5,288 +5,191 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
+	"strings"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// SealStatus the seal status for Vault.
-type SealStatus int
+// StatusCode is the exit code of "vault status".
+type StatusCode int
 
-// InitStatus the init status for Vault.
-type InitStatus int
-
-// Vault status exit codes.
 const (
-	UnSealed      SealStatus = 0
-	Error         SealStatus = 1
-	Sealed        SealStatus = 2
-	StatusUnknown SealStatus = 9
-
-	// Inactive - Vault not running.
-	Inactive InitStatus = 0
-	// Uninitialized - Vault active and uninitialized.
-	Uninitialized InitStatus = 1
-	// Initialized - Vault active and initialized.
-	Initialized InitStatus = 2
+	// The exit code of "vault status" reflects our seal status
+	// https://developer.hashicorp.com/vault/docs/commands/status
+	StatusInitializedUnsealed StatusCode = 0
+	StatusError               StatusCode = 1
+	StatusSealed              StatusCode = 2
+	// Unknown is our default state and is defined outside of LSB range.
+	StatusUnknown StatusCode = 9
 )
 
-func (s SealStatus) String() string {
+// String returns the status code as a string.
+func (s StatusCode) String() string {
 	switch s {
-	case UnSealed:
-		return "Unsealed"
-	case Error:
-		return "Error"
-	case Sealed:
-		return "Sealed"
+	case StatusInitializedUnsealed:
+		return "unsealed"
+	case StatusError:
+		return "error"
+	case StatusSealed:
+		return "sealed"
 	case StatusUnknown:
-		return "StatusUnknown"
-	}
-
-	return "StatusUnknown"
-}
-
-// FromExitCode gets the SealStatus from the exit code of the 'vault status' command.
-func FromExitCode(exitCode int) SealStatus {
-	switch exitCode {
-	case 0:
-		return UnSealed
-	case 1:
-		return Error
-	case 2:
-		return Sealed
-	case 9:
-		return StatusUnknown
+		return "unknown"
 	default:
-		return StatusUnknown
+		return "undefined"
 	}
 }
 
-func (i InitStatus) String() string {
-	switch i {
-	case Inactive:
-		return "Inactive"
-	case Uninitialized:
-		return "Uninitialized"
-	case Initialized:
-		return "Initialized"
+// StatusResponse is the JSON stdout result of "vault status". It should be
+// taken with a grain of salt. For seal status in particular, always trust the
+// exit code before the status response.
+type StatusResponse struct {
+	StatusCode
+	SealType    string `json:"type,omitempty"`
+	Initialized bool   `json:"initialized,omitempty"`
+	Sealed      bool   `json:"sealed,omitempty"`
+	Version     string `json:"version,omitempty"`
+	HAEnabled   bool   `json:"ha_enabled,omitempty"`
+}
+
+// GetStatus returns the vault node status.
+func GetStatus(ctx context.Context, tr it.Transport, req *CLIRequest) (*StatusResponse, error) {
+	var err error
+	res := &StatusResponse{StatusCode: StatusUnknown}
+
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+	default:
 	}
 
-	return "StatusUnknown"
-}
-
-// State contains the information output from the vault status command.
-type State struct {
-	SealType    string `json:"type"`
-	Initialized bool   `json:"initialized"`
-	Sealed      bool   `json:"sealed"`
-	Version     string `json:"version"`
-	HAEnabled   bool   `json:"ha_enabled"`
-
-	// redundant, but useful for polling on status
-	SealStatus SealStatus
-	InitStatus InitStatus
-}
-
-func NewState() State {
-	return State{
-		Sealed:      true,
-		Initialized: false,
-		SealStatus:  StatusUnknown,
-		InitStatus:  Inactive,
-	}
-}
-
-type StateCheck func(s State) error
-
-func CheckIsUnsealed() StateCheck {
-	return func(s State) error {
-		if s.Sealed {
-			return fmt.Errorf("expected Vault to be unsealed, state: %#v", s)
-		}
-
-		return nil
-	}
-}
-
-func CheckIsActive() StateCheck {
-	return func(s State) error {
-		if s.InitStatus == Inactive {
-			return fmt.Errorf("expected Vault to be active, state: %#v", s)
-		}
-
-		return nil
-	}
-}
-
-func CheckIsInitialized() StateCheck {
-	return func(s State) error {
-		if !s.Initialized {
-			return fmt.Errorf("expected Vault to be initialized, state: %#v", s)
-		}
-
-		return nil
-	}
-}
-
-// CheckSealStatusKnown returns true if the seal status is either Sealed or Unsealed.
-func CheckSealStatusKnown() StateCheck {
-	return func(s State) error {
-		if s.SealStatus == StatusUnknown {
-			return fmt.Errorf("expected Vault seal status to be known, state: %#v", s)
-		}
-
-		return nil
-	}
-}
-
-// StatusRequest is a vault status request.
-type StatusRequest struct {
-	*CLIRequest
-}
-
-// StatusRequestOpt is a functional option for a config create request.
-type StatusRequestOpt func(*StatusRequest) *StatusRequest
-
-// NewStatusRequest takes functional options and returns a new
-// systemd unit request.
-func NewStatusRequest(opts ...StatusRequestOpt) *StatusRequest {
-	c := &StatusRequest{
-		&CLIRequest{},
-	}
-
-	for _, opt := range opts {
-		c = opt(c)
-	}
-
-	return c
-}
-
-// WithStatusRequestBinPath sets the vault binary path.
-func WithStatusRequestBinPath(path string) StatusRequestOpt {
-	return func(u *StatusRequest) *StatusRequest {
-		u.BinPath = path
-		return u
-	}
-}
-
-// WithStatusRequestVaultAddr sets the vault address.
-func WithStatusRequestVaultAddr(addr string) StatusRequestOpt {
-	return func(u *StatusRequest) *StatusRequest {
-		u.VaultAddr = addr
-		return u
-	}
-}
-
-// GetState returns the vault state.
-func GetState(ctx context.Context, ssh it.Transport, req *StatusRequest) (*State, error) {
 	if req.BinPath == "" {
-		return nil, fmt.Errorf("you must supply a vault bin path")
-	}
-	if req.VaultAddr == "" {
-		return nil, fmt.Errorf("you must supply a vault listen address")
+		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
 	}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(
-		fmt.Sprintf("%s status -format=json", req.BinPath),
-		command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
-	))
-	sealStatus := UnSealed
-	// If we get an error check the error code and get the seal status
-	if err != nil || stderr != "" {
-		var exitError *it.ExecError
-		if errors.As(err, &exitError) {
-			sealStatus = FromExitCode(exitError.ExitCode())
-			if sealStatus == Error || sealStatus == StatusUnknown {
-				return nil, remoteflight.WrapErrorWith(
-					fmt.Errorf("failed to execute status command, due to: %w", exitError),
-					createStdErrMessage(stderr),
-				)
-			}
+	if req.VaultAddr == "" {
+		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+	}
+
+	if err == nil {
+		var err1 error
+		stdout, stderr, err1 := tr.Run(ctx, command.New(
+			fmt.Sprintf("%s status -format=json", req.BinPath),
+			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
+		))
+
+		// Set our status from the status command exit code
+		var code StatusCode
+		var err2 error
+		if err1 == nil && stderr == "" {
+			code = StatusInitializedUnsealed
+		} else if err1 == nil && stderr != "" {
+			code = StatusError
 		} else {
-			return nil, remoteflight.WrapErrorWith(
-				fmt.Errorf("failed to execute status command, due to: %w", err),
-				createStdErrMessage(stderr),
-			)
+			code, err2 = vaultStatusCodeFromError(err1)
+		}
+		res.StatusCode = code
+
+		switch res.StatusCode {
+		// Don't set our outer error if our seal status is known.
+		case StatusInitializedUnsealed, StatusSealed:
+		case StatusError, StatusUnknown:
+			err = errors.Join(err, err1, err2)
+		default:
+			err = errors.Join(err, err1, err2)
+		}
+
+		if stderr != "" {
+			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
+		}
+
+		// Deserialize the body
+		if stdout == "" {
+			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+		} else {
+			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
-	state := NewState()
-	state.SealStatus = sealStatus
-
-	err = json.Unmarshal([]byte(stdout), &state)
 	if err != nil {
-		tflog.Error(ctx, "Failed to unmarshal seal status", map[string]interface{}{"state": stdout})
-		return nil, remoteflight.WrapErrorWith(
-			fmt.Errorf("failed to unmarshal the seal status: [%s], due to: %w", stdout, err),
-			createStdErrMessage(stderr),
-		)
+		return nil, errors.Join(fmt.Errorf("get vault status: vault status"), err)
 	}
 
-	if state.Initialized {
-		state.InitStatus = Initialized
-	} else {
-		state.InitStatus = Uninitialized
-	}
-
-	return &state, nil
+	return res, err
 }
 
-func createStdErrMessage(stderr string) string {
-	if stderr == "" {
+// IsSealed checks whether or not the status of the cluster is sealed. If we
+// are unable to determine the seal status, or the exit code and status body
+// diverge, an error will be returned.
+func (s *StatusResponse) IsSealed() (bool, error) {
+	if s == nil {
+		return true, fmt.Errorf("state does not include status body")
+	}
+
+	switch s.StatusCode {
+	case StatusInitializedUnsealed:
+		if s.Sealed {
+			return true, fmt.Errorf("status response does not match status code, expected sealed=false, got sealed=true")
+		}
+
+		return false, nil
+	case StatusError:
+		return true, fmt.Errorf("unable to determine seal status because status returned an error exit code")
+	case StatusSealed:
+		if !s.Sealed {
+			return true, fmt.Errorf("status response does not match status code, expected sealed=true, got sealed=false")
+		}
+
+		return true, nil
+	case StatusUnknown:
+		return true, fmt.Errorf("unable to determine vault status")
+	default:
+		return true, fmt.Errorf("unable to determine vault status, unexpected exit code %s", s.StatusCode)
+	}
+}
+
+// String returns the status response as a string.
+func (s *StatusResponse) String() string {
+	if s == nil {
 		return ""
 	}
+	out := new(strings.Builder)
 
-	return fmt.Sprintf("stderr: [%s]", stderr)
+	_, _ = out.WriteString(fmt.Sprintf("Code: %[1]d (%[1]s)\n", s.StatusCode))
+	if s.SealType != "" {
+		_, _ = out.WriteString(fmt.Sprintf("Seal Type: %s\n", s.SealType))
+	}
+	_, _ = out.WriteString(fmt.Sprintf("Initialized: %t\n", s.Initialized))
+	_, _ = out.WriteString(fmt.Sprintf("Sealed: %t\n", s.Sealed))
+	if s.Version != "" {
+		_, _ = out.WriteString(fmt.Sprintf("Version: %s\n", s.Version))
+	}
+	_, _ = out.WriteString(fmt.Sprintf("HA Enabled: %t\n", s.HAEnabled))
+
+	return out.String()
 }
 
-// WaitForState waits until the vault service state satisfies all of the provided StateCheck(s).
-// If the context has a duration we will keep trying until it is done.
-func WaitForState(ctx context.Context, ssh it.Transport, req *StatusRequest, checks ...StateCheck) (*State, error) {
-	var err error
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+// NewStatusResponse returns a new instance of StatusResponse.
+func NewStatusResponse() *StatusResponse {
+	return &StatusResponse{}
+}
 
-	for {
-		var state *State
-		select {
-		case <-ctx.Done():
-			return state, fmt.Errorf("timed out waiting for vault: %w: state: %+v", err, state)
-		case <-ticker.C:
-			state, err = GetState(ctx, ssh, req)
-			tflog.Debug(ctx, "Checking Vault state", map[string]interface{}{
-				"instance": req.VaultAddr,
-				"state":    fmt.Sprintf("%+v", state),
-			})
-			if err == nil {
-				if len(checks) == 0 {
-					return state, nil
-				}
-				if state == nil {
-					continue
-				}
+// vaultStatusCodeFromError takes an error message and attempts to return a
+// status code if it embeds an error exit code.
+func vaultStatusCodeFromError(err error) (StatusCode, error) {
+	var exitError *it.ExecError
 
-				for _, check := range checks {
-					err = check(*state)
-					if err != nil {
-						break
-					}
-				}
-				if err != nil {
-					continue
-				}
-				tflog.Debug(ctx, "Vault state check done", map[string]interface{}{
-					"instance": req.VaultAddr,
-					"state":    fmt.Sprintf("%+v", state),
-				})
-
-				return state, nil
-			} else {
-				tflog.Error(ctx, "status check failed", map[string]interface{}{"error": err.Error()})
-			}
+	if errors.As(err, &exitError) {
+		code := StatusCode(exitError.ExitCode())
+		switch code {
+		case StatusInitializedUnsealed, StatusSealed, StatusError:
+			return code, nil
+		case StatusUnknown:
+			return code, fmt.Errorf("did not get an exit code: %d (%[1]s)", code)
+		default:
+			return code, fmt.Errorf("invalid exit code: %d (%[1]s)", code)
 		}
 	}
+
+	return StatusUnknown, fmt.Errorf("err did not include exit code: %w", err)
 }

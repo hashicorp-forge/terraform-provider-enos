@@ -3,18 +3,22 @@ package vault
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	v1 "k8s.io/api/core/v1"
+
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // InitRequest is the init request.
 type InitRequest struct {
-	*CLIRequest
+	*StateRequest
+	StateRequestOpts []StateRequestOpt
 	*InitArguments
 }
 
@@ -43,6 +47,8 @@ type InitResponse struct {
 	RecoveryKeysShares    json.Number `json:"recovery_keys_shares"`
 	RecoveryKeysThreshold json.Number `json:"recovery_keys_threshold"`
 	RootToken             string      `json:"root_token"`
+	PriorState            *State
+	PostState             *State
 }
 
 // InitRequestOpt is a functional option for a config create request.
@@ -52,8 +58,8 @@ type InitRequestOpt func(*InitRequest) *InitRequest
 // systemd unit request.
 func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 	c := &InitRequest{
-		&CLIRequest{},
-		&InitArguments{
+		StateRequest: NewStateRequest(),
+		InitArguments: &InitArguments{
 			KeyShares:         -1,
 			KeyThreshold:      -1,
 			PGPKeys:           []string{},
@@ -68,21 +74,17 @@ func NewInitRequest(opts ...InitRequestOpt) *InitRequest {
 		c = opt(c)
 	}
 
+	for _, opt := range c.StateRequestOpts {
+		opt(c.StateRequest)
+	}
+
 	return c
 }
 
-// WithInitRequestBinPath sets the vault binary path.
-func WithInitRequestBinPath(path string) InitRequestOpt {
+// WithInitRequestStateRequestOpts sets the options for the state request.
+func WithInitRequestStateRequestOpts(opts ...StateRequestOpt) InitRequestOpt {
 	return func(u *InitRequest) *InitRequest {
-		u.BinPath = path
-		return u
-	}
-}
-
-// WithInitRequestVaultAddr sets the vault address.
-func WithInitRequestVaultAddr(addr string) InitRequestOpt {
-	return func(u *InitRequest) *InitRequest {
-		u.VaultAddr = addr
+		u.StateRequestOpts = opts
 		return u
 	}
 }
@@ -225,30 +227,94 @@ func (r *InitRequest) String() string {
 	return cmd.String()
 }
 
-// Init Initializes a vault cluster.
-func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
+// Init initializes a vault cluster.
+func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse, error) {
+	binPath := req.BinPath
+	if binPath == "" {
+		return nil, fmt.Errorf("you must supply a vault bin path")
+	}
+
+	vaultAddr := req.VaultAddr
+	if vaultAddr == "" {
+		return nil, fmt.Errorf("you must supply a vault listen address")
+	}
+
+	var err error
 	res := &InitResponse{}
 
-	tflog.Debug(ctx, fmt.Sprintf("Running Vault Init command: %s", req.String()))
+	priorStateChecks := []CheckStater{
+		CheckStateSealStateIsKnown(),
+	}
+	postStateChecks := []CheckStater{
+		CheckStateSealStateIsKnown(),
+		CheckStateIsInitialized(),
+	}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(
+	switch tr.Type() {
+	case it.TransportType("ssh"):
+		priorStateChecks = append(priorStateChecks, CheckStateHasSystemdEnabledAndRunningProperties())
+		postStateChecks = append(postStateChecks, CheckStateHasSystemdEnabledAndRunningProperties())
+	case it.TransportType("kubernetes"):
+		k, ok := tr.(*k8s.Transport)
+		if ok {
+			priorStateChecks = append(priorStateChecks, CheckStatePodHasPhase(k.Pod, v1.PodRunning))
+			postStateChecks = append(postStateChecks, CheckStatePodHasPhase(k.Pod, v1.PodRunning))
+		}
+	default:
+	}
+
+	// Wait for vault to ready to initialize.
+	res.PriorState, err = WaitForState(ctx, tr, req.StateRequest, priorStateChecks...)
+	if err != nil {
+		return res, fmt.Errorf("waiting for vault cluster to be ready to initialize: %w", err)
+	}
+
+	// Check if we're already initialized and move on.
+	ok, err := res.PriorState.IsInitialized()
+	if err == nil && ok {
+		res.PostState, err = WaitForState(ctx, tr, req.StateRequest, postStateChecks...)
+		if err != nil {
+			return res, fmt.Errorf("waiting for vault cluster to be ready to be initialized: %w", err)
+		}
+
+		return res, nil
+	}
+
+	// Initialize vault
+	tflog.Debug(ctx, fmt.Sprintf("Running Vault Init command: %s", req.String()))
+	stdout, stderr, err := tr.Run(ctx, command.New(
 		req.String(),
 		command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 	))
-	if err != nil {
-		return res, remoteflight.WrapErrorWith(err, stderr)
-	}
 
 	if stdout == "" {
-		return res, fmt.Errorf("vault initialization command failed to return output")
+		err = errors.Join(err, fmt.Errorf("init command did not return data"))
+	}
+	if stderr != "" {
+		err = errors.Join(err, fmt.Errorf("init command had unexpected write to STDERR: %s", stderr))
 	}
 
-	err = json.Unmarshal([]byte(stdout), &res)
-
-	tflog.Debug(ctx, fmt.Sprintf("Vault Init command Response: %#v", res))
+	if err == nil {
+		err = json.Unmarshal([]byte(stdout), &res)
+		if err != nil {
+			err = fmt.Errorf("deserialize JSON body of init: %w", err)
+		}
+		tflog.Debug(ctx, fmt.Sprintf("Vault Init command Response: %#v", res))
+	}
 
 	if err != nil {
+		// Get our post-init state and return our error
+		var err1 error
+		res.PostState, err1 = GetState(ctx, tr, req.StateRequest)
+		err = errors.Join(err, err1)
+
 		return res, err
+	}
+
+	// Wait for vault to be initialized.
+	res.PostState, err = WaitForState(ctx, tr, req.StateRequest, postStateChecks...)
+	if err != nil {
+		return res, fmt.Errorf("waiting for vault cluster to be ready to be initialized: %w", err)
 	}
 
 	return res, nil

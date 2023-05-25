@@ -8,16 +8,16 @@ import (
 	"text/template"
 
 	nomadapi "github.com/hashicorp/enos-provider/internal/nomad"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/nomad"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 type nomadClientFactory func(cfg nomadapi.ClientCfg) (nomadapi.Client, error)
 
-type nomadTransportBuilder func(state *embeddedTransportNomadv1, ctx context.Context) (it.Transport, error)
+type nomadTransportBuilder func(state *embeddedTransportNomadv1, ctx context.Context) (transport.Transport, error)
 
-var defaultNomadTransportBuilder = func(state *embeddedTransportNomadv1, ctx context.Context) (it.Transport, error) {
+var defaultNomadTransportBuilder = func(state *embeddedTransportNomadv1, ctx context.Context) (transport.Transport, error) {
 	opts := nomad.TransportOpts{}
 
 	if host, ok := state.Host.Get(); ok {
@@ -138,7 +138,7 @@ func (em *embeddedTransportNomadv1) Validate(ctx context.Context) error {
 	return nil
 }
 
-func (em *embeddedTransportNomadv1) Client(ctx context.Context) (it.Transport, error) {
+func (em *embeddedTransportNomadv1) Client(ctx context.Context) (transport.Transport, error) {
 	return em.nomadTransportBuilder(em, ctx)
 }
 
@@ -164,7 +164,7 @@ func (em *embeddedTransportNomadv1) GetAttributesForReplace() []string {
 	return attribsForReplace
 }
 
-func (em *embeddedTransportNomadv1) Type() TransportType {
+func (em *embeddedTransportNomadv1) Type() transport.TransportType {
 	return NOMAD
 }
 

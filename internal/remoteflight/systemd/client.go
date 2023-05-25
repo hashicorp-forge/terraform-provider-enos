@@ -1,10 +1,10 @@
 package systemd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/hashicorp/enos-provider/internal/log"
@@ -14,78 +14,31 @@ import (
 	"github.com/hashicorp/enos-provider/internal/transport/file"
 )
 
-// StatusCode is a systemd exit code from a status check.
-type StatusCode int
-
-const (
-	StatusActive   StatusCode = 0
-	StatusInactive StatusCode = 3 // or, unfortunately, "activating", thanks systemd
-	StatusUnknown  StatusCode = 9
-)
-
-// serviceInfoRegex is the regex used to parse the systemctl services output into a slice of ServiceInfo.
-var serviceInfoRegex = regexp.MustCompile(`^(?P<unit>\S+)\.service\s+(?P<load>\S+)\s+(?P<active>\S+)\s+(?P<sub>\S+)\s+(?P<description>\S.*)$`)
-
 // KnownServices are list of known HashiCorp services.
 var KnownServices = []string{"boundary", "consul", "vault"}
 
-type GetLogsRequest struct {
-	Unit string
-	Host string
-}
-
-type GetLogsResponse struct {
-	Unit string
-	Host string
-	Logs []byte
-}
-
-// ServiceInfo is a list units of type service from systemctl command reference https://man7.org/linux/man-pages/man1/systemctl.1.html#COMMANDS
-type ServiceInfo struct {
-	Unit        string
-	Load        string
-	Active      string
-	Sub         string
-	Description string
-}
-
-var _ remoteflight.GetLogsResponse = (*GetLogsResponse)(nil)
-
-// GetAppName implements remoteflight.GetLogsResponse.
-func (s GetLogsResponse) GetAppName() string {
-	return s.Unit
-}
-
-func (s GetLogsResponse) GetLogFileName() string {
-	return fmt.Sprintf("%s_%s.log", s.Unit, s.Host)
-}
-
-func (s GetLogsResponse) GetLogs() []byte {
-	return s.Logs
-}
-
 // Client an interface for a sysetmd client.
 type Client interface {
-	// ListServices gets the list of systemd services installed
-	ListServices(ctx context.Context) ([]ServiceInfo, error)
-	// GetLogs gets the logs for a process using journalctl
-	GetLogs(ctx context.Context, req GetLogsRequest) (remoteflight.GetLogsResponse, error)
 	// CreateUnitFile creates a systemd unit file for the provided request
 	CreateUnitFile(ctx context.Context, req *CreateUnitFileRequest) error
-	// RunSystemctlCommand runs a systemctl command for the provided request
-	RunSystemctlCommand(ctx context.Context, req *SystemctlCommandReq) (*SystemctlCommandRes, error)
 	// EnableService enables a systemd service with the provided unit name
 	EnableService(ctx context.Context, unit string) error
+	// GetUnitJournal gets the journal for a systemd unit
+	GetUnitJournal(ctx context.Context, req *GetUnitJournalRequest) (remoteflight.GetLogsResponse, error)
+	// ListServices gets the list of systemd services installed
+	ListServices(ctx context.Context) ([]ServiceInfo, error)
+	// RestartService restarts a systemd service with the provided unit name
+	RestartService(ctx context.Context, unit string) error
+	// RunSystemctlCommand runs a systemctl command for the provided request
+	RunSystemctlCommand(ctx context.Context, req *SystemctlCommandReq) (*SystemctlCommandRes, error)
+	// ShowProperties gets the properties of a matching unit or job
+	ShowProperties(ctx context.Context, unit string) (UnitProperties, error)
 	// StartService starts a systemd service with the provided unit name
 	StartService(ctx context.Context, unit string) error
 	// StopService stops a systemd service with the provided unit name
 	StopService(ctx context.Context, unit string) error
-	// RestartService restarts a systemd service with the provided unit name
-	RestartService(ctx context.Context, unit string) error
 	// ServiceStatus gets the service status for a systemd service with the provided unit name
-	ServiceStatus(ctx context.Context, unit string) StatusCode
-	// IsActiveService checks if the systemd service with the provided unit name is active (running)
-	IsActiveService(ctx context.Context, unit string) bool
+	ServiceStatus(ctx context.Context, unit string) SystemctlStatusCode
 }
 
 type client struct {
@@ -95,6 +48,7 @@ type client struct {
 
 var _ Client = (*client)(nil)
 
+// NewClient takes a transport and logger and returns a new systemd Client.
 func NewClient(transport it.Transport, logger log.Logger) Client {
 	return &client{
 		transport: transport,
@@ -102,7 +56,11 @@ func NewClient(transport it.Transport, logger log.Logger) Client {
 	}
 }
 
-func (c *client) GetLogs(ctx context.Context, req GetLogsRequest) (remoteflight.GetLogsResponse, error) {
+// GetUnitJournal gets the unit journal.
+func (c *client) GetUnitJournal(ctx context.Context, req *GetUnitJournalRequest) (
+	remoteflight.GetLogsResponse,
+	error,
+) {
 	stdout, stderr, err := c.transport.Run(ctx, command.New(fmt.Sprintf("journalctl -x -u %s", req.Unit)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get systemd logs, due to: %w", err)
@@ -116,7 +74,7 @@ func (c *client) GetLogs(ctx context.Context, req GetLogsRequest) (remoteflight.
 		c.logger.Debug("no systemd logs")
 	}
 
-	return GetLogsResponse{
+	return &GetUnitJournalResponse{
 		Unit: req.Unit,
 		Host: req.Host,
 		Logs: []byte(stdout),
@@ -166,7 +124,9 @@ func (c *client) ListServices(ctx context.Context) ([]ServiceInfo, error) {
 
 // RunSystemctlCommand runs a systemctl command request.
 func (c *client) RunSystemctlCommand(ctx context.Context, req *SystemctlCommandReq) (*SystemctlCommandRes, error) {
-	res := &SystemctlCommandRes{}
+	res := &SystemctlCommandRes{
+		Status: StatusUnknown,
+	}
 	cmd, err := req.String()
 	if err != nil {
 		return res, err
@@ -176,8 +136,10 @@ func (c *client) RunSystemctlCommand(ctx context.Context, req *SystemctlCommandR
 	if err != nil {
 		var exitError *it.ExecError
 		if errors.As(err, &exitError) {
-			res.Status = exitError.ExitCode()
+			res.Status = SystemctlStatusCode(exitError.ExitCode())
 		}
+	} else {
+		res.Status = StatusOK
 	}
 
 	return res, err
@@ -190,7 +152,7 @@ func (c *client) EnableService(ctx context.Context, unit string) error {
 		WithSystemctlCommandOptions("--now"),
 	))
 	if err != nil {
-		return remoteflight.WrapErrorWith(err, res.Stderr, fmt.Sprintf("enabling %s", unit))
+		return errors.Join(fmt.Errorf("enabling %s, stderr: %s", unit, res.Stderr), err)
 	}
 
 	return nil
@@ -202,7 +164,7 @@ func (c *client) StartService(ctx context.Context, unit string) error {
 		WithSystemctlCommandSubCommand(SystemctlSubCommandStart),
 	))
 	if err != nil {
-		return remoteflight.WrapErrorWith(err, res.Stderr, fmt.Sprintf("starting %s", unit))
+		return errors.Join(fmt.Errorf("starting %s, stderr: %s", unit, res.Stderr), err)
 	}
 
 	return nil
@@ -214,78 +176,109 @@ func (c *client) StopService(ctx context.Context, unit string) error {
 		WithSystemctlCommandSubCommand(SystemctlSubCommandStop),
 	))
 	if err != nil {
-		return remoteflight.WrapErrorWith(err, res.Stderr, fmt.Sprintf("stopping %s", unit))
+		return errors.Join(fmt.Errorf("stopping %s, stderr: %s", unit, res.Stderr), err)
 	}
 
 	return nil
 }
 
 func (c *client) RestartService(ctx context.Context, unit string) error {
-	isActive := c.IsActiveService(ctx, unit)
+	props, err := c.ShowProperties(ctx, unit)
+	if err != nil {
+		return fmt.Errorf("restarting %s, systemd properties: %s, %w", unit, props, err)
+	}
 
-	// If it's already running smoothly stop it
-	if isActive {
-		err := c.StopService(ctx, unit)
+	// Shut the service down if it's loaded and active. We don't really to worry
+	// about our sub-state as we're trying to restart it.
+	if props.HasProperties(UnitProperties{
+		"LoadState":   "loaded",
+		"ActiveState": "active",
+	}) {
+		err = c.StopService(ctx, unit)
 		if err != nil {
-			return err
-		}
-	} else {
-		err := c.EnableService(ctx, unit)
-		if err != nil {
-			return err
+			return fmt.Errorf("restarting %s, systemd properties: %s, %w", unit, props, err)
 		}
 	}
 
-	return c.StartService(ctx, unit)
+	// Enable our service if it isn't already
+	if !props.HasProperties(UnitProperties{
+		"UnitFileStatus": "enabled",
+	}) {
+		err := c.EnableService(ctx, unit)
+		if err != nil {
+			return fmt.Errorf("restarting %s, systemd properties: %s, %w", unit, props, err)
+		}
+	}
+
+	// Start it
+	err = c.StartService(ctx, unit)
+	if err != nil {
+		return fmt.Errorf("restarting %s, systemd properties: %s, %w", unit, props, err)
+	}
+
+	return nil
 }
 
 // ServiceStatus returns the systemd status of the systemd service (until we have a better way).
-func (c *client) ServiceStatus(ctx context.Context, unit string) StatusCode {
+func (c *client) ServiceStatus(ctx context.Context, unit string) SystemctlStatusCode {
+	res, _ := c.RunSystemctlCommand(ctx, NewRunSystemctlCommand(
+		WithSystemctlCommandUnitName(unit),
+		WithSystemctlCommandSubCommand(SystemctlSubCommandShow),
+	))
+
+	return res.Status
+}
+
+// ShowProperties gets a full list of systemd properties for a matching unit or job.
+func (c *client) ShowProperties(ctx context.Context, unit string) (UnitProperties, error) {
 	res, err := c.RunSystemctlCommand(ctx, NewRunSystemctlCommand(
 		WithSystemctlCommandUnitName(unit),
-		WithSystemctlCommandSubCommand(SystemctlSubCommandIsActive),
+		WithSystemctlCommandSubCommand(SystemctlSubCommandShow),
 	))
-	// if we return no err, service is active
+
+	if res.Stdout == "" {
+		err = errors.Join(err, fmt.Errorf("no show result was written to STDOUT"))
+	}
+
+	var props UnitProperties
 	if err == nil {
-		return StatusActive
+		var err1 error
+		props, err1 = decodeUnitPropertiesFromShow(res.Stdout)
+		if err1 != nil {
+			err = errors.Join(err, fmt.Errorf("%w: properties: %s", err, props))
+		}
 	}
 
-	// otherwise, set status to Unknown by default and extract the code from xssh
-	statusCode := StatusUnknown
-	if res.Status != 0 {
-		statusCode = StatusCode(res.Status)
+	if err != nil {
+		return nil, fmt.Errorf("showing systemd properties: %w", err)
 	}
 
-	return statusCode
+	return props, nil
 }
 
-func (c *client) IsActiveService(ctx context.Context, unit string) bool {
-	status := c.ServiceStatus(ctx, unit)
-	return status == StatusActive
-}
+func decodeUnitPropertiesFromShow(show string) (UnitProperties, error) {
+	var err error
+	props := NewUnitProperties()
 
-// parseServiceInfos parses the systemctl services output into a slice of ServiceInfos.
-func parseServiceInfos(services string) []ServiceInfo {
-	serviceInfos := []ServiceInfo{}
-	for _, line := range strings.Split(services, "\n") {
-		if line == "" {
+	scanner := bufio.NewScanner(strings.NewReader(show))
+	for scanner.Scan() {
+		if e := scanner.Err(); e != nil {
+			err = errors.Join(err, e)
 			continue
 		}
-		match := serviceInfoRegex.FindStringSubmatch(line)
-		result := make(map[string]string)
-		for i, name := range serviceInfoRegex.SubexpNames() {
-			if i != 0 && name != "" {
-				result[name] = match[i]
+
+		if t := scanner.Text(); t != "" {
+			parts := strings.SplitN(t, "=", 2)
+			if len(parts) != 2 {
+				continue
 			}
+			props[parts[0]] = parts[1]
 		}
-		serviceInfos = append(serviceInfos, ServiceInfo{
-			Unit:        result["unit"],
-			Load:        result["load"],
-			Active:      result["active"],
-			Sub:         result["sub"],
-			Description: result["description"],
-		})
 	}
 
-	return serviceInfos
+	if err != nil {
+		return nil, fmt.Errorf("decoding properties from show output: %w", err)
+	}
+
+	return props, nil
 }

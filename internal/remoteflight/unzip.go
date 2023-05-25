@@ -118,7 +118,7 @@ func WithUnzipRequestReplace(replace bool) UnzipOpt {
 }
 
 // Unzip unzips an archive on a remote machine with enos-flight-control.
-func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*UnzipResponse, error) {
+func Unzip(ctx context.Context, tr transport.Transport, ur *UnzipRequest) (*UnzipResponse, error) {
 	res := &UnzipResponse{}
 
 	select {
@@ -140,7 +140,7 @@ func Unzip(ctx context.Context, ssh transport.Transport, ur *UnzipRequest) (*Unz
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return res, WrapErrorWith(err, stdout, stderr)
 	}

@@ -26,6 +26,10 @@ func TestAccResourceVaultInit(t *testing.T) {
 		vault_addr = "{{.VaultAddr.Value}}"
 		{{end}}
 
+		{{if .SystemdUnitName.Value}}
+		unit_name =	"{{.SystemdUnitName.Value}}"
+		{{end}}
+
 		{{if .KeyShares.Value}}
 		key_shares = {{.KeyShares.Value}}
 		{{end}}
@@ -75,6 +79,7 @@ func TestAccResourceVaultInit(t *testing.T) {
 	vaultInit.ID.Set("foo")
 	vaultInit.BinPath.Set("/opt/vault/bin/vault")
 	vaultInit.VaultAddr.Set("http://127.0.0.1:8200")
+	vaultInit.SystemdUnitName.Set("vaulter")
 	vaultInit.KeyShares.Set(7)
 	vaultInit.KeyThreshold.Set(5)
 	vaultInit.PGPKeys.SetStrings([]string{"keybase:foo", "keybase:bar"})
@@ -96,20 +101,21 @@ func TestAccResourceVaultInit(t *testing.T) {
 		"all fields are loaded correctly",
 		vaultInit,
 		resource.ComposeTestCheckFunc(
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "id", regexp.MustCompile(`^foo$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "bin_path", regexp.MustCompile(`^/opt/vault/bin/vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "vault_addr", regexp.MustCompile(`^http://127.0.0.1:8200$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "key_shares", regexp.MustCompile(`^7$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "key_threshold", regexp.MustCompile(`^5$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "pgp_keys[0]", regexp.MustCompile(`^keybase:foo$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "recovery_shares", regexp.MustCompile(`^6$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "recovery_threshold", regexp.MustCompile(`^4$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "root_token_pgp_key", regexp.MustCompile(`^keybase:hashicorp$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "consul_auto", regexp.MustCompile(`^true$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "consul_service", regexp.MustCompile(`^vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "stored_shares", regexp.MustCompile(`^7$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "id", regexp.MustCompile(`^foo$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "bin_path", regexp.MustCompile(`^/opt/vault/bin/vault$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "vault_addr", regexp.MustCompile(`^http://127.0.0.1:8200$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "unit_name", regexp.MustCompile(`^name$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "key_shares", regexp.MustCompile(`^7$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "key_threshold", regexp.MustCompile(`^5$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "pgp_keys[0]", regexp.MustCompile(`^keybase:foo$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "recovery_shares", regexp.MustCompile(`^6$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "recovery_threshold", regexp.MustCompile(`^4$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "root_token_pgp_key", regexp.MustCompile(`^keybase:hashicorp$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "consul_auto", regexp.MustCompile(`^true$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "consul_service", regexp.MustCompile(`^vault$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "stored_shares", regexp.MustCompile(`^7$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
+			resource.TestMatchResourceAttr("enos_vault_init.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
 		),
 		false,
 	})

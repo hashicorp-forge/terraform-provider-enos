@@ -11,4 +11,12 @@ provider "enos" "ubuntu" {
   }
 }
 
+provider "enos" "default" {}
+
+provider "helm" "default" {
+  kubernetes {
+    config_path = abspath(joinpath(path.root, "kubeconfig"))
+  }
+}
+
 provider "random" "default" {}

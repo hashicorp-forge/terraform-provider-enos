@@ -26,6 +26,10 @@ func TestAccResourceVaultUnseal(t *testing.T) {
 		vault_addr = "{{.VaultAddr.Value}}"
 		{{end}}
 
+		{{if .SystemdUnitName.Value}}
+		unit_name = "{{.SystemdUnitName.Value}}"
+		{{end}}
+
 		{{if .SealType.Value}}
 		seal_type = "{{.SealType.Value}}"
 		{{end}}
@@ -47,7 +51,7 @@ func TestAccResourceVaultUnseal(t *testing.T) {
 	vaultUnseal.ID.Set("foo")
 	vaultUnseal.BinPath.Set("/opt/vault/bin/vault")
 	vaultUnseal.VaultAddr.Set("http://127.0.0.1:8200")
-
+	vaultUnseal.SystemdUnitName.Set("vaulter")
 	vaultUnseal.SealType.Set("shamir")
 	vaultUnseal.UnsealKeys.SetStrings([]string{"bar"})
 	ssh := newEmbeddedTransportSSH()
@@ -64,6 +68,7 @@ func TestAccResourceVaultUnseal(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "id", regexp.MustCompile(`^foo$`)),
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "bin_path", regexp.MustCompile(`^/opt/vault/bin/vault$`)),
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "vault_addr", regexp.MustCompile(`^http://127.0.0.1:8200$`)),
+			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "unit_name", regexp.MustCompile(`^vaulter$`)),
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "seal_type", regexp.MustCompile(`^shamisr$`)),
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "unseal_keys[0]", regexp.MustCompile("^bar$")),
 			resource.TestMatchResourceAttr("enos_vault_unseal.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),

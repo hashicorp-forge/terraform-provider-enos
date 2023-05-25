@@ -21,55 +21,7 @@ type SystemctlCommandReq struct {
 type SystemctlCommandRes struct {
 	Stdout string
 	Stderr string
-	Status int
-}
-
-// UnitType is the systemd unit type to operate on.
-type UnitType int
-
-// SystemdUnitTypes are the system unit types.
-const (
-	UnitTypeNotSet UnitType = iota
-	UnitTypeService
-	UnitTypeSocket
-	UnitTypeDevice
-	UnitTypeMount
-	UnitTypeAutomount
-	UnitTypeSwap
-	UnitTypeTarget
-	UnitTypePath
-	UnitTypeTimer
-	UnitTypeSlice
-	UnitTypeScope
-)
-
-func (u UnitType) String() string {
-	switch u {
-	case UnitTypeService, UnitTypeNotSet:
-		return "service"
-	case UnitTypeSocket:
-		return "socket"
-	case UnitTypeDevice:
-		return "device"
-	case UnitTypeMount:
-		return "mount"
-	case UnitTypeAutomount:
-		return "automount"
-	case UnitTypeSwap:
-		return "swap"
-	case UnitTypeTarget:
-		return "target"
-	case UnitTypePath:
-		return "path"
-	case UnitTypeTimer:
-		return "timer"
-	case UnitTypeSlice:
-		return "slice"
-	case UnitTypeScope:
-		return "scope"
-	default:
-		return "service"
-	}
+	Status SystemctlStatusCode
 }
 
 // SystemctlSubCommand is the systemctl sub command to use.
@@ -83,11 +35,32 @@ const (
 	SystemctlSubCommandIsActive
 	SystemctlSubCommandKill
 	SystemctlSubCommandListUnits
+	SystemctlSubCommandReload
+	SystemctlSubCommandRestart
+	SystemctlSubCommandShow
 	SystemctlSubCommandStart
 	SystemctlSubCommandStatus
 	SystemctlSubCommandStop
-	SystemctlSubCommandReload
-	SystemctlSubCommandRestart
+)
+
+// SystemctlStatusCode is a systemctl exit code. Systemctl attempts to use LSB
+// exit codes, however, there are lots of corner cases which make certain codes
+// unreliable and not all sub-commands adhere to these codes. As such, we
+// should strive to interpret a units state by looking at its properties
+// whenever possible
+//
+// Further reading:
+//   - https://www.freedesktop.org/software/systemd/man/systemctl.html#Exit%20status
+//   - https://freedesktop.org/software/systemd/man/systemd.exec.html#Process%20Exit%20Codes
+//   - https://bugs.freedesktop.org/show_bug.cgi?id=77507
+type SystemctlStatusCode int
+
+const (
+	StatusOK         SystemctlStatusCode = 0
+	StatusNotFailed  SystemctlStatusCode = 1
+	StatusNotActive  SystemctlStatusCode = 3
+	StatusNoSuchUnit SystemctlStatusCode = 4
+	StatusUnknown    SystemctlStatusCode = 9
 )
 
 // RunSystemctlCommandOpt is a functional option for an systemd unit request.
@@ -155,6 +128,23 @@ func WithSystemctlCommandOptions(options string) RunSystemctlCommandOpt {
 	}
 }
 
+func (s SystemctlStatusCode) String() string {
+	switch s {
+	case StatusOK:
+		return "ok"
+	case StatusNotFailed:
+		return "not-failed"
+	case StatusNotActive:
+		return "not-active"
+	case StatusNoSuchUnit:
+		return "no-such-unit"
+	case StatusUnknown:
+		return "unknown"
+	default:
+		return "unknown"
+	}
+}
+
 // String returns the command request as a systemctl string.
 func (c *SystemctlCommandReq) String() (string, error) {
 	cmd := &strings.Builder{}
@@ -176,31 +166,33 @@ func (c *SystemctlCommandReq) String() (string, error) {
 	}
 
 	switch c.SubCommand {
+	case SystemctlSubCommandNotSet:
+		return "", fmt.Errorf("sub command is not set")
+	case SystemctlSubCommandDaemonReload:
+		cmd.WriteString("daemon-reload")
+	case SystemctlSubCommandIsActive:
+		cmd.WriteString(fmt.Sprintf("is-active %s", unitName))
+	case SystemctlSubCommandEnable:
+		cmd.WriteString(fmt.Sprintf("enable %s", unitName))
+	case SystemctlSubCommandKill:
+		cmd.WriteString(fmt.Sprintf("kill %s", unitName))
+	case SystemctlSubCommandListUnits:
+		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
+	case SystemctlSubCommandReload:
+		cmd.WriteString(fmt.Sprintf("reload %s", unitName))
+	case SystemctlSubCommandRestart:
+		cmd.WriteString(fmt.Sprintf("restart %s", unitName))
+	case SystemctlSubCommandShow:
+		cmd.WriteString(fmt.Sprintf("show %s", unitName))
+	case SystemctlSubCommandStart:
+		cmd.WriteString(fmt.Sprintf("start %s", unitName))
 	case SystemctlSubCommandStatus:
 		cmd.WriteString("status")
 		if unitName != "" {
 			cmd.WriteString(fmt.Sprintf(" %s", unitName))
 		}
-	case SystemctlSubCommandEnable:
-		cmd.WriteString(fmt.Sprintf("enable %s", unitName))
-	case SystemctlSubCommandIsActive:
-		cmd.WriteString(fmt.Sprintf("is-active %s", unitName))
-	case SystemctlSubCommandStart:
-		cmd.WriteString(fmt.Sprintf("start %s", unitName))
 	case SystemctlSubCommandStop:
 		cmd.WriteString(fmt.Sprintf("stop %s", unitName))
-	case SystemctlSubCommandReload:
-		cmd.WriteString(fmt.Sprintf("reload %s", unitName))
-	case SystemctlSubCommandRestart:
-		cmd.WriteString(fmt.Sprintf("restart %s", unitName))
-	case SystemctlSubCommandKill:
-		cmd.WriteString(fmt.Sprintf("kill %s", unitName))
-	case SystemctlSubCommandListUnits:
-		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
-	case SystemctlSubCommandDaemonReload:
-		cmd.WriteString("daemon-reload")
-	case SystemctlSubCommandNotSet:
-		return "", fmt.Errorf("sub command is not set")
 	default:
 		return "", fmt.Errorf("unknown command: %d", c.SubCommand)
 	}

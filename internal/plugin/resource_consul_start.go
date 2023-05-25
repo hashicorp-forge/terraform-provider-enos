@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
+	istrings "github.com/hashicorp/enos-provider/internal/strings"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -604,9 +605,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		return fmt.Errorf("failed to create the consul configuration file, due to: %w", err)
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-	defer cancel()
-
 	// Create the consul data directory
 	err = remoteflight.CreateDirectory(ctx, transport, remoteflight.NewCreateDirectoryRequest(
 		remoteflight.WithDirName(dataDir),
@@ -634,10 +632,44 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		return fmt.Errorf("failed to validate consul configuration file, due to: %w", err)
 	}
 
-	// Restart the service and wait for it to be running
-	err = sysd.RestartService(timeoutCtx, "consul")
+	// A reasonable amount of time for all cluster nodes to come online, discover
+	// each other and elect a leader.
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	// Restart the service and wait for until systemd thinks that the process
+	// is active and running.
+	err = sysd.RestartService(ctx, "consul")
 	if err != nil {
 		return fmt.Errorf("failed to start the consul service, due to: %w", err)
+	}
+
+	// Wait for the consul cluster to be ready to service requests
+	checks := []consul.CheckStater{
+		consul.CheckStateHasSystemdEnabledAndRunningProperties(),
+		consul.CheckStateNodeIsHealthy(),
+		consul.CheckStateClusterHasLeader(),
+	}
+
+	if minNodes, ok := s.Config.BootstrapExpect.Get(); ok {
+		checks = append(checks,
+			consul.CheckStateClusterHasMinNVoters(uint(minNodes)),
+			consul.CheckStateClusterHasMinNHealthyNodes(uint(minNodes)),
+		)
+	}
+
+	state, err := consul.WaitForState(ctx, transport, consul.NewStateRequest(
+		consul.WithStateRequestFlightControlUseHomeDir(),
+		consul.WithStateRequestSystemdUnitName(unitName),
+	), checks...)
+	if err != nil {
+		err = fmt.Errorf("failed to start the consul service: %w", err)
+		if state != nil {
+			err = fmt.Errorf(
+				"%w\nConsul State after starting the consul systemd service:\n%s",
+				err, istrings.Indent("  ", state.String()),
+			)
+		}
 	}
 
 	return err

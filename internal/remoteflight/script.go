@@ -122,12 +122,12 @@ func WithRunScriptDestination(destination string) RunScriptRequestOpt {
 }
 
 // RunScript copies the script to the remote host, executes it, and cleans it up.
-func RunScript(ctx context.Context, client it.Transport, req *RunScriptRequest) (*RunScriptResponse, error) {
+func RunScript(ctx context.Context, tr it.Transport, req *RunScriptRequest) (*RunScriptResponse, error) {
 	var err error
 	res := &RunScriptResponse{}
 	ui := ui.NewBuffered()
 
-	err = CopyFile(ctx, client, req.CopyFileRequest)
+	err = CopyFile(ctx, tr, req.CopyFileRequest)
 	if err != nil {
 		return res, err
 	}
@@ -136,7 +136,7 @@ func RunScript(ctx context.Context, client it.Transport, req *RunScriptRequest) 
 	if req.Sudo {
 		cmd = fmt.Sprintf("sudo %s", cmd)
 	}
-	stdout, stderr, err1 := client.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
+	stdout, stderr, err1 := tr.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
 	err = errors.Join(err, err1)
 	err = errors.Join(err, ui.Append(stdout, stderr))
 	res.Stderr = ui.StderrString()
@@ -149,7 +149,7 @@ func RunScript(ctx context.Context, client it.Transport, req *RunScriptRequest) 
 		return res, nil
 	}
 
-	stdout, stderr, err1 = client.Run(
+	stdout, stderr, err1 = tr.Run(
 		ctx, command.New(fmt.Sprintf("rm -f %s", req.CopyFileRequest.Destination), command.WithEnvVars(req.Env)),
 	)
 	err = errors.Join(err, err1)

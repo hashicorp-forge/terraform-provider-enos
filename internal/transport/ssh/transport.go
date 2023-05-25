@@ -109,6 +109,11 @@ func WithContext(ctx context.Context) func(*transport) {
 	}
 }
 
+// Type returns the transport type.
+func (t *transport) Type() it.TransportType {
+	return it.TransportType("ssh")
+}
+
 // Copy copies the source to the destination using the given SSH configuration
 // options.
 func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err error) {

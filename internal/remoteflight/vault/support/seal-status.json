@@ -1,0 +1,23 @@
+{
+  "request_id": "",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "build_date": "2023-04-28T20:01:42Z",
+    "cluster_id": "a009341f-5b9f-7166-a740-4aaaf0cedd27",
+    "cluster_name": "vault-cluster-50f6305a",
+    "initialized": true,
+    "migration": false,
+    "n": 5,
+    "nonce": "",
+    "progress": 0,
+    "recovery_seal": true,
+    "sealed": false,
+    "storage_type": "raft",
+    "t": 3,
+    "type": "shamir",
+    "version": "1.14.0-beta1+ent"
+  },
+  "warnings": null
+}

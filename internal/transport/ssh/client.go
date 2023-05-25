@@ -360,9 +360,9 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	}
 
 	// ensure that the session is accepting requests
-	requestTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
+	requestTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	requestTicker := time.NewTicker(2 * time.Second)
+	requestTicker := time.NewTicker(1 * time.Second)
 	requestErrs := make(chan error, 7)
 	requestSuccess := make(chan bool)
 
@@ -398,7 +398,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		case <-ctx.Done():
 			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(), "15 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "30 second request timeout exceeded")
 		default:
 		}
 
@@ -406,7 +406,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		case <-ctx.Done():
 			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(), "15 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "30 second request timeout exceeded")
 		case <-requestTicker.C:
 			go sendRequest()
 		case <-requestSuccess:

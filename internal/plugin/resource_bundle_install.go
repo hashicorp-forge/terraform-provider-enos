@@ -9,11 +9,13 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/artifactory"
 	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/releases"
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	"github.com/hashicorp/enos-provider/internal/retry"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -294,7 +296,11 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			)
 		}
 
-		platform, err := remoteflight.TargetPlatform(ctx, client)
+		platform, err := remoteflight.TargetPlatform(ctx, client, remoteflight.NewTargetRequest(
+			remoteflight.WithTargetRequestRetryOpts(
+				retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
+			),
+		))
 		if err != nil {
 			return AttributePathError(
 				fmt.Errorf("failed to determine target host plaform, due to: %w", err),
@@ -302,7 +308,11 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			)
 		}
 
-		arch, err := remoteflight.TargetArchitecture(ctx, client)
+		arch, err := remoteflight.TargetArchitecture(ctx, client, remoteflight.NewTargetRequest(
+			remoteflight.WithTargetRequestRetryOpts(
+				retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
+			),
+		))
 		if err != nil {
 			return AttributePathError(
 				fmt.Errorf("failed to determine target host architecture, due to: %w", err),

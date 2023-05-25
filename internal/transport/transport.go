@@ -10,6 +10,7 @@ type Transport interface {
 	Copy(context.Context, Copyable, string) error
 	Run(context.Context, Command) (stdout, stderr string, err error)
 	Stream(context.Context, Command) (stdout, stderr io.Reader, errC chan error)
+	Type() TransportType
 	io.Closer
 }
 
@@ -23,3 +24,6 @@ type Copyable interface {
 	io.ReadSeekCloser
 	Size() int64
 }
+
+// TransportType is the string representation of the transport type.
+type TransportType string

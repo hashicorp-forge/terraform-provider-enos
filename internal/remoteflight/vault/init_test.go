@@ -17,8 +17,10 @@ func TestInitRequestString(t *testing.T) {
 		{
 			`/bin/vault operator init -format=json -key-shares=7 -key-threshold=5 -pgp-keys='keybase:ryan,keybase:jaymala,keybase:kier'`,
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 				WithInitRequestKeyShares(7),
 				WithInitRequestKeyThreshold(5),
 				WithInitRequestPGPKeys([]string{"keybase:ryan", "keybase:jaymala", "keybase:kier"}),
@@ -27,8 +29,10 @@ func TestInitRequestString(t *testing.T) {
 		{
 			`/bin/vault operator init -format=json -key-shares=7 -recovery-shares=7 -recovery-threshold=5 -recovery-pgp-keys='keybase:ryan,keybase:jaymala,keybase:kier' -root-token-pgp-key='keybase:hashicorp' -stored-shares=7`,
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 				WithInitRequestStoredShares(7),
 				WithInitRequestRecoveryShares(7),
 				WithInitRequestRecoveryThreshold(5),
@@ -40,8 +44,10 @@ func TestInitRequestString(t *testing.T) {
 		{
 			`/bin/vault operator init -format=json -consul-auto=true -consul-service='vault'`,
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 				WithInitRequestConsulAuto(true),
 				WithInitRequestConsulService("vault"),
 			},
@@ -68,30 +74,38 @@ func TestInitRequestValidate(t *testing.T) {
 		{
 			"has required args",
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 			},
 			true,
 		},
 		{
 			"missing vault addr",
 			[]InitRequestOpt{
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+				),
 			},
 			false,
 		},
 		{
 			"missing bin path",
 			[]InitRequestOpt{
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 			},
 			false,
 		},
 		{
 			"mismatched stored shares and key shares",
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 				WithInitRequestStoredShares(5),
 			},
 			false,
@@ -99,8 +113,10 @@ func TestInitRequestValidate(t *testing.T) {
 		{
 			"has equal stored shares and key shares",
 			[]InitRequestOpt{
-				WithInitRequestBinPath("/bin/vault"),
-				WithInitRequestVaultAddr("http://127.0.0.1:8200"),
+				WithInitRequestStateRequestOpts(
+					WithStateRequestBinPath("/bin/vault"),
+					WithStateRequestVaultAddr("http://127.0.0.1:8200"),
+				),
 				WithInitRequestStoredShares(5),
 				WithInitRequestKeyShares(5),
 			},

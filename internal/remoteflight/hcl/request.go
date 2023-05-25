@@ -66,7 +66,7 @@ func WithHCLConfigChown(chown string) CreateHCLConfigFileOpt {
 
 // CreateHCLConfigFile takes a context, transport, and create request and
 // creates the config file.
-func CreateHCLConfigFile(ctx context.Context, ssh it.Transport, req *CreateHCLConfigFileRequest) error {
+func CreateHCLConfigFile(ctx context.Context, tr it.Transport, req *CreateHCLConfigFileRequest) error {
 	hcl, err := req.HCLConfig.BuildHCL()
 	if err != nil {
 		return err
@@ -89,5 +89,5 @@ func CreateHCLConfigFile(ctx context.Context, ssh it.Transport, req *CreateHCLCo
 		copyOpts = append(copyOpts, remoteflight.WithCopyFileChown(req.Chown))
 	}
 
-	return remoteflight.CopyFile(ctx, ssh, remoteflight.NewCopyFileRequest(copyOpts...))
+	return remoteflight.CopyFile(ctx, tr, remoteflight.NewCopyFileRequest(copyOpts...))
 }

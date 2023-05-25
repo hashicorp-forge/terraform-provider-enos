@@ -76,7 +76,7 @@ func WithUserUID(uid string) UserOpt {
 // we try to use tools that most-likely exist on most macOS and linux distro's.
 // NOTE: If requiring these tools becomes too much of a burden we can create a "user"
 // subcommand in flightcontrol to get the details with osusergo.
-func FindUser(ctx context.Context, ssh it.Transport, name string) (*User, error) {
+func FindUser(ctx context.Context, tr it.Transport, name string) (*User, error) {
 	var err error
 	var stderr string
 	user := &User{}
@@ -87,12 +87,12 @@ func FindUser(ctx context.Context, ssh it.Transport, name string) (*User, error)
 
 	user.Name = name
 
-	user.UID, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("id -u %s", name)))
+	user.UID, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf("id -u %s", name)))
 	if err != nil {
 		return user, WrapErrorWith(err, fmt.Sprintf("attempting to get %s uid", name), stderr)
 	}
 
-	user.GID, stderr, err = ssh.Run(ctx, command.New(fmt.Sprintf("id -g %s", name)))
+	user.GID, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf("id -g %s", name)))
 	if err != nil {
 		return user, WrapErrorWith(err, fmt.Sprintf("attempting to get %s gid", name), stderr)
 	}
@@ -102,7 +102,7 @@ func FindUser(ctx context.Context, ssh it.Transport, name string) (*User, error)
 
 // CreateUser takes a context, transport, and user and creates the user on the
 // remote machine.
-func CreateUser(ctx context.Context, ssh it.Transport, user *User) error {
+func CreateUser(ctx context.Context, tr it.Transport, user *User) error {
 	if user.Name == "" {
 		return fmt.Errorf("invalid user: you must supply a username")
 	}
@@ -125,7 +125,7 @@ func CreateUser(ctx context.Context, ssh it.Transport, user *User) error {
 	}
 	cmd.WriteString(fmt.Sprintf(" %s", user.Name))
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(cmd.String()))
+	stdout, stderr, err := tr.Run(ctx, command.New(cmd.String()))
 	if err != nil {
 		return WrapErrorWith(err, stderr, stdout)
 	}
@@ -137,16 +137,16 @@ func CreateUser(ctx context.Context, ssh it.Transport, user *User) error {
 // the user by the user name. If it fails it will attempt to create the user.
 // If the user create succeeds it will lookup the user again and return it WithDownloadRequestUseSudo
 // the GID and UID fields populated.
-func FindOrCreateUser(ctx context.Context, ssh it.Transport, user *User) (*User, error) {
-	user, err := FindUser(ctx, ssh, user.Name)
+func FindOrCreateUser(ctx context.Context, tr it.Transport, user *User) (*User, error) {
+	user, err := FindUser(ctx, tr, user.Name)
 	if err == nil {
 		return user, nil
 	}
 
-	err = CreateUser(ctx, ssh, user)
+	err = CreateUser(ctx, tr, user)
 	if err != nil {
 		return user, err
 	}
 
-	return FindUser(ctx, ssh, user.Name)
+	return FindUser(ctx, tr, user.Name)
 }

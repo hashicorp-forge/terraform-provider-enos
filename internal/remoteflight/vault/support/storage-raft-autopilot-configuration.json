@@ -1,0 +1,16 @@
+{
+  "request_id": "ca6c20f5-ef0a-ca50-b299-4158f4cc2035",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "cleanup_dead_servers": false,
+    "dead_server_last_contact_threshold": "24h0m0s",
+    "disable_upgrade_migration": false,
+    "last_contact_threshold": "10s",
+    "max_trailing_logs": 1000,
+    "min_quorum": 0,
+    "server_stabilization_time": "10s"
+  },
+  "warnings": null
+}

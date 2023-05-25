@@ -21,31 +21,14 @@ var defaultTransportClientFactory = func(ctx context.Context, transport transpor
 	return transport.Client(ctx)
 }
 
-type TransportType uint
-
 const (
-	UNKNOWN TransportType = iota
-	SSH
-	K8S
-	NOMAD
+	UNKNOWN it.TransportType = "unknown"
+	SSH     it.TransportType = "ssh"
+	K8S     it.TransportType = "kubernetes"
+	NOMAD   it.TransportType = "nomad"
 )
 
-func (t TransportType) String() string {
-	switch t {
-	case SSH:
-		return "ssh"
-	case K8S:
-		return "kubernetes"
-	case NOMAD:
-		return "nomad"
-	case UNKNOWN:
-		return "unknown"
-	default:
-		return "undefined"
-	}
-}
-
-func (t TransportType) createTransport() (transportState, error) {
+func createTransport(t it.TransportType) (transportState, error) {
 	switch t {
 	case SSH:
 		return newEmbeddedTransportSSH(), nil
@@ -60,7 +43,7 @@ func (t TransportType) createTransport() (transportState, error) {
 	}
 }
 
-func (t TransportType) isKnown() bool {
+func isKnownTransportType(t it.TransportType) bool {
 	switch t {
 	case SSH, K8S, NOMAD:
 		return true
@@ -71,7 +54,7 @@ func (t TransportType) isKnown() bool {
 	}
 }
 
-func transportTypeFrom(typeString string) TransportType {
+func transportTypeFrom(typeString string) it.TransportType {
 	switch typeString {
 	case "ssh":
 		return SSH
@@ -84,12 +67,12 @@ func transportTypeFrom(typeString string) TransportType {
 	return UNKNOWN
 }
 
-var TransportTypes = []TransportType{SSH, K8S, NOMAD}
+var TransportTypes = []it.TransportType{SSH, K8S, NOMAD}
 
-type Transports map[TransportType]transportState
+type Transports map[it.TransportType]transportState
 
-func (t Transports) types() []TransportType {
-	types := make([]TransportType, len(t))
+func (t Transports) types() []it.TransportType {
+	types := make([]it.TransportType, len(t))
 
 	count := 0
 	for tType := range t {
@@ -171,7 +154,7 @@ type transportState interface {
 	// from the resources terraform configuration or from provider defaults.
 	IsConfigured() bool
 
-	Type() TransportType
+	Type() it.TransportType
 
 	// render renders the transport state to HCL
 	render() (string, error)
@@ -184,7 +167,7 @@ type transportState interface {
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
 		mu:            sync.Mutex{},
-		transports:    map[TransportType]transportState{},
+		transports:    map[it.TransportType]transportState{},
 		clientFactory: defaultTransportClientFactory,
 	}
 }
@@ -264,10 +247,10 @@ func (em *embeddedTransportV1) FromTerraform5Value(val tftypes.Value) error {
 
 	for key, val := range vals {
 		tType := transportTypeFrom(key)
-		if !tType.isKnown() {
+		if !isKnownTransportType(tType) {
 			return fmt.Errorf("failed to unmarshall unknown transport config: %s", key)
 		}
-		transport, err := tType.createTransport()
+		transport, err := createTransport(tType)
 		if err != nil {
 			return err
 		}
@@ -299,8 +282,8 @@ func (em *embeddedTransportV1) Terraform5Value() tftypes.Value {
 	attributeTypes := map[string]tftypes.Type{}
 	for tType, transport := range em.transports {
 		value := transport.Terraform5Value()
-		values[tType.String()] = value
-		attributeTypes[tType.String()] = value.Type()
+		values[string(tType)] = value
+		attributeTypes[string(tType)] = value.Type()
 	}
 
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: attributeTypes}, values)
@@ -328,8 +311,8 @@ func (em *embeddedTransportV1) Copy() (*embeddedTransportV1, error) {
 // terraform configuration for that resource. The configured attributes do not include the attributes
 // that may have been received as default values via ApplyDefaults. To get all the attribute values
 // including those received via defaults use the Attributes method instead.
-func (em *embeddedTransportV1) CopyValues() map[TransportType]map[string]tftypes.Value {
-	configuredAttributes := map[TransportType]map[string]tftypes.Value{}
+func (em *embeddedTransportV1) CopyValues() map[it.TransportType]map[string]tftypes.Value {
+	configuredAttributes := map[it.TransportType]map[string]tftypes.Value{}
 
 	for tType, transport := range em.transports {
 		configuredAttributes[tType] = transport.CopyValues()
@@ -341,8 +324,8 @@ func (em *embeddedTransportV1) CopyValues() map[TransportType]map[string]tftypes
 // Attributes returns all the attributes of the transport state. This includes those that where
 // configured by the user (via terraform configuration) and those that received their values
 // via defaults.
-func (em *embeddedTransportV1) Attributes() map[TransportType]map[string]TFType {
-	attributes := map[TransportType]map[string]TFType{}
+func (em *embeddedTransportV1) Attributes() map[it.TransportType]map[string]TFType {
+	attributes := map[it.TransportType]map[string]TFType{}
 
 	for tType, transport := range em.transports {
 		attributes[tType] = transport.Attributes()
@@ -428,7 +411,7 @@ func (em *embeddedTransportV1) ApplyDefaults(defaults *embeddedTransportV1) (tra
 			return nil, err
 		}
 
-		transport, err := defaultsTransport.Type().createTransport()
+		transport, err := createTransport(defaultsTransport.Type())
 		if err != nil {
 			return nil, err
 		}
@@ -466,8 +449,10 @@ func (em *embeddedTransportV1) Debug() string {
 	}
 
 	debug := make([]string, len(em.transports))
-	for i := range em.transports {
-		debug[i] = fmt.Sprintf("%s\n", em.transports[i].debug())
+	c := 0
+	for _, t := range em.transports {
+		debug[c] = fmt.Sprintf("%s\n", t.debug())
+		c++
 	}
 
 	return strings.Join(debug, "\n\n")
@@ -479,7 +464,7 @@ func (em *embeddedTransportV1) transportReplacedAttributePaths(proposed *embedde
 	for tType, transport := range em.transports {
 		proposedTransport := proposed.transports[tType]
 		if transport.IsConfigured() && proposedTransport.IsConfigured() {
-			addAttributesForReplace(transport, proposedTransport, attrs, tType.String())
+			addAttributesForReplace(transport, proposedTransport, attrs, string(tType))
 		}
 	}
 

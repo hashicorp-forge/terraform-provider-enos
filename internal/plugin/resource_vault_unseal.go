@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/enos-provider/internal/server/state"
+	istrings "github.com/hashicorp/enos-provider/internal/strings"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -23,13 +25,14 @@ type vaultUnseal struct {
 var _ resource.Resource = (*vaultUnseal)(nil)
 
 type vaultUnsealStateV1 struct {
-	ID         *tfString
-	BinPath    *tfString
-	VaultAddr  *tfString
-	SealType   *tfString
-	UnsealKeys *tfStringSlice
-	Status     *tfNum
-	Transport  *embeddedTransportV1
+	ID              *tfString
+	BinPath         *tfString
+	VaultAddr       *tfString
+	SystemdUnitName *tfString // when using systemd to manage service
+	SealType        *tfString
+	UnsealKeys      *tfStringSlice
+	Status          *tfNum
+	Transport       *embeddedTransportV1
 
 	failureHandlers
 }
@@ -54,6 +57,7 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 		ID:              newTfString(),
 		BinPath:         newTfString(),
 		VaultAddr:       newTfString(),
+		SystemdUnitName: newTfString(),
 		SealType:        newTfString(),
 		UnsealKeys:      newTfStringSlice(),
 		Transport:       transport,
@@ -212,22 +216,28 @@ func (s *vaultUnsealStateV1) Schema() *tfprotov6.Schema {
 					Required: true,
 				},
 				{
-					Name:     "vault_addr",
-					Type:     s.VaultAddr.TFType(),
-					Required: true,
-				},
-				{
 					Name:     "seal_type",
 					Type:     s.SealType.TFType(),
 					Optional: true,
 				},
+				{
+					Name:        "unit_name",
+					Description: "The sysmted unit name if using systemd as a process manager",
+					Type:        tftypes.String,
+					Optional:    true,
+				},
+				s.Transport.SchemaAttributeTransport(),
 				{
 					Name:      "unseal_keys",
 					Type:      s.UnsealKeys.TFType(),
 					Required:  true,
 					Sensitive: true,
 				},
-				s.Transport.SchemaAttributeTransport(),
+				{
+					Name:     "vault_addr",
+					Type:     s.VaultAddr.TFType(),
+					Required: true,
+				},
 			},
 		},
 	}
@@ -258,9 +268,10 @@ func (s *vaultUnsealStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
 		"id":          s.ID,
 		"bin_path":    s.BinPath,
-		"vault_addr":  s.VaultAddr,
 		"seal_type":   s.SealType,
+		"unit_name":   s.SystemdUnitName,
 		"unseal_keys": s.UnsealKeys,
+		"vault_addr":  s.VaultAddr,
 	})
 	if err != nil {
 		return err
@@ -278,10 +289,11 @@ func (s *vaultUnsealStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"id":          s.ID.TFType(),
 		"bin_path":    s.BinPath.TFType(),
-		"vault_addr":  s.VaultAddr.TFType(),
 		"seal_type":   s.SealType.TFType(),
-		"unseal_keys": s.UnsealKeys.TFType(),
 		"transport":   s.Transport.Terraform5Type(),
+		"unit_name":   s.SystemdUnitName.TFType(),
+		"unseal_keys": s.UnsealKeys.TFType(),
+		"vault_addr":  s.VaultAddr.TFType(),
 	}}
 }
 
@@ -290,10 +302,11 @@ func (s *vaultUnsealStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
 		"id":          s.ID.TFValue(),
 		"bin_path":    s.BinPath.TFValue(),
-		"vault_addr":  s.VaultAddr.TFValue(),
 		"seal_type":   s.SealType.TFValue(),
-		"unseal_keys": s.UnsealKeys.TFValue(),
 		"transport":   s.Transport.Terraform5Value(),
+		"unit_name":   s.SystemdUnitName.TFValue(),
+		"unseal_keys": s.UnsealKeys.TFValue(),
+		"vault_addr":  s.VaultAddr.TFValue(),
 	})
 }
 
@@ -302,31 +315,65 @@ func (s *vaultUnsealStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+// Unseal unseals a vault cluster.
 func (s *vaultUnsealStateV1) Unseal(ctx context.Context, client it.Transport) error {
 	req := s.buildUnsealRequest()
-	err := vault.Unseal(ctx, client, req)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	res, err := vault.Unseal(ctx, client, req)
 	if err != nil {
-		return fmt.Errorf("failed to unseal Vault, due to: %w", err)
+		err = fmt.Errorf("failed to unseal the vault cluster: %w", err)
+		if res.PriorState != nil {
+			err = fmt.Errorf(
+				"%w\nVault State before attempting to unseal cluster\n%s",
+				err, istrings.Indent("  ", res.PriorState.String()),
+			)
+		}
+		if res.PostState != nil {
+			err = fmt.Errorf(
+				"%w\nVault State after attempting to unseal cluster\n%s",
+				err, istrings.Indent("  ", res.PriorState.String()),
+			)
+		}
 	}
 
 	return err
 }
 
 func (s *vaultUnsealStateV1) buildUnsealRequest() *vault.UnsealRequest {
-	opts := []vault.UnsealRequestOpt{
-		vault.WithUnsealRequestBinPath(s.BinPath.Value()),
-		vault.WithUnsealRequestVaultAddr(s.VaultAddr.Value()),
-	}
-	// If sealtype unset, defaults to shamir
-	if seal, ok := s.SealType.Get(); !ok {
-		opts = append(opts, vault.WithUnsealRequestSealType(vault.SealTypeShamir))
-	} else {
-		opts = append(opts, vault.WithUnsealRequestSealType(vault.SealType(seal)))
-	}
-	unsealKeys, ok := s.UnsealKeys.GetStrings()
-	if ok {
-		opts = append(opts, vault.WithUnsealRequestUnsealKeys(unsealKeys))
+	stateOpts := []vault.StateRequestOpt{
+		vault.WithStateRequestFlightControlUseHomeDir(),
 	}
 
-	return vault.NewUnsealRequest(opts...)
+	if binPath, ok := s.BinPath.Get(); ok {
+		stateOpts = append(stateOpts, vault.WithStateRequestBinPath(binPath))
+	}
+
+	if vaultAddr, ok := s.VaultAddr.Get(); ok {
+		stateOpts = append(stateOpts, vault.WithStateRequestVaultAddr(vaultAddr))
+	}
+
+	unitName := "vault"
+	if unit, ok := s.SystemdUnitName.Get(); ok {
+		unitName = unit
+	}
+	stateOpts = append(stateOpts, vault.WithStateRequestSystemdUnitName(unitName))
+
+	unsealOpts := []vault.UnsealRequestOpt{
+		vault.WithUnsealStateRequestOpts(stateOpts...),
+	}
+
+	sType := vault.SealTypeShamir
+	if s, ok := s.SealType.Get(); ok {
+		sType = vault.SealType(s)
+	}
+	unsealOpts = append(unsealOpts, vault.WithUnsealRequestSealType(sType))
+
+	unsealKeys, ok := s.UnsealKeys.GetStrings()
+	if ok {
+		unsealOpts = append(unsealOpts, vault.WithUnsealRequestUnsealKeys(unsealKeys))
+	}
+
+	return vault.NewUnsealRequest(unsealOpts...)
 }

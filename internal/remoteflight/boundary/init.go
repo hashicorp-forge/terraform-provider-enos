@@ -153,7 +153,7 @@ func (r *InitRequest) String() string {
 
 // Init calls boundary init to initialize the database and Boundary cluster,
 // providing default credentials to use upon completion.
-func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitResponse, error) {
+func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse, error) {
 	res := &InitResponse{}
 	envVars := map[string]string{}
 
@@ -161,7 +161,7 @@ func Init(ctx context.Context, ssh it.Transport, req *InitRequest) (*InitRespons
 		envVars["BOUNDARY_LICENSE"] = req.License
 	}
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(
+	stdout, stderr, err := tr.Run(ctx, command.New(
 		req.String(),
 		command.WithEnvVars(envVars)))
 	if err != nil {

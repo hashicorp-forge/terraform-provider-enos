@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 // Request is a download request.
@@ -18,10 +20,27 @@ type Request struct {
 	SHA256       string
 	AuthUser     string
 	AuthPassword string
+	WriteStdout  bool
 }
 
 // RequestOpt are functional options for a new Request.
 type RequestOpt func(*Request) (*Request, error)
+
+// ErrDownload is a download error.
+type ErrDownload struct {
+	Err        error
+	StatusCode int
+}
+
+// Error returns the error as a string.
+func (e *ErrDownload) Error() string {
+	return fmt.Sprintf("%s (%d)", e.Err, e.StatusCode)
+}
+
+// Unwrap returns the wrapped error.
+func (e *ErrDownload) Unwrap() error {
+	return e.Err
+}
 
 // WithRequestDestination sets the destination.
 func WithRequestDestination(dst io.WriteCloser) RequestOpt {
@@ -68,6 +87,15 @@ func WithRequestAuthPassword(password string) RequestOpt {
 	}
 }
 
+// WithRequestWriteStdout sets whether or not we should write the body to STDOUT.
+func WithRequestWriteStdout(enabled bool) RequestOpt {
+	return func(req *Request) (*Request, error) {
+		req.WriteStdout = enabled
+
+		return req, nil
+	}
+}
+
 // NewRequest takes N RequestOpt args and returns a new request.
 func NewRequest(opts ...RequestOpt) (*Request, error) {
 	r := &Request{
@@ -109,30 +137,45 @@ func Download(ctx context.Context, req *Request) error {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("reading download query response body: %w", err)
-		}
-
-		return fmt.Errorf("download error: %s - %s", res.Status, string(body))
+	var memBuf io.Writer
+	if req.SHA256 != "" || (res.StatusCode != http.StatusOK) {
+		memBuf = new(bytes.Buffer)
+	} else {
+		memBuf = io.Discard
 	}
 
-	if req.SHA256 == "" {
-		_, err = io.Copy(req.Destination, res.Body)
-		return err
+	outs := []io.Writer{memBuf}
+
+	if req.WriteStdout {
+		outs = append(outs, os.Stdout)
 	}
 
-	buf := bytes.Buffer{}
-	fan := io.MultiWriter(req.Destination, &buf)
+	if (res.StatusCode == http.StatusOK) && (req.Destination != nil) {
+		outs = append(outs, req.Destination)
+	}
+
+	fan := io.MultiWriter(outs...)
 	_, err = io.Copy(fan, res.Body)
-	if err != nil {
-		return err
+
+	var resBody []byte
+	buf, ok := memBuf.(*bytes.Buffer)
+	if ok {
+		resBody = buf.Bytes()
 	}
 
-	sha := fmt.Sprintf("%x", sha256.Sum256(buf.Bytes()))
-	if sha != req.SHA256 {
-		return fmt.Errorf("download failed: unxpected SHA 256 sum: expected (%s) received (%s)", req.SHA256, sha)
+	if res.StatusCode != http.StatusOK {
+		err = errors.Join(err, fmt.Errorf("download error: %s - %s", res.Status, string(resBody)))
+	}
+
+	if req.SHA256 != "" {
+		sha := fmt.Sprintf("%x", sha256.Sum256(resBody))
+		if sha != req.SHA256 {
+			err = errors.Join(err, fmt.Errorf("download failed: unxpected SHA 256 sum: expected (%s) received (%s)", req.SHA256, sha))
+		}
+	}
+
+	if err != nil {
+		return &ErrDownload{Err: err, StatusCode: res.StatusCode}
 	}
 
 	return nil

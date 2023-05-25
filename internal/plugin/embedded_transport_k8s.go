@@ -8,14 +8,14 @@ import (
 	"text/template"
 
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-type k8sTransportBuilder func(state *embeddedTransportK8Sv1, ctx context.Context) (it.Transport, error)
+type k8sTransportBuilder func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error)
 
-var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context.Context) (it.Transport, error) {
+var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error) {
 	opts := k8s.TransportOpts{}
 
 	if err := state.Validate(ctx); err != nil {
@@ -149,7 +149,7 @@ func (em *embeddedTransportK8Sv1) Validate(ctx context.Context) error {
 	return nil
 }
 
-func (em *embeddedTransportK8Sv1) Client(ctx context.Context) (it.Transport, error) {
+func (em *embeddedTransportK8Sv1) Client(ctx context.Context) (transport.Transport, error) {
 	return em.k8sTransportBuilder(em, ctx)
 }
 
@@ -176,7 +176,7 @@ func (em *embeddedTransportK8Sv1) GetAttributesForReplace() []string {
 	return attribsForReplace
 }
 
-func (em *embeddedTransportK8Sv1) Type() TransportType {
+func (em *embeddedTransportK8Sv1) Type() transport.TransportType {
 	return K8S
 }
 

@@ -2,19 +2,27 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	v1 "k8s.io/api/core/v1"
+
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 )
 
 // UnsealRequest is a Vault unseal request.
 type UnsealRequest struct {
-	*CLIRequest
+	*StateRequest
+	StateRequestOpts []StateRequestOpt
 	*UnsealArguments
+}
+
+// UnsealResponse is a Vault unseal response.
+type UnsealResponse struct {
+	PriorState *State
+	PostState  *State
 }
 
 type UnsealArguments struct {
@@ -27,14 +35,14 @@ type SealType string
 
 // SealTypes are the possible Vault seal types.
 const (
-	SealTypeShamir        = "shamir"
-	SealTypeAliCloud      = "alicloudkms"
-	SealTypeAWSKMS        = "awskms"
-	SealTypeAzureKeyVault = "azurekeyvault"
-	SealTypeGCPKMS        = "gcpkms"
-	SealTypeOCIKMS        = "ocikms"
-	SealTypeHSMPCKS11     = "pcks11"
-	SealTypeTransit       = "transit"
+	SealTypeShamir        SealType = "shamir"
+	SealTypeAliCloud      SealType = "alicloudkms"
+	SealTypeAWSKMS        SealType = "awskms"
+	SealTypeAzureKeyVault SealType = "azurekeyvault"
+	SealTypeGCPKMS        SealType = "gcpkms"
+	SealTypeOCIKMS        SealType = "ocikms"
+	SealTypeHSMPCKS11     SealType = "pcks11"
+	SealTypeTransit       SealType = "transit"
 )
 
 // UnsealRequestOpt is a functional option for a unseal request.
@@ -44,8 +52,8 @@ type UnsealRequestOpt func(*UnsealRequest) *UnsealRequest
 // unseal request.
 func NewUnsealRequest(opts ...UnsealRequestOpt) *UnsealRequest {
 	c := &UnsealRequest{
-		&CLIRequest{},
-		&UnsealArguments{
+		StateRequest: NewStateRequest(),
+		UnsealArguments: &UnsealArguments{
 			SealType:   "",
 			UnsealKeys: []string{},
 		},
@@ -55,21 +63,17 @@ func NewUnsealRequest(opts ...UnsealRequestOpt) *UnsealRequest {
 		c = opt(c)
 	}
 
+	for _, opt := range c.StateRequestOpts {
+		opt(c.StateRequest)
+	}
+
 	return c
 }
 
-// WithUnsealRequestBinPath sets the Vault binary path.
-func WithUnsealRequestBinPath(path string) UnsealRequestOpt {
+// WithUnsealStateRequestOpts sets the state request options.
+func WithUnsealStateRequestOpts(opts ...StateRequestOpt) UnsealRequestOpt {
 	return func(u *UnsealRequest) *UnsealRequest {
-		u.BinPath = path
-		return u
-	}
-}
-
-// WithUnsealRequestVaultAddr sets the Vault address.
-func WithUnsealRequestVaultAddr(addr string) UnsealRequestOpt {
-	return func(u *UnsealRequest) *UnsealRequest {
-		u.VaultAddr = addr
+		u.StateRequestOpts = opts
 		return u
 	}
 }
@@ -92,69 +96,120 @@ func WithUnsealRequestUnsealKeys(unsealKeys []string) UnsealRequestOpt {
 
 // Unseal checks the current steal status, and if needed unseals the Vault in
 // different ways depending on seal type.
-func Unseal(ctx context.Context, ssh it.Transport, req *UnsealRequest) error {
+func Unseal(ctx context.Context, tr it.Transport, req *UnsealRequest) (*UnsealResponse, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	binPath := req.BinPath
 	if binPath == "" {
-		return fmt.Errorf("you must supply a Vault bin path")
+		return nil, fmt.Errorf("you must supply a vault bin path")
 	}
 
 	vaultAddr := req.VaultAddr
 	if vaultAddr == "" {
-		return fmt.Errorf("you must supply a Vault listen address")
+		return nil, fmt.Errorf("you must supply a vault listen address")
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	var err error
+	res := &UnsealResponse{}
 
-	statusRequest := NewStatusRequest(
-		WithStatusRequestBinPath(binPath),
-		WithStatusRequestVaultAddr(vaultAddr))
+	priorStateChecks := []CheckStater{
+		CheckStateIsInitialized(),
+		CheckStateSealStateIsKnown(),
+	}
+	postStateChecks := []CheckStater{
+		CheckStateIsInitialized(),
+		CheckStateIsUnsealed(),
+	}
 
-	// it is not possible to unseal unless Vault is initialized.
-	// We need to wait for Vault to initialize before continuing.
-	state, err := WaitForState(timeoutCtx, ssh, statusRequest, CheckIsInitialized())
+	// BUG(vault_status): Only enforce the seal type check for shamir as the seal-status API
+	// is broken when using auto-unseal methods. When the issue is resolved we can assert it here.
+	// If vault_status is implemented before the bug is fixed we should assert the seal-type
+	// separately and output a warning diagnostic.
+	//
+	// Further reading:
+	// - https://hashicorp.atlassian.net/browse/VAULT-7061
+	if req.SealType == SealTypeShamir {
+		postStateChecks = append(postStateChecks, CheckStateHasSealType(req.SealType))
+	}
+
+	switch tr.Type() {
+	case it.TransportType("ssh"):
+		priorStateChecks = append(priorStateChecks, CheckStateHasSystemdEnabledAndRunningProperties())
+		postStateChecks = append(postStateChecks, CheckStateHasSystemdEnabledAndRunningProperties())
+	case it.TransportType("kubernetes"):
+		k, ok := tr.(*k8s.Transport)
+		if ok {
+			priorStateChecks = append(priorStateChecks, CheckStatePodHasPhase(k.Pod, v1.PodRunning))
+			postStateChecks = append(postStateChecks, CheckStatePodHasPhase(k.Pod, v1.PodRunning))
+		}
+	default:
+	}
+
+	// Wait for vault to ready to unseal.
+	res.PriorState, err = WaitForState(ctx, tr, req.StateRequest, priorStateChecks...)
 	if err != nil {
-		return fmt.Errorf("cannot unseal vault, vault is not initialized, current state: [%#v], error: %w", state, err)
+		return res, fmt.Errorf("waiting for vault cluster to be ready to unseal: %w", err)
 	}
 
-	switch state.SealStatus {
-	case UnSealed:
-		// Alive, unsealed
-		return nil
-	case Error:
-		// Connection error, retry, we will wait for Vault to be unsealed below.
-	case Sealed:
-		// Running but didn't unseal
+	sealed, err := res.PriorState.IsSealed()
+	if err != nil {
+		return res, fmt.Errorf("checking vault seal status before unseal: %w", err)
+	}
+
+	getPostState := func(res *UnsealResponse) error {
+		var err error
+		res.PostState, err = GetState(ctx, tr, req.StateRequest)
+
+		return err
+	}
+
+	if sealed {
 		switch req.SealType {
 		case SealTypeShamir:
-			for _, key := range req.UnsealKeys {
+			for i, key := range req.UnsealKeys {
 				select {
 				case <-ctx.Done():
-					return fmt.Errorf("timed out unsealing Vault: %w", ctx.Err())
+					err = errors.Join(
+						ctx.Err(),
+						fmt.Errorf("timed out when unsealing with key: (%d) %s", i, key),
+						getPostState(res),
+					)
+
+					return res, err
 				default:
 				}
-				_, stderr, err := ssh.Run(ctx, command.New(fmt.Sprintf("%s operator unseal %s;", binPath, key),
-					command.WithEnvVar("VAULT_ADDR", vaultAddr)))
+
+				_, stderr, err := tr.Run(ctx, command.New(
+					fmt.Sprintf("%s operator unseal %s;", binPath, key),
+					command.WithEnvVar("VAULT_ADDR", vaultAddr)),
+				)
 				if err != nil {
-					return fmt.Errorf("failed to unseal: %s stderr: %s", err, stderr)
+					err = errors.Join(
+						err,
+						fmt.Errorf("failed unsealing with key: (%d) %s, stderr: \n%s", i, key, stderr),
+						getPostState(res),
+					)
+
+					return res, err
 				}
 			}
-
-		case SealTypeAWSKMS:
-			// Didn't auto-unseal yet, we will wait for Vault to be unsealed below
+		case SealTypeAliCloud, SealTypeAWSKMS, SealTypeAzureKeyVault, SealTypeGCPKMS,
+			SealTypeOCIKMS, SealTypeHSMPCKS11, SealTypeTransit:
+			// Let auto-unseal take the wheel and wait for vault to be unsealed below.
 		default:
-			return fmt.Errorf("unknown seal type specified")
+			return res, fmt.Errorf("unspported seal type: %s", req.SealType)
 		}
-	case StatusUnknown:
-		return fmt.Errorf("the Vault service returned an unknown code")
-	default:
-		return fmt.Errorf("the Vault service returned an unknown code")
 	}
 
-	if state, err = WaitForState(ctx, ssh, statusRequest, CheckIsUnsealed()); err != nil {
-		tflog.Error(ctx, "Failed to unseal vault", map[string]interface{}{"state": state})
-		return remoteflight.WrapErrorWith(err, "failed to unseal")
+	// Wait for vault to be unsealed.
+	res.PostState, err = WaitForState(ctx, tr, req.StateRequest, postStateChecks...)
+	if err != nil {
+		return res, fmt.Errorf("waiting for vault cluster to be ready to be unsealed: %w", err)
 	}
 
-	return nil
+	return res, nil
 }

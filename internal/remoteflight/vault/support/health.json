@@ -1,0 +1,15 @@
+{
+  "initialized": false,
+  "sealed": true,
+  "standby": true,
+  "performance_standby": false,
+  "replication_performance_mode": "unknown",
+  "replication_dr_mode": "unknown",
+  "server_time_utc": 1683834751,
+  "version": "1.14.0-beta1+ent",
+  "license": {
+    "state": "autoloaded",
+    "expiry_time": "2026-07-01T00:00:00Z",
+    "terminated": false
+  }
+}

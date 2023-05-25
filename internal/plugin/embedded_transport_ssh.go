@@ -9,14 +9,14 @@ import (
 
 	"github.com/hashicorp/enos-provider/internal/log"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/ssh"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-type sshTransportBuilder func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error)
+type sshTransportBuilder func(state *embeddedTransportSSHv1, ctx context.Context) (transport.Transport, error)
 
-var defaultSSHTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error) {
+var defaultSSHTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (transport.Transport, error) {
 	sshOpts := []ssh.Opt{
 		ssh.WithContext(ctx),
 		ssh.WithUser(state.User.Value()),
@@ -61,7 +61,7 @@ EOF
 
 type embeddedTransportSSHv1 struct {
 	sshTransportBuilder  sshTransportBuilder // added in order to support testing
-	systemdClientFactory func(transport it.Transport, logger log.Logger) systemd.Client
+	systemdClientFactory func(transport transport.Transport, logger log.Logger) systemd.Client
 
 	User           *tfString
 	Host           *tfString
@@ -172,7 +172,7 @@ func (em *embeddedTransportSSHv1) Validate(ctx context.Context) error {
 	return nil
 }
 
-func (em *embeddedTransportSSHv1) Client(ctx context.Context) (it.Transport, error) {
+func (em *embeddedTransportSSHv1) Client(ctx context.Context) (transport.Transport, error) {
 	return em.sshTransportBuilder(em, ctx)
 }
 
@@ -195,7 +195,7 @@ func (em *embeddedTransportSSHv1) GetAttributesForReplace() []string {
 	return []string{}
 }
 
-func (em *embeddedTransportSSHv1) Type() TransportType {
+func (em *embeddedTransportSSHv1) Type() transport.TransportType {
 	return SSH
 }
 

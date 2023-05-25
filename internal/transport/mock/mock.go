@@ -15,6 +15,10 @@ func New() it.Transport {
 	return &mockTransport{}
 }
 
+func (m *mockTransport) Type() it.TransportType {
+	return it.TransportType("mock")
+}
+
 func (m *mockTransport) Copy(ctx context.Context, copyable it.Copyable, s string) error {
 	return nil
 }

@@ -1,0 +1,69 @@
+{
+  "request_id": "366321e4-04da-4cb9-d107-8f545a2bf3f3",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "api_addr": "http://10.13.10.150:8200",
+    "cache_size": 0,
+    "cluster_addr": "http://10.13.10.150:8201",
+    "cluster_cipher_suites": "",
+    "cluster_name": "",
+    "default_lease_ttl": 0,
+    "default_max_request_duration": 0,
+    "detect_deadlocks": "",
+    "disable_cache": false,
+    "disable_clustering": false,
+    "disable_indexing": false,
+    "disable_mlock": false,
+    "disable_performance_standby": false,
+    "disable_printable_check": false,
+    "disable_sealwrap": false,
+    "disable_sentinel_trace": false,
+    "enable_response_header_hostname": false,
+    "enable_response_header_raft_node_id": false,
+    "enable_ui": true,
+    "experiments": null,
+    "introspection_endpoint": false,
+    "listeners": [
+      {
+        "config": {
+          "address": "0.0.0.0:8200",
+          "tls_disable": "true"
+        },
+        "type": "tcp"
+      }
+    ],
+    "log_format": "",
+    "log_level": "info",
+    "log_requests_level": "",
+    "max_lease_ttl": 0,
+    "pid_file": "",
+    "plugin_directory": "",
+    "plugin_file_permissions": 0,
+    "plugin_file_uid": 0,
+    "raw_storage_endpoint": false,
+    "reporting": {
+      "license": {
+        "billing_start_timestamp": "0001-01-01T00:00:00Z",
+        "enabled": true
+      }
+    },
+    "seals": [
+      {
+        "disabled": false,
+        "type": "awskms"
+      }
+    ],
+    "storage": {
+      "cluster_addr": "http://10.13.10.150:8201",
+      "disable_clustering": false,
+      "raft": {
+        "max_entry_size": ""
+      },
+      "redirect_addr": "http://10.13.10.150:8200",
+      "type": "raft"
+    }
+  },
+  "warnings": null
+}

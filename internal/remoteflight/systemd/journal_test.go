@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetSSHLogsResponse_GetLogFileName(t *testing.T) {
+func TestGetSSHUnitJournalResponse_GetLogFileName(t *testing.T) {
 	t.Parallel()
 
-	s := GetLogsResponse{
+	s := GetUnitJournalResponse{
 		Unit: "taco-truck",
 		Host: "10.0.0.1",
 		Logs: []byte{},

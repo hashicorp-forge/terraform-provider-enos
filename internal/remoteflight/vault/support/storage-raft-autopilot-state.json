@@ -1,0 +1,74 @@
+{
+  "request_id": "584623e0-4fc0-2976-f57c-b91b7c027ca3",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "failure_tolerance": 1,
+    "healthy": true,
+    "leader": "node_0",
+    "optimistic_failure_tolerance": 1,
+    "servers": {
+      "node_0": {
+        "address": "10.13.10.239:8201",
+        "healthy": true,
+        "id": "node_0",
+        "last_contact": "0s",
+        "last_index": 462,
+        "last_term": 3,
+        "name": "node_0",
+        "node_status": "alive",
+        "node_type": "voter",
+        "stable_since": "2023-05-10T21:34:05.142269016Z",
+        "status": "leader",
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      },
+      "node_1": {
+        "address": "10.13.10.150:8201",
+        "healthy": true,
+        "id": "node_1",
+        "last_contact": "1.345194439s",
+        "last_index": 462,
+        "last_term": 3,
+        "name": "node_1",
+        "node_status": "alive",
+        "node_type": "voter",
+        "stable_since": "2023-05-10T21:34:07.143318399Z",
+        "status": "voter",
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      },
+      "node_2": {
+        "address": "10.13.10.114:8201",
+        "healthy": true,
+        "id": "node_2",
+        "last_contact": "1.23103906s",
+        "last_index": 462,
+        "last_term": 3,
+        "name": "node_2",
+        "node_status": "alive",
+        "node_type": "voter",
+        "stable_since": "2023-05-10T21:34:07.143318399Z",
+        "status": "voter",
+        "upgrade_version": "1.14.0",
+        "version": "1.14.0"
+      }
+    },
+    "upgrade_info": {
+      "status": "idle",
+      "target_version": "1.14.0",
+      "target_version_voters": [
+        "node_0",
+        "node_1",
+        "node_2"
+      ]
+    },
+    "voters": [
+      "node_0",
+      "node_1",
+      "node_2"
+    ]
+  },
+  "warnings": null
+}

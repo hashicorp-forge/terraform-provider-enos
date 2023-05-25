@@ -14,11 +14,11 @@ import (
 
 // Version takes a context, transport, and path to the vault binary on a
 // remote machine and returns the version.
-func Version(ctx context.Context, ssh it.Transport, req *StatusRequest) (semver.Version, error) {
+func Version(ctx context.Context, tr it.Transport, req *StateRequest) (semver.Version, error) {
 	var ver semver.Version
 	cmd := fmt.Sprintf("sudo %s version", req.BinPath)
 
-	stdout, stderr, err := ssh.Run(ctx, command.New(cmd))
+	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return ver, remoteflight.WrapErrorWith(err, stdout, stderr)
 	}

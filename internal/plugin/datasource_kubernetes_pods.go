@@ -250,7 +250,7 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 				},
 				{
 					Name:        "context_name",
-					Description: "The name of the cluster context top connect to",
+					Description: "The name of the cluster context to connect to",
 					Type:        tftypes.String,
 					Required:    true,
 				},

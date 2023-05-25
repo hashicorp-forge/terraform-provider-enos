@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 )
@@ -14,30 +15,47 @@ type RetryInterval func(int) time.Duration
 
 var ErrNoRetryFunc = errors.New("no retry function has been set")
 
+// MaxRetriesUnlimited is the value of our max retries when we don't have a maximum.
+const MaxRetriesUnlimited int = -1
+
 // Retry is a function that takes a Retryable interface and a context.
 // It runs Run(), performing whatever action the caller has defined.
 // If Run() returns an error, Retry determines whether it should retry using ShouldRetry(),
 // and if it should, sleeps the appropriate duration as specified by Interval() before retrying.
-func Retry(ctx context.Context, req Retryable) (interface{}, error) {
-	var res interface{}
+func Retry(ctx context.Context, req Retryable) (any, error) {
+	var res any
 	var err error
+	attempts := 1
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			if e := ctx.Err(); e != nil {
+				err = errors.Join(err, e)
+			}
+
+			return res, err
 		default:
 		}
 
-		res, err = req.Run(ctx)
-		if err == nil {
+		var err1 error
+		res, err1 = req.Run(ctx)
+		if err1 == nil {
 			return res, nil
+		} else {
+			if attempts > 1 {
+				//nolint:stylecheck // it's okay to add a newline here for readability
+				err = errors.Join(err, fmt.Errorf("attempt %d: %w\n", attempts, err1))
+			} else {
+				err = errors.Join(err, err1)
+			}
 		}
 
 		if !req.ShouldRetry() {
 			return res, err
 		}
 
+		attempts++
 		time.Sleep(req.Interval())
 	}
 }
@@ -46,7 +64,7 @@ func Retry(ctx context.Context, req Retryable) (interface{}, error) {
 // the interval to wait between retries, and whether to retry or not.
 type Retryable interface {
 	Interval() time.Duration
-	Run(ctx context.Context) (interface{}, error)
+	Run(ctx context.Context) (any, error)
 	ShouldRetry() bool
 }
 
@@ -60,7 +78,7 @@ type Retrier struct {
 	// A function that returns a time.Duration for the next interval, based on current attempt number (optional)
 	RetryInterval RetryInterval
 	// The operation to be run (required)
-	Func    func(context.Context) (interface{}, error)
+	Func    func(context.Context) (any, error)
 	lastErr error
 }
 
@@ -74,7 +92,7 @@ type RetrierOpt func(*Retrier) *Retrier
 // retried), it returns an error.
 func NewRetrier(opts ...RetrierOpt) (*Retrier, error) {
 	r := &Retrier{
-		MaxRetries:     -1, // A negative MaxRetries value means unlimited retries
+		MaxRetries:     MaxRetriesUnlimited,
 		attempts:       0,
 		RetryInterval:  IntervalFibonacci(1 * time.Second),
 		OnlyRetryError: []error{},
@@ -93,7 +111,7 @@ func NewRetrier(opts ...RetrierOpt) (*Retrier, error) {
 
 // WithRetrierFunc allows the caller to define the operation to be run/retried.
 // It is required to create a new Retrier.
-func WithRetrierFunc(f func(context.Context) (interface{}, error)) RetrierOpt {
+func WithRetrierFunc(f func(context.Context) (any, error)) RetrierOpt {
 	return func(r *Retrier) *Retrier {
 		r.Func = f
 		return r
@@ -137,9 +155,9 @@ func (r *Retrier) Interval() time.Duration {
 
 // Run is a function that runs the operation that has been set on the Retrier,
 // passing along the context and increasing the attempt number with each try.
-func (r *Retrier) Run(ctx context.Context) (interface{}, error) {
+func (r *Retrier) Run(ctx context.Context) (any, error) {
 	r.attempts++
-	var res interface{}
+	var res any
 
 	res, r.lastErr = r.Func(ctx)
 
@@ -152,7 +170,7 @@ func (r *Retrier) Run(ctx context.Context) (interface{}, error) {
 // only occur in the case of those errors.
 func (r *Retrier) ShouldRetry() bool {
 	// Default value for MaxRetries is -1, indicating that it has not been set by the caller.
-	if r.MaxRetries > -1 && r.attempts >= r.MaxRetries {
+	if r.MaxRetries > MaxRetriesUnlimited && r.attempts >= r.MaxRetries {
 		return false
 	}
 
@@ -169,6 +187,17 @@ func (r *Retrier) ShouldRetry() bool {
 	}
 
 	return true
+}
+
+// IntervalDuration returns a function that calculates a static interveral duration.
+func IntervalDuration(dur time.Duration) RetryInterval {
+	return func(attempt int) time.Duration {
+		if attempt == 0 {
+			return 0
+		}
+
+		return dur
+	}
 }
 
 // IntervalExponential returns a function that calculates an interval duration for

@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/hashicorp/enos-provider/internal/random"
+	"github.com/hashicorp/enos-provider/internal/retry"
 	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/enos-provider/internal/transport/command"
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -79,7 +81,7 @@ var (
 type PackageInstallInstaller struct {
 	Type              string
 	CompatibleGetters []*PackageInstallGetter
-	Install           func(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error
+	Install           func(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error
 }
 
 // Compatible determines if the install get artifact is compatible with
@@ -97,7 +99,7 @@ func (m *PackageInstallInstaller) Compatible(get *PackageInstallGetter) bool {
 // PackageInstallGetter is where the package is coming from.
 type PackageInstallGetter struct {
 	Type string
-	Get  func(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error
+	Get  func(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error
 }
 
 // PackageInstallRequest is a request to install a package on a target machine.
@@ -208,7 +210,7 @@ func WithPackageInstallTemporaryDirectory(dir string) PackageInstallRequestOpt {
 }
 
 // PackageInstall copies the script to the remote host, executes it, and cleans it up.
-func PackageInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) (*PackageInstallResponse, error) {
+func PackageInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (*PackageInstallResponse, error) {
 	res := &PackageInstallResponse{}
 
 	if req.Getter == nil {
@@ -226,15 +228,15 @@ func PackageInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRe
 		)
 	}
 
-	err := req.Getter.Get(ctx, ssh, req)
+	err := req.Getter.Get(ctx, tr, req)
 	if err != nil {
 		return res, err
 	}
 
-	return res, req.Installer.Install(ctx, ssh, req)
+	return res, req.Installer.Install(ctx, tr, req)
 }
 
-func packageInstallGetCopy(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallGetCopy(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	if req.CopyPath == "" {
 		return fmt.Errorf("you must supply a path to the get artifact you wish you copy")
 	}
@@ -251,7 +253,7 @@ func packageInstallGetCopy(ctx context.Context, ssh it.Transport, req *PackageIn
 		req.TempDir,
 		fmt.Sprintf("enos_install_get.%s.%s", random.ID(), filepath.Base(req.CopyPath)),
 	)
-	err = CopyFile(ctx, ssh, NewCopyFileRequest(
+	err = CopyFile(ctx, tr, NewCopyFileRequest(
 		WithCopyFileContent(src),
 		WithCopyFileDestination(req.TempArtifactPath),
 	))
@@ -262,9 +264,16 @@ func packageInstallGetCopy(ctx context.Context, ssh it.Transport, req *PackageIn
 	return nil
 }
 
-func packageInstallGetDownload(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
-	_, err := InstallFlightControl(ctx, ssh, NewInstallFlightControlRequest(
-		WithInstallFlightControlRequestPath(req.FlightControlPath),
+func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
+	res, err := InstallFlightControl(ctx, tr, NewInstallFlightControlRequest(
+		WithInstallFlightControlRequestUseHomeDir(),
+		WithInstallFlightControlRequestTargetRequest(
+			NewTargetRequest(
+				WithTargetRequestRetryOpts(
+					retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
+				),
+			),
+		),
 	))
 	if err != nil {
 		return fmt.Errorf("installing flight-control binary to download package: %w", err)
@@ -278,13 +287,14 @@ func packageInstallGetDownload(ctx context.Context, ssh it.Transport, req *Packa
 	)
 
 	opts := []DownloadOpt{
+		WithDownloadRequestFlightControlPath(res.Path),
 		WithDownloadRequestDestination(req.TempArtifactPath),
 		// since this request is run in a retry loop, we need to make sure to replace the file as it
 		// could potentially exist from an earlier failed attempt to download
 		WithDownloadRequestReplace(true),
 	}
 	opts = append(opts, req.DownloadOpts...)
-	_, err = Download(ctx, ssh, NewDownloadRequest(opts...))
+	_, err = Download(ctx, tr, NewDownloadRequest(opts...))
 	if err != nil {
 		return fmt.Errorf("downloading artifact to the remote host: %w", err)
 	}
@@ -292,65 +302,73 @@ func packageInstallGetDownload(ctx context.Context, ssh it.Transport, req *Packa
 	return nil
 }
 
-func packageInstallGetRepository(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallGetRepository(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	// TODO: right now this is just a shim because we assume the package repository
 	// has the package. We could eventually check the package repo for the package.
 	return nil
 }
 
-func packageInstallZipInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
-	_, err := InstallFlightControl(ctx, ssh, NewInstallFlightControlRequest(
-		WithInstallFlightControlRequestPath(req.FlightControlPath),
+func packageInstallZipInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
+	res, err := InstallFlightControl(ctx, tr, NewInstallFlightControlRequest(
+		WithInstallFlightControlRequestUseHomeDir(),
+		WithInstallFlightControlRequestTargetRequest(
+			NewTargetRequest(
+				WithTargetRequestRetryOpts(
+					retry.WithIntervalFunc(retry.IntervalExponential(2*time.Second)),
+				),
+			),
+		),
 	))
 	if err != nil {
 		return fmt.Errorf("installing flight-control binary to unzip bundle: %w", err)
 	}
 
 	opts := []UnzipOpt{
+		WithUnzipRequestFlightControlPath(res.Path),
 		WithUnzipRequestSourcePath(req.TempArtifactPath),
 		WithUnzipRequestDestinationDir(req.DestionationPath),
 		WithUnzipRequestUseSudo(true),
 		WithUnzipRequestReplace(true),
 	}
 	opts = append(opts, req.UnzipOpts...)
-	_, err = Unzip(ctx, ssh, NewUnzipRequest(opts...))
+	_, err = Unzip(ctx, tr, NewUnzipRequest(opts...))
 	if err != nil {
 		return err
 	}
 
-	return DeleteFile(ctx, ssh, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
+	return DeleteFile(ctx, tr, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
-func packageInstallDEBInstall(ctx context.Context, client it.Transport, req *PackageInstallRequest) error {
+func packageInstallDEBInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	// If we have existing config files, we're assuming we want to keep them.
 	// --force-confold defaults to using the existing files, instead of
 	// interactively choosing which to use.
 	cmd := fmt.Sprintf("sudo dpkg --force-confold --install %s", req.TempArtifactPath)
-	stdout, stderr, err := client.Run(ctx, command.New(cmd))
+	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing debian package")
 	}
 
-	return DeleteFile(ctx, client, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
+	return DeleteFile(ctx, tr, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
-func packageInstallRPMInstall(ctx context.Context, client it.Transport, req *PackageInstallRequest) error {
+func packageInstallRPMInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	// NOTE: I don't like force here but it's the only way to make rpm
 	// reinstall on update without lots of special logic. Eventually we could
 	// get much more clever here to handle upgrade, reinstall, etc.
 	cmd := fmt.Sprintf("sudo rpm -U --force %s", req.TempArtifactPath)
-	stdout, stderr, err := client.Run(ctx, command.New(cmd))
+	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing rpm package")
 	}
 
-	return DeleteFile(ctx, client, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
+	return DeleteFile(ctx, tr, NewDeleteFileRequest(WithDeleteFilePath(req.TempArtifactPath)))
 }
 
-func packageInstallYumInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallYumInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	return ErrPackageInstallInstallerUnknown
 }
 
-func packageInstallAptInstall(ctx context.Context, ssh it.Transport, req *PackageInstallRequest) error {
+func packageInstallAptInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	return ErrPackageInstallInstallerUnknown
 }

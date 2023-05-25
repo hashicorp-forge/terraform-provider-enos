@@ -1,0 +1,35 @@
+{
+  "request_id": "254cd6f3-8e1c-5501-728f-d5f0c7c234ee",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "config": {
+      "index": 0,
+      "servers": [
+        {
+          "address": "10.13.10.239:8201",
+          "leader": true,
+          "node_id": "node_0",
+          "protocol_version": "3",
+          "voter": true
+        },
+        {
+          "address": "10.13.10.150:8201",
+          "leader": false,
+          "node_id": "node_1",
+          "protocol_version": "3",
+          "voter": true
+        },
+        {
+          "address": "10.13.10.114:8201",
+          "leader": false,
+          "node_id": "node_2",
+          "protocol_version": "3",
+          "voter": true
+        }
+      ]
+    }
+  },
+  "warnings": null
+}

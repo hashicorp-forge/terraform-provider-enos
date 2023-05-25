@@ -2,6 +2,7 @@ package remoteflight
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -134,7 +135,7 @@ func WithDeleteFilePath(path string) DeleteFileRequestOpt {
 // CopyFile copies a file to the remote host. It first copies a file to a temporary
 // directory, sets permissions, then copies to the destination directory as
 // a superuser — retrying these operations if necessary.
-func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) error {
+func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error {
 	if file == nil {
 		return fmt.Errorf("no file copy request provided")
 	}
@@ -154,36 +155,62 @@ func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) e
 		var stderr string
 		var res interface{}
 
-		err = client.Copy(ctx, file.Content, tmpPath)
+		err = tr.Copy(ctx, file.Content, tmpPath)
 		if err != nil {
 			return res, fmt.Errorf("copying file to target host: %w", err)
 		}
 
 		if file.Chmod != "" {
-			stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chmod %[1]s %[2]s || sudo chmod %[1]s %[2]s", file.Chmod, tmpPath)))
+			stdout, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf("chmod %s %s", file.Chmod, tmpPath)))
 			if err != nil {
-				return res, WrapErrorWith(err, stdout, stderr, "changing file permissions")
+				err = WrapErrorWith(err, stdout, stderr, "changing file permissions")
+				stdout, stderr, err1 := tr.Run(ctx, command.New(fmt.Sprintf("sudo chmod %s %s", file.Chmod, tmpPath)))
+				if err1 != nil {
+					err1 = WrapErrorWith(err1, stdout, stderr, "changing file permissions with sudo")
+					return res, errors.Join(err, err1)
+				}
 			}
 		}
 
 		if file.Chown != "" {
-			stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chown %[1]s %[2]s || sudo chown %[1]s %[2]s", file.Chown, tmpPath)))
+			stdout, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf("chown %s %s", file.Chown, tmpPath)))
 			if err != nil {
-				return res, WrapErrorWith(err, stdout, stderr, "changing file ownership")
+				err = WrapErrorWith(err, stdout, stderr, "changing file ownership")
+				stdout, stderr, err1 := tr.Run(ctx, command.New(fmt.Sprintf("sudo chown %s %s", file.Chown, tmpPath)))
+				if err1 != nil {
+					err1 = WrapErrorWith(err1, stdout, stderr, "changing file ownership with sudo")
+					return res, errors.Join(err, err1)
+				}
 			}
 		}
 
-		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%[1]s' || sudo mkdir -p '%[1]s'`, filepath.Dir(file.Destination))))
+		stdout, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%s'`, filepath.Dir(file.Destination))))
 		if err != nil {
-			return res, WrapErrorWith(err, stdout, stderr, "creating file's directory on target host")
+			err = WrapErrorWith(err, stdout, stderr, "creating file's directory on target host")
+			stdout, stderr, err1 := tr.Run(ctx, command.New(fmt.Sprintf(`sudo mkdir -p '%s'`, filepath.Dir(file.Destination))))
+			if err1 != nil {
+				err1 = WrapErrorWith(err1, stdout, stderr, "creating file's directory on target host")
+				return res, errors.Join(err, err1)
+			}
 		}
 
-		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mv %[1]s %[2]s || sudo mv %[1]s %[2]s`, tmpPath, file.Destination)))
+		cmd := fmt.Sprintf(`mv %s %s`, tmpPath, file.Destination)
+		stdout, stderr, err = tr.Run(ctx, command.New(cmd))
 		if err != nil {
-			return res, WrapErrorWith(err, stdout, stderr, "moving file to destination path")
+			err = WrapErrorWith(err, stdout, stderr, fmt.Sprintf("moving file to destination path, cmd: %s", cmd))
+			cmd = fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)
+			stdout, stderr, err1 := tr.Run(ctx, command.New(cmd))
+			if err1 != nil {
+				err1 = WrapErrorWith(
+					err1, stdout, stderr,
+					fmt.Sprintf("moving file to destination path with sudo, cmd: %s", cmd),
+				)
+
+				return res, errors.Join(err, err1)
+			}
 		}
 
-		return res, err
+		return res, nil
 	}
 
 	opts := append(file.RetryOpts, retry.WithRetrierFunc(fileOperations))
@@ -201,14 +228,14 @@ func CopyFile(ctx context.Context, client it.Transport, file *CopyFileRequest) e
 }
 
 // DeleteFile deletes a file on the remote host, retrying if necessary.
-func DeleteFile(ctx context.Context, client it.Transport, req *DeleteFileRequest) error {
+func DeleteFile(ctx context.Context, tr it.Transport, req *DeleteFileRequest) error {
 	if req == nil {
 		return fmt.Errorf("no file delete request provided")
 	}
 
 	rmFile := func(ctx context.Context) (interface{}, error) {
 		var res interface{}
-		stdout, stderr, err := client.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
+		stdout, stderr, err := tr.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
 		}

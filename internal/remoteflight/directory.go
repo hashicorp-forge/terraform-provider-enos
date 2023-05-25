@@ -47,7 +47,7 @@ func WithDirChown(owner string) CreateDirectoryRequestOpt {
 }
 
 // CreateDirectory creates the directory and sets owner permissions.
-func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirectoryRequest) error {
+func CreateDirectory(ctx context.Context, tr it.Transport, dir *CreateDirectoryRequest) error {
 	if dir == nil {
 		return fmt.Errorf("no directory or owner provided")
 	}
@@ -60,13 +60,13 @@ func CreateDirectory(ctx context.Context, client it.Transport, dir *CreateDirect
 	var stdout string
 	var stderr string
 
-	stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%[1]s' || sudo mkdir -p '%[1]s'`, dir.DirName)))
+	stdout, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf(`mkdir -p '%[1]s' || sudo mkdir -p '%[1]s'`, dir.DirName)))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "creating directory on target host")
 	}
 
 	if dir.DirOwner != "" {
-		stdout, stderr, err = client.Run(ctx, command.New(fmt.Sprintf("chown -R %[1]s %[2]s || sudo chown -R %[1]s %[2]s", dir.DirOwner, dir.DirName)))
+		stdout, stderr, err = tr.Run(ctx, command.New(fmt.Sprintf("chown -R %[1]s %[2]s || sudo chown -R %[1]s %[2]s", dir.DirOwner, dir.DirName)))
 		if err != nil {
 			return WrapErrorWith(err, stdout, stderr, "changing file ownership")
 		}

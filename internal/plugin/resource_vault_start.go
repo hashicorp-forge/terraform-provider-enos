@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
 	"github.com/hashicorp/enos-provider/internal/server/state"
+	istrings "github.com/hashicorp/enos-provider/internal/strings"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
@@ -740,15 +741,14 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 	}
 
 	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
+	unitName := "vault"
+	if unit, ok := s.SystemdUnitName.Get(); ok {
+		unitName = unit
+	}
 
 	// Manage the vault systemd service ourselves unless it has explicitly been
 	// set that we should not.
 	if manage, set := s.ManageService.Get(); !set || (set && manage) {
-		unitName := "vault"
-		if unit, ok := s.SystemdUnitName.Get(); ok {
-			unitName = unit
-		}
-
 		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Vault - A tool for managing secrets",
@@ -815,19 +815,30 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 	defer cancel()
 
 	// Restart the service and wait for it to be running
-	err = sysd.RestartService(timeoutCtx, "vault")
+	err = sysd.RestartService(timeoutCtx, unitName)
 	if err != nil {
 		return fmt.Errorf("failed to start the vault service, due to: %w", err)
 	}
 
-	state, err := vault.WaitForState(timeoutCtx, transport, vault.NewStatusRequest(
-		vault.WithStatusRequestBinPath(s.BinPath.Value()),
-		vault.WithStatusRequestVaultAddr(s.Config.APIAddr.Value()),
-	), vault.CheckIsActive(), vault.CheckSealStatusKnown())
+	state, err := vault.WaitForState(timeoutCtx, transport, vault.NewStateRequest(
+		vault.WithStateRequestFlightControlUseHomeDir(),
+		vault.WithStateRequestBinPath(s.BinPath.Value()),
+		vault.WithStateRequestVaultAddr(s.Config.APIAddr.Value()),
+		vault.WithStateRequestSystemdUnitName(unitName),
+	), vault.CheckStateHasSystemdEnabledAndRunningProperties(),
+		vault.CheckStateSealStateIsKnown(),
+	)
 	if err != nil {
-		return fmt.Errorf("failed to start the vault service, due to: %w", err)
+		err = fmt.Errorf("failed to start the vault service: %w", err)
+		if state != nil {
+			err = fmt.Errorf(
+				"%w\nCluster State after starting the vault systemd service:\n%s",
+				err, istrings.Indent("  ", state.String()),
+			)
+		}
 	}
-	s.Status.Set(int(state.SealStatus))
+
+	s.Status.Set(int(state.Status.StatusCode))
 
 	return err
 }

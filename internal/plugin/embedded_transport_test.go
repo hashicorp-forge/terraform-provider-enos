@@ -494,7 +494,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 }
 
 // helpers.
-type transportconfig map[TransportType]configmap
+type transportconfig map[it.TransportType]configmap
 
 func (tc transportconfig) k8s(config configmap) transportconfig {
 	tc[K8S] = config.copy()
@@ -564,12 +564,12 @@ func (tc transportconfig) toTFValue(t *testing.T) tftypes.Value {
 	types := map[string]tftypes.Type{}
 
 	for tType, cfg := range tc {
-		types[tType.String()] = tftypes.Map{ElementType: tftypes.String}
+		types[string(tType)] = tftypes.Map{ElementType: tftypes.String}
 		transportValues := map[string]tftypes.Value{}
 		for name, val := range cfg {
 			transportValues[name] = tftypes.NewValue(tftypes.String, val)
 		}
-		values[tType.String()] = tftypes.NewValue(types[tType.String()], transportValues)
+		values[string(tType)] = tftypes.NewValue(types[string(tType)], transportValues)
 	}
 
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: types}, values)
@@ -634,9 +634,9 @@ func assertTransportCfg(t *testing.T, transport *embeddedTransportV1, config tra
 						t.Fatalf("unknown Nomad attr: %s", attr)
 					}
 				case UNKNOWN:
-					t.Fatalf("unknown transport type: %s", tType.String())
+					t.Fatalf("unknown transport type: %s", string(tType))
 				default:
-					t.Fatalf("undefined transport type: %s", tType.String())
+					t.Fatalf("undefined transport type: %s", string(tType))
 				}
 			}
 		}
