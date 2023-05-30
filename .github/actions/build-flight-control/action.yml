@@ -9,7 +9,10 @@ runs:
       with:
         go-version-file: .go-version
     - name: Install upx
-      run: sudo apt-get install -y upx-ucl
+      run: |
+        curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v4.0.2/upx-4.0.2-amd64_linux.tar.xz
+        tar -xvf upx.tar.xz
+        sudo mv upx*/upx /usr/local/sbin/
       shell: bash
     - name: Build flight-control
       run: make flight-control
