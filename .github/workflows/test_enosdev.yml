@@ -1,5 +1,5 @@
 ---
-name: test enos-provider from hashicorp-qti/enosdev
+name: test from hashicorp-qti/enosdev
 
 on:
   workflow_dispatch:
@@ -116,7 +116,7 @@ jobs:
           rm -rf $HOME/.terraform.d
 
   scenario-vault-k8s:
-    name: enos scenario run vault-k8s
+    name: enos scenario run vault_k8s
     runs-on: ubuntu-latest
     env:
       ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs

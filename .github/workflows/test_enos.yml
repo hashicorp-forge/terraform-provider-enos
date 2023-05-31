@@ -1,17 +1,9 @@
 ---
-name: test enos-provider from hashicorp-qti/enos
+name: test from hashicorp-qti/enos
 
 on:
   workflow_dispatch:
-    inputs:
-      enos_provider_version:
-        required: true
-        type: string
   workflow_call:
-    inputs:
-      enos_provider_version:
-        required: true
-        type: string
 
 # These permissions are necessary for the doormat-action to get the OIDC token
 permissions:
@@ -114,7 +106,7 @@ jobs:
           rm -rf $HOME/.terraform.d
 
   scenario-vault-k8s:
-    name: enos scenario run vault-k8s
+    name: enos scenario run vault_k8s
     runs-on: ubuntu-latest
     env:
       ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs

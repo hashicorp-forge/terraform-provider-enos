@@ -75,7 +75,7 @@ jobs:
         working-directory: enos/modules/go-acceptance-test-target
 
   validate-examples:
-    name: validate example modules
+    name: terraform validate examples/*
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
