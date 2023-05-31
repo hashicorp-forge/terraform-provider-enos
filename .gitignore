@@ -41,9 +41,8 @@ mirror/*.tfvars
 test-build
 
 # Enos
-enos/.enos
+.enos
 enos/support
-enoscli-tests/.enos
 enoscli-tests/support/*
-enos/kubeconfig
-enos/enos-user.vars.hcl
+enos/kubeconfig*
+enos/enos-local.vars.hcl

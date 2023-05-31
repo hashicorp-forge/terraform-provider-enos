@@ -1,52 +1,57 @@
 scenario "failure_handlers" {
-  locals {
-    common_tags = {
-      Name        = "enos_provider_remote_host"
-      Environment = var.environment
-    }
-    instance_type = "t3.micro"
+  matrix {
+    use = ["dev", "enos"]
   }
 
-  terraform_cli = terraform_cli.default
+  locals {
+    common_tags = {
+      Name        = "enos-provider"
+      Environment = var.environment
+    }
+  }
+
+  terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
   terraform     = terraform.default
   providers = [
-    provider.aws.east,
+    provider.aws.default,
     provider.enos.ubuntu,
   ]
 
-  step "create_vpc" {
-    module = module.create_vpc
-
-    providers = {
-      aws = provider.aws.east
-    }
+  step "find_azs" {
+    module = module.az_finder
 
     variables {
-      tags          = local.common_tags
-      instance_type = local.instance_type
+      instance_type = ["t3.micro"]
+    }
+  }
+
+  step "create_vpc" {
+    module = module.aws_infra
+
+    variables {
+      ami_architectures  = ["amd64"]
+      availability_zones = step.find_azs.availability_zones
     }
   }
 
   step "setup_remote_host" {
-    module = module.setup_remote_host
+    module = module.failure_handlers_setup_remote_host
 
     providers = {
-      aws  = provider.aws.east
       enos = provider.enos.ubuntu
     }
 
     variables {
       vpc_id        = step.create_vpc.vpc_id
-      subnet_id     = step.create_vpc.subnet_id
       tags          = local.common_tags
-      instance_type = local.instance_type
+      instance_type = "t3.micro"
     }
 
     depends_on = [step.create_vpc]
   }
 
   step "install_and_start_vault" {
-    module = module.install_and_start_vault
+    module = module.failure_handlers_install_and_start_vault
 
     providers = {
       enos = provider.enos.ubuntu
@@ -59,7 +64,7 @@ scenario "failure_handlers" {
   }
 
   step "install_and_start_consul" {
-    module = module.install_and_start_consul
+    module = module.failure_handlers_install_and_start_consul
 
     providers = {
       enos = provider.enos.ubuntu

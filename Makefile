@@ -14,7 +14,6 @@ FLIGHTCONTROL_BUILD_TAGS?=-tags osusergo,netgo
 FLIGHTCONTROL_LD_FLAGS?=-ldflags="-extldflags=-static -s -w"
 
 CI?=false
-ENOS_CLI_TEST_DIR=$(TEST_BLD_DIR)/enoscli-tests
 LINT_OUT_FORMAT?=colored-line-number
 HASUPX:= $(shell upx dot 2> /dev/null)
 TEST?=$$(go list ./... | grep -v 'vendor')
@@ -68,33 +67,11 @@ endif
 test:
 	go test $(TEST) -v $(TESTARGS) -timeout=5m -parallel=4
 
-test-tf:
-	terraform -chdir=examples/core init
-	terraform -chdir=examples/core fmt -check -recursive
-	terraform -chdir=examples/core validate
-
 test-acc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 12m
 
 test-race-detector:
 	GORACE=log_path=/tmp/gorace.log TF_ACC=1 go test -race $(TEST) -v $(TESTARGS) -timeout 120m ./command/plugin
-
-# run the k8s enoscli tests for the stable release
-.PHONY: test-k8s
-test-k8s: K8S_TEST_DIR = $(ENOS_CLI_TEST_DIR)/k8s
-test-k8s:
-	rm -rf $(ENOS_CLI_TEST_DIR); mkdir -p $(ENOS_CLI_TEST_DIR) && \
-	cp -r enoscli-tests $(TEST_BLD_DIR) && \
-    LC_ALL=C grep -lr "ENOS_PROVIDER_NAME" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_NAME/$(PROVIDER_NAME)/g" && \
-    LC_ALL=C grep -lr "ENOS_PROVIDER_VERSION" $(ENOS_CLI_TEST_DIR) | xargs sed $(SED_OPTS) "s/ENOS_PROVIDER_VERSION/$(PROVIDER_BIN_VERSION)/g" && \
-    enos scenario launch -d $(K8S_TEST_DIR) kind_cluster && \
-    enos scenario output -d $(K8S_TEST_DIR) kind_cluster && \
-    enos scenario destroy -d $(K8S_TEST_DIR) kind_cluster
-
-# run the k8s enoscli tests for the dev release
-.PHONY: test-k8s-dev
-test-k8s-dev: PROVIDER_NAME = enosdev
-test-k8s-dev: test-k8s
 
 .PHONY: fmt
 fmt: fmt-golang fmt-enos
@@ -106,11 +83,8 @@ fmt-golang:
 .PHONY: fmt-enos
 fmt-enos:
 	enos fmt enos
-	enos fmt enoscli-tests
 	terraform fmt -recursive enos
-	terraform fmt -recursive enoscli-tests
 	terraform fmt -recursive examples
-	terraform fmt -recursive ci-tests
 
 .PHONY: fmt-check
 fmt-check: fmt-check-golang fmt-check-enos
@@ -122,11 +96,8 @@ fmt-check-golang:
 .PHONY: fmt-check-enos
 fmt-check-enos:
 	enos fmt -cd enos
-	enos fmt -cd enoscli-tests
 	terraform fmt -recursive -check enos
-	terraform fmt -recursive -check enoscli-tests
 	terraform fmt -recursive -check examples
-	terraform fmt -recursive -check ci-tests
 
 .PHONY: lint
 lint:
