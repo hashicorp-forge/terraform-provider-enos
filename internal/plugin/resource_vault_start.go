@@ -63,6 +63,7 @@ type vaultConfig struct {
 	APIAddr     *tfString
 	ClusterAddr *tfString
 	Listener    *vaultConfigBlock
+	LogLevel    *tfString
 	Storage     *vaultConfigBlock
 	Seal        *vaultConfigBlock
 	UI          *tfBool
@@ -100,6 +101,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 			ClusterName: newTfString(),
 			APIAddr:     newTfString(),
 			ClusterAddr: newTfString(),
+			LogLevel:    newTfString(),
 			Listener:    newVaultConfigBlock("config", "listener"),
 			Seal:        newVaultConfigBlock("config", "seal"),
 			Storage:     newVaultConfigBlock("config", "storage"),
@@ -550,6 +552,7 @@ func (c *vaultConfig) Terraform5Type() tftypes.Type {
 			"api_addr":     tftypes.String,
 			"cluster_addr": tftypes.String,
 			"listener":     c.Listener.Terraform5Type(),
+			"log_level":    tftypes.String,
 			"storage":      c.Storage.Terraform5Type(),
 			"seal":         c.Seal.Terraform5Type(),
 			"ui":           c.UI.TFType(),
@@ -564,6 +567,7 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 		"api_addr":     c.APIAddr.TFValue(),
 		"cluster_addr": c.ClusterAddr.TFValue(),
 		"listener":     c.Listener.Terraform5Value(),
+		"log_level":    c.LogLevel.TFValue(),
 		"seal":         c.Seal.Terraform5Value(),
 		"storage":      c.Storage.Terraform5Value(),
 		"ui":           c.UI.TFValue(),
@@ -576,6 +580,7 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 		"cluster_name": c.ClusterName,
 		"api_addr":     c.APIAddr,
 		"cluster_addr": c.ClusterAddr,
+		"log_level":    c.LogLevel,
 		"ui":           c.UI,
 	})
 	if err != nil {
@@ -623,6 +628,10 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 
 	if ui, ok := c.UI.Get(); ok {
 		hclBuilder.AppendAttribute("ui", ui)
+	}
+
+	if ll, ok := c.LogLevel.Get(); ok {
+		hclBuilder.AppendAttribute("log_level", ll)
 	}
 
 	if label, ok := c.Listener.Type.Get(); ok {
@@ -677,6 +686,10 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 	}
 	configFilePath := filepath.Join(configDir, "vault.hcl")
 	licensePath := filepath.Join(configDir, "vault.lic")
+
+	if _, ok := s.Config.LogLevel.Get(); !ok {
+		s.Config.LogLevel.Set("info")
+	}
 
 	envFilePath := "/etc/vault.d/vault.env"
 

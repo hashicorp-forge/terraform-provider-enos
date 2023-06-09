@@ -46,6 +46,24 @@ scenario "vault" {
     }
   }
 
+  step "consul_license" {
+    skip_step = var.consul_release.edition == "oss"
+    module    = module.read_file
+
+    variables {
+      file_name = abspath(joinpath(path.root, "support/consul.hclic"))
+    }
+  }
+
+  step "vault_license" {
+    skip_step = matrix.edition == "oss"
+    module    = module.read_file
+
+    variables {
+      file_name = abspath(joinpath(path.root, "support/vault.hclic"))
+    }
+  }
+
   step "license" {
     skip_step = matrix.edition == "oss"
     module    = module.read_file
@@ -67,10 +85,11 @@ scenario "vault" {
     }
 
     variables {
-      ami_id        = step.infra.ami_ids["ubuntu"]["amd64"]
-      vpc_id        = step.infra.vpc_id
-      instance_type = local.instance_types["amd64"]
-      kms_key_arn   = step.infra.kms_key_arn
+      ami_id         = step.infra.ami_ids["ubuntu"]["amd64"]
+      consul_license = var.consul_release.edition == "oss" ? null : step.consul_license.content
+      instance_type  = local.instance_types["amd64"]
+      kms_key_arn    = step.infra.kms_key_arn
+      vpc_id         = step.infra.vpc_id
     }
   }
 
@@ -92,7 +111,7 @@ scenario "vault" {
       kms_key_arn        = step.infra.kms_key_arn
       storage_backend    = matrix.backend
       unseal_method      = matrix.unseal_method
-      vault_license      = matrix.edition != "oss" ? step.license.license : null
+      vault_license      = matrix.edition != "oss" ? step.vault_license.content : null
       vault_release = {
         version = local.vault_version
         edition = matrix.edition
@@ -119,7 +138,7 @@ scenario "vault" {
       kms_key_arn        = step.infra.kms_key_arn
       storage_backend    = "raft"
       unseal_method      = matrix.unseal_method
-      vault_license      = matrix.edition != "oss" ? step.license.license : null
+      vault_license      = matrix.edition != "oss" ? step.vault_license.content : null
       vault_release = {
         version = local.vault_version
         edition = matrix.edition

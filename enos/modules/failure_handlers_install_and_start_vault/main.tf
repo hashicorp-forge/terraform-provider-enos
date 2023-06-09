@@ -60,6 +60,7 @@ resource "enos_vault_start" "vault" {
         tls_disable = "true"
       }
     }
+    log_level = "debug"
     storage = {
       type       = local.storage_backend
       attributes = null

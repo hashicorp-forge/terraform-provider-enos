@@ -34,6 +34,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 					{{end}}
 				}
 			}
+			log_level = "${{.Config.LogLevel.Value}}"
 			seal = {
 				type = "{{.Config.Seal.Type.Value}}"
 				attributes = {
@@ -86,6 +87,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 		"address":     "0.0.0.0:8200",
 		"tls_disable": "true",
 	})
+	vaultStart.Config.LogLevel.Set("debug")
 	vaultStart.Config.Storage.Type.Set("consul")
 	vaultStart.Config.Storage.Attrs.Set(map[string]interface{}{
 		"address": "127.0.0.1:8500",
@@ -118,6 +120,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.type", regexp.MustCompile(`^tcp$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.address", regexp.MustCompile(`^0.0.0.0:8200$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.tls_disable", regexp.MustCompile(`^true$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.log_level", regexp.MustCompile(`^debug$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.type", regexp.MustCompile(`^consul$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.address", regexp.MustCompile(`^127.0.0.0:8500$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", regexp.MustCompile(`^vault$`)),

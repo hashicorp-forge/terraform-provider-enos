@@ -47,7 +47,7 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
-      - name: create up acceptance target host
+      - name: Create up acceptance target host
         working-directory: enos/modules/go-acceptance-test-target
         run: |
           terraform init
@@ -55,7 +55,7 @@ jobs:
           terraform apply -auto-approve
           HOST_IP=$(terraform output instance_public_ip | tr -d \" | tr -d "\n")
           echo "host_ip=$HOST_IP" >> $GITHUB_ENV
-      - name: configure ssh keys
+      - name: Configure ssh keys
         run: |
           echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
           echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
@@ -75,7 +75,7 @@ jobs:
         working-directory: enos/modules/go-acceptance-test-target
 
   validate-examples:
-    name: terraform validate examples/*
+    name: terraform validate examples
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -86,7 +86,7 @@ jobs:
         with:
           target: linux/amd64
       - uses: hashicorp/setup-terraform@v2
-      - name: validate example terraform modules
+      - name: Run terraform --chdir=examples/* validate
         run: |
           terraform -chdir=examples/core init
           terraform -chdir=examples/core fmt -check -recursive
@@ -128,7 +128,7 @@ jobs:
         with:
           github-token:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-      - name: set up support files
+      - name: Set up support files
         run: |
           mkdir -p ./support
           echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./support/enos-ci-ssh-key.pem
@@ -139,14 +139,14 @@ jobs:
         with:
           target: linux/amd64
       - run: enos scenario launch failure_handlers use:dev --timeout 60m0s
-      - name: trigger scenario failure
+      - name: Trigger scenario failure
         id: run_remote_exec
         continue-on-error: true
         env:
           ENOS_VAR_run_failure_handler_tests: true
         run: enos scenario run failure_handlers use:dev --timeout 60m0s
       - if: steps.run_remote_exec.outcome == 'failure'
-        name: verify debug log existence
+        name: Verify debug log existence
         id: test_logs_exist
         run: |
           log_file_count=$(ls ${{ env.ENOS_DEBUG_DATA_ROOT_DIR }}/{consul,vault}* | wc -l)
@@ -154,7 +154,7 @@ jobs:
       - if: ${{ always() }}
         run: enos scenario destroy failure_handlers use:dev --timeout 60m0s
       - if: ${{ always() }}
-        name: remove enos runtime directories
+        name: Remove enos runtime directories
         run: |
           rm -rf /tmp/enos*
           rm -rf ./support
@@ -192,7 +192,7 @@ jobs:
       - if: ${{ always() }}
         run: enos scenario destroy kind use:dev --timeout 60m0s
       - if: ${{ always() }}
-        name: remove enos runtime directories
+        name: Remove enos runtime directories
         run: |
           rm -rf /tmp/enos*
           rm -rf ./support
@@ -200,66 +200,55 @@ jobs:
           rm -rf $HOME/.terraform.d
 
   scenario-vault:
-    name: enos scenario run vault
-    runs-on: ubuntu-latest
-    env:
-      ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs
-      ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    defaults:
-      run:
-        shell: bash
-        working-directory: enos
+    name: "enos scenario run vault arch:${{ matrix.arch }} backend:${{ matrix.backend }} consul_edition:${{ matrix.consul_edition }} consul_version:${{ matrix.consul_version }} distro:${{ matrix.distro }} edition:${{ matrix.edition }} use:${{ matrix.use }} unseal_method:${{ matrix.unseal_method }} version:${{ matrix.version }}"
+    uses: ./.github/workflows/run_scenario_vault_ssh.yml
+    secrets: inherit
     strategy:
-      matrix:
-        filter:
-          - arch:amd64 distro:ubuntu edition:oss version:1.8.12 backend:raft use:dev unseal_method:awskms
-          - arch:arm64 distro:ubuntu edition:ent version:1.11.10 backend:consul use:dev unseal_method:shamir
-          - arch:amd64 distro:rhel edition:ent version:1.12.6 backend:consul use:dev unseal_method:shamir
-          - arch:arm64 distro:rhel edition:oss version:1.13.2 backend:raft use:dev unseal_method:awskms
       fail-fast: false
-    steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
-        with:
-          ref: ${{ github.head_ref }}   # checkout the correct branch name
-      - uses: hashicorp/doormat-action@main
-        with:
-          # This role, its associated IAM policy, the allowed Github workflow
-          # event types and their associated qualifiers are managed via
-          # Terraform in the hashicorp/enos-ci repository. If you wish to allow
-          # AWS credentials for different Github event types, workflows or
-          # branches you'll need to update the role there.
-          aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
-      - uses: hashicorp/setup-terraform@v2
-        with:
-          # the terraform wrapper will break terraform execution in enos because
-          # it changes the output to text when we expect it to be JSON.
-          terraform_wrapper: false
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-      - uses: hashicorp/action-setup-enos@v1
-        with:
-          github-token:
-            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-      - name: set up support files
-        run: |
-          mkdir -p ./support
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./support/enos-ci-ssh-key.pem
-          echo "${{ secrets.VAULT_LICENSE }}" > ./support/vault.hclic
-          chmod 600 ./support/enos-ci-ssh-key.pem
-          chmod 600 ./support/vault.hclic
-      - uses: ./.github/actions/build-provider
-        with:
-          target: linux/amd64
-      - run: enos scenario run vault ${{ matrix.filter }} --timeout 60m0s
-      - run: enos scenario destroy vault ${{ matrix.filter }} --timeout 60m0s
-        if: ${{ always() }}
-      - name: remove enos runtime directories
-        if: ${{ always() }}
-        run: |
-          rm -rf /tmp/enos*
-          rm -rf ./support
-          rm -rf ./.enos
-          rm -rf $HOME/.terraform.d
+      matrix:
+        include:
+          - arch: amd64
+            backend: raft
+            distro: ubuntu
+            edition: oss
+            use: dev
+            unseal_method: awskms
+            version: 1.8.12
+          - arch: arm64
+            backend: consul
+            consul_edition: oss
+            consul_version: 1.14.7
+            distro: ubuntu
+            edition: oss
+            use: dev
+            unseal_method: shamir
+            version: 1.11.10
+          - arch: amd64
+            backend: consul
+            consul_edition: oss
+            consul_version: 1.15.3
+            distro: rhel
+            edition: ent
+            use: dev
+            unseal_method: awskms
+            version: 1.12.6
+          - arch: arm64
+            backend: raft
+            distro: rhel
+            edition: oss
+            use: dev
+            unseal_method: shamir
+            version: 1.12.6
+    with:
+      arch: ${{ matrix.arch }}
+      backend: ${{ matrix.backend }}
+      consul_edition: ${{ matrix.consul_edition }}
+      consul_version: ${{ matrix.consul_version }}
+      distro: ${{ matrix.distro }}
+      edition: ${{ matrix.edition }}
+      use: ${{ matrix.use }}
+      unseal_method: ${{ matrix.unseal_method }}
+      version: ${{ matrix.version }}
 
   scenario-vault-k8s:
     name: enos scenario run vault_k8s
@@ -303,7 +292,7 @@ jobs:
       - run: enos scenario run vault_k8s ${{ matrix.filter }} --timeout 60m0s
       - run: enos scenario destroy vault_k8s ${{ matrix.filter }} --timeout 60m0s
         if: ${{ always() }}
-      - name: remove enos runtime directories
+      - name: Remove enos runtime directories
         if: ${{ always() }}
         run: |
           rm -rf /tmp/enos*
@@ -327,11 +316,11 @@ jobs:
         with:
           github-token:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-      - name: gofumpt
+      - name: Run make fmt-check
         run: |
           go install mvdan.cc/gofumpt@latest
           make fmt-check
-      - name: golangci-lint
+      - name: Run make lint
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           LINT_OUT_FORMAT=github-actions make lint

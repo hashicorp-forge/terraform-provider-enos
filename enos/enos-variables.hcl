@@ -1,7 +1,13 @@
-variable "consul_version" {
-  description = "The version of consul to install"
-  type        = string
-  default     = "1.15.2"
+variable "consul_release" {
+  type = object({
+    version = string
+    edition = string
+  })
+  description = "Consul release version and edition to install from releases.hashicorp.com"
+  default = {
+    version = "1.15.3"
+    edition = "oss"
+  }
 }
 
 variable "enosdev_provider_version" {

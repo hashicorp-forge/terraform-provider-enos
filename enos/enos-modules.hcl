@@ -7,18 +7,17 @@ module "aws_infra" {
 }
 
 module "aws_ssh_consul_cluster" {
-  source = "app.terraform.io/hashicorp-qti/aws-consul/enos"
+  // source = "app.terraform.io/hashicorp-qti/aws-consul/enos"
+  // source = "../../terraform-enos-aws-consul"
+  source = "./modules/aws_ssh_consul_cluster"
 
   project_name    = "enos-provider"
   environment     = "ci"
   common_tags     = var.tags
   ssh_aws_keypair = "enos-ci-ssh-key"
 
-  consul_license = "none"
-  consul_release = {
-    version = var.consul_version
-    edition = "oss"
-  }
+  consul_license = null
+  consul_release = var.consul_release
 }
 
 module "aws_ssh_consul_cluster_enosdev" {
@@ -29,15 +28,15 @@ module "aws_ssh_consul_cluster_enosdev" {
   common_tags     = var.tags
   ssh_aws_keypair = "enos-ci-ssh-key"
 
-  consul_license = "none"
-  consul_release = {
-    version = var.consul_version
-    edition = "oss"
-  }
+
+  consul_license = null
+  consul_release = var.consul_release
 }
 
 module "aws_ssh_vault_cluster" {
-  source = "app.terraform.io/hashicorp-qti/aws-vault/enos"
+  // source = "app.terraform.io/hashicorp-qti/aws-vault/enos"
+  // source = "../../terraform-enos-aws-vault"
+  source = "./modules/aws_ssh_vault_cluster"
 
   project_name    = "enos-provider"
   environment     = "ci"

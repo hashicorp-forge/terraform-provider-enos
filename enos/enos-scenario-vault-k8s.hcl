@@ -66,7 +66,7 @@ scenario "vault_k8s" {
       kubeconfig_base64 = step.create_kind_cluster.kubeconfig_base64
       vault_edition     = matrix.edition
       vault_log_level   = var.log_level
-      ent_license       = matrix.edition != "oss" ? step.read_license.license : null
+      ent_license       = matrix.edition != "oss" ? step.read_license.content : null
     }
   }
 
