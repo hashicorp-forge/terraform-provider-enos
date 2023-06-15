@@ -3,7 +3,8 @@ terraform {
     # We need to specify the provider source in each module until we publish it
     # to the public registry
     enos = {
-      source = "app.terraform.io/hashicorp-qti/enosdev"
+      source  = "app.terraform.io/hashicorp-qti/enosdev"
+      version = ">= 0.4.2"
     }
   }
 }

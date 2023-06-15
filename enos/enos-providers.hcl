@@ -28,6 +28,24 @@ provider "helm" "default" {
   }
 }
 
+provider "helm" "kind_dev" {
+  kubernetes {
+    config_path = abspath(joinpath(path.root, "kubeconfig_kind_dev"))
+  }
+}
+
+provider "helm" "kind_enos" {
+  kubernetes {
+    config_path = abspath(joinpath(path.root, "kubeconfig_kind_enos"))
+  }
+}
+
+provider "helm" "kind_enosdev" {
+  kubernetes {
+    config_path = abspath(joinpath(path.root, "kubeconfig_kind_enosdev"))
+  }
+}
+
 provider "helm" "oss_dev" {
   kubernetes {
     config_path = abspath(joinpath(path.root, "kubeconfig_oss_dev"))

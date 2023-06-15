@@ -1,5 +1,6 @@
 terraform {
   required_version = ">= 1.2.0"
+
   required_providers {
     enos = {
       source = "app.terraform.io/hashicorp-qti/enos"
@@ -7,17 +8,20 @@ terraform {
   }
 }
 
+variable "kubeconfig_path" {
+  type = string
+}
+
 locals {
-  kubeconfig_path = abspath("${path.root}/.terraform/kubeconfig")
-  image_name      = "bananas"
-  image_tag       = "0.1.0"
+  image_name = "bananas"
+  image_tag  = "0.1.0"
 }
 
 resource "random_pet" "cluster_name" {}
 
 resource "enos_local_kind_cluster" "test" {
   name            = random_pet.cluster_name.id
-  kubeconfig_path = local.kubeconfig_path
+  kubeconfig_path = var.kubeconfig_path
 }
 
 resource "enos_local_exec" "create_bananas" {
@@ -42,7 +46,7 @@ output "cluster_name" {
 }
 
 output "kubeconfig_path" {
-  value = local.kubeconfig_path
+  value = var.kubeconfig_path
 }
 
 output "kubeconfig_base64" {

@@ -225,7 +225,7 @@ jobs:
             version: 1.11.10
           - arch: amd64
             backend: consul
-            consul_edition: oss
+            consul_edition: ent
             consul_version: 1.15.3
             distro: rhel
             edition: ent

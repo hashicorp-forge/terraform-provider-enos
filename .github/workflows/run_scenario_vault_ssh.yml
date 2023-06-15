@@ -110,7 +110,8 @@ jobs:
           chmod 600 enos/support/enos-ci-ssh-key.pem
           chmod 600 enos/support/vault.hclic
           chmod 600 enos/support/consul.hclic
-      - uses: ./.github/actions/build-provider
+      - if: ${{ inputs.use == 'dev' }}
+        uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
       - run: enos scenario run vault arch:${{ inputs.arch }} backend:${{ inputs.backend}} distro:${{ inputs.distro }} edition:${{ inputs.edition }} unseal_method:${{ inputs.unseal_method }} use:${{ inputs.use }} version:${{ inputs.version }} --timeout 60m0s

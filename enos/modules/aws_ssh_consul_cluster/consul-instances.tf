@@ -42,13 +42,13 @@ resource "enos_consul_start" "consul" {
   data_dir   = var.consul_data_dir
   config_dir = var.consul_config_dir
   config = {
-    data_dir         = "${var.consul_data_dir}"
+    data_dir         = var.consul_data_dir
     datacenter       = "dc1"
     retry_join       = ["provider=aws tag_key=Type tag_value=${local.consul_cluster_tag}"]
     server           = true
-    bootstrap_expect = 3
-    log_level        = "INFO"
-    log_file         = "${var.consul_log_dir}"
+    bootstrap_expect = var.instance_count
+    log_level        = var.consul_log_level
+    log_file         = var.consul_log_dir
   }
   license   = var.consul_license
   unit_name = "consul"

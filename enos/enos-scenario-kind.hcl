@@ -5,30 +5,46 @@ scenario "kind" {
 
   locals {
     pod_replica_count = 3
+    helm_provider = {
+      "dev"     = provider.helm.kind_dev
+      "enos"    = provider.helm.kind_enos
+      "enosdev" = provider.helm.kind_enosdev
+    }
+    kubeconfig_path = abspath(joinpath(path.root, "kubeconfig_kind_${matrix.use}"))
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
   terraform     = matrix.use == "enosdev" ? terraform.k8s_enosdev : terraform.k8s
   providers = [
     provider.enos.default,
-    provider.helm.default,
+    provider.helm.kind_dev,
+    provider.helm.kind_enos,
+    provider.helm.kind_enosdev,
   ]
 
-  step "create_cluster" {
+  step "create_kind_cluster" {
     module = matrix.use == "enosdev" ? module.kind_create_test_cluster_enosdev : module.kind_create_test_cluster
+
+    variables {
+      kubeconfig_path = local.kubeconfig_path
+    }
   }
 
   step "deploy_helm_chart" {
     module = module.helm_chart
 
+    providers = {
+      helm = local.helm_provider[matrix.use]
+    }
+
     variables {
-      host                   = step.create_cluster.host
-      client_certificate     = step.create_cluster.client_certificate
-      client_key             = step.create_cluster.client_key
-      cluster_ca_certificate = step.create_cluster.cluster_ca_certificate
+      host                   = step.create_kind_cluster.host
+      client_certificate     = step.create_kind_cluster.client_certificate
+      client_key             = step.create_kind_cluster.client_key
+      cluster_ca_certificate = step.create_kind_cluster.cluster_ca_certificate
       replica_count          = local.pod_replica_count
-      repository             = step.create_cluster.repository
-      tag                    = step.create_cluster.tag
+      repository             = step.create_kind_cluster.repository
+      tag                    = step.create_kind_cluster.tag
     }
   }
 
@@ -39,8 +55,8 @@ scenario "kind" {
     module = matrix.use == "enosdev" ? module.test_kind_container_enosdev : module.test_kind_container
 
     variables {
-      kubeconfig_base64 = step.create_cluster.kubeconfig_base64
-      context_name      = step.create_cluster.context_name
+      kubeconfig_base64 = step.create_kind_cluster.kubeconfig_base64
+      context_name      = step.create_kind_cluster.context_name
       replica_count     = local.pod_replica_count
       namespace         = step.deploy_helm_chart.namespace
       pod_label_selectors = [
@@ -51,7 +67,7 @@ scenario "kind" {
   }
 
   output "cluster_name" {
-    value = step.create_cluster.cluster_name
+    value = step.create_kind_cluster.cluster_name
   }
 
   output "pods_tested" {
