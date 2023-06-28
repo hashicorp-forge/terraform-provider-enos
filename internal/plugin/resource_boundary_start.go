@@ -28,18 +28,18 @@ type boundaryStart struct {
 var _ resource.Resource = (*boundaryStart)(nil)
 
 type boundaryStartStateV1 struct {
-	ID              *tfString
-	BinName         *tfString
-	BinPath         *tfString
-	ConfigPath      *tfString
-	ConfigName      *tfString
-	License         *tfString
-	ManageService   *tfBool
-	Status          *tfNum
-	SystemdUnitName *tfString
-	Transport       *embeddedTransportV1
-	Username        *tfString
-
+	ID                   *tfString
+	BinName              *tfString
+	BinPath              *tfString
+	ConfigPath           *tfString
+	ConfigName           *tfString
+	License              *tfString
+	ManageService        *tfBool
+	Status               *tfNum
+	SystemdUnitName      *tfString
+	Username             *tfString
+	RecordingStoragePath *tfString
+	Transport            *embeddedTransportV1
 	failureHandlers
 }
 
@@ -60,18 +60,19 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 	}
 
 	return &boundaryStartStateV1{
-		ID:              newTfString(),
-		BinName:         newTfString(),
-		BinPath:         newTfString(),
-		ConfigPath:      newTfString(),
-		ConfigName:      newTfString(),
-		ManageService:   newTfBool(),
-		License:         newTfString(),
-		Status:          newTfNum(),
-		SystemdUnitName: newTfString(),
-		Username:        newTfString(),
-		Transport:       transport,
-		failureHandlers: fh,
+		ID:                   newTfString(),
+		BinName:              newTfString(),
+		BinPath:              newTfString(),
+		ConfigPath:           newTfString(),
+		ConfigName:           newTfString(),
+		ManageService:        newTfBool(),
+		License:              newTfString(),
+		Status:               newTfNum(),
+		SystemdUnitName:      newTfString(),
+		Username:             newTfString(),
+		RecordingStoragePath: newTfString(),
+		Transport:            transport,
+		failureHandlers:      fh,
 	}
 }
 
@@ -254,6 +255,11 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 					Type:     tftypes.String,
 					Optional: true,
 				},
+				{
+					Name:     "recording_storage_path",
+					Type:     tftypes.String,
+					Optional: true,
+				},
 				s.Transport.SchemaAttributeTransport(),
 			},
 		},
@@ -283,16 +289,17 @@ func (s *boundaryStartStateV1) Validate(ctx context.Context) error {
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Boundary with As().
 func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"id":             s.ID,
-		"bin_name":       s.BinName,
-		"bin_path":       s.BinPath,
-		"config_path":    s.ConfigPath,
-		"config_name":    s.ConfigName,
-		"manage_service": s.ManageService,
-		"license":        s.License,
-		"status":         s.Status,
-		"unit_name":      s.SystemdUnitName,
-		"username":       s.Username,
+		"id":                     s.ID,
+		"bin_name":               s.BinName,
+		"bin_path":               s.BinPath,
+		"config_path":            s.ConfigPath,
+		"config_name":            s.ConfigName,
+		"manage_service":         s.ManageService,
+		"license":                s.License,
+		"status":                 s.Status,
+		"unit_name":              s.SystemdUnitName,
+		"username":               s.Username,
+		"recording_storage_path": s.RecordingStoragePath,
 	})
 	if err != nil {
 		return err
@@ -308,16 +315,17 @@ func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":             s.ID.TFType(),
-		"bin_name":       s.BinName.TFType(),
-		"bin_path":       s.BinPath.TFType(),
-		"config_path":    s.ConfigPath.TFType(),
-		"config_name":    s.ConfigName.TFType(),
-		"manage_service": s.ManageService.TFType(),
-		"license":        s.License.TFType(),
-		"status":         s.Status.TFType(),
-		"unit_name":      s.SystemdUnitName.TFType(),
-		"username":       s.Username.TFType(),
+		"id":                     s.ID.TFType(),
+		"bin_name":               s.BinName.TFType(),
+		"bin_path":               s.BinPath.TFType(),
+		"config_path":            s.ConfigPath.TFType(),
+		"config_name":            s.ConfigName.TFType(),
+		"manage_service":         s.ManageService.TFType(),
+		"license":                s.License.TFType(),
+		"status":                 s.Status.TFType(),
+		"unit_name":              s.SystemdUnitName.TFType(),
+		"username":               s.Username.TFType(),
+		"recording_storage_path": s.RecordingStoragePath.TFType(),
 
 		"transport": s.Transport.Terraform5Type(),
 	}}
@@ -326,17 +334,18 @@ func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 // Terraform5Value is the file state tftypes.Value.
 func (s *boundaryStartStateV1) Terraform5Value() tftypes.Value {
 	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"id":             s.ID.TFValue(),
-		"bin_name":       s.BinName.TFValue(),
-		"bin_path":       s.BinPath.TFValue(),
-		"config_path":    s.ConfigPath.TFValue(),
-		"config_name":    s.ConfigName.TFValue(),
-		"manage_service": s.ManageService.TFValue(),
-		"license":        s.License.TFValue(),
-		"status":         s.Status.TFValue(),
-		"unit_name":      s.SystemdUnitName.TFValue(),
-		"username":       s.Username.TFValue(),
-		"transport":      s.Transport.Terraform5Value(),
+		"id":                     s.ID.TFValue(),
+		"bin_name":               s.BinName.TFValue(),
+		"bin_path":               s.BinPath.TFValue(),
+		"config_path":            s.ConfigPath.TFValue(),
+		"config_name":            s.ConfigName.TFValue(),
+		"manage_service":         s.ManageService.TFValue(),
+		"license":                s.License.TFValue(),
+		"status":                 s.Status.TFValue(),
+		"unit_name":              s.SystemdUnitName.TFValue(),
+		"username":               s.Username.TFValue(),
+		"recording_storage_path": s.RecordingStoragePath.TFValue(),
+		"transport":              s.Transport.Terraform5Value(),
 	})
 }
 
@@ -384,6 +393,17 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 	))
 	if err != nil {
 		return fmt.Errorf("failed to find or create the boundary user, due to: %w", err)
+	}
+
+	// Create a directory for session recordings if a directory is given
+	if path, ok := s.RecordingStoragePath.Get(); ok {
+		err = remoteflight.CreateDirectory(ctx, transport, remoteflight.NewCreateDirectoryRequest(
+			remoteflight.WithDirName(path),
+			remoteflight.WithDirChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
+		))
+		if err != nil {
+			return fmt.Errorf("failed to create recording_storage_path directory, due to %w", err)
+		}
 	}
 
 	// Copy the license file if we have one

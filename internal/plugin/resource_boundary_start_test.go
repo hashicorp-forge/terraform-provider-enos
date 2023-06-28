@@ -32,6 +32,10 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 		config_path = "{{.ConfigPath.Value}}"
 		{{end}}
 
+		{{if .RecordingStoragePath.Value}}
+		recording_storage_path = "{{.RecordingStoragePath.Value}}"
+		{{end}}
+
         {{ renderTransport .Transport }}
    }`))
 
@@ -42,6 +46,7 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 	boundaryStart.BinName.Set("boundary-worker")
 	boundaryStart.BinPath.Set("/opt/boundary/bin")
 	boundaryStart.ConfigPath.Set("/etc/boundary")
+	boundaryStart.RecordingStoragePath.Set("/recordings")
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	ssh := newEmbeddedTransportSSH()
@@ -55,6 +60,7 @@ func TestAccResourceBoundaryStart(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "bin_name", regexp.MustCompile(`^boundary-worker$`)),
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "bin_path", regexp.MustCompile(`^/opt/boundary/bin$`)),
 			resource.TestMatchResourceAttr("enos_boundary_start.foo", "config_path", regexp.MustCompile(`^/etc/boundary$`)),
+			resource.TestMatchResourceAttr("enos_boundary_start.foo", "recording_storage_path", regexp.MustCompile(`^/recordings$`)),
 		),
 		false,
 	})
