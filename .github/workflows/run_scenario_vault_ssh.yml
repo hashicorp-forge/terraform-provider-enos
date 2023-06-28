@@ -24,6 +24,8 @@ on:
       edition:
         required: true
         type: string
+      enos_provider_version:
+        type: string
       use:
         required: true
         type: string
@@ -55,6 +57,8 @@ on:
       edition:
         required: true
         type: string
+      enos_provider_version:
+        type: string
       use:
         required: true
         type: string
@@ -76,11 +80,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs
+      ENOS_VAR_enosdev_provider_version: ${{ inputs.enos_provider_version }}
       ENOS_VAR_tfc_api_token: ${{ secrets.TF_API_TOKEN }}
       ENOS_VAR_consul_release: '{edition = "${{ inputs.consul_edition }}", version = "${{ inputs.consul_version }}"}'
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
       - uses: hashicorp/doormat-action@main

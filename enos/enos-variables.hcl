@@ -13,7 +13,7 @@ variable "consul_release" {
 variable "enosdev_provider_version" {
   description = "The version of the enosdev provider to install for enosdev scenarios"
   type        = string
-  default     = "0.3.26"
+  default     = "0.4.3"
 }
 
 variable "environment" {
