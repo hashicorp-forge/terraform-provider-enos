@@ -12,7 +12,7 @@ locals {
   release = {
     product = "consul"
     version = "1.10.3"
-    edition = "oss"
+    edition = "ce"
   }
 
   install_dir = "/opt/consul/bin"

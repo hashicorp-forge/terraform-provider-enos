@@ -262,7 +262,6 @@ func (r *vaultStart) ApplyResourceChange(ctx context.Context, req resource.Apply
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startVault(ctx, client)
-
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Start Error", err))
 			return
@@ -719,7 +718,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
 			remoteflight.WithCopyFileContent(tfile.NewReader(license)),
 		))
-
 		if err != nil {
 			return fmt.Errorf("failed to copy vault license, due to: %w", err)
 		}
@@ -748,7 +746,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
 		hcl.WithHCLConfigFile(config),
 	))
-
 	if err != nil {
 		return fmt.Errorf("failed to create the vault configuration file, due to: %w", err)
 	}
@@ -808,7 +805,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			systemd.WithUnitChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
 			systemd.WithUnitFile(unit),
 		))
-
 		if err != nil {
 			return fmt.Errorf("failed to create the vault systemd unit, due to: %w", err)
 		}

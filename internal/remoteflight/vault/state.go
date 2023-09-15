@@ -260,7 +260,6 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 			WithReplicationRequestBinPath(req.BinPath),
 			WithReplicationRequestVaultAddr(req.VaultAddr),
 		))
-
 		if err != nil {
 			return state, err
 		}

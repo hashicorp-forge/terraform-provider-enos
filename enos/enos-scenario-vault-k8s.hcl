@@ -1,16 +1,16 @@
 scenario "vault_k8s" {
   matrix {
-    edition = ["oss", "ent"]
+    edition = ["ce", "ent"]
     use     = ["dev", "enos", "enosdev"]
   }
 
   locals {
-    image_repo = var.image_repository != null ? var.image_repository : matrix.edition == "oss" ? "hashicorp/vault" : "hashicorp/vault-enterprise"
+    image_repo = var.image_repository != null ? var.image_repository : matrix.edition == "ce" ? "hashicorp/vault" : "hashicorp/vault-enterprise"
     helm_provider = {
-      "oss" = {
-        "dev"     = provider.helm.oss_dev
-        "enos"    = provider.helm.oss_enos
-        "enosdev" = provider.helm.oss_enosdev
+      "ce" = {
+        "dev"     = provider.helm.ce_dev
+        "enos"    = provider.helm.ce_enos
+        "enosdev" = provider.helm.ce_enosdev
       }
       "ent" = {
         "dev"     = provider.helm.ent_dev
@@ -24,16 +24,16 @@ scenario "vault_k8s" {
   terraform     = matrix.use == "enosdev" ? terraform.k8s_enosdev : terraform.k8s
   providers = [
     provider.enos.default,
-    provider.helm.oss_dev,
-    provider.helm.oss_enos,
-    provider.helm.oss_enosdev,
+    provider.helm.ce_dev,
+    provider.helm.ce_enos,
+    provider.helm.ce_enosdev,
     provider.helm.ent_dev,
     provider.helm.ent_enos,
     provider.helm.ent_enosdev,
   ]
 
   step "read_license" {
-    skip_step = matrix.edition == "oss"
+    skip_step = matrix.edition == "ce"
     module    = module.read_file
 
     variables {
@@ -66,7 +66,7 @@ scenario "vault_k8s" {
       kubeconfig_base64 = step.create_kind_cluster.kubeconfig_base64
       vault_edition     = matrix.edition
       vault_log_level   = var.log_level
-      ent_license       = matrix.edition != "oss" ? step.read_license.content : null
+      ent_license       = matrix.edition != "ce" ? step.read_license.content : null
     }
   }
 

@@ -15,7 +15,7 @@ locals {
   vault_release = {
     product = "vault"
     version = "1.12.0"
-    edition = "oss"
+    edition = "ce"
   }
 
   vault_install_dir = "/opt/vault/bin"

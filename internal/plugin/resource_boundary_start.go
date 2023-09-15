@@ -190,7 +190,6 @@ func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req resource.Ap
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startBoundary(ctx, client)
-
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Start Error", err))
 			return
@@ -490,7 +489,6 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 			systemd.WithUnitChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
 			systemd.WithUnitFile(unit),
 		))
-
 		if err != nil {
 			return fmt.Errorf("failed to create the boundary systemd unit, due to: %w", err)
 		}

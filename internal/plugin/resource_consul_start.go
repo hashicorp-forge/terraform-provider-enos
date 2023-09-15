@@ -221,7 +221,6 @@ func (r *consulStart) ApplyResourceChange(ctx context.Context, req resource.Appl
 		}
 	} else if reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.startConsul(ctx, client)
-
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Consul Start Error", err))
 			return
@@ -559,7 +558,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 			remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
 			remoteflight.WithCopyFileContent(tfile.NewReader(license)),
 		))
-
 		if err != nil {
 			return fmt.Errorf("failed to copy consul license, due to: %w", err)
 		}
@@ -569,7 +567,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 			consul.WithValidateConfigBinPath(s.BinPath.Value()),
 			consul.WithValidateFilePath(licensePath),
 		))
-
 		if err != nil {
 			return fmt.Errorf("consul license validation failed, due to: %w", err)
 		}
@@ -586,7 +583,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		systemd.WithUnitChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
 		systemd.WithUnitFile(unit),
 	))
-
 	if err != nil {
 		return fmt.Errorf("failed to create the consul systemd unit, due to: %w", err)
 	}
@@ -600,7 +596,6 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", consulUsername, consulUsername)),
 		hcl.WithHCLConfigFile(config),
 	))
-
 	if err != nil {
 		return fmt.Errorf("failed to create the consul configuration file, due to: %w", err)
 	}

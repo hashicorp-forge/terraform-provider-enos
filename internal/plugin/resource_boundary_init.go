@@ -260,7 +260,6 @@ func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req resource.App
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.Init(ctx, client)
-
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Boundary Init Error", err))
 			return

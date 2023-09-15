@@ -13,7 +13,7 @@ on:
       consul_edition:
         required: false
         type: string
-        default: oss
+        default: ce
       consul_version:
         required: false
         type: string
@@ -46,7 +46,7 @@ on:
       consul_edition:
         required: false
         type: string
-        default: oss
+        default: ce
       consul_version:
         required: false
         type: string

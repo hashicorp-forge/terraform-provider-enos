@@ -92,7 +92,7 @@ func (r *Release) SHA256SUMSURL() string {
 
 func (r *Release) versionWithEdition() string {
 	switch r.Edition {
-	case "oss":
+	case "ce", "oss":
 		return r.Version
 	default:
 		return fmt.Sprintf("%s+%s", r.Version, r.Edition)

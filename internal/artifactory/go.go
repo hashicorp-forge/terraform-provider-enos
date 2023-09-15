@@ -12,7 +12,7 @@ var supportedVaultTargets = map[string][]string{
 }
 
 // supportedEditions is our currently supported Vault editions.
-var supportedVaultEditions = []string{"oss", "ent", "ent.hsm", "ent.fips1402", "ent.hsm.fips1402"}
+var supportedVaultEditions = []string{"ce", "oss", "ent", "ent.hsm", "ent.fips1402", "ent.hsm.fips1402"}
 
 // SupportedVaultArch validates that the given platform and arch are supported.
 func SupportedVaultArch(platform, arch string) bool {

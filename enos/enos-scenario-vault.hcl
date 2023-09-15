@@ -3,7 +3,7 @@ scenario "vault" {
     backend       = ["consul", "raft"]
     distro        = ["ubuntu", "rhel"]
     arch          = ["amd64", "arm64"]
-    edition       = ["oss", "ent"]
+    edition       = ["ce", "ent"]
     version       = ["1.8.12", "1.9.10", "1.10.11", "1.11.10", "1.12.6", "1.13.2"]
     unseal_method = ["shamir", "awskms"]
     use           = ["dev", "enos", "enosdev"]
@@ -47,7 +47,7 @@ scenario "vault" {
   }
 
   step "consul_license" {
-    skip_step = var.consul_release.edition == "oss"
+    skip_step = var.consul_release.edition == "ce"
     module    = module.read_file
 
     variables {
@@ -56,7 +56,7 @@ scenario "vault" {
   }
 
   step "vault_license" {
-    skip_step = matrix.edition == "oss"
+    skip_step = matrix.edition == "ce"
     module    = module.read_file
 
     variables {
@@ -65,7 +65,7 @@ scenario "vault" {
   }
 
   step "license" {
-    skip_step = matrix.edition == "oss"
+    skip_step = matrix.edition == "ce"
     module    = module.read_file
 
     variables {
@@ -86,7 +86,7 @@ scenario "vault" {
 
     variables {
       ami_id         = step.infra.ami_ids["ubuntu"]["amd64"]
-      consul_license = var.consul_release.edition == "oss" ? null : step.consul_license.content
+      consul_license = var.consul_release.edition == "ce" ? null : step.consul_license.content
       instance_type  = local.instance_types["amd64"]
       kms_key_arn    = step.infra.kms_key_arn
       vpc_id         = step.infra.vpc_id
@@ -111,7 +111,7 @@ scenario "vault" {
       kms_key_arn        = step.infra.kms_key_arn
       storage_backend    = matrix.backend
       unseal_method      = matrix.unseal_method
-      vault_license      = matrix.edition != "oss" ? step.vault_license.content : null
+      vault_license      = matrix.edition != "ce" ? step.vault_license.content : null
       vault_release = {
         version = local.vault_version
         edition = matrix.edition
@@ -138,7 +138,7 @@ scenario "vault" {
       kms_key_arn        = step.infra.kms_key_arn
       storage_backend    = "raft"
       unseal_method      = matrix.unseal_method
-      vault_license      = matrix.edition != "oss" ? step.vault_license.content : null
+      vault_license      = matrix.edition != "ce" ? step.vault_license.content : null
       vault_release = {
         version = local.vault_version
         edition = matrix.edition

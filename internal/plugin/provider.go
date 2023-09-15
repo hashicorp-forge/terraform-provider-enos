@@ -15,6 +15,8 @@ import (
 )
 
 // env var for setting the debug_data_root_dir.
+//
+//nolint:gosec // G101 we're not harding a credential
 const enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR"
 
 var (
@@ -62,8 +64,8 @@ func (p *Provider) Schema() *tfprotov6.Schema {
 					Name:     "debug_data_root_dir",
 					Type:     tftypes.String,
 					Optional: true,
-					Description: `The root directory where failure diagnostics files (e.g. application log files) are saved. 
-If configured and the directory does not exist, it will be created. 
+					Description: `The root directory where failure diagnostics files (e.g. application log files) are saved.
+If configured and the directory does not exist, it will be created.
 If the directory is not configured, diagnostic files will not be saved locally.`,
 				},
 			},

@@ -160,7 +160,7 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req resource.Pla
 	// Make sure that we set a default edition if we have a product
 	if _, ok := proposedState.Release.Product.Get(); ok {
 		if _, ok := proposedState.Release.Edition.Get(); !ok {
-			proposedState.Release.Edition.Set("oss")
+			proposedState.Release.Edition.Set("ce")
 		}
 	}
 }

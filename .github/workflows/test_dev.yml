@@ -210,16 +210,16 @@ jobs:
           - arch: amd64
             backend: raft
             distro: ubuntu
-            edition: oss
+            edition: ce
             use: dev
             unseal_method: awskms
             version: 1.8.12
           - arch: arm64
             backend: consul
-            consul_edition: oss
+            consul_edition: ce
             consul_version: 1.14.7
             distro: ubuntu
-            edition: oss
+            edition: ce
             use: dev
             unseal_method: shamir
             version: 1.11.10
@@ -235,7 +235,7 @@ jobs:
           - arch: arm64
             backend: raft
             distro: rhel
-            edition: oss
+            edition: ce
             use: dev
             unseal_method: shamir
             version: 1.12.6
@@ -265,7 +265,7 @@ jobs:
       matrix:
         filter:
           - edition:ent use:dev
-          - edition:oss use:dev
+          - edition:ce use:dev
       fail-fast: false
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3

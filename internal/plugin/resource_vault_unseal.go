@@ -191,7 +191,6 @@ func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req resource.Appl
 		}
 	} else if !reflect.DeepEqual(plannedState, priorState) {
 		err = plannedState.Unseal(ctx, client)
-
 		if err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Vault Unseal Error", err))
 			return

@@ -46,21 +46,21 @@ provider "helm" "kind_enosdev" {
   }
 }
 
-provider "helm" "oss_dev" {
+provider "helm" "ce_dev" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_oss_dev"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_ce_dev"))
   }
 }
 
-provider "helm" "oss_enos" {
+provider "helm" "ce_enos" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_oss_enos"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_ce_enos"))
   }
 }
 
-provider "helm" "oss_enosdev" {
+provider "helm" "ce_enosdev" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_oss_enosdev"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_ce_enosdev"))
   }
 }
 

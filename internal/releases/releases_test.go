@@ -28,6 +28,16 @@ func TestBundleURL(t *testing.T) {
 		{
 			&Release{
 				Product:  "vault",
+				Version:  "1.15.0",
+				Edition:  "ce",
+				Platform: "linux",
+				Arch:     "arm64",
+			},
+			"https://releases.hashicorp.com/vault/1.15.0/vault_1.15.0_linux_arm64.zip",
+		},
+		{
+			&Release{
+				Product:  "vault",
 				Version:  "1.7.0",
 				Edition:  "ent.hsm",
 				Platform: "linux",
