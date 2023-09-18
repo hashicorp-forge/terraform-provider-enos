@@ -397,8 +397,8 @@ func (r *RaftAutopilotStateResponseData) String() string {
 	if r == nil {
 		return ""
 	}
-	out := new(strings.Builder)
 
+	out := new(strings.Builder)
 	_, _ = out.WriteString(fmt.Sprintf("Healthy: %t\n", r.Healthy))
 	_, _ = out.WriteString(fmt.Sprintf("Failure Tolerance: %s\n", r.FailureTolerance))
 	_, _ = out.WriteString(fmt.Sprintf("Leader: %s\n", r.Leader))
@@ -478,8 +478,8 @@ func (r *RaftAutopilotStateServer) String() string {
 	if r == nil {
 		return ""
 	}
-	out := new(strings.Builder)
 
+	out := new(strings.Builder)
 	_, _ = out.WriteString(fmt.Sprintf("ID: %s\n", r.ID))
 	_, _ = out.WriteString(fmt.Sprintf("Name: %s\n", r.Name))
 	_, _ = out.WriteString(fmt.Sprintf("Address: %s\n", r.Address))

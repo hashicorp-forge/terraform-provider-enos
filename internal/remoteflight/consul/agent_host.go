@@ -121,7 +121,7 @@ func (r *AgentHostRequest) String() string {
 
 // Hostname returns the hostname of the host.
 func (r *AgentHostResponse) Hostname() string {
-	if r.Host == nil {
+	if r == nil || r.Host == nil {
 		return ""
 	}
 

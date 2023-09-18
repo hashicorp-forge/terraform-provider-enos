@@ -153,8 +153,8 @@ func (s *StatusResponse) String() string {
 	if s == nil {
 		return ""
 	}
-	out := new(strings.Builder)
 
+	out := new(strings.Builder)
 	_, _ = out.WriteString(fmt.Sprintf("Code: %[1]d (%[1]s)\n", s.StatusCode))
 	if s.SealType != "" {
 		_, _ = out.WriteString(fmt.Sprintf("Seal Type: %s\n", s.SealType))

@@ -141,9 +141,13 @@ func (s *ReplicationData) String() string {
 		return ""
 	}
 
-	dr := s.DR.String()
-	perf := s.Performance.String()
-
+	var dr, perf string
+	if s.DR != nil {
+		dr = s.DR.String()
+	}
+	if s.Performance != nil {
+		perf = s.Performance.String()
+	}
 	if dr == "" && perf == "" {
 		return ""
 	}

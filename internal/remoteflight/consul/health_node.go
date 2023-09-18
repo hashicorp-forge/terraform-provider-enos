@@ -141,11 +141,7 @@ func (r *HealthNodeRequest) String() string {
 
 // String returns the NodeHealthResponse as a string.
 func (n *HealthNodeResponse) String() string {
-	if n != nil && n.Nodes != nil {
-		return ""
-	}
-
-	if len(n.Nodes) < 1 {
+	if n == nil || n.Nodes == nil || len(n.Nodes) < 1 {
 		return ""
 	}
 

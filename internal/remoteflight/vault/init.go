@@ -191,6 +191,10 @@ func (r *InitRequest) Validate() error {
 
 // String returns the init request as an init command.
 func (r *InitRequest) String() string {
+	if r == nil {
+		return ""
+	}
+
 	cmd := &strings.Builder{}
 	cmd.WriteString(fmt.Sprintf("%s operator init -format=json", r.BinPath))
 	if r.KeyShares != -1 {

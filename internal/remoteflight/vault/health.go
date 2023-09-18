@@ -286,7 +286,9 @@ func (r *HealthResponse) String() string {
 	_, _ = out.WriteString(fmt.Sprintf("Replication DR Mode: %s\n", r.ReplicationDRMode))
 	_, _ = out.WriteString(fmt.Sprintf("Replication Performance Mode: %s\n", r.ReplicationPerformanceMode))
 	_, _ = out.WriteString(fmt.Sprintf("Server Time UTC: %d\n", r.ServerTimeUTC))
-	_, _ = out.WriteString(fmt.Sprintf("License:\n%s", istrings.Indent("  ", r.License.String())))
+	if r.License != nil {
+		_, _ = out.WriteString(fmt.Sprintf("License:\n%s", istrings.Indent("  ", r.License.String())))
+	}
 
 	return out.String()
 }

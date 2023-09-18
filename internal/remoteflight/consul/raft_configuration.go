@@ -127,7 +127,7 @@ func (r *RaftConfigurationRequest) String() string {
 
 // String returns the raft configuration response as a string.
 func (r *RaftConfigurationResponse) String() string {
-	if r != nil && r.Servers != nil {
+	if r == nil || r.Servers == nil || len(r.Servers) < 1 {
 		return ""
 	}
 
