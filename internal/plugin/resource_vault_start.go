@@ -837,6 +837,16 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 	), vault.CheckStateHasSystemdEnabledAndRunningProperties(),
 		vault.CheckStateSealStateIsKnown(),
 	)
+
+	statusCode := vault.StatusUnknown
+	if state != nil {
+		var err1 error
+		statusCode, err1 = state.StatusCode()
+		err = errors.Join(err, err1)
+	}
+
+	s.Status.Set(int(statusCode))
+
 	if err != nil {
 		err = fmt.Errorf("failed to start the vault service: %w", err)
 		if state != nil {
@@ -846,8 +856,6 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			)
 		}
 	}
-
-	s.Status.Set(int(state.Status.StatusCode))
 
 	return err
 }

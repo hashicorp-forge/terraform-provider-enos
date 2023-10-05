@@ -150,7 +150,7 @@ func WithStateRequestListPodsRequestOpts(opts ...kubernetes.ListPodsRequestOpt) 
 func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, error) {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("getting vault state: %w", ctx.Err())
 	default:
 	}
 
@@ -166,7 +166,7 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 
 	pidManager, err := remoteflight.TargetProcessManager(ctx, tr, targetReq)
 	if err != nil {
-		return state, fmt.Errorf("getting state: unable to determine target process manager: %w", err)
+		return state, fmt.Errorf("getting vault state: unable to determine target process manager: %w", err)
 	}
 
 	switch pidManager {
@@ -254,8 +254,12 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 		return state, nil
 	}
 
-	if (state.Health.ReplicationDRMode != "" && state.Health.ReplicationDRMode != "disabled") ||
-		(state.Health.ReplicationPerformanceMode != "" && state.Health.ReplicationPerformanceMode != "disabled") {
+	replicationEnabled, err := state.ReplicationEnabled()
+	if err != nil {
+		return state, err
+	}
+
+	if replicationEnabled {
 		state.ReplicationStatus, err = GetReplicationStatus(ctx, tr, NewReplicationRequest(
 			WithReplicationRequestBinPath(req.BinPath),
 			WithReplicationRequestVaultAddr(req.VaultAddr),
@@ -282,14 +286,24 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 		return state, err
 	}
 
-	if state.Status.HAEnabled {
+	haEnabled, err := state.HAEnabled()
+	if err != nil {
+		return state, err
+	}
+
+	if haEnabled {
 		state.HAStatus, err = GetHAStatus(ctx, tr, req.CLIRequest)
 		if err != nil {
 			return state, err
 		}
 	}
 
-	if state.SealStatus.Data.StorageType == "raft" {
+	storageType, err := state.StorageType()
+	if err != nil {
+		return state, err
+	}
+
+	if storageType == "raft" {
 		state.RaftConfig, err = GetRaftConfiguration(ctx, tr, req.CLIRequest)
 		if err != nil {
 			return state, err
@@ -324,10 +338,6 @@ func WaitForState(ctx context.Context, tr it.Transport, req *StateRequest, check
 		state, err := GetState(ctx, tr, req)
 		if err != nil {
 			return state, err
-		}
-
-		if len(checks) == 0 {
-			return state, nil
 		}
 
 		if state == nil {
@@ -425,7 +435,7 @@ func (s *State) IsSealed() (bool, error) {
 	}
 
 	if s.SealStatus == nil {
-		return false, fmt.Errorf("state has /v1/sys/seal-status data")
+		return false, fmt.Errorf("state has no /v1/sys/seal-status data")
 	}
 
 	statusSealed, err := s.Status.IsSealed()
@@ -483,4 +493,69 @@ func (s *State) IsInitialized() (bool, error) {
 	}
 
 	return s.Status.Initialized, nil
+}
+
+// ReplicationEnabled checks whether or not the state includes replication health information and if
+// replication is enabled.
+func (s *State) ReplicationEnabled() (bool, error) {
+	if s == nil {
+		return false, fmt.Errorf("state is unknown")
+	}
+
+	if s.Health == nil {
+		return false, fmt.Errorf("state has no /v1/sys/health data")
+	}
+
+	if s.Health.ReplicationDRMode != "" && s.Health.ReplicationDRMode != "disabled" {
+		return true, nil
+	}
+
+	if s.Health.ReplicationPerformanceMode != "" && s.Health.ReplicationPerformanceMode != "disabled" {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// HAEnabled checks whether or not the state includes status infroatmion and if HA is enabled.
+func (s *State) HAEnabled() (bool, error) {
+	if s == nil {
+		return false, fmt.Errorf("state is unknown")
+	}
+
+	if s.Status == nil {
+		return true, fmt.Errorf("state does not include 'vault status' response")
+	}
+
+	return s.Status.HAEnabled, nil
+}
+
+// StorageType gets the storage type from the seal status data.
+func (s *State) StorageType() (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("state is unknown")
+	}
+
+	if s.SealStatus == nil {
+		return "", fmt.Errorf("state has no /v1/sys/seal-status response data")
+	}
+
+	if s.SealStatus.Data == nil {
+		return "", fmt.Errorf("state has no /v1/sys/seal-status data")
+	}
+
+	return s.SealStatus.Data.StorageType, nil
+}
+
+// StatusCode gets the status code from the 'vault status' response.
+func (s *State) StatusCode() (StatusCode, error) {
+	if s == nil {
+		return StatusUnknown, fmt.Errorf("state is unknown")
+	}
+
+	if s.Status == nil {
+		return StatusUnknown, fmt.Errorf("state does not include 'vault status' response")
+	}
+
+	return s.Status.StatusCode, nil
 }
