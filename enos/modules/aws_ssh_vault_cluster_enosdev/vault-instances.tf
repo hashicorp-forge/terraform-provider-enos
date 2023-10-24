@@ -157,8 +157,11 @@ resource "enos_vault_start" "followers" {
       type       = var.storage_backend
       attributes = { for key, value in local.storage_config[each.key] : key => value }
     }
-    seal = local.seal[var.unseal_method]
-    ui   = true
+    // NOTE: using our seals key here and seal for leader to ensure backwards compat
+    seals = {
+      "primary" = local.seal[var.unseal_method]
+    }
+    ui = true
   }
   license   = var.vault_license
   unit_name = "vault"
@@ -214,60 +217,6 @@ resource "enos_vault_unseal" "leader" {
   }
 }
 
-# We need to ensure that the directory used for audit logs is present and accessible to the vault
-# user on all nodes, since logging will only happen on the leader.
-resource "enos_remote_exec" "create_audit_log_dir" {
-  depends_on = [
-    enos_vault_unseal.leader,
-  ]
-  for_each = toset([
-    for idx in local.vault_instances : idx
-    if var.enable_file_audit_device
-  ])
-
-  environment = {
-    LOG_FILE_PATH = local.audit_device_file_path
-    SERVICE_USER  = local.vault_service_user
-  }
-
-  scripts = [abspath("${path.module}/scripts/create_audit_log_dir.sh")]
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance[each.value].public_ip
-    }
-  }
-}
-
-resource "enos_remote_exec" "init_audit_device" {
-  depends_on = [
-    enos_remote_exec.create_audit_log_dir,
-    enos_vault_unseal.leader,
-  ]
-  for_each = toset([
-    for idx in local.leader : idx
-    if local.enable_audit_device
-  ])
-
-  environment = {
-    VAULT_TOKEN    = enos_vault_init.leader[each.key].root_token
-    VAULT_ADDR     = "http://127.0.0.1:8200"
-    VAULT_BIN_PATH = local.vault_bin_path
-    LOG_FILE_PATH  = local.audit_device_file_path
-    SERVICE_USER   = local.vault_service_user
-  }
-
-  scripts = [
-    abspath("${path.module}/scripts/enable_audit_logging.sh"),
-  ]
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance[each.key].public_ip
-    }
-  }
-}
-
 resource "enos_vault_unseal" "followers" {
   depends_on = [
     enos_vault_init.leader,
@@ -317,22 +266,88 @@ resource "enos_vault_unseal" "when_vault_unseal_when_no_init_is_set" {
   }
 }
 
-resource "enos_remote_exec" "vault_write_license" {
-  count = var.vault_init ? 1 : 0
+locals {
+  private_ips = [for _, v in aws_instance.vault_instance : tostring(v.private_ip)]
+}
+
+resource "enos_remote_exec" "wait_for_leader_in_vault_hosts" {
   depends_on = [
     enos_vault_unseal.leader,
-    enos_vault_unseal.when_vault_unseal_when_no_init_is_set,
+    enos_vault_unseal.followers,
   ]
+  for_each = local.vault_instances
 
-  content = templatefile("${path.module}/templates/vault-write-license.sh", {
-    vault_bin_path   = local.vault_bin_path,
-    vault_root_token = coalesce(var.vault_root_token, try(enos_vault_init.leader[0].root_token, null), "none")
-    vault_license    = coalesce(var.vault_license, "none")
-  })
+  environment = {
+    RETRY_INTERVAL             = 2
+    TIMEOUT_SECONDS            = 60
+    VAULT_ADDR                 = "http://127.0.0.1:8200"
+    VAULT_TOKEN                = enos_vault_init.leader[0].root_token
+    VAULT_INSTANCE_PRIVATE_IPS = jsonencode(local.private_ips)
+    VAULT_INSTALL_DIR          = var.vault_install_dir
+  }
+
+  scripts = [abspath("${path.module}/scripts/wait-for-leader.sh")]
 
   transport = {
     ssh = {
-      host = aws_instance.vault_instance[0].public_ip
+      host = aws_instance.vault_instance[each.key].public_ip
+    }
+  }
+}
+
+# We need to ensure that the directory used for audit logs is present and accessible to the vault
+# user on all nodes, since logging will only happen on the leader.
+resource "enos_remote_exec" "create_audit_log_dir" {
+  depends_on = [
+    enos_vault_unseal.leader,
+    enos_vault_unseal.followers,
+    enos_remote_exec.wait_for_leader_in_vault_hosts,
+  ]
+  for_each = toset([
+    for idx in local.vault_instances : idx
+    if var.enable_file_audit_device
+  ])
+
+  environment = {
+    LOG_FILE_PATH = local.audit_device_file_path
+    SERVICE_USER  = local.vault_service_user
+  }
+
+  scripts = [abspath("${path.module}/scripts/create_audit_log_dir.sh")]
+
+  transport = {
+    ssh = {
+      host = aws_instance.vault_instance[each.value].public_ip
+    }
+  }
+}
+
+resource "enos_remote_exec" "init_audit_device" {
+  depends_on = [
+    enos_remote_exec.create_audit_log_dir,
+    enos_vault_unseal.leader,
+    enos_vault_unseal.followers,
+  ]
+  for_each = toset([
+    for idx in local.leader : idx
+    if local.enable_audit_device
+  ])
+
+  environment = {
+    VAULT_TOKEN    = enos_vault_init.leader[each.key].root_token
+    VAULT_ADDR     = "http://127.0.0.1:8200"
+    VAULT_BIN_PATH = local.vault_bin_path
+    LOG_FILE_PATH  = local.audit_device_file_path
+    SERVICE_USER   = local.vault_service_user
+  }
+
+  scripts = [
+    abspath("${path.module}/scripts/enable_audit_logging.sh"),
+  ]
+
+  transport = {
+    ssh = {
+      host = aws_instance.vault_instance[each.key].public_ip
     }
   }
 }

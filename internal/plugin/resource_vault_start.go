@@ -65,7 +65,8 @@ type vaultConfig struct {
 	Listener    *vaultConfigBlock
 	LogLevel    *tfString
 	Storage     *vaultConfigBlock
-	Seal        *vaultConfigBlock
+	Seal        *vaultConfigBlock // Single seal configuration
+	Seals       *vaultSealsConfig // HA Seal configuration
 	UI          *tfBool
 }
 
@@ -76,6 +77,26 @@ type vaultConfigBlock struct {
 	AttrsValues    map[string]tftypes.Value
 	AttrsRaw       tftypes.Value
 	Unknown        bool
+	Null           bool
+}
+
+// vaultSealsConfig is the Vault Enterprise HA seals block. It supports up to the
+// maximum of three HA seals.
+type vaultSealsConfig struct {
+	Primary   *vaultConfigBlock
+	Secondary *vaultConfigBlock
+	Tertiary  *vaultConfigBlock
+	Unknown   bool
+	Null      bool
+	// keep these around for marshaling the dynamic value
+	RawValues map[string]tftypes.Value
+	RawValue  tftypes.Value
+}
+
+type vaultConfigBlockSet struct {
+	typ   string
+	attrs map[string]any
+	paths []string
 }
 
 var _ state.State = (*vaultStartStateV1)(nil)
@@ -95,18 +116,9 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 	}
 
 	return &vaultStartStateV1{
-		ID:      newTfString(),
-		BinPath: newTfString(),
-		Config: &vaultConfig{
-			ClusterName: newTfString(),
-			APIAddr:     newTfString(),
-			ClusterAddr: newTfString(),
-			LogLevel:    newTfString(),
-			Listener:    newVaultConfigBlock("config", "listener"),
-			Seal:        newVaultConfigBlock("config", "seal"),
-			Storage:     newVaultConfigBlock("config", "storage"),
-			UI:          newTfBool(),
-		},
+		ID:              newTfString(),
+		BinPath:         newTfString(),
+		Config:          newVaultConfig(),
 		ConfigDir:       newTfString(),
 		License:         newTfString(),
 		Status:          newTfNum(),
@@ -119,6 +131,20 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 	}
 }
 
+func newVaultConfig() *vaultConfig {
+	return &vaultConfig{
+		ClusterName: newTfString(),
+		APIAddr:     newTfString(),
+		ClusterAddr: newTfString(),
+		LogLevel:    newTfString(),
+		Listener:    newVaultConfigBlock("config", "listener"),
+		Seal:        newVaultConfigBlock("config", "seal"),
+		Seals:       newVaultSealsConfig(),
+		Storage:     newVaultConfigBlock("config", "storage"),
+		UI:          newTfBool(),
+	}
+}
+
 func newVaultConfigBlock(attributePaths ...string) *vaultConfigBlock {
 	return &vaultConfigBlock{
 		AttributePaths: attributePaths,
@@ -126,6 +152,25 @@ func newVaultConfigBlock(attributePaths ...string) *vaultConfigBlock {
 		AttrsValues:    map[string]tftypes.Value{},
 		Type:           newTfString(),
 		Unknown:        false,
+		Null:           true,
+	}
+}
+
+func newVaultConfigBlockSet(typ string, attrs map[string]any, paths ...string) *vaultConfigBlockSet {
+	return &vaultConfigBlockSet{
+		typ:   typ,
+		attrs: attrs,
+		paths: paths,
+	}
+}
+
+func newVaultSealsConfig() *vaultSealsConfig {
+	return &vaultSealsConfig{
+		Unknown:   false,
+		Null:      true,
+		Primary:   newVaultConfigBlock("config", "seals", "primary"),
+		Secondary: newVaultConfigBlock("config", "seals", "secondary"),
+		Tertiary:  newVaultConfigBlock("config", "seals", "tertiary"),
 	}
 }
 
@@ -430,10 +475,29 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
+func (s *vaultConfigBlock) Set(set *vaultConfigBlockSet) {
+	if s == nil || set == nil {
+		return
+	}
+
+	s.Unknown = false
+	s.Null = false
+	s.AttributePaths = set.paths
+	s.Type.Set(set.typ)
+	s.Attrs.Set(set.attrs)
+}
+
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
+	if s == nil {
+		return fmt.Errorf("cannot unmarshal %s into nil vaultConfigBlock", val.String())
+	}
+
 	if val.IsNull() {
-		return AttributePathError(fmt.Errorf("serialization error, config block is missing"), s.AttributePaths...)
+		s.Null = true
+		s.Unknown = false
+
+		return nil
 	}
 
 	if !val.IsKnown() {
@@ -441,6 +505,9 @@ func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
 
 		return nil
 	}
+
+	s.Null = false
+	s.Unknown = false
 
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
@@ -491,6 +558,10 @@ func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
 func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
+	}
+
+	if s.Null {
+		return tftypes.NewValue(s.Terraform5Type(), nil)
 	}
 
 	// Sit down, grab a beverage, lets tell a story. What we have here is dynamic
@@ -545,29 +616,247 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	})
 }
 
+// FromTerraform5Value unmarshals the value to the struct.
+func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
+	if s == nil {
+		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vaultSealsConfig", val.String()),
+			"config", "seals",
+		)
+	}
+
+	if val.IsNull() {
+		s.Null = true
+		s.Unknown = false
+
+		return nil
+	}
+
+	if !val.IsKnown() {
+		s.Unknown = true
+
+		return nil
+	}
+
+	s.Null = false
+	s.Unknown = false
+	s.RawValue = val
+	s.RawValues = map[string]tftypes.Value{}
+	err := val.As(&s.RawValues)
+	if err != nil {
+		return AttributePathError(fmt.Errorf("unable to decode object value: %w", err), "config", "seals")
+	}
+
+	// Okay, we've been given either an object or map. Since our input schema is a dynamic pseudo
+	// type, the user can pass whatever they want in and terraform won't enforce any schema rules.
+	// We'll have ensure what we've been passed in matches what we actually support, otherwise
+	// the user could run into a nasty Terraform diagnostic that isn't helpful.
+
+	// Make sure we didn't configure any keys that we don't support.
+	for key := range s.RawValues {
+		switch key {
+		case "primary", "secondary", "tertiary":
+		default:
+			return AttributePathError(fmt.Errorf("unknown configuration '%s', expected 'primary', 'secondary', or 'tertiary'", key),
+				"config", "seals", "primary",
+			)
+		}
+	}
+
+	// We support an object or map. If the user has passed in a map then all thevalue types
+	// all must be the same. We'll tell them to redeclare the value as an object and not use
+	// strings as the keys to ensure we get an object whose attribute values don't all have to be
+	// the same.
+	if s.RawValue.Type().Is(tftypes.Map{}) && len(s.RawValues) > 1 {
+		var lastType tftypes.Type
+		for key, val := range s.RawValues {
+			if lastType == nil {
+				lastType = val.Type()
+				continue
+			}
+
+			if !val.Type().Equal(lastType) {
+				return AttributePathError(fmt.Errorf(
+					"unable to configure more than one seal type as a map value. Try unquoting '%s', and all other seals, to set them as an object attributes", key),
+					"config", "seals", key,
+				)
+			}
+			lastType = val.Type()
+		}
+	}
+
+	primary, ok := s.RawValues["primary"]
+	if ok {
+		err = s.Primary.FromTerraform5Value(primary)
+		if err != nil {
+			return AttributePathError(err, "config", "seals", "primary")
+		}
+	}
+
+	secondary, ok := s.RawValues["secondary"]
+	if ok {
+		err = s.Secondary.FromTerraform5Value(secondary)
+		if err != nil {
+			return AttributePathError(err, "config", "seals", "secondary")
+		}
+	}
+
+	tertiary, ok := s.RawValues["tertiary"]
+	if ok {
+		err = s.Tertiary.FromTerraform5Value(tertiary)
+		if err != nil {
+			return AttributePathError(err, "config", "seals", "secondary")
+		}
+	}
+
+	return nil
+}
+
+// Terraform5Type is the tftypes.Type.
+func (s *vaultSealsConfig) Terraform5Type() tftypes.Type {
+	return tftypes.DynamicPseudoType
+}
+
+// Terraform5Value is the tftypes.Value.
+func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
+	if s.Null {
+		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+	}
+
+	if s.Unknown {
+		return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+	}
+
+	attrs := map[string]tftypes.Type{}
+	vals := map[string]tftypes.Value{}
+	for name := range s.RawValues {
+		switch name {
+		case "primary":
+			attrs[name] = s.Primary.Terraform5Type()
+			vals[name] = s.Primary.Terraform5Value()
+		case "secondary":
+			attrs[name] = s.Secondary.Terraform5Type()
+			vals[name] = s.Secondary.Terraform5Value()
+		case "tertiary":
+			attrs[name] = s.Tertiary.Terraform5Type()
+			vals[name] = s.Secondary.Terraform5Value()
+		default:
+		}
+	}
+
+	if len(vals) == 0 {
+		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+	}
+
+	// Depending on how many are set, Terraform might pass the configuration over
+	// as a map or object, so we need to handle both.
+	if s.RawValue.Type().Is(tftypes.Map{}) {
+		for _, val := range vals {
+			return tftypes.NewValue(tftypes.Map{ElementType: val.Type()}, vals)
+		}
+	}
+
+	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
+}
+
+func (s *vaultSealsConfig) Set(name string, set *vaultConfigBlockSet) error {
+	if s == nil {
+		return fmt.Errorf("cannot set seal config for %s to nil vaultSealsConfig", name)
+	}
+
+	s.Unknown = false
+	s.Null = false
+
+	switch name {
+	case "primary":
+		s.set(s.Primary, set)
+	case "secondary":
+		s.set(s.Secondary, set)
+	case "tertiary":
+		s.set(s.Tertiary, set)
+	default:
+		return fmt.Errorf("unsupport seals name '%s', must be one of 'primary', 'secondary', 'tertiary'", name)
+	}
+
+	return nil
+}
+
+func (s *vaultSealsConfig) SetSeals(sets map[string]*vaultConfigBlockSet) error {
+	if s == nil {
+		return fmt.Errorf("cannot set seal config for nil vaultSealsConfig")
+	}
+
+	for name, set := range sets {
+		err := s.Set(name, set)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *vaultSealsConfig) set(blk *vaultConfigBlock, set *vaultConfigBlockSet) {
+	if blk == nil {
+		nBlk := newVaultConfigBlock()
+		*blk = *nBlk
+	}
+
+	blk.Set(set)
+}
+
+func (s *vaultSealsConfig) Value() map[string]*vaultConfigBlock {
+	if s == nil || s.Unknown || s.Null {
+		return nil
+	}
+
+	return map[string]*vaultConfigBlock{
+		"primary":   s.Primary,
+		"secondary": s.Secondary,
+		"tertiary":  s.Tertiary,
+	}
+}
+
 func (c *vaultConfig) Terraform5Type() tftypes.Type {
 	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"api_addr":     tftypes.String,
-			"cluster_addr": tftypes.String,
-			"listener":     c.Listener.Terraform5Type(),
-			"log_level":    tftypes.String,
-			"storage":      c.Storage.Terraform5Type(),
-			"seal":         c.Seal.Terraform5Type(),
-			"ui":           c.UI.TFType(),
-			"cluster_name": c.ClusterName.TFType(),
-		},
+		AttributeTypes:     c.attrs(),
+		OptionalAttributes: c.optionalAttrs(),
+	}
+}
+
+func (c *vaultConfig) attrs() map[string]tftypes.Type {
+	return map[string]tftypes.Type{
+		"api_addr":     tftypes.String,
+		"cluster_addr": tftypes.String,
+		"listener":     c.Listener.Terraform5Type(),
+		"log_level":    tftypes.String,
+		"storage":      c.Storage.Terraform5Type(),
+		"seal":         c.Seal.Terraform5Type(),
+		"seals":        c.Seals.Terraform5Type(),
+		"ui":           c.UI.TFType(),
+		"cluster_name": c.ClusterName.TFType(),
+	}
+}
+
+func (c *vaultConfig) optionalAttrs() map[string]struct{} {
+	return map[string]struct{}{
+		"seal":  {},
+		"seals": {},
 	}
 }
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
-	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
+	typ := tftypes.Object{
+		AttributeTypes: c.attrs(),
+	}
+
+	return tftypes.NewValue(typ, map[string]tftypes.Value{
 		"cluster_name": c.ClusterName.TFValue(),
 		"api_addr":     c.APIAddr.TFValue(),
 		"cluster_addr": c.ClusterAddr.TFValue(),
 		"listener":     c.Listener.Terraform5Value(),
 		"log_level":    c.LogLevel.TFValue(),
 		"seal":         c.Seal.Terraform5Value(),
+		"seals":        c.Seals.Terraform5Value(),
 		"storage":      c.Storage.Terraform5Value(),
 		"ui":           c.UI.TFValue(),
 	})
@@ -597,6 +886,14 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	seal, ok := vals["seal"]
 	if ok {
 		err = c.Seal.FromTerraform5Value(seal)
+		if err != nil {
+			return err
+		}
+	}
+
+	seals, ok := vals["seals"]
+	if ok {
+		err = c.Seals.FromTerraform5Value(seals)
 		if err != nil {
 			return err
 		}
@@ -639,10 +936,42 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 		}
 	}
 
-	// Ignore shamir because it doesn't actually have a config stanza
+	// Ignore shamir seals because they don't actually have a config stanza
 	if label, ok := c.Seal.Type.Get(); ok && label != "shamir" {
 		if attrs, ok := c.Seal.Attrs.GetObject(); ok {
 			hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+		}
+	}
+
+	for priority, seal := range c.Seals.Value() {
+		if label, ok := seal.Type.Get(); ok && label != "shamir" {
+			if attrs, ok := seal.Attrs.GetObject(); ok {
+				switch priority {
+				case "primary":
+					if _, ok := attrs["priority"]; !ok {
+						attrs["priority"] = "1"
+					}
+					if _, ok := attrs["name"]; !ok {
+						attrs["name"] = "primary"
+					}
+				case "secondary":
+					if _, ok := attrs["priority"]; !ok {
+						attrs["priority"] = "2"
+					}
+					if _, ok := attrs["name"]; !ok {
+						attrs["name"] = "secondary"
+					}
+				case "tertiary":
+					if _, ok := attrs["priority"]; !ok {
+						attrs["priority"] = "3"
+					}
+					if _, ok := attrs["name"]; !ok {
+						attrs["name"] = "tertiary"
+					}
+				default:
+				}
+				hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+			}
 		}
 	}
 

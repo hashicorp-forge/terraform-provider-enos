@@ -259,7 +259,12 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 		return state, err
 	}
 
-	if replicationEnabled {
+	// Get our replication status if our node has replication enabled and only if the node is active.
+	// If the node is unsealed but in standby mode we'll get 500's from the replication API.
+	if replicationEnabled && state.Health.StatusIsOneOf(
+		HealthStatusInitializedUnsealedActive,
+		HealthStatusDRReplicationSecondaryActive,
+	) {
 		state.ReplicationStatus, err = GetReplicationStatus(ctx, tr, NewReplicationRequest(
 			WithReplicationRequestBinPath(req.BinPath),
 			WithReplicationRequestVaultAddr(req.VaultAddr),
@@ -506,11 +511,15 @@ func (s *State) ReplicationEnabled() (bool, error) {
 		return false, fmt.Errorf("state has no /v1/sys/health data")
 	}
 
-	if s.Health.ReplicationDRMode != "" && s.Health.ReplicationDRMode != "disabled" {
+	if s.Health.ReplicationDRMode != ReplicationModeUnset &&
+		s.Health.ReplicationDRMode != ReplicationModeUnknown &&
+		s.Health.ReplicationDRMode != ReplicationModeDisabled {
 		return true, nil
 	}
 
-	if s.Health.ReplicationPerformanceMode != "" && s.Health.ReplicationPerformanceMode != "disabled" {
+	if s.Health.ReplicationPerformanceMode != ReplicationModeUnset &&
+		s.Health.ReplicationPerformanceMode != ReplicationModeUnknown &&
+		s.Health.ReplicationPerformanceMode != ReplicationModeDisabled {
 		return true, nil
 	}
 

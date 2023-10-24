@@ -49,6 +49,14 @@ const (
 	HealthStatusUnknown HealthStatus = 9
 )
 
+const (
+	ReplicationModeUnset     string = ""
+	ReplicationModeUnknown   string = "unknown"
+	ReplicationModeDisabled  string = "disabled"
+	ReplicationModePrimary   string = "primary"
+	ReplicationModeSecondary string = "secondary"
+)
+
 // String returns the health status response as a string.
 func (s HealthStatus) String() string {
 	switch s {

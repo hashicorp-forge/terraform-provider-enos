@@ -9,8 +9,57 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
+
+// TestVaultStartConfigOptionalAttrs tests that we can set tftypes that have optional attributes
+// and also that Seals can support different types.
+func TestVaultStartConfigOptionalAttrs(t *testing.T) {
+	t.Parallel()
+
+	vaultCfg := newVaultConfig()
+	vaultCfg.APIAddr.Set("http://127.0.0.1:8200")
+	vaultCfg.ClusterAddr.Set("http://127.0.0.1:8201")
+	vaultCfg.ClusterName.Set("avaultcluster")
+	vaultCfg.Listener.Set(newVaultConfigBlockSet(
+		"tcp", map[string]any{
+			"address":     "0.0.0.0:8200",
+			"tls_disable": "true",
+		}, "config", "listener"))
+	vaultCfg.LogLevel.Set("debug")
+	vaultCfg.Storage.Set(newVaultConfigBlockSet("consul", map[string]any{
+		"address": "127.0.0.1:8500",
+		"path":    "vault",
+	}, "config", "storage"))
+	vaultCfg.Seal.Set(newVaultConfigBlockSet("awskms", map[string]any{
+		"kms_key_id": "some-key-id",
+	}, "config", "seal"))
+	require.NoError(t, vaultCfg.Seals.SetSeals(map[string]*vaultConfigBlockSet{
+		"primary": newVaultConfigBlockSet("awskms", map[string]any{
+			"kms_key_id": "some-key-id",
+		}, "config", "seal"),
+		"secondary": newVaultConfigBlockSet("pkcs11", map[string]any{
+			"lib":            "/usr/lib/softhsm/libsofthsm2.so",
+			"slot":           "730906792",
+			"pin":            "1234",
+			"key_label":      "hsm:v1:vault",
+			"hmac_key_label": "hsm:v1:vault-hmac",
+			"generate_key":   "true",
+			"priority":       "1",
+			"key_name":       "hsm1",
+		}, "config", "seal"),
+		"tertiary": newVaultConfigBlockSet("none", nil, "config", "seal"),
+	}))
+
+	// Make sure we can create a dynamic value with optional attrs
+	val := vaultCfg.Terraform5Value()
+	_, err := tfprotov6.NewDynamicValue(val.Type(), val)
+	require.NoError(t, err)
+
+	// Make sure we can create a new tftypes.Value from our seals
+	_ = vaultCfg.Seals.Terraform5Value()
+}
 
 // TestAccResourceVaultStart tests the vault_start resource.
 func TestAccResourceVaultStart(t *testing.T) {
@@ -35,6 +84,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 				}
 			}
 			log_level = "${{.Config.LogLevel.Value}}"
+			{{if .Config.Seal.Attrs.Value}}
 			seal = {
 				type = "{{.Config.Seal.Type.Value}}"
 				attributes = {
@@ -43,6 +93,23 @@ func TestAccResourceVaultStart(t *testing.T) {
 					{{end}}
 				}
 			}
+			{{end}}
+			{{if .Config.Seals}}
+			seals = {
+			{{range $priority, $seal := .Config.Seals.Value}}
+				{{if $seal.Type.Value }}
+				{{$priority}} = {
+					type = "{{$seal.Type.Value}}"
+					attributes = {
+						{{range $name, $val := $seal.Attrs.Value}}
+						{{$name}} = "{{$val}}"
+						{{end}}
+					}
+				}
+				{{end}}
+			{{end}}
+			}
+			{{end}}
 			storage = {
 				type = "{{.Config.Storage.Type.Value}}"
 				attributes = {
@@ -82,21 +149,29 @@ func TestAccResourceVaultStart(t *testing.T) {
 	vaultStart.Config.APIAddr.Set("http://127.0.0.1:8200")
 	vaultStart.Config.ClusterAddr.Set("http://127.0.0.1:8201")
 	vaultStart.Config.ClusterName.Set("avaultcluster")
-	vaultStart.Config.Listener.Type.Set("tcp")
-	vaultStart.Config.Listener.Attrs.Set(map[string]interface{}{
-		"address":     "0.0.0.0:8200",
-		"tls_disable": "true",
-	})
+	vaultStart.Config.Listener.Set(newVaultConfigBlockSet(
+		"tcp", map[string]any{
+			"address":     "0.0.0.0:8200",
+			"tls_disable": "true",
+		}, "config", "listener"))
 	vaultStart.Config.LogLevel.Set("debug")
-	vaultStart.Config.Storage.Type.Set("consul")
-	vaultStart.Config.Storage.Attrs.Set(map[string]interface{}{
+	vaultStart.Config.Storage.Set(newVaultConfigBlockSet("consul", map[string]any{
 		"address": "127.0.0.1:8500",
 		"path":    "vault",
-	})
-	vaultStart.Config.Seal.Type.Set("awskms")
-	vaultStart.Config.Seal.Attrs.Set(map[string]interface{}{
+	}, "config", "storage"))
+	vaultStart.Config.Seal.Set(newVaultConfigBlockSet("awskms", map[string]any{
 		"kms_key_id": "some-key-id",
-	})
+	}, "config", "seal"))
+	require.NoError(t, vaultStart.Config.Seals.SetSeals(map[string]*vaultConfigBlockSet{
+		"primary": newVaultConfigBlockSet("awskms", map[string]any{
+			"kms_key_id": "some-key-id",
+			"priority":   "1",
+		}, "config", "seal"),
+		"secondary": newVaultConfigBlockSet("awskms", map[string]any{
+			"kms_key_id": "another-key-id",
+			"priority":   "2",
+		}, "config", "seal"),
+	}))
 	vaultStart.License.Set("some-license-key")
 	vaultStart.SystemdUnitName.Set("vaulter")
 	vaultStart.Username.Set("vault")
@@ -126,6 +201,12 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", regexp.MustCompile(`^vault$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.type", regexp.MustCompile(`^awskms$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].type", regexp.MustCompile(`^awskms$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.priority", regexp.MustCompile(`^1$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].type", regexp.MustCompile(`^awskms$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.kms_key_id", regexp.MustCompile(`^another-key-id$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.priority", regexp.MustCompile(`^4$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.license", regexp.MustCompile(`^some-license-key$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.unit_name", regexp.MustCompile(`^vault$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.username", regexp.MustCompile(`^vaulter$`)),

@@ -82,7 +82,7 @@ type embeddedTransportSSHv1 struct {
 	// To generate that schema, we need to keep track of the raw values that are
 	// passed over the wire from the user configuration. We'll set these Values
 	// when we're unmarshaled and use them later when constructing our marshal
-	// schema. Thr marshalled values must contain the same attributes as the unmarshalled values
+	// schema. The marshalled values must contain the same attributes as the unmarshalled values
 	// otherwise Terraform will blow up with an error.
 	Values map[string]tftypes.Value
 }

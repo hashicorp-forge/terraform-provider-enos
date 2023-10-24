@@ -3,6 +3,9 @@ package server
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -53,6 +56,12 @@ func RegisterResourceRouter(router resourcerouter.Router) func(Server) Server {
 
 		return server
 	}
+}
+
+// GetMetadata is an optional tfprotov6 API that we're shimming here to update the latest
+// terraform-plugin-go.
+func (s Server) GetMetadata(ctx context.Context, req *tfprotov6.GetMetadataRequest) (*tfprotov6.GetMetadataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 func (s Server) GetProviderSchema(ctx context.Context, req *tfprotov6.GetProviderSchemaRequest) (*tfprotov6.GetProviderSchemaResponse, error) {

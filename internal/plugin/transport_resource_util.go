@@ -26,6 +26,18 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 	default:
 	}
 
+	defer func() {
+		// The library we use to convert the wire config to tftypes can panic. We'll recover
+		// here to bubble up those errors as diagnostics instead of just panicking and leaving
+		// Terraform hanging.
+		if pan := recover(); pan != nil {
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Serialization Error", fmt.Errorf(
+					"%v state: %+v, config:%+v ", pan, state, req.Config),
+			))
+		}
+	}()
+
 	if err := unmarshal(state, req.Config); err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 	}
@@ -92,6 +104,18 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, serializable s
 		return
 	default:
 	}
+
+	defer func() {
+		// The library we use to convert the wire config to tftypes can panic. We'll recover
+		// here to bubble up those errors as diagnostics instead of just panicking and leaving
+		// Terraform hanging.
+		if pan := recover(); pan != nil {
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Serialization Error", fmt.Errorf(
+					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState),
+			))
+		}
+	}()
 
 	err := unmarshal(serializable, req.CurrentState)
 	if err != nil {

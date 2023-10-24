@@ -16,7 +16,7 @@ FLIGHTCONTROL_LD_FLAGS?=-ldflags="-extldflags=-static -s -w"
 CI?=false
 LINT_OUT_FORMAT?=colored-line-number
 HASUPX:= $(shell upx dot 2> /dev/null)
-TEST?=$$(go list ./... | grep -v 'vendor')
+TEST?=./...
 TEST_BLD_DIR=./test-build
 
 # Heavy sigh, sed uses slightly different syntax on linux than macos, here we setup the opts assuming
