@@ -32,8 +32,8 @@ func newErrSetProviderConfig(err error) error {
 
 // DataSourceServerAdapter Adapter for a tfprotov6.DataSourceServer removing the error return type from all methods.
 type DataSourceServerAdapter interface {
-	ValidateDataResourceConfig(context.Context, tfprotov6.ValidateDataResourceConfigRequest, *tfprotov6.ValidateDataResourceConfigResponse)
-	ReadDataSource(context.Context, tfprotov6.ReadDataSourceRequest, *tfprotov6.ReadDataSourceResponse)
+	ValidateDataResourceConfig(ctx context.Context, req tfprotov6.ValidateDataResourceConfigRequest, res *tfprotov6.ValidateDataResourceConfigResponse)
+	ReadDataSource(ctx context.Context, req tfprotov6.ReadDataSourceRequest, res *tfprotov6.ReadDataSourceResponse)
 }
 
 // DataSource is the DataSource.
@@ -41,7 +41,7 @@ type DataSource interface {
 	DataSourceServerAdapter
 	Name() string
 	Schema() *tfprotov6.Schema
-	SetProviderConfig(tftypes.Value) error
+	SetProviderConfig(val tftypes.Value) error
 }
 
 // RouterOpt is a functional option for the data router.

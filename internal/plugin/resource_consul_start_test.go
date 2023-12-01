@@ -78,7 +78,7 @@ func TestAccResourceConsulStart(t *testing.T) {
 	ssh := newEmbeddedTransportSSH()
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
-	assert.NoError(t, consulStart.Transport.SetTransportState(ssh))
+	require.NoError(t, consulStart.Transport.SetTransportState(ssh))
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	ssh, ok := consulStart.Transport.SSH()

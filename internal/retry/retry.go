@@ -44,7 +44,8 @@ func Retry(ctx context.Context, req Retryable) (any, error) {
 			return res, nil
 		} else {
 			if attempts > 1 {
-				//nolint:stylecheck // it's okay to add a newline here for readability
+				//nolint:stylecheck
+				//lint:ignore ST1005 it's okay to add a newline here for readability
 				err = errors.Join(err, fmt.Errorf("attempt %d: %w\n", attempts, err1))
 			} else {
 				err = errors.Join(err, err1)

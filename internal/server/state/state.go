@@ -18,7 +18,7 @@ type State interface {
 	Serializable
 
 	Schema() *tfprotov6.Schema
-	Validate(context.Context) error
+	Validate(ctx context.Context) error
 
 	// HandleFailure is called when either an apply or plan fails, diag is the tfprotov6.Diagnostic
 	// for the failure, providerConfig is the tftypes.Value of the provider configuration.

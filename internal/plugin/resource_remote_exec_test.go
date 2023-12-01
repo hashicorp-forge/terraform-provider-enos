@@ -9,7 +9,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
@@ -78,7 +77,7 @@ EOF
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, remoteExec.Transport.SetTransportState(ssh))
+	require.NoError(t, remoteExec.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		remoteExec,
@@ -109,7 +108,7 @@ EOF
 		realTest.Content.Set(`echo "hello world" > /tmp/enos_remote_exec_script_content`)
 		ssh := newEmbeddedTransportSSH()
 		ssh.Host.Set(host)
-		assert.NoError(t, realTest.Transport.SetTransportState(ssh))
+		require.NoError(t, realTest.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"real test",
 			realTest,
@@ -121,7 +120,7 @@ EOF
 		noStdoutOrStderr.Inline.SetStrings([]string{"exit 0"})
 		ssh = newEmbeddedTransportSSH()
 		ssh.Host.Set(host)
-		assert.NoError(t, noStdoutOrStderr.Transport.SetTransportState(ssh))
+		require.NoError(t, noStdoutOrStderr.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"NoStdoutOrStderr",
 			noStdoutOrStderr,
@@ -145,7 +144,7 @@ EOF
 				test.Content.Set(cmd)
 				ssh := newEmbeddedTransportSSH()
 				ssh.Host.Set(host)
-				assert.NoError(t, test.Transport.SetTransportState(ssh))
+				require.NoError(t, test.Transport.SetTransportState(ssh))
 				buf := bytes.Buffer{}
 				err := cfg.Execute(&buf, test)
 				if err != nil {
@@ -209,7 +208,7 @@ func TestBadTransportConfig(t *testing.T) {
 	k8sTransport.ContextName.Set("bananas")
 	k8sTransport.Pod.Set("yoyo")
 	k8sTransport.Container.Set("container")
-	assert.NoError(t, k8sRemoteExecState.Transport.SetTransportState(k8sTransport))
+	require.NoError(t, k8sRemoteExecState.Transport.SetTransportState(k8sTransport))
 
 	sshRemoteExecState := newRemoteExecStateV1()
 	sshRemoteExecState.ID.Set("bad_ssh_transport")
@@ -220,7 +219,7 @@ func TestBadTransportConfig(t *testing.T) {
 	sshTransport.PrivateKeyPath.Set("/not/a/real/path")
 	sshTransport.Passphrase.Set("balogna")
 	sshTransport.PassphrasePath.Set("/not/a/passphrase")
-	assert.NoError(t, sshRemoteExecState.Transport.SetTransportState(sshTransport))
+	require.NoError(t, sshRemoteExecState.Transport.SetTransportState(sshTransport))
 
 	nomadRemoteExecState := newRemoteExecStateV1()
 	nomadRemoteExecState.ID.Set("bad_nomad_transport")
@@ -229,7 +228,7 @@ func TestBadTransportConfig(t *testing.T) {
 	nomadTransport.SecretID.Set("bologna")
 	nomadTransport.AllocationID.Set("some id")
 	nomadTransport.TaskName.Set("bananas")
-	assert.NoError(t, nomadRemoteExecState.Transport.SetTransportState(nomadTransport))
+	require.NoError(t, nomadRemoteExecState.Transport.SetTransportState(nomadTransport))
 
 	tests := []struct {
 		name               string
@@ -317,7 +316,7 @@ func TestChangedEnvVars(t *testing.T) {
 	transportSSH.User.Set("ubuntu")
 	transportSSH.Host.Set("127.0.0.1")
 	transportSSH.PrivateKey.Set("not a private key")
-	assert.NoError(t, remoteExecState.Transport.SetTransportState(transportSSH))
+	require.NoError(t, remoteExecState.Transport.SetTransportState(transportSSH))
 
 	var clientCreateCount int
 
@@ -367,7 +366,7 @@ func TestChangedEnvVars(t *testing.T) {
 		},
 	})
 
-	assert.Equal(t, 2, clientCreateCount)
+	require.Equal(t, 2, clientCreateCount)
 }
 
 func TestInlineWithPipedCommandAndEnvVars(t *testing.T) {
@@ -389,11 +388,11 @@ wrapping_token_creation_time:    2022-12-08 16:08:32.532833589 +0000 UTC
 wrapping_token_creation_path:    sys/replication/performance/primary/secondary-token`, token)
 
 	client, err := ssh.New(ssh.WithHost(host), ssh.WithKeyPath(privateKeyPath), ssh.WithUser("ubuntu"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	//nolint:gosec// we're okay to use hardcoded tokens in tests
 	tokensFile := "/tmp/tokens"
-	assert.NoError(t, client.Copy(context.Background(), tfile.NewReader(tokens), tokensFile))
+	require.NoError(t, client.Copy(context.Background(), tfile.NewReader(tokens), tokensFile))
 
 	cfg := template.Must(template.New("enos_remote_exec").
 		Funcs(transportRenderFunc).
@@ -413,14 +412,14 @@ wrapping_token_creation_path:    sys/replication/performance/primary/secondary-t
 	transportSSH.User.Set("ubuntu")
 	transportSSH.Host.Set(host)
 	transportSSH.PrivateKeyPath.Set(privateKeyPath)
-	assert.NoError(t, transport.SetTransportState(transportSSH))
+	require.NoError(t, transport.SetTransportState(transportSSH))
 	data := map[string]interface{}{
 		"TokensFile": tokensFile,
 		"Transport":  transport,
 	}
 
 	s := bytes.Buffer{}
-	assert.NoError(t, cfg.Execute(&s, data))
+	require.NoError(t, cfg.Execute(&s, data))
 
 	apply := resource.TestStep{
 		Config:   s.String(),

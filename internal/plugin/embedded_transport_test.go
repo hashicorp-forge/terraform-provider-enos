@@ -402,22 +402,22 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 			ssh.PrivateKeyPath.Set("copy-private-key-path")
 			ssh.Passphrase.Set("copy-passphrase")
 			ssh.PassphrasePath.Set("copy-passphrase-path")
-			assert.NoError(tt, transportCopy.SetTransportState(ssh))
+			require.NoError(tt, transportCopy.SetTransportState(ssh))
 			k8s := newEmbeddedTransportK8Sv1()
 			k8s.KubeConfigBase64.Set("copy-kubeconfig-path")
 			k8s.ContextName.Set("copy-context-name")
 			k8s.Namespace.Set("copy-namespace")
 			k8s.Pod.Set("copy-pod")
 			k8s.Container.Set("copy-container")
-			assert.NoError(tt, transportCopy.SetTransportState(k8s))
+			require.NoError(tt, transportCopy.SetTransportState(k8s))
 			nomad := newEmbeddedTransportNomadv1()
 			nomad.Host.Set("foo")
 			nomad.SecretID.Set("bogus")
 			nomad.AllocationID.Set("oppopoop")
 			nomad.TaskName.Set("not a task")
-			assert.NoError(tt, transportCopy.SetTransportState(nomad))
+			require.NoError(tt, transportCopy.SetTransportState(nomad))
 
-			assertTransportCfg(tt, transport, test.config)
+			requireTransportCfggg(tt, transport, test.config)
 		})
 	}
 }
@@ -575,7 +575,7 @@ func (tc transportconfig) toTFValue(t *testing.T) tftypes.Value {
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: types}, values)
 }
 
-func assertTransportCfg(t *testing.T, transport *embeddedTransportV1, config transportconfig) {
+func requireTransportCfggg(t *testing.T, transport *embeddedTransportV1, config transportconfig) {
 	t.Helper()
 
 	for tType, tConfig := range config {

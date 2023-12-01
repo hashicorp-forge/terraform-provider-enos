@@ -6,7 +6,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -45,7 +44,7 @@ func TestAccResourceBoundaryInit(t *testing.T) {
 	require.NoError(t, err)
 	ssh := newEmbeddedTransportSSH()
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, boundaryStart.Transport.SetTransportState(ssh))
+	require.NoError(t, boundaryStart.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		boundaryStart,

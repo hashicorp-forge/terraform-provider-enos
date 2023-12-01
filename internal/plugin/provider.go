@@ -16,7 +16,7 @@ import (
 
 // env var for setting the debug_data_root_dir.
 //
-//nolint:gosec // G101 we're not harding a credential
+
 const enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR"
 
 var (

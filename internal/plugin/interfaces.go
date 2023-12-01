@@ -20,6 +20,6 @@ type StateWithTransport interface {
 }
 
 type ResourceWithProviderConfig interface {
-	SetProviderConfig(tftypes.Value) error
+	SetProviderConfig(val tftypes.Value) error
 	GetProviderConfig() (*config, error)
 }

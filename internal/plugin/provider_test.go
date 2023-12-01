@@ -64,7 +64,7 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	cfg := newProviderConfig()
 	cfg.Transport = transport
 	val, err := state.Marshal(cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
@@ -73,12 +73,12 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 		TerraformVersion: "1.3",
 		Config:           val,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, diags.HasErrors(resp.Diagnostics))
 
 	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
 
-	assertTransportCfg(t, provider.config.Transport, transportCfg)
+	requireTransportCfggg(t, provider.config.Transport, transportCfg)
 
 	resetEnv(t)
 }
@@ -95,7 +95,7 @@ func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 	cfg.Transport = transport
 	cfg.DebugDataRootDir.Set("/this/is/where/I/thought/the/debug/should/be")
 	val, err := state.Marshal(cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
@@ -104,12 +104,12 @@ func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 		TerraformVersion: "1.3",
 		Config:           val,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, diags.HasErrors(resp.Diagnostics))
 
 	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
 
-	assertTransportCfg(t, provider.config.Transport, transportCfg)
+	requireTransportCfggg(t, provider.config.Transport, transportCfg)
 
 	resetEnv(t)
 }

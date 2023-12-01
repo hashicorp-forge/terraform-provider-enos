@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -40,12 +41,12 @@ func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
 		WithIntervalFunc(IntervalFibonacci(1*time.Nanosecond)),
 		WithRetrierFunc(funcToRun),
 	)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, errRetry := Retry(ctx, req)
 
-	assert.NoError(t, errRetry)
-	assert.Equal(t, attempt, 1)
+	require.NoError(t, errRetry)
+	assert.Equal(t, 1, attempt)
 }
 
 // Test that when the first attempt fails, we retry.
@@ -63,11 +64,12 @@ func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 		var err error
 
 		// We want to fail on first try and succeed on second try
-		if attempt == 1 {
+		switch attempt {
+		case 1:
 			return res, errors.New("failing purposefully on first try")
-		} else if attempt == 2 {
+		case 2:
 			return res, err
-		} else {
+		default:
 			return res, errors.New("not the first or second try")
 		}
 	}
@@ -79,8 +81,8 @@ func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 
 	_, err := Retry(ctx, req)
 
-	assert.NoError(t, err)
-	assert.Equal(t, attempt, 2)
+	require.NoError(t, err)
+	assert.Equal(t, 2, attempt)
 }
 
 // Test that we do not exceed the max number of retries.
@@ -105,10 +107,8 @@ func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
 		WithRetrierFunc(funcToRun),
 	)
 
-	var err error
-	_, returnedErr := Retry(ctx, req)
-
-	assert.Error(t, returnedErr, err)
+	_, err := Retry(ctx, req)
+	require.Error(t, err)
 	assert.Equal(t, attempt, maxRetries)
 }
 
@@ -124,11 +124,12 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 		attempt++
 		var res interface{}
 
-		if attempt == 1 {
+		switch attempt {
+		case 1:
 			return res, error1
-		} else if attempt == 2 {
+		case 2:
 			return res, error2
-		} else {
+		default:
 			return res, errorUnspecified
 		}
 	}
@@ -141,9 +142,9 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 
 	_, err := Retry(ctx, req)
 
-	assert.Equal(t, attempt, 3)
-
-	assert.True(t, errors.Is(err, errorUnspecified))
+	assert.Equal(t, 3, attempt)
+	require.Error(t, err)
+	require.ErrorIs(t, err, errorUnspecified)
 }
 
 // Test that if Timeout is set on the context, Retry times out accordingly.
@@ -214,7 +215,7 @@ func TestRetry_IntervalExponential(t *testing.T) {
 		{8, 256 * time.Second},
 	} {
 		generatedResult := IntervalExponential(1 * time.Second)(testObj.inputNum)
-		assert.Equal(t, generatedResult, testObj.expectedResult)
+		assert.Equal(t, testObj.expectedResult, generatedResult)
 	}
 }
 
@@ -236,6 +237,6 @@ func TestRetry_IntervalFibonacci(t *testing.T) {
 		{8, 21 * time.Second},
 	} {
 		generatedResult := IntervalFibonacci(1 * time.Second)(testObj.inputNum)
-		assert.Equal(t, generatedResult, testObj.expectedResult)
+		assert.Equal(t, testObj.expectedResult, generatedResult)
 	}
 }

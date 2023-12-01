@@ -385,7 +385,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 	envFilePath := "/etc/boundary/boundary.env"
 
 	// Create the OS user
-	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
+	_, err = remoteflight.CreateOrUpdateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(boundaryUser),
 		remoteflight.WithUserHomeDir(configPath),
 		remoteflight.WithUserShell("/bin/false"),

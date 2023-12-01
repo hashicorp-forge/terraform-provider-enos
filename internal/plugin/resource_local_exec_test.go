@@ -8,7 +8,7 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
@@ -147,7 +147,7 @@ EOF
 func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 	tempDir := t.TempDir() // Note: this dir is automatically deleted after the test is run
 	f, err := os.CreateTemp(tempDir, "reapply_test.txt")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cfg := template.Must(template.New("enos_local_exec").Parse(`resource "enos_local_exec" "reapply_test" {
         content = "echo \"hello\" >> {{ .File }}"
@@ -205,6 +205,6 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 	})
 
 	actual, err := io.ReadAll(f)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello\nhello\n", string(actual))
+	require.NoError(t, err)
+	require.Equal(t, "hello\nhello\n", string(actual))
 }

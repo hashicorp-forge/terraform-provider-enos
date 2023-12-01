@@ -525,10 +525,17 @@ func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
 				return err
 			}
 		case "attributes":
-			if v.IsNull() || !v.IsKnown() {
-				// We can't unmarshal null or known things
+			if !v.IsKnown() {
+				// Attrs are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
+				// dynamic value that we'll know after apply.
+				s.Attrs.Unknown = true
 				continue
 			}
+			if v.IsNull() {
+				// We can't unmarshal null or unknown things
+				continue
+			}
+
 			s.AttrsRaw = v
 			err = v.As(&s.AttrsValues)
 			if err != nil {
@@ -583,11 +590,19 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 	var attrsVal tftypes.Value
 
 	if s.AttrsRaw.Type() == nil {
-		attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+		// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
+		// value.
+		if s.Attrs.Unknown {
+			attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+		} else {
+			attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+		}
 	} else {
-		// MarshalMsgPack is deprecated but it's by far the easiest way to inspect
-		// the serialized value of the raw attribute.
+		// MarshalMsgPack is deprecated but it's by far the easiest way to inspect the serialized value
+		// of the raw attribute.
+		//
 		//nolint:staticcheck
+		//lint:ignore SA1019 we have to use this internnal only API to determine DynamicPseudoType types.
 		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
 		if err != nil {
 			panic(fmt.Sprintf("unable to marshal the vault config block to the wire format: %s", err.Error()))
@@ -944,7 +959,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	}
 
 	for priority, seal := range c.Seals.Value() {
-		if label, ok := seal.Type.Get(); ok && label != "shamir" {
+		if label, ok := seal.Type.Get(); ok && label != "shamir" && label != "none" {
 			if attrs, ok := seal.Attrs.GetObject(); ok {
 				switch priority {
 				case "primary":
@@ -1030,7 +1045,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 		}
 	}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
+	_, err = remoteflight.CreateOrUpdateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(vaultUsername),
 		remoteflight.WithUserHomeDir(configDir),
 		remoteflight.WithUserShell("/bin/false"),

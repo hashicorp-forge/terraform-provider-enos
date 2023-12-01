@@ -88,7 +88,7 @@ func TestSSH(t *testing.T) {
 
 		_, _, err := c.Run(ctx, command.New("printf 'exit 1' > /tmp/run_exit_1; chmod +x /tmp/run_exit_1; /tmp/run_exit_1"))
 		var exitErr *it.ExecError
-		assert.ErrorAs(t, err, &exitErr)
+		require.ErrorAs(t, err, &exitErr)
 		assert.Equal(t, 1, exitErr.ExitCode())
 
 		_, _, err = c.Run(ctx, command.New("rm /tmp/run_exit_1"))

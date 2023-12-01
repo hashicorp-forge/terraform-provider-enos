@@ -11,7 +11,7 @@ type Logger interface {
 	// With creates a new logger which will include the provided key/value in each log message
 	With(key string, value interface{}) Logger
 	// WithValues creates a new logger which will include all the provided key/value(s) in each log message
-	WithValues(map[string]interface{}) Logger
+	WithValues(values map[string]interface{}) Logger
 	Trace(msg string, additionalFields ...map[string]interface{})
 	Debug(msg string, additionalFields ...map[string]interface{})
 	Info(msg string, additionalFields ...map[string]interface{})

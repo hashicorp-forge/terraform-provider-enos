@@ -35,8 +35,8 @@ func WithDefaultDataRouter(overrides ...dr.DataSource) func(server.Server) serve
 // defaultDataSources returns a slice of all the data sources that the provider supports.
 func defaultDataSources() []dr.DataSource {
 	return []dr.DataSource{
-		newEnvironment(),
 		newArtifactoryItem(),
+		newEnvironment(),
 		newKubernetesPods(),
 	}
 }
@@ -44,18 +44,19 @@ func defaultDataSources() []dr.DataSource {
 // defaultResources returns a slice of all the resources that the provider supports.
 func defaultResources() []rr.Resource {
 	return []rr.Resource{
+		newBoundaryInit(),
+		newBoundaryStart(),
+		newBundleInstall(),
+		newConsulStart(),
 		newFile(),
-		newLocalKindLoadImage(),
 		newLocalKindCluster(),
+		newLocalKindLoadImage(),
 		newLocalExec(),
 		newRemoteExec(),
-		newBundleInstall(),
-		newVaultStart(),
+		newUser(),
 		newVaultInit(),
+		newVaultStart(),
 		newVaultUnseal(),
-		newConsulStart(),
-		newBoundaryStart(),
-		newBoundaryInit(),
 	}
 }
 

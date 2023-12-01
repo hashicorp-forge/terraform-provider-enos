@@ -25,7 +25,7 @@ func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 	version, okver := os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
 	revision, okrev := os.LookupEnv("ARTIFACTORY_REVISION")
 
-	if !(okacc && okuser && oktoken && okver && okrev) {
+	if !okacc || !okuser || !oktoken || !okver || !okrev {
 		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACATORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
 		t.Skip()
 

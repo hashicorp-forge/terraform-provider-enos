@@ -13,7 +13,7 @@ import (
 // hclEntry is any item that can be appended into an *hclwrite.Body, such as a block or an attribute.
 type hclEntry interface {
 	// appendTo appends this item to the provided body
-	appendTo(*hclwrite.Body) error
+	appendTo(body *hclwrite.Body) error
 }
 
 // Builder can be used to build structured hcl content, supporting appending attributes and blocks.

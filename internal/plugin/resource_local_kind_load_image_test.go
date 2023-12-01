@@ -163,16 +163,16 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 				if test.expectedLoadImageRequest != nil {
 					assert.Len(tt, mockKindClient.loadImageRequests, 1)
 					assert.Equal(tt, mockKindClient.loadImageRequests[0], *test.expectedLoadImageRequest)
-					assert.Len(tt, mockKindClient.loadImageArchiveRequests, 0)
+					assert.Empty(tt, mockKindClient.loadImageArchiveRequests)
 				} else if test.expectedLoadImageArchiveRequest != nil {
 					assert.Len(tt, mockKindClient.loadImageArchiveRequests, 1)
 					assert.Equal(tt, mockKindClient.loadImageArchiveRequests[0], *test.expectedLoadImageArchiveRequest)
-					assert.Len(tt, mockKindClient.loadImageRequests, 0)
+					assert.Empty(tt, mockKindClient.loadImageRequests)
 				}
 
 				// sanity check
-				assert.Len(tt, mockKindClient.createRequests, 0)
-				assert.Len(tt, mockKindClient.deleteRequests, 0)
+				assert.Empty(tt, mockKindClient.createRequests)
+				assert.Empty(tt, mockKindClient.deleteRequests)
 			}
 		})
 	}

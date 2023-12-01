@@ -11,8 +11,8 @@ import (
 type Provider interface {
 	Schema() *tfprotov6.Schema
 	MetaSchema() *tfprotov6.Schema
-	Validate(context.Context, *tfprotov6.ValidateProviderConfigRequest) (*tfprotov6.ValidateProviderConfigResponse, error)
-	Configure(context.Context, *tfprotov6.ConfigureProviderRequest) (*tfprotov6.ConfigureProviderResponse, error)
-	Stop(context.Context, *tfprotov6.StopProviderRequest) (*tfprotov6.StopProviderResponse, error)
+	Validate(ctx context.Context, req *tfprotov6.ValidateProviderConfigRequest) (*tfprotov6.ValidateProviderConfigResponse, error)
+	Configure(ctx context.Context, req *tfprotov6.ConfigureProviderRequest) (*tfprotov6.ConfigureProviderResponse, error)
+	Stop(ctx context.Context, req *tfprotov6.StopProviderRequest) (*tfprotov6.StopProviderResponse, error)
 	Config() tftypes.Value
 }

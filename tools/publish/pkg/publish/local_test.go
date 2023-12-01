@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +43,7 @@ func TestAddGoBinariesFrom(t *testing.T) {
 		"terraform-provider-enos_0.3.24_darwin_arm64.zip",
 	} {
 		_, err = os.Open(filepath.Join(mirror.artifacts.dir, zipName))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -83,7 +82,7 @@ func TestAddGoBinariesFromWithRename(t *testing.T) {
 		"terraform-provider-enosdev_0.3.24_darwin_arm64.zip",
 	} {
 		_, err = os.Open(filepath.Join(mirror.artifacts.dir, zipName))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 

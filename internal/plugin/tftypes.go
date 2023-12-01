@@ -688,6 +688,38 @@ type tfObject struct {
 
 var _ TFType = (*tfObject)(nil)
 
+// FullyKnown returns a boolean of whether or not all values are fully known. If callers are using
+// tfObject as a DynamicPseudoType they can call this to determine whether or not we should return
+// a DynamicPseudoType or real type.
+func (b *tfObject) FullyKnown() bool {
+	if b == nil {
+		return false
+	}
+
+	if b.Unknown {
+		return false
+	}
+
+	for _, val := range b.Val {
+		tfType, ok := val.(TFType)
+		if ok {
+			if !tfType.TFValue().IsFullyKnown() {
+				return false
+			}
+
+			continue
+		}
+		tfVal, ok := val.(tftypes.Value)
+		if ok {
+			if !tfVal.IsFullyKnown() {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func (b *tfObject) TFType() tftypes.Type {
 	// Sometimes objects represent DynamicPseudoType's. In this cases we want
 	// to iterate over the Val if any and ensure that we include them in the type.

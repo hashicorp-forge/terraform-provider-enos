@@ -84,10 +84,10 @@ func (c *client) readFile(ctx context.Context, path string) (string, error) {
 	}
 
 	handle, err := os.Open(abs)
-	defer handle.Close() //nolint: staticcheck
 	if err != nil {
 		return res, err
 	}
+	defer handle.Close()
 
 	buf := bytes.Buffer{}
 	_, err = buf.ReadFrom(handle)

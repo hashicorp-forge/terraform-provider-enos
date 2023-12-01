@@ -6,7 +6,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -96,7 +95,7 @@ func TestAccResourceVaultInit(t *testing.T) {
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, vaultInit.Transport.SetTransportState(ssh))
+	require.NoError(t, vaultInit.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		vaultInit,

@@ -13,6 +13,7 @@ import (
 type ValidateFileRequest struct {
 	*CLIRequest
 	FilePath string
+	Username string
 }
 
 // ValidateFileRequestOpt is a functional option for a Consul validate command.
@@ -23,6 +24,7 @@ type ValidateFileRequestOpt func(*ValidateFileRequest) *ValidateFileRequest
 func NewValidateFileRequest(opts ...ValidateFileRequestOpt) *ValidateFileRequest {
 	s := &ValidateFileRequest{
 		CLIRequest: &CLIRequest{},
+		Username:   "consul",
 	}
 
 	for _, opt := range opts {
@@ -48,10 +50,18 @@ func WithValidateFilePath(path string) ValidateFileRequestOpt {
 	}
 }
 
+// WithValidateUsername sets the username to sudo as for validation.
+func WithValidateUsername(name string) ValidateFileRequestOpt {
+	return func(u *ValidateFileRequest) *ValidateFileRequest {
+		u.Username = name
+		return u
+	}
+}
+
 // ValidateConsulConfig validates the consul config using the consul validate command.
 func ValidateConsulConfig(ctx context.Context, tr it.Transport, req *ValidateFileRequest) error {
 	_, stderr, err := tr.Run(ctx, command.New(
-		fmt.Sprintf("%s validate %s", req.BinPath, req.FilePath),
+		fmt.Sprintf("sudo -u %s %s validate %s", req.Username, req.BinPath, req.FilePath),
 	))
 	if err != nil {
 		return remoteflight.WrapErrorWith(err, stderr)

@@ -224,6 +224,20 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 
 			return
 		}
+
+		// Make sure we set our planned sum if we didn't know it until apply time.
+		if !plsumok {
+			sha256, err := plannedState.config().computeSHA256(ctx)
+			if err != nil {
+				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+					"Invalid Configuration",
+					fmt.Errorf("failed to read all scripts, due to: %w", err),
+				))
+
+				return
+			}
+			plannedState.Sum.Set(sha256)
+		}
 	}
 }
 

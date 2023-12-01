@@ -503,7 +503,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 		return nil
 	}
 
-	buf := make([]byte, int(head.ContentLength))
+	buf := make([]byte, int(*head.ContentLength))
 	writer := manager.NewWriteAtBuffer(buf)
 	downloader := manager.NewDownloader(s3Client)
 	_, err = downloader.Download(ctx, writer, &s3.GetObjectInput{
@@ -543,7 +543,7 @@ func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3C
 		return err
 	}
 
-	buf := make([]byte, int(head.ContentLength))
+	buf := make([]byte, int(*head.ContentLength))
 	bufwriter := manager.NewWriteAtBuffer(buf)
 	downloader := manager.NewDownloader(s3Client)
 	_, err = downloader.Download(ctx, bufwriter, &s3.GetObjectInput{

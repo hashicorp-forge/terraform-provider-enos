@@ -32,12 +32,12 @@ func newErrSetProviderConfig(err error) error {
 
 // ResourceServerAdapter Adapter for a tfprotov6.ResourceServer removing the error return type from all methods.
 type ResourceServerAdapter interface {
-	ValidateResourceConfig(context.Context, tfprotov6.ValidateResourceConfigRequest, *tfprotov6.ValidateResourceConfigResponse)
-	UpgradeResourceState(context.Context, tfprotov6.UpgradeResourceStateRequest, *tfprotov6.UpgradeResourceStateResponse)
-	ReadResource(context.Context, tfprotov6.ReadResourceRequest, *tfprotov6.ReadResourceResponse)
-	PlanResourceChange(context.Context, PlanResourceChangeRequest, *PlanResourceChangeResponse)
-	ApplyResourceChange(context.Context, ApplyResourceChangeRequest, *ApplyResourceChangeResponse)
-	ImportResourceState(context.Context, tfprotov6.ImportResourceStateRequest, *tfprotov6.ImportResourceStateResponse)
+	ValidateResourceConfig(ctx context.Context, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse)
+	UpgradeResourceState(ctx context.Context, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse)
+	ReadResource(ctx context.Context, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse)
+	PlanResourceChange(ctx context.Context, req PlanResourceChangeRequest, res *PlanResourceChangeResponse)
+	ApplyResourceChange(ctx context.Context, req ApplyResourceChangeRequest, res *ApplyResourceChangeResponse)
+	ImportResourceState(ctx context.Context, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse)
 }
 
 // Resource represents a Terraform resource.
@@ -45,7 +45,7 @@ type Resource interface {
 	ResourceServerAdapter
 	Name() string
 	Schema() *tfprotov6.Schema
-	SetProviderConfig(tftypes.Value) error
+	SetProviderConfig(val tftypes.Value) error
 }
 
 // RouterOpt is a functional option for the router constructor.

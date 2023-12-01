@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
@@ -88,7 +89,7 @@ func resetEnv(t *testing.T) {
 	unsetAllEnosEnv(t)
 
 	for key, val := range startEnv {
-		assert.NoError(t, os.Setenv(key, val))
+		require.NoError(t, os.Setenv(key, val))
 	}
 }
 
@@ -111,7 +112,7 @@ func unsetSSHEnv(t *testing.T) {
 		"ENOS_TRANSPORT_PASSPHRASE",
 		"ENOS_TRANSPORT_PASSPHRASE_PATH",
 	} {
-		assert.NoError(t, os.Unsetenv(eVar))
+		require.NoError(t, os.Unsetenv(eVar))
 	}
 }
 
@@ -125,7 +126,7 @@ func unsetK8SEnv(t *testing.T) {
 		"ENOS_K8S_POD",
 		"ENOS_K8S_CONTAINER",
 	} {
-		assert.NoError(t, os.Unsetenv(eVar))
+		require.NoError(t, os.Unsetenv(eVar))
 	}
 }
 
@@ -138,13 +139,13 @@ func unsetNomadEnv(t *testing.T) {
 		"ENOS_NOMAD_ALLOCATION_ID",
 		"ENOS_NOMAD_TASK_NAME",
 	} {
-		assert.NoError(t, os.Unsetenv(eVar))
+		require.NoError(t, os.Unsetenv(eVar))
 	}
 }
 
 func unsetProviderEnv(t *testing.T) {
 	t.Helper()
-	assert.NoError(t, os.Unsetenv(enosDebugDataRootDirEnvVarKey))
+	require.NoError(t, os.Unsetenv(enosDebugDataRootDirEnvVarKey))
 }
 
 func setEnosSSHEnv(t *testing.T, et *embeddedTransportV1) {
@@ -195,7 +196,7 @@ func setEnvVars(t *testing.T, vars map[string]*tfString) {
 	for key, val := range vars {
 		v, ok := val.Get()
 		if ok {
-			assert.NoError(t, os.Setenv(key, v))
+			require.NoError(t, os.Setenv(key, v))
 		}
 	}
 }
@@ -298,19 +299,19 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 	k8sTransport := newEmbeddedTransportK8Sv1()
 	configureK8STransportFromEnvironment(k8sTransport)
 	if k8sTransport.IsConfigured() {
-		assert.NoError(t, provider.config.Transport.SetTransportState(k8sTransport))
+		require.NoError(t, provider.config.Transport.SetTransportState(k8sTransport))
 	}
 
 	sshTransport := newEmbeddedTransportSSH()
 	configureSSHTransportFromEnvironment(sshTransport)
 	if sshTransport.IsConfigured() {
-		assert.NoError(t, provider.config.Transport.SetTransportState(sshTransport))
+		require.NoError(t, provider.config.Transport.SetTransportState(sshTransport))
 	}
 
 	nomadTransport := newEmbeddedTransportNomadv1()
 	configureNomadTransportFromEnvironment(nomadTransport)
 	if nomadTransport.IsConfigured() {
-		assert.NoError(t, provider.config.Transport.SetTransportState(nomadTransport))
+		require.NoError(t, provider.config.Transport.SetTransportState(nomadTransport))
 	}
 
 	var datasourceOverrides []datarouter.DataSource

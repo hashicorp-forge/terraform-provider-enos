@@ -78,6 +78,10 @@ scenario "failure_handlers" {
   step "test_failure_handlers" {
     skip_step = !var.run_failure_handler_tests
     module    = module.test_failure_handlers
+    depends_on = [
+      step.install_and_start_vault,
+      step.install_and_start_consul
+    ]
 
     providers = {
       enos = provider.enos.ubuntu
@@ -86,11 +90,21 @@ scenario "failure_handlers" {
     variables {
       host_public_ip = step.setup_remote_host.public_ip
     }
+  }
 
+  step "test_enos_user" {
     depends_on = [
-      step.install_and_start_vault,
-      step.install_and_start_consul
+      step.setup_remote_host
     ]
+    module = module.test_enos_user
+
+    providers = {
+      enos = provider.enos.ubuntu
+    }
+
+    variables {
+      host_public_ip = step.setup_remote_host.public_ip
+    }
   }
 
   output "public_ip" {

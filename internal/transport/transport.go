@@ -7,9 +7,9 @@ import (
 
 // Transport is a generic transport interface.
 type Transport interface {
-	Copy(context.Context, Copyable, string) error
-	Run(context.Context, Command) (stdout, stderr string, err error)
-	Stream(context.Context, Command) (stdout, stderr io.Reader, errC chan error)
+	Copy(ctx context.Context, body Copyable, dest string) error
+	Run(ctx context.Context, cmd Command) (stdout, stderr string, err error)
+	Stream(ctx context.Context, cmd Command) (stdout, stderr io.Reader, errC chan error)
 	Type() TransportType
 	io.Closer
 }

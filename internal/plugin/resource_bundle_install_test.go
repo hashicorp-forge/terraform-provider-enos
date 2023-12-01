@@ -7,7 +7,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -58,7 +57,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
+	require.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"path",
 		installBundlePath,
@@ -82,7 +81,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
+	require.NoError(t, installBundlePath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"release",
 		installBundleRelease,
@@ -109,7 +108,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, installBundleArtifactory.Transport.SetTransportState(ssh))
+	require.NoError(t, installBundleArtifactory.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"artifactory",
 		installBundleArtifactory,
@@ -150,7 +149,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		bundleInstallReleaseInstall.Release.Version.Set("0.1.0")
 		ssh = newEmbeddedTransportSSH()
 		ssh.Host.Set(enosVars["host"])
-		assert.NoError(t, bundleInstallReleaseInstall.Transport.SetTransportState(ssh))
+		require.NoError(t, bundleInstallReleaseInstall.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTemplate{
 			"real_release",
 			bundleInstallReleaseInstall,
@@ -173,7 +172,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("d01a82111133908167a5a140604ab3ec8fd18601758376a5f8e9dd54c7703373")
 			ssh := newEmbeddedTransportSSH()
 			ssh.Host.Set(enosVars["host"])
-			assert.NoError(t, bundleInstallArtifactoryInstall.Transport.SetTransportState(ssh))
+			require.NoError(t, bundleInstallArtifactoryInstall.Transport.SetTransportState(ssh))
 			cases = append(cases, testAccResourceTemplate{
 				"real_art",
 				bundleInstallArtifactoryInstall,

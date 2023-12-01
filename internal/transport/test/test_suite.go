@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -85,8 +84,8 @@ func (s *TransportTestSuite) TestRun() {
 			cancel()
 			if tt.wantExitCode != 0 {
 				var exitErr *it.ExecError
-				require.True(t1, errors.As(err, &exitErr))
-				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				require.ErrorAs(t, err, &exitErr)
+				require.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
 				err = exitErr.Unwrap()
 			}
 			var merr *multierror.Error
@@ -170,8 +169,8 @@ func (s *TransportTestSuite) TestCopy() {
 			err := transport.Copy(tt.args.ctx, tt.args.copyable, tt.args.dst)
 			if tt.wantExitCode != 0 {
 				var exitErr *it.ExecError
-				require.True(t1, errors.As(err, &exitErr))
-				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				require.ErrorAs(t1, err, &exitErr)
+				require.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
 				err = exitErr.Unwrap()
 			}
 			if merr, ok := err.(*multierror.Error); ok {
@@ -283,8 +282,8 @@ func (s *TransportTestSuite) TestStream() {
 
 			if tt.wantExitCode != 0 {
 				var exitErr *it.ExecError
-				require.True(t1, errors.As(err, &exitErr))
-				assert.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
+				require.ErrorAs(t1, err, &exitErr)
+				require.Equal(t1, tt.wantExitCode, exitErr.ExitCode())
 				err = exitErr.Unwrap()
 			}
 			if (err != nil && err.Error() != tt.wantErr) || (err != nil && tt.wantErr == "") {

@@ -15,6 +15,7 @@ FLIGHTCONTROL_LD_FLAGS?=-ldflags="-extldflags=-static -s -w"
 
 CI?=false
 LINT_OUT_FORMAT?=colored-line-number
+.PHONY: HASUPX
 HASUPX:= $(shell upx dot 2> /dev/null)
 TEST?=./...
 TEST_BLD_DIR=./test-build
@@ -29,17 +30,25 @@ endif
 # Make sure our shell isn't set to /bin/sh because we use pushd/popd
 SHELL = /bin/bash
 
+.PHONY: default
 default: build install
 
+.PHONY: all
+all: clean lint fmt-check build-all install test-race-detector
+
+.PHONY: build
 build:
 	mkdir -p ./dist
 	CGO_ENABLED=0 GOOS=${PROVIDER_BIN_OS} GOARCH=${PROVIDER_BIN_ARCH} go build ${PROVIDER_BUILD_TAGS} ${PROVIDER_LD_FLAGS} -o ./dist/${PROVIDER_BIN_NAME}_${PROVIDER_BIN_VERSION}_${PROVIDER_BIN_OS}_${PROVIDER_BIN_ARCH} ./command/plugin
 
+.PHONY: build-race-detector
 build-race-detector:
 	CGO_ENABLED=0 GOOS=${PROVIDER_BIN_OS} GOARCH=${PROVIDER_BIN_ARCH} go build -race ${PROVIDER_BUILD_TAGS} ${PROVIDER_LD_FLAGS} -o ./dist/${PROVIDER_BIN_NAME}_${PROVIDER_BIN_VERSION}_${PROVIDER_BIN_OS}_${PROVIDER_BIN_ARCH} ./command/plugin
 
+.PHONY: build-all
 build-all: flight-control build
 
+.PHONY: install
 install:
 	for binary in $$(ls ./dist | grep ${PROVIDER_BIN_NAME}) ; do \
 	version=$$(echo $$binary | cut -d "_" -f 2); \
@@ -49,13 +58,16 @@ install:
 	cp ./dist/$$binary ~/.terraform.d/plugins/${PROVIDER_HOSTNAME}/${PROVIDER_NAMESPACE}/${PROVIDER_NAME}/$${version}/$${platform}_$${arch}/${PROVIDER_BIN_NAME}; \
 done
 
+.PHONY: flight-control
 flight-control: flight-control-build flight-control-pack
 
+.PHONY: flight-control-build
 flight-control-build:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_darwin_amd64 ./command/enos-flight-control
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_amd64 ./command/enos-flight-control
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_arm64 ./command/enos-flight-control
 
+.PHONY: flight-control-pack
 flight-control-pack:
 ifndef HASUPX
 	$(error "upx is required to pack enos-flight-control - get it via `brew install upx`")
@@ -64,12 +76,15 @@ endif
 	upx -q -9 *; \
 	popd || exit 1 \
 
+.PHONY: test
 test:
 	go test $(TEST) -v $(TESTARGS) -timeout=5m -parallel=4
 
+.PHONY: test-acc
 test-acc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 12m
 
+.PHONY: test-race-detector
 test-race-detector:
 	GORACE=log_path=/tmp/gorace.log TF_ACC=1 go test -race $(TEST) -v $(TESTARGS) -timeout 120m ./command/plugin
 
@@ -109,4 +124,4 @@ lint-fix:
 
 .PHONY: clean
 clean:
-	rm -rf dist bin .terraform*
+	rm -rf dist/* bin/* .terraform*

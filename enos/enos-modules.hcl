@@ -133,3 +133,7 @@ module "test_kind_container" {
 module "test_kind_container_enosdev" {
   source = "./modules/test_kind_container_enosdev"
 }
+
+module "test_enos_user" {
+  source = "./modules/test_enos_user"
+}

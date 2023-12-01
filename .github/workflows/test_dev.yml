@@ -14,7 +14,7 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       # Build all provider targets here to ensure they all compile
       - uses: ./.github/actions/build-provider
       - run: ls -al ./dist
@@ -23,7 +23,7 @@ jobs:
     name: go test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: ./.github/actions/build-flight-control
       - run: make test-race-detector
 
@@ -33,7 +33,7 @@ jobs:
     env:
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: ./.github/actions/build-flight-control
       - uses: hashicorp/doormat-action@main
         with:
@@ -81,7 +81,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
@@ -107,7 +107,7 @@ jobs:
         shell: bash
         working-directory: enos
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
       - uses: hashicorp/doormat-action@main
@@ -172,7 +172,7 @@ jobs:
         shell: bash
         working-directory: enos
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
       - uses: hashicorp/setup-terraform@v2
@@ -268,7 +268,7 @@ jobs:
           - edition:ce use:dev
       fail-fast: false
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
       - uses: hashicorp/setup-terraform@v2
@@ -304,7 +304,7 @@ jobs:
     name: static analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: ./.github/actions/build-flight-control
       - uses: hashicorp/setup-terraform@v2
         with:

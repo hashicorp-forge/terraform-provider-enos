@@ -41,7 +41,7 @@ const (
 	SealTypeAzureKeyVault SealType = "azurekeyvault"
 	SealTypeGCPKMS        SealType = "gcpkms"
 	SealTypeOCIKMS        SealType = "ocikms"
-	SealTypeHSMPCKS11     SealType = "pcks11"
+	SealTypeHSMPKCS11     SealType = "pkcs11"
 	SealTypeTransit       SealType = "transit"
 )
 
@@ -198,7 +198,7 @@ func Unseal(ctx context.Context, tr it.Transport, req *UnsealRequest) (*UnsealRe
 				}
 			}
 		case SealTypeAliCloud, SealTypeAWSKMS, SealTypeAzureKeyVault, SealTypeGCPKMS,
-			SealTypeOCIKMS, SealTypeHSMPCKS11, SealTypeTransit:
+			SealTypeOCIKMS, SealTypeHSMPKCS11, SealTypeTransit:
 			// Let auto-unseal take the wheel and wait for vault to be unsealed below.
 		default:
 			return res, fmt.Errorf("unspported seal type: %s", req.SealType)

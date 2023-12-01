@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/enos-provider/internal/kubernetes"
 	"github.com/hashicorp/enos-provider/internal/log"
@@ -296,7 +297,7 @@ func TestGetLogsFailureHandler(t *testing.T) {
 	existDir := t.TempDir()
 
 	noExistDir := t.TempDir()
-	assert.NoError(t, os.RemoveAll(noExistDir))
+	require.NoError(t, os.RemoveAll(noExistDir))
 
 	chickenLogs := []byte(`Preparing to make tacos
 Found cheese
@@ -410,7 +411,7 @@ Error: Failed to find consul`)
 				assert.FileExists(t, logFile)
 
 				logContents, err := os.ReadFile(logFile)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, serviceMap[service], logContents)
 				assert.Contains(t, diag.Detail, fmt.Sprintf("  %s: %s", service, logFile))
 			}

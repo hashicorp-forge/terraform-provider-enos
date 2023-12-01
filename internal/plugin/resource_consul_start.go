@@ -509,7 +509,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		dataDir = ddir
 	}
 
-	_, err = remoteflight.FindOrCreateUser(ctx, transport, remoteflight.NewUser(
+	_, err = remoteflight.CreateOrUpdateUser(ctx, transport, remoteflight.NewUser(
 		remoteflight.WithUserName(consulUsername),
 		remoteflight.WithUserHomeDir(dataDir),
 		remoteflight.WithUserShell("/bin/false"),
@@ -620,6 +620,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 
 	// Validate the Consul config file
 	err = consul.ValidateConsulConfig(ctx, transport, consul.NewValidateFileRequest(
+		consul.WithValidateUsername(consulUsername),
 		consul.WithValidateConfigBinPath(s.BinPath.Value()),
 		consul.WithValidateFilePath(configFilePath),
 	))

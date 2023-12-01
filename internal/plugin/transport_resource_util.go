@@ -18,7 +18,12 @@ type transportResourceUtil struct{}
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
 // validate the resource's configuration.
-func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, state state.Serializable, req tfprotov6.ValidateResourceConfigRequest, res *tfprotov6.ValidateResourceConfigResponse) {
+func (t *transportResourceUtil) ValidateResourceConfig(
+	ctx context.Context,
+	state state.Serializable,
+	req tfprotov6.ValidateResourceConfigRequest,
+	res *tfprotov6.ValidateResourceConfigResponse,
+) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -54,7 +59,12 @@ func (t *transportResourceUtil) ValidateResourceConfig(ctx context.Context, stat
 //     values to the new values.
 //  3. Upgrade the existing state with the new values and return the marshaled
 //     version of the current upgraded state.
-func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state state.Serializable, req tfprotov6.UpgradeResourceStateRequest, res *tfprotov6.UpgradeResourceStateResponse) {
+func (t *transportResourceUtil) UpgradeResourceState(
+	ctx context.Context,
+	state state.Serializable,
+	req tfprotov6.UpgradeResourceStateRequest,
+	res *tfprotov6.UpgradeResourceStateResponse,
+) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -95,9 +105,13 @@ func (t *transportResourceUtil) UpgradeResourceState(ctx context.Context, state 
 	}
 }
 
-// ReadResource is the request Terraform sends when it wants to get the latest
-// state for the resource.
-func (t *transportResourceUtil) ReadResource(ctx context.Context, serializable state.Serializable, req tfprotov6.ReadResourceRequest, res *tfprotov6.ReadResourceResponse) {
+// ReadResource is the request Terraform sends when it wants to get the latest state for the resource.
+func (t *transportResourceUtil) ReadResource(
+	ctx context.Context,
+	serializable state.Serializable,
+	req tfprotov6.ReadResourceRequest,
+	res *tfprotov6.ReadResourceResponse,
+) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -128,6 +142,77 @@ func (t *transportResourceUtil) ReadResource(ctx context.Context, serializable s
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
 		return
 	}
+}
+
+// ReadUnmarshalAndBuildTransport takes the current state and resource, unmarshals the wire value
+// to our state and creates a transport that is configured with the resources provider config. It
+// returns the transport if possible.
+func (t *transportResourceUtil) ReadUnmarshalAndBuildTransport(
+	ctx context.Context,
+	current StateWithTransport,
+	resource ResourceWithProviderConfig,
+	req tfprotov6.ReadResourceRequest,
+	res *tfprotov6.ReadResourceResponse,
+) *embeddedTransportV1 {
+	select {
+	case <-ctx.Done():
+		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
+		return nil
+	default:
+	}
+
+	defer func() {
+		// The library we use to convert the wire config to tftypes can panic. We'll recover
+		// here to bubble up those errors as diagnostics instead of just panicking and leaving
+		// Terraform hanging.
+		if pan := recover(); pan != nil {
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Serialization Error", fmt.Errorf(
+					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState),
+			))
+		}
+	}()
+
+	providerConfig, err := resource.GetProviderConfig()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Read Error",
+			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
+		})
+
+		return nil
+	}
+
+	err = unmarshal(current, req.CurrentState)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Serialization Error", err))
+		return nil
+	}
+
+	etP := current.EmbeddedTransport()
+	et, err := etP.Copy()
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Read Error",
+			fmt.Errorf("failed to copy embedded transport, due to: %s", err),
+		))
+
+		return nil
+	}
+
+	configuredTransport, err := et.ApplyDefaults(providerConfig.Transport)
+	if err != nil {
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+			"Transport Error",
+			fmt.Errorf("failed to apply transport defaults, due to: %w", err),
+		))
+
+		return nil
+	}
+	etP.setResolvedTransport(configuredTransport)
+
+	return et
 }
 
 // PlanUnmarshalVerifyAndBuildTransport is a helper method that unmarshals
@@ -193,7 +278,12 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 
 // ApplyUnmarshalState is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
-func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, planned StateWithTransport, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
+func (t *transportResourceUtil) ApplyUnmarshalState(
+	ctx context.Context,
+	prior, planned StateWithTransport,
+	req resource.ApplyResourceChangeRequest,
+	res *resource.ApplyResourceChangeResponse,
+) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))
@@ -222,7 +312,12 @@ func (t *transportResourceUtil) ApplyUnmarshalState(ctx context.Context, prior, 
 
 // ApplyValidatePlannedAndBuildTransport takes the planned state and provider transport,
 // validates them, and returns a new embedded transport that can be used to create a transport client.
-func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx context.Context, planned StateWithTransport, resource ResourceWithProviderConfig, res *resource.ApplyResourceChangeResponse) *embeddedTransportV1 {
+func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(
+	ctx context.Context,
+	planned StateWithTransport,
+	resource ResourceWithProviderConfig,
+	res *resource.ApplyResourceChangeResponse,
+) *embeddedTransportV1 {
 	providerConfig, err := resource.GetProviderConfig()
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
@@ -294,7 +389,12 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(ctx contex
 //
 // Importing a enos resources doesn't make a lot of sense but we have to support the
 // function regardless.
-func (t *transportResourceUtil) ImportResourceState(ctx context.Context, serializable state.Serializable, req tfprotov6.ImportResourceStateRequest, res *tfprotov6.ImportResourceStateResponse) {
+func (t *transportResourceUtil) ImportResourceState(
+	ctx context.Context,
+	serializable state.Serializable,
+	req tfprotov6.ImportResourceStateRequest,
+	res *tfprotov6.ImportResourceStateResponse,
+) {
 	select {
 	case <-ctx.Done():
 		res.Diagnostics = append(res.Diagnostics, ctxToDiagnostic(ctx))

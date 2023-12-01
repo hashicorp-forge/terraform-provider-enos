@@ -81,10 +81,10 @@ func main() {
 	}
 
 	tmplF, err := os.Open(tmplPath)
-	defer tmplF.Close() //nolint: staticcheck
 	if err != nil {
 		exit(err)
 	}
+	defer tmplF.Close()
 
 	buf := bytes.Buffer{}
 	_, err = buf.ReadFrom(tmplF)
@@ -105,10 +105,10 @@ func main() {
 
 	fmt.Printf("writing to %s\n", destPath)
 	dest, err := os.Create(destPath)
-	defer dest.Close() //nolint: staticcheck
 	if err != nil {
 		exit(err)
 	}
+	defer dest.Close()
 
 	_, err = buf.WriteTo(dest)
 	if err != nil {

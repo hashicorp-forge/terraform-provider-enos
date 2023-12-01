@@ -84,7 +84,7 @@ EOF
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
 	require.NoError(t, err)
 	ssh.PrivateKey.Set(privateKey)
-	assert.NoError(t, keyNoPass.Transport.SetTransportState(ssh))
+	require.NoError(t, keyNoPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with no passphrase",
 		keyNoPass,
@@ -108,7 +108,7 @@ EOF
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
 	ssh.PrivateKeyPath.Set("../fixtures/ssh.pem")
-	assert.NoError(t, keyPathNoPass.Transport.SetTransportState(ssh))
+	require.NoError(t, keyPathNoPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key from a file path with no passphrase",
 		keyPathNoPass,
@@ -129,7 +129,7 @@ EOF
 	passphrase, err := readTestFile("../fixtures/passphrase.txt")
 	require.NoError(t, err)
 	ssh.Passphrase.Set(passphrase)
-	assert.NoError(t, keyPass.Transport.SetTransportState(ssh))
+	require.NoError(t, keyPass.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with passphrase value",
 		keyPass,
@@ -148,7 +148,7 @@ EOF
 	ssh.Host.Set("localhost")
 	ssh.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	ssh.PassphrasePath.Set("../fixtures/passphrase.txt")
-	assert.NoError(t, keyPassPath.Transport.SetTransportState(ssh))
+	require.NoError(t, keyPassPath.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] private key value with passphrase from file path",
 		keyPassPath,
@@ -167,7 +167,7 @@ EOF
 	ssh.Host.Set("localhost")
 	ssh.PrivateKeyPath.Set("../fixtures/ssh_pass.pem")
 	ssh.PassphrasePath.Set("../fixtures/passphrase.txt")
-	assert.NoError(t, content.Transport.SetTransportState(ssh))
+	require.NoError(t, content.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[ssh] with string content instead of source file",
 		content,
@@ -185,7 +185,7 @@ EOF
 	k8s.KubeConfigBase64.Set("../fixtures/kubeconfig")
 	k8s.ContextName.Set("kind-kind")
 	k8s.Pod.Set("some-pod")
-	assert.NoError(t, content.Transport.SetTransportState(k8s))
+	require.NoError(t, content.Transport.SetTransportState(k8s))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[kubernetes] with string content instead of source file",
 		content,
@@ -204,7 +204,7 @@ EOF
 	nomad.SecretID.Set("secret")
 	nomad.AllocationID.Set("d76bc89d")
 	nomad.TaskName.Set("task")
-	assert.NoError(t, content.Transport.SetTransportState(nomad))
+	require.NoError(t, content.Transport.SetTransportState(nomad))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[nomad] with string content instead of source file",
 		content,
@@ -222,7 +222,7 @@ EOF
 	nomad.Host.Set("http://127.0.0.1:4646")
 	nomad.AllocationID.Set("d76bc89d")
 	nomad.TaskName.Set("task")
-	assert.NoError(t, content.Transport.SetTransportState(nomad))
+	require.NoError(t, content.Transport.SetTransportState(nomad))
 	cases = append(cases, testAccResourceTransportTemplate{
 		"[nomad] with string content instead of source file no secret id",
 		content,
@@ -311,7 +311,7 @@ EOF
 		ssh.Host.Set(host)
 		ssh.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
 		ssh.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
-		assert.NoError(t, realTestSrc.Transport.SetTransportState(ssh))
+		require.NoError(t, realTestSrc.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"[ssh] real test source file",
 			realTestSrc,
@@ -330,7 +330,7 @@ EOF
 		ssh.Host.Set(host)
 		ssh.PrivateKeyPath.Set(os.Getenv("ENOS_TRANSPORT_PRIVATE_KEY_PATH"))
 		ssh.PassphrasePath.Set(os.Getenv("ENOS_TRANSPORT_PASSPHRASE_PATH"))
-		assert.NoError(t, realTestContent.Transport.SetTransportState(ssh))
+		require.NoError(t, realTestContent.Transport.SetTransportState(ssh))
 		cases = append(cases, testAccResourceTransportTemplate{
 			"[ssh] real test content",
 			realTestContent,
@@ -500,7 +500,7 @@ func TestResourceFileMarshalRoundtrip(t *testing.T) {
 		{"src", "/tmp/src", fileState.Src},
 		{"dst", "/tmp/dst", fileState.Dst},
 	})
-	assert.NoError(t, fileState.Transport.SetTransportState(ssh, k8s, nomad))
+	require.NoError(t, fileState.Transport.SetTransportState(ssh, k8s, nomad))
 
 	marshaled, err := state.Marshal(fileState)
 	require.NoError(t, err)
@@ -571,7 +571,7 @@ func TestSetProviderConfig(t *testing.T) {
 		{"allocation_id", "some allocation id", nomad.AllocationID},
 		{"task_name", "some task", nomad.TaskName},
 	})
-	assert.NoError(t, p.Transport.SetTransportState(ssh, k8s, nomad))
+	require.NoError(t, p.Transport.SetTransportState(ssh, k8s, nomad))
 
 	require.NoError(t, p.Transport.FromTerraform5Value(tr.Terraform5Value()))
 	require.NoError(t, f.SetProviderConfig(p.Terraform5Value()))
