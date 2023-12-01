@@ -65,8 +65,6 @@ jobs:
         env:
           ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
-          ARTIFACTORY_PRODUCT_VERSION: 1.7.0
-          ARTIFACTORY_REVISION: f45845666b4e552bfc8ca775834a3ef6fc097fe0
           ENOS_TRANSPORT_USER: ubuntu
           ENOS_TRANSPORT_PRIVATE_KEY_PATH: ./enos-ci-ssh-key.pem
           ENOS_TRANSPORT_HOST: ${{ env.host_ip }}

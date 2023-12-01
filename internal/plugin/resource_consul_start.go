@@ -45,6 +45,7 @@ type consulStartStateV1 struct {
 }
 
 type consulConfig struct {
+	BindAddr        *tfString
 	Datacenter      *tfString
 	DataDir         *tfString
 	RetryJoin       *tfStringSlice
@@ -76,6 +77,7 @@ func newConsulStartStateV1() *consulStartStateV1 {
 		ConfigDir: newTfString(),
 		DataDir:   newTfString(),
 		Config: &consulConfig{
+			BindAddr:        newTfString(),
 			Datacenter:      newTfString(),
 			DataDir:         newTfString(),
 			RetryJoin:       newTfStringSlice(),
@@ -288,6 +290,11 @@ func (c *consulConfig) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
+					Name:     "bind_addr",
+					Type:     tftypes.String,
+					Optional: true,
+				},
+				{
 					Name:     "datacenter",
 					Type:     tftypes.String,
 					Optional: true,
@@ -376,6 +383,32 @@ func (s *consulStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	return s.Transport.FromTerraform5Value(vals["transport"])
 }
 
+func (c *consulConfig) Terraform5Type() tftypes.Type {
+	return tftypes.Object{
+		AttributeTypes:     c.attrs(),
+		OptionalAttributes: c.optionalAttrs(),
+	}
+}
+
+func (c *consulConfig) attrs() map[string]tftypes.Type {
+	return map[string]tftypes.Type{
+		"bind_addr":        c.BindAddr.TFType(),
+		"datacenter":       c.Datacenter.TFType(),
+		"data_dir":         c.DataDir.TFType(),
+		"retry_join":       c.RetryJoin.TFType(),
+		"server":           c.Server.TFType(),
+		"bootstrap_expect": c.BootstrapExpect.TFType(),
+		"log_file":         c.LogFile.TFType(),
+		"log_level":        c.LogLevel.TFType(),
+	}
+}
+
+func (c *consulConfig) optionalAttrs() map[string]struct{} {
+	return map[string]struct{}{
+		"bind_addr": {},
+	}
+}
+
 // Terraform5Type is the file state tftypes.Type.
 func (s *consulStartStateV1) Terraform5Type() tftypes.Type {
 	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
@@ -411,22 +444,13 @@ func (s *consulStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-func (c *consulConfig) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"data_dir":         c.DataDir.TFType(),
-			"datacenter":       c.Datacenter.TFType(),
-			"retry_join":       c.RetryJoin.TFType(),
-			"server":           c.Server.TFType(),
-			"bootstrap_expect": c.BootstrapExpect.TFType(),
-			"log_file":         c.LogFile.TFType(),
-			"log_level":        c.LogLevel.TFType(),
-		},
-	}
-}
-
 func (c *consulConfig) Terraform5Value() tftypes.Value {
-	return tftypes.NewValue(c.Terraform5Type(), map[string]tftypes.Value{
+	typ := tftypes.Object{
+		AttributeTypes: c.attrs(),
+	}
+
+	return tftypes.NewValue(typ, map[string]tftypes.Value{
+		"bind_addr":        c.BindAddr.TFValue(),
 		"data_dir":         c.DataDir.TFValue(),
 		"datacenter":       c.Datacenter.TFValue(),
 		"retry_join":       c.RetryJoin.TFValue(),
@@ -440,6 +464,7 @@ func (c *consulConfig) Terraform5Value() tftypes.Value {
 // FromTerraform5Value unmarshals the value to the struct.
 func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
 	_, err := mapAttributesTo(val, map[string]interface{}{
+		"bind_addr":        c.BindAddr,
 		"data_dir":         c.DataDir,
 		"datacenter":       c.Datacenter,
 		"retry_join":       c.RetryJoin,
@@ -458,6 +483,10 @@ func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
 // ToHCLConfig returns the consul config in the remoteflight HCLConfig format.
 func (c *consulConfig) ToHCLConfig() *hcl.Builder {
 	hlcBuilder := hcl.NewBuilder()
+
+	if bindAddr, ok := c.BindAddr.Get(); ok {
+		hlcBuilder.AppendAttribute("bind_addr", bindAddr)
+	}
 
 	if dataCenter, ok := c.Datacenter.Get(); ok {
 		hlcBuilder.AppendAttribute("datacenter", dataCenter)

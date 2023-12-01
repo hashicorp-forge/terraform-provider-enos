@@ -17,16 +17,14 @@ import (
 // criteria.
 //
 //nolint:paralleltest// because our resource handles it
-func TestAccDataSourceArtifacotoryItem(t *testing.T) {
+func TestAccDataSourceArtifactoryItem(t *testing.T) {
 	state := newArtifactoryItemStateV1()
 	_, okacc := os.LookupEnv("TF_ACC")
 	username, okuser := os.LookupEnv("ARTIFACTORY_USER")
 	token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
-	version, okver := os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
-	revision, okrev := os.LookupEnv("ARTIFACTORY_REVISION")
 
-	if !okacc || !okuser || !oktoken || !okver || !okrev {
-		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER, ARTIFACATORY_PRODUCT_VERSION, ARTIFACTORY_REVISION aren't set`)
+	if !okacc || !okuser || !oktoken {
+		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER aren't set`)
 		t.Skip()
 
 		return
@@ -35,16 +33,13 @@ func TestAccDataSourceArtifacotoryItem(t *testing.T) {
 	state.Username.Set(username)
 	state.Token.Set(token)
 	state.Host.Set("https://artifactory.hashicorp.engineering/artifactory")
-	state.Repo.Set("hashicorp-packagespec-buildcache-local*")
-	state.Path.Set("cache-v1/vault-enterprise/*")
-	state.Name.Set("*.zip")
+	state.Repo.Set("hashicorp-crt-stable-local*")
+	state.Path.Set("vault/*")
+	state.Name.Set("vault_1.15.4-1_arm64.deb")
 	state.Properties.SetStrings(map[string]string{
-		"artifactType":    "package",
-		"productVersion":  version,
-		"productRevision": revision,
-		"GOOS":            "linux",
-		"GOARCH":          "amd64",
-		"EDITION":         "ent",
+		"commit":          "818455b6d8db30c219a13560fa699f5566a0d898",
+		"product-name":    "vault",
+		"product-version": "1.15.4",
 	})
 
 	cfg := template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
@@ -79,7 +74,7 @@ output "url" {
 			{
 				Config: buf.String(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestMatchOutput("url", regexp.MustCompile(`.zip`)),
+					resource.TestMatchOutput("url", regexp.MustCompile(`.deb`)),
 				),
 			},
 		},

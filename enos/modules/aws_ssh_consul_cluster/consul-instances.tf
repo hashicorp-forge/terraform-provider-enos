@@ -42,6 +42,13 @@ resource "enos_consul_start" "consul" {
   data_dir   = var.consul_data_dir
   config_dir = var.consul_config_dir
   config = {
+    # When using Amazon Linux 2 instances, multiple IPs are made available, so we
+    # need to tell Consul which one to bind to. Other other supported distros do
+    # not have this requirement, but this filter still returns the correct IP on
+    # those, so this config can be used as is for all distros. We use the go-sockaddr
+    # template to handle this: https://pkg.go.dev/github.com/hashicorp/go-sockaddr/template#pkg-overview
+    # Consul bind_addr docs: https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr
+    bind_addr        = "{{ GetPrivateInterfaces | include \"type\" \"IP\" | sort \"default\" |  limit 1 | attr \"address\"}}"
     data_dir         = var.consul_data_dir
     datacenter       = "dc1"
     retry_join       = ["provider=aws tag_key=Type tag_value=${local.consul_cluster_tag}"]
