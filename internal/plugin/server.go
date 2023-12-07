@@ -49,6 +49,7 @@ func defaultResources() []rr.Resource {
 		newBundleInstall(),
 		newConsulStart(),
 		newFile(),
+		newHostInfo(),
 		newLocalKindCluster(),
 		newLocalKindLoadImage(),
 		newLocalExec(),

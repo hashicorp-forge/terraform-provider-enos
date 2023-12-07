@@ -23,6 +23,10 @@ const MaxRetriesUnlimited int = -1
 // If Run() returns an error, Retry determines whether it should retry using ShouldRetry(),
 // and if it should, sleeps the appropriate duration as specified by Interval() before retrying.
 func Retry(ctx context.Context, req Retryable) (any, error) {
+	if req == nil {
+		return nil, fmt.Errorf("no retryable request")
+	}
+
 	var res any
 	var err error
 	attempts := 1
@@ -81,6 +85,18 @@ type Retrier struct {
 	// The operation to be run (required)
 	Func    func(context.Context) (any, error)
 	lastErr error
+}
+
+// Clone returns a cloned copy of the retrier. If for some reason we add pointer fieds to this
+// struct we'll have to handle those.
+func (r *Retrier) Clone() *Retrier {
+	if r == nil {
+		return nil
+	}
+
+	cpy := *r
+
+	return &cpy
 }
 
 // RetrierOpt is a function that takes a pointer to a Retrier and returns that same pointer,

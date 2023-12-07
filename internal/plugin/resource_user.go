@@ -135,6 +135,7 @@ func (f *user) ReadResource(ctx context.Context, req tfprotov6.ReadResourceReque
 	if err != nil {
 		return
 	}
+	defer it.Close()
 
 	// We actually have a valid transport and user name. Try and find the user.
 	user, err := remoteflight.FindUser(ctx, it, name)

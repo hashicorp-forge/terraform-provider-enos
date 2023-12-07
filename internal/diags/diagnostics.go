@@ -42,3 +42,22 @@ func ErrToDiagnostic(summary string, err error) *tfprotov6.Diagnostic {
 
 	return diagnostic
 }
+
+// ErrToDiagnostic creates a new Diagnostic for the provided error. If the error is of type
+// tftypes.AttributePathError the attribute path is added to the diagnostic.
+func ErrToDiagnosticWarn(summary string, err error) *tfprotov6.Diagnostic {
+	diagnostic := &tfprotov6.Diagnostic{
+		Summary:  summary,
+		Severity: tfprotov6.DiagnosticSeverityWarning,
+	}
+
+	var attrErr tftypes.AttributePathError
+	if errors.As(err, &attrErr) {
+		diagnostic.Detail = attrErr.Unwrap().Error()
+		diagnostic.Attribute = attrErr.Path
+	} else {
+		diagnostic.Detail = err.Error()
+	}
+
+	return diagnostic
+}

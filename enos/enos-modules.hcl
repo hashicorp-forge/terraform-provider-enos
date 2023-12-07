@@ -66,6 +66,14 @@ module "create_kind_cluster_enosdev" {
   source = "./modules/create_kind_cluster_enosdev"
 }
 
+module "create_vpc" {
+  source = "./modules/create_vpc"
+}
+
+module "ec2_info" {
+  source = "./modules/ec2_info"
+}
+
 module "environment" {
   source = "./modules/environment"
 }
@@ -122,8 +130,22 @@ module "read_file" {
   source = "./modules/read_file"
 }
 
+module "target_ec2_instances" {
+  source = "./modules/target_ec2_instances"
+
+  ssh_keypair = "enos-ci-ssh-key"
+}
+
+module "test_enos_user" {
+  source = "./modules/test_enos_user"
+}
+
 module "test_failure_handlers" {
   source = "./modules/test_failure_handlers"
+}
+
+module "test_host_info" {
+  source = "./modules/test_host_info"
 }
 
 module "test_kind_container" {
@@ -132,8 +154,4 @@ module "test_kind_container" {
 
 module "test_kind_container_enosdev" {
   source = "./modules/test_kind_container_enosdev"
-}
-
-module "test_enos_user" {
-  source = "./modules/test_enos_user"
 }
