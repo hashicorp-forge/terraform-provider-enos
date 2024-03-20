@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package artifactory
 
 import (
@@ -63,7 +66,7 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 
 	res := &SearchAQLResponse{}
 
-	search, err := url.Parse(fmt.Sprintf("%s/api/search/aql", c.Host))
+	search, err := url.Parse(c.Host + "/api/search/aql")
 	if err != nil {
 		return res, fmt.Errorf("generating search url: %w", err)
 	}

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -173,16 +176,16 @@ func WithInitRequestStoredShares(shares int) InitRequestOpt {
 // Validate validates that the init requests has required fields.
 func (r *InitRequest) Validate() error {
 	if r.BinPath == "" {
-		return fmt.Errorf("no binary path has been supplied")
+		return errors.New("no binary path has been supplied")
 	}
 
 	if r.VaultAddr == "" {
-		return fmt.Errorf("to vault address has been supplied")
+		return errors.New("to vault address has been supplied")
 	}
 
 	if r.StoredShares != -1 {
 		if r.StoredShares != r.KeyShares {
-			return fmt.Errorf("the number of stored shares must be equal to key shares")
+			return errors.New("the number of stored shares must be equal to key shares")
 		}
 	}
 
@@ -196,7 +199,7 @@ func (r *InitRequest) String() string {
 	}
 
 	cmd := &strings.Builder{}
-	cmd.WriteString(fmt.Sprintf("%s operator init -format=json", r.BinPath))
+	cmd.WriteString(r.BinPath + " operator init -format=json")
 	if r.KeyShares != -1 {
 		cmd.WriteString(fmt.Sprintf(" -key-shares=%d", r.KeyShares))
 	}
@@ -235,12 +238,12 @@ func (r *InitRequest) String() string {
 func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse, error) {
 	binPath := req.BinPath
 	if binPath == "" {
-		return nil, fmt.Errorf("you must supply a vault bin path")
+		return nil, errors.New("you must supply a vault bin path")
 	}
 
 	vaultAddr := req.VaultAddr
 	if vaultAddr == "" {
-		return nil, fmt.Errorf("you must supply a vault listen address")
+		return nil, errors.New("you must supply a vault listen address")
 	}
 
 	var err error
@@ -285,14 +288,14 @@ func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse
 	}
 
 	// Initialize vault
-	tflog.Debug(ctx, fmt.Sprintf("Running Vault Init command: %s", req.String()))
+	tflog.Debug(ctx, "Running Vault Init command: "+req.String())
 	stdout, stderr, err := tr.Run(ctx, command.New(
 		req.String(),
 		command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 	))
 
 	if stdout == "" {
-		err = errors.Join(err, fmt.Errorf("init command did not return data"))
+		err = errors.Join(err, errors.New("init command did not return data"))
 	}
 	if stderr != "" {
 		err = errors.Join(err, fmt.Errorf("init command had unexpected write to STDERR: %s", stderr))

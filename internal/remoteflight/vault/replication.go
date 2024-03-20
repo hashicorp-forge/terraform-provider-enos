@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -92,16 +95,16 @@ func GetReplicationStatus(ctx context.Context, tr it.Transport, req *Replication
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s read -format=json sys/replication/status", req.BinPath),
+			req.BinPath+" read -format=json sys/replication/status",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 		))
 		if err1 != nil {
@@ -113,14 +116,14 @@ func GetReplicationStatus(ctx context.Context, tr it.Transport, req *Replication
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(err, fmt.Errorf("get vault replication status: vault read sys/replication/status"))
+		return nil, errors.Join(err, errors.New("get vault replication status: vault read sys/replication/status"))
 	}
 
 	return res, nil
@@ -154,10 +157,10 @@ func (s *ReplicationData) String() string {
 
 	out := new(strings.Builder)
 	if dr != "" {
-		_, _ = out.WriteString(fmt.Sprintf("DR\n%s", istrings.Indent("  ", dr)))
+		_, _ = out.WriteString("DR\n" + istrings.Indent("  ", dr))
 	}
 	if perf != "" {
-		_, _ = out.WriteString(fmt.Sprintf("Performance\n%s", istrings.Indent("  ", perf)))
+		_, _ = out.WriteString("Performance\n" + istrings.Indent("  ", perf))
 	}
 
 	return out.String()

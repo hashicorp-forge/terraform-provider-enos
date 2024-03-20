@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
@@ -73,7 +77,7 @@ func ValidateConsulConfig(ctx context.Context, tr it.Transport, req *ValidateFil
 // ValidateConsulLicense validates the consul license using file path or env variable.
 func ValidateConsulLicense(ctx context.Context, tr it.Transport, req *ValidateFileRequest) error {
 	if req.FilePath == "" {
-		return fmt.Errorf("you must provide a license file path ")
+		return errors.New("you must provide a license file path ")
 	}
 
 	_, stderr, err := tr.Run(ctx, command.New(

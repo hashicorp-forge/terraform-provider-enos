@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -175,11 +178,11 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 	}
 
 	if req.FlightControlPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply an enos-flight-control path"))
+		err = errors.Join(err, errors.New("you must supply an enos-flight-control path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if err == nil {
@@ -196,7 +199,7 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 
 			// Try and decode the STDOUT body
 			if stdout == "" {
-				err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+				err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 			} else {
 				err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 			}
@@ -208,7 +211,7 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault health: vault read sys/health"), err)
+		return nil, errors.Join(errors.New("get vault health: vault read sys/health"), err)
 	}
 
 	return res, nil
@@ -257,7 +260,7 @@ func (r *HealthResponse) StatusIsOneOf(statuses ...HealthStatus) bool {
 // IsSealed returns whether or not the node is sealed.
 func (r *HealthResponse) IsSealed() (bool, error) {
 	if r == nil {
-		return true, fmt.Errorf("health status is unknown")
+		return true, errors.New("health status is unknown")
 	}
 
 	statusSealed := r.StatusIsOneOf(
@@ -295,7 +298,7 @@ func (r *HealthResponse) String() string {
 	_, _ = out.WriteString(fmt.Sprintf("Replication Performance Mode: %s\n", r.ReplicationPerformanceMode))
 	_, _ = out.WriteString(fmt.Sprintf("Server Time UTC: %d\n", r.ServerTimeUTC))
 	if r.License != nil {
-		_, _ = out.WriteString(fmt.Sprintf("License:\n%s", istrings.Indent("  ", r.License.String())))
+		_, _ = out.WriteString("License:\n" + istrings.Indent("  ", r.License.String()))
 	}
 
 	return out.String()

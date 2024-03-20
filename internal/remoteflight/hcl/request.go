@@ -1,8 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package hcl
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight"
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -73,7 +76,7 @@ func CreateHCLConfigFile(ctx context.Context, tr it.Transport, req *CreateHCLCon
 	}
 
 	if req.FilePath == "" {
-		return fmt.Errorf("you must provide a config file destination path")
+		return errors.New("you must provide a config file destination path")
 	}
 
 	copyOpts := []remoteflight.CopyFileRequestOpt{

@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 scenario "kind" {
   matrix {
     use = ["dev", "enos", "enosdev"]

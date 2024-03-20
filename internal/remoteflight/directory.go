@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	it "github.com/hashicorp/enos-provider/internal/transport"
@@ -49,11 +53,11 @@ func WithDirChown(owner string) CreateDirectoryRequestOpt {
 // CreateDirectory creates the directory and sets owner permissions.
 func CreateDirectory(ctx context.Context, tr it.Transport, dir *CreateDirectoryRequest) error {
 	if dir == nil {
-		return fmt.Errorf("no directory or owner provided")
+		return errors.New("no directory or owner provided")
 	}
 
 	if dir.DirName == "" {
-		return fmt.Errorf("no directory provided")
+		return errors.New("no directory provided")
 	}
 
 	var err error

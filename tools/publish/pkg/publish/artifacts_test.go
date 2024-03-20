@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package publish
 
 import (
@@ -27,7 +30,7 @@ func TestCreateZipArchiveFilePermissions(t *testing.T) {
 	artifacts := NewArtifacts("test")
 
 	for _, mode := range modes {
-		binPath := filepath.Join(dir, fmt.Sprintf("bin-%s", mode.String()))
+		binPath := filepath.Join(dir, "bin-"+mode.String())
 		err = os.WriteFile(binPath, []byte("something"), mode)
 		require.NoError(t, err)
 		err = os.Chmod(binPath, mode)

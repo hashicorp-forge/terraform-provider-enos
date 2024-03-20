@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
@@ -204,7 +207,7 @@ func WaitForState(ctx context.Context, tr it.Transport, req *StateRequest, check
 		}
 
 		if state == nil {
-			return nil, errors.Join(err, fmt.Errorf("no state data found"))
+			return nil, errors.Join(err, errors.New("no state data found"))
 		}
 
 		for _, check := range checks {

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -307,7 +310,17 @@ func (k *localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
-			Version: 1,
+			Version:         1,
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_kind_load_image^ resource can be used to load a local docker image into a kind cluster. This
+resource is equivalent to issuing the command:
+
+^^^shell
+kind load docker-image
+^^^
+See the kind docs [here](https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster)
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:     "id",
@@ -339,10 +352,38 @@ func (k *localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
 					Optional:    true,
 				},
 				{
-					Name:        "loaded_images",
-					Type:        k.LoadedImages.Terraform5Type(),
-					Description: "A list of node/image pairs for the images that where loaded",
-					Computed:    true,
+					Name:            "loaded_images",
+					Type:            k.LoadedImages.Terraform5Type(),
+					Computed:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					//nolint:dupword
+					Description: docCaretToBacktick(`
+An object matching the LoadedImageResult struct described below. The nodes field refers to the
+kubernetes node names.
+
+^^^go
+// LoadedImageResult info about what cluster nodes an image was loaded on
+type LoadedImageResult struct {
+  // Images the images that were loaded. Each image is loaded on each node
+  Images []docker.ImageInfo
+  // Nodes kind cluster control plane nodes where the images were loaded
+  Nodes []string
+}
+
+// ImageInfo information about a docker image
+type ImageInfo struct {
+  Repository string
+  Tags       []TagInfo
+}
+
+// TagInfo information about an image tag
+type TagInfo struct {
+  Tag string
+  // ID docker image ID
+  ID string
+}
+^^^
+`),
 				},
 			},
 		},

@@ -1,8 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package docker
 
 import (
 	"archive/tar"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -61,7 +65,7 @@ func GetImageInfos(archivePath string) ([]ImageInfo, error) {
 		header, err := archiveReader.Next()
 		if err != nil {
 			if err == io.EOF {
-				return nil, fmt.Errorf("failed to find docker file manifest")
+				return nil, errors.New("failed to find docker file manifest")
 			}
 
 			return nil, fmt.Errorf("failed to read archive contents due to: %w", err)

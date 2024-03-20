@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ssh
 
 import (
@@ -232,7 +235,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 60 second limit")))
+				return nil, wrapErr(drainErrors(errors.New("exceeded 60 second limit")))
 			default:
 			}
 
@@ -240,7 +243,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(fmt.Errorf("exceeded 60 second limit")))
+				return nil, wrapErr(drainErrors(errors.New("exceeded 60 second limit")))
 			case <-dialTicker.C:
 				go dial()
 			case client := <-clientC:

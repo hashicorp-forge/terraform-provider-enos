@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
@@ -137,7 +140,7 @@ func Unzip(ctx context.Context, tr transport.Transport, ur *UnzipRequest) (*Unzi
 		ur.Replace,
 	)
 	if ur.Sudo {
-		cmd = fmt.Sprintf("sudo %s", cmd)
+		cmd = "sudo " + cmd
 	}
 
 	stdout, stderr, err := tr.Run(ctx, command.New(cmd))

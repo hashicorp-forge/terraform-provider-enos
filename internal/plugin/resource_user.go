@@ -1,8 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
@@ -245,7 +248,7 @@ func (f *user) ApplyResourceChange(ctx context.Context, req resource.ApplyResour
 	userSpec := plannedState.User()
 	// Build our user create opts from our request. The only required option is "name".
 	if userSpec == nil || userSpec.Name == nil || *userSpec.Name == "" {
-		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Apply Error", fmt.Errorf("cannot create a user without a name")))
+		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Apply Error", errors.New("cannot create a user without a name")))
 		return
 	}
 
@@ -337,42 +340,66 @@ func (u *userStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_user^ resource can be used to create a local user on a target machine. While it was intended
+to be used for SSH targets, if the container allows local user creation and has the useradd utility
+it might work for running containers.
+
+resource "enos_user" "vault" {
+  name     = "vault"
+  home_dir = "/etc/vault.d"
+  shell    = "/bin/false"
+
+  transport = {
+    ssh = {
+      host = "192.168.0.1"
+    }
+  }
+}
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "name",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "name",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The name of the user you wish to create or update",
 				},
 				{
-					Name:     "home_dir",
-					Type:     tftypes.String,
-					Computed: true,
-					Optional: true,
+					Name:        "home_dir",
+					Type:        tftypes.String,
+					Computed:    true,
+					Optional:    true,
+					Description: "The users home directory",
 				},
 				{
-					Name:     "shell",
-					Type:     tftypes.String,
-					Computed: true,
-					Optional: true,
+					Name:        "shell",
+					Type:        tftypes.String,
+					Computed:    true,
+					Optional:    true,
+					Description: "The users default shell",
 				},
 				{
-					Name:     "uid",
-					Type:     tftypes.String,
-					Computed: true,
-					Optional: true,
+					Name:        "uid",
+					Type:        tftypes.String,
+					Computed:    true,
+					Optional:    true,
+					Description: "The UID of the user",
 				},
 				{
-					Name:     "gid",
-					Type:     tftypes.String,
-					Computed: true,
-					Optional: true,
+					Name:        "gid",
+					Type:        tftypes.String,
+					Computed:    true,
+					Optional:    true,
+					Description: "The GID of the user",
 				},
-				u.Transport.SchemaAttributeTransport(),
+				u.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}

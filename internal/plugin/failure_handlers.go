@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,7 +112,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			return
 		}
 
-		errDiag.Detail = fmt.Sprintf("%s\n\nApplication Logs:", errDiag.Detail)
+		errDiag.Detail = errDiag.Detail + "\n\nApplication Logs:"
 		for _, resp := range responses {
 			appName := resp.GetAppName()
 			logFile := filepath.Join(dataDir, resp.GetLogFileName())
@@ -148,7 +152,7 @@ func saveLogsToFile(logFile string, logs []byte) error {
 func getK8sLogs(ctx context.Context, transport *embeddedTransportK8Sv1) ([]remoteflight.GetLogsResponse, error) {
 	pod, ok := transport.Pod.Get()
 	if !ok {
-		return nil, fmt.Errorf("missing [pod] property, cannot fetch logs")
+		return nil, errors.New("missing [pod] property, cannot fetch logs")
 	}
 
 	client, err := transport.k8sClient()
@@ -177,7 +181,7 @@ func getK8sLogs(ctx context.Context, transport *embeddedTransportK8Sv1) ([]remot
 			return nil, fmt.Errorf("failed to get pod info, due to: %w", err)
 		}
 		if len(info.Containers) != 1 {
-			return nil, fmt.Errorf("invalid get logs request, there must be only one container")
+			return nil, errors.New("invalid get logs request, there must be only one container")
 		}
 		container = info.Containers[0]
 	}

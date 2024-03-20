@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 output "instance_ids" {
   description = "IDs of Consul instances"
   value       = [for instance in aws_instance.consul_instance : instance.id]

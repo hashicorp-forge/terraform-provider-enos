@@ -1,8 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -37,9 +41,9 @@ func createTransport(t it.TransportType) (transportState, error) {
 	case NOMAD:
 		return newEmbeddedTransportNomadv1(), nil
 	case UNKNOWN:
-		return nil, fmt.Errorf("cannot create a UNKNOWN transport")
+		return nil, errors.New("cannot create a UNKNOWN transport")
 	default:
-		return nil, fmt.Errorf("cannot create an undefined transport")
+		return nil, errors.New("cannot create an undefined transport")
 	}
 }
 
@@ -215,7 +219,7 @@ func (em *embeddedTransportV1) SetTransportState(states ...transportState) error
 	for _, state := range states {
 		transportType := state.Type()
 		if transportType == UNKNOWN {
-			return fmt.Errorf("failed to set transport state for unknown transport type: ")
+			return errors.New("failed to set transport state for unknown transport type: ")
 		}
 		em.transports[transportType] = state
 	}
@@ -223,14 +227,48 @@ func (em *embeddedTransportV1) SetTransportState(states ...transportState) error
 	return nil
 }
 
+// Allow resources to specify which transports are supported when declaring their schema.
+type supportedTransports int
+
+const (
+	supportsSSH supportedTransports = 1 << iota
+	supportsK8s
+	supportsNomad
+)
+
+const supportsAll supportedTransports = supportsSSH | supportsK8s | supportsNomad
+
 // SchemaAttributeTransport is our transport schema configuration attribute.
 // Resources that embed a transport should use this as transport schema.
-func (em *embeddedTransportV1) SchemaAttributeTransport() *tfprotov6.SchemaAttribute {
+func (em *embeddedTransportV1) SchemaAttributeTransport(supports supportedTransports) *tfprotov6.SchemaAttribute {
+	var desc string
+	if supports&supportsAll == supportsAll {
+		desc = transportsDescription
+	} else {
+		b := strings.Builder{}
+
+		if supports&supportsSSH == supportsSSH {
+			b.WriteString(sshTransportDescription)
+			b.WriteString("\n")
+		}
+		if supports&supportsK8s == supportsK8s {
+			b.WriteString(k8sTransportDescription)
+			b.WriteString("\n")
+		}
+		if supports&supportsNomad == supportsNomad {
+			b.WriteString(sshTransportDescription)
+			b.WriteString("\n")
+		}
+
+		desc = b.String()
+	}
+
 	return &tfprotov6.SchemaAttribute{
-		Name:        "transport",
-		Type:        em.Terraform5Type(),
-		Description: "The default transport configuration that transport enabled resources will inherit unless otherwise set",
-		Optional:    true, // We'll handle our own schema validation
+		Name:            "transport",
+		Type:            em.Terraform5Type(),
+		DescriptionKind: tfprotov6.StringKindMarkdown,
+		Description:     desc,
+		Optional:        true, // We'll handle our own schema validation
 	}
 }
 
@@ -445,13 +483,13 @@ func (em *embeddedTransportV1) GetConfiguredTransport() (transportState, error) 
 
 func (em *embeddedTransportV1) Debug() string {
 	if em.resolvedTransport != nil {
-		return fmt.Sprintf("%s\n", em.resolvedTransport.debug())
+		return em.resolvedTransport.debug() + "\n"
 	}
 
 	debug := make([]string, len(em.transports))
 	c := 0
 	for _, t := range em.transports {
-		debug[c] = fmt.Sprintf("%s\n", t.debug())
+		debug[c] = t.debug() + "\n"
 		c++
 	}
 

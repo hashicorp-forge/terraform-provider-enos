@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -14,10 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// env var for setting the debug_data_root_dir.
-//
-
-const enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR"
+const (
+	enosDebugDataRootDirEnvVarKey = "ENOS_DEBUG_DATA_ROOT_DIR" // env var for setting the debug_data_root_dir.
+)
 
 var (
 	_ server.Provider    = (*Provider)(nil)
@@ -59,7 +61,7 @@ func (p *Provider) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			Version: 1,
 			Attributes: []*tfprotov6.SchemaAttribute{
-				p.config.Transport.SchemaAttributeTransport(),
+				p.config.Transport.SchemaAttributeTransport(supportsAll),
 				{
 					Name:     "debug_data_root_dir",
 					Type:     tftypes.String,
@@ -69,6 +71,8 @@ If configured and the directory does not exist, it will be created.
 If the directory is not configured, diagnostic files will not be saved locally.`,
 				},
 			},
+			DescriptionKind: providerDescriptionKind,
+			Description:     providerDescription,
 		},
 	}
 }

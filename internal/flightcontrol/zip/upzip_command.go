@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package zip
 
 import (
 	"archive/zip"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -46,7 +50,7 @@ func (c *UnzipCommand) Synopsis() string {
 // Help is the cli.Command help.
 func (c *UnzipCommand) Help() string {
 	help := `
-Usage: enos-flight-control unzip --source /some/file.zip --destination /some/directory --create true
+Usage: enos-flight-control unzip --source /some/file.zip --destination /some/directory --create-destination true
 
   Unzips a zip archive
 
@@ -137,7 +141,7 @@ func (c *UnzipCommand) Unzip() error {
 		}
 
 		if !s.IsDir() {
-			return fmt.Errorf("destination path exists but is not a directory")
+			return errors.New("destination path exists but is not a directory")
 		}
 	}
 

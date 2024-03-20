@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -158,20 +161,20 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *CLIRequest)
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if req.Token == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault token for the /v1/sys/storage/raft/configuration endpoint"))
+		err = errors.Join(err, errors.New("you must supply a vault token for the /v1/sys/storage/raft/configuration endpoint"))
 	}
 
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s read -format=json sys/storage/raft/configuration", req.BinPath),
+			req.BinPath+" read -format=json sys/storage/raft/configuration",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
@@ -184,14 +187,14 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *CLIRequest)
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault raft configuration: vault read sys/storage/raft/configuration"), err)
+		return nil, errors.Join(errors.New("get vault raft configuration: vault read sys/storage/raft/configuration"), err)
 	}
 
 	return res, nil
@@ -209,20 +212,20 @@ func GetRaftAutopilotConfiguration(ctx context.Context, tr it.Transport, req *CL
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if req.Token == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault token for the /v1/sys/storage/raft/autopilot/configuration endpoint"))
+		err = errors.Join(err, errors.New("you must supply a vault token for the /v1/sys/storage/raft/autopilot/configuration endpoint"))
 	}
 
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s read -format=json sys/storage/raft/autopilot/configuration", req.BinPath),
+			req.BinPath+" read -format=json sys/storage/raft/autopilot/configuration",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
@@ -235,14 +238,14 @@ func GetRaftAutopilotConfiguration(ctx context.Context, tr it.Transport, req *CL
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault autopilot configuration: vault read sys/storage/raft/autopilot/configuration"), err)
+		return nil, errors.Join(errors.New("get vault autopilot configuration: vault read sys/storage/raft/autopilot/configuration"), err)
 	}
 
 	return res, nil
@@ -260,20 +263,20 @@ func GetRaftAutopilotState(ctx context.Context, tr it.Transport, req *CLIRequest
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if req.Token == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault token for the /v1/sys/storage/raft/autopilot/state endpoint"))
+		err = errors.Join(err, errors.New("you must supply a vault token for the /v1/sys/storage/raft/autopilot/state endpoint"))
 	}
 
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s read -format=json sys/storage/raft/autopilot/state", req.BinPath),
+			req.BinPath+" read -format=json sys/storage/raft/autopilot/state",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
@@ -286,14 +289,14 @@ func GetRaftAutopilotState(ctx context.Context, tr it.Transport, req *CLIRequest
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault autopilot state: vault read sys/storage/raft/autopilot/state"), err)
+		return nil, errors.Join(errors.New("get vault autopilot state: vault read sys/storage/raft/autopilot/state"), err)
 	}
 
 	return res, nil

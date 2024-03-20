@@ -1,8 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"regexp"
 	"testing"
@@ -234,7 +236,7 @@ EOF
 
 	for _, test := range cases {
 		// Run them with resource defined transport config
-		t.Run(fmt.Sprintf("resource transport %s", test.name), func(t *testing.T) {
+		t.Run("resource transport "+test.name, func(t *testing.T) {
 			unsetAllEnosEnv(t)
 			defer resetEnv(t)
 
@@ -258,7 +260,7 @@ EOF
 		})
 
 		// Run them with provider config passed through the environment
-		t.Run(fmt.Sprintf("provider transport %s", test.name), func(t *testing.T) {
+		t.Run("provider transport "+test.name, func(t *testing.T) {
 			unsetAllEnosEnv(t)
 			switch test.transportUsed {
 			case SSH:
@@ -342,7 +344,7 @@ EOF
 
 		for _, test := range cases {
 			// Run them with resource defined transport config
-			t.Run(fmt.Sprintf("resource transport %s", test.name), func(tt *testing.T) {
+			t.Run("resource transport "+test.name, func(tt *testing.T) {
 				defer resetEnv(tt)
 
 				buf := bytes.Buffer{}
@@ -365,7 +367,7 @@ EOF
 			})
 
 			// Run them with provider config passed through the environment
-			t.Run(fmt.Sprintf("provider transport %s", test.name), func(tt *testing.T) {
+			t.Run("provider transport "+test.name, func(tt *testing.T) {
 				resetEnv(tt)
 				unsetK8SEnv(tt) // for now we don't support real k8s based tests
 				defer resetEnv(tt)

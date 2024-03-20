@@ -1,8 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package resourcerouter
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -23,7 +25,7 @@ func (e *errSetProviderConfig) Unwrap() error {
 }
 
 func (e *errSetProviderConfig) Error() string {
-	return fmt.Sprintf("setting provider config on resource: %s", e.err.Error())
+	return "setting provider config on resource: " + e.err.Error()
 }
 
 func newErrSetProviderConfig(err error) error {

@@ -1,8 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package publish
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go/aws"
@@ -66,7 +69,7 @@ func Copy(ctx context.Context, req *CopyReq) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("version not found")
+		return errors.New("version not found")
 	}
 
 	// Initialize our destination mirror and make sure it doesn't already have
@@ -93,7 +96,7 @@ func Copy(ctx context.Context, req *CopyReq) error {
 		return err
 	}
 	if ok {
-		return fmt.Errorf("version already copyed")
+		return errors.New("version already copyed")
 	}
 
 	// Copy artifacts from the source S3 mirror to destination S3 mirror

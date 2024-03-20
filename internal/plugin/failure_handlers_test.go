@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +34,7 @@ type mockSystemdClient struct {
 func (m mockSystemdClient) GetUnitJournal(ctx context.Context, req *systemd.GetUnitJournalRequest) (remoteflight.GetLogsResponse, error) {
 	logs, ok := m.logs[req.Unit]
 	if !ok {
-		return nil, fmt.Errorf("unit not installed")
+		return nil, errors.New("unit not installed")
 	}
 
 	return &systemd.GetUnitJournalResponse{

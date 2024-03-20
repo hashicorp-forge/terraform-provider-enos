@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
@@ -104,26 +107,26 @@ func FindUser(ctx context.Context, tr it.Transport, name string) (*User, error) 
 // remote machine.
 func CreateUser(ctx context.Context, tr it.Transport, user *User) (*User, error) {
 	if user == nil || user.Name == nil {
-		return nil, fmt.Errorf("invalid user: you must supply a username")
+		return nil, errors.New("invalid user: you must supply a username")
 	}
 
 	cmd := strings.Builder{}
 	cmd.WriteString("sudo useradd -m --system")
 	if user.HomeDir != nil {
-		cmd.WriteString(fmt.Sprintf(" --home %s", *user.HomeDir))
+		cmd.WriteString(" --home " + *user.HomeDir)
 	}
 	if user.Shell != nil {
-		cmd.WriteString(fmt.Sprintf(" --shell %s", *user.Shell))
+		cmd.WriteString(" --shell " + *user.Shell)
 	}
 	if user.UID != nil {
-		cmd.WriteString(fmt.Sprintf(" --uid %s", *user.UID))
+		cmd.WriteString(" --uid " + *user.UID)
 	}
 	if user.GID != nil {
-		cmd.WriteString(fmt.Sprintf(" --gid %s", *user.GID))
+		cmd.WriteString(" --gid " + *user.GID)
 	} else {
 		cmd.WriteString(" -U")
 	}
-	cmd.WriteString(fmt.Sprintf(" %s", *user.Name))
+	cmd.WriteString(" " + *user.Name)
 
 	stdout, stderr, err := tr.Run(ctx, command.New(cmd.String()))
 	if err != nil {
@@ -137,7 +140,7 @@ func CreateUser(ctx context.Context, tr it.Transport, user *User) (*User, error)
 // specification.
 func CreateOrUpdateUser(ctx context.Context, tr it.Transport, want *User) (*User, error) {
 	if want == nil || want.Name == nil {
-		return nil, fmt.Errorf("update user: invalid update specification")
+		return nil, errors.New("update user: invalid update specification")
 	}
 
 	have, err := FindUser(ctx, tr, *want.Name)
@@ -230,7 +233,7 @@ func (u *User) HasSameSetProperties(other *User) bool {
 
 func decodePasswdLine(line string) (*User, error) {
 	if line == "" {
-		return nil, fmt.Errorf("cannot decode blank /etc/passwd line")
+		return nil, errors.New("cannot decode blank /etc/passwd line")
 	}
 
 	user := &User{}
@@ -251,7 +254,7 @@ func decodePasswdLine(line string) (*User, error) {
 
 func findUserGetEnt(ctx context.Context, tr it.Transport, name string) (*User, error) {
 	// Try getent first
-	line, stderr, err := tr.Run(ctx, command.New(fmt.Sprintf("getent passwd %s", name)))
+	line, stderr, err := tr.Run(ctx, command.New("getent passwd "+name))
 	if err != nil {
 		return nil, fmt.Errorf("finding user %s, getent passwd %s: %w: %s", name, name, err, stderr)
 	}
@@ -285,13 +288,13 @@ func findUserID(ctx context.Context, tr it.Transport, name string) (*User, error
 	var err error
 	var stderr string
 
-	uid, stderr, err := tr.Run(ctx, command.New(fmt.Sprintf("id -u %s", name)))
+	uid, stderr, err := tr.Run(ctx, command.New("id -u "+name))
 	if err != nil {
 		return user, WrapErrorWith(err, fmt.Sprintf("attempting to get %s uid", name), stderr)
 	}
 	user.UID = &uid
 
-	gid, stderr, err := tr.Run(ctx, command.New(fmt.Sprintf("id -g %s", name)))
+	gid, stderr, err := tr.Run(ctx, command.New("id -g "+name))
 	if err != nil {
 		return user, WrapErrorWith(err, fmt.Sprintf("attempting to get %s gid", name), stderr)
 	}

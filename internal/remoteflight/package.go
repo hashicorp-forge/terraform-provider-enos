@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -68,13 +72,13 @@ var (
 
 var (
 	// ErrPackageInstallGetterUnknown means the package get has not been set.
-	ErrPackageInstallGetterUnknown = fmt.Errorf("package install get is unknown")
+	ErrPackageInstallGetterUnknown = errors.New("package install get is unknown")
 	// ErrPackageInstallGetterUnsupported means the package get is unsupported not been set.
-	ErrPackageInstallGetterUnsupported = fmt.Errorf("package install get is unsupported")
+	ErrPackageInstallGetterUnsupported = errors.New("package install get is unsupported")
 	// ErrPackageInstallInstallerUnknown means the package method has not been set.
-	ErrPackageInstallInstallerUnknown = fmt.Errorf("package install method is unknown")
+	ErrPackageInstallInstallerUnknown = errors.New("package install method is unknown")
 	// ErrPackageInstallInstallerUnsupported means the package method is unsupported.
-	ErrPackageInstallInstallerUnsupported = fmt.Errorf("package install method is unsupported")
+	ErrPackageInstallInstallerUnsupported = errors.New("package install method is unsupported")
 )
 
 // PackageInstallInstaller is how a package is going to be installed.
@@ -238,7 +242,7 @@ func PackageInstall(ctx context.Context, tr it.Transport, req *PackageInstallReq
 
 func packageInstallGetCopy(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
 	if req.CopyPath == "" {
-		return fmt.Errorf("you must supply a path to the get artifact you wish you copy")
+		return errors.New("you must supply a path to the get artifact you wish you copy")
 	}
 
 	src, err := tfile.Open(req.CopyPath)
@@ -283,7 +287,7 @@ func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *Packag
 	// exists.
 	req.TempArtifactPath = filepath.Join(
 		req.TempDir,
-		fmt.Sprintf("enos_install_download.%s", random.ID()),
+		"enos_install_download."+random.ID(),
 	)
 
 	opts := []DownloadOpt{
@@ -343,7 +347,7 @@ func packageInstallDEBInstall(ctx context.Context, tr it.Transport, req *Package
 	// If we have existing config files, we're assuming we want to keep them.
 	// --force-confold defaults to using the existing files, instead of
 	// interactively choosing which to use.
-	cmd := fmt.Sprintf("sudo dpkg --force-confold --install %s", req.TempArtifactPath)
+	cmd := "sudo dpkg --force-confold --install " + req.TempArtifactPath
 	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing debian package")
@@ -356,7 +360,7 @@ func packageInstallRPMInstall(ctx context.Context, tr it.Transport, req *Package
 	// NOTE: I don't like force here but it's the only way to make rpm
 	// reinstall on update without lots of special logic. Eventually we could
 	// get much more clever here to handle upgrade, reinstall, etc.
-	cmd := fmt.Sprintf("sudo rpm -U --force %s", req.TempArtifactPath)
+	cmd := "sudo rpm -U --force " + req.TempArtifactPath
 	stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 	if err != nil {
 		return WrapErrorWith(err, stdout, stderr, "installing rpm package")

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
@@ -168,7 +171,7 @@ func Download(ctx context.Context, tr transport.Transport, dr *DownloadRequest) 
 		dr.Replace,
 	)
 	if dr.Sudo {
-		cmd = fmt.Sprintf("sudo %s", cmd)
+		cmd = "sudo " + cmd
 	}
 	if dr.SHA256 != "" {
 		cmd = fmt.Sprintf("%s --sha256 '%s'", cmd, dr.SHA256)

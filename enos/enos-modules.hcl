@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 module "aws_infra" {
   source = "app.terraform.io/hashicorp-qti/aws-infra/enos"
 

@@ -1,6 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package systemd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -155,7 +159,7 @@ func (c *SystemctlCommandReq) String() (string, error) {
 	}
 
 	if c.Options != "" {
-		cmd.WriteString(fmt.Sprintf("%s ", c.Options))
+		cmd.WriteString(c.Options + " ")
 	}
 
 	unitName := c.Name
@@ -167,37 +171,37 @@ func (c *SystemctlCommandReq) String() (string, error) {
 
 	switch c.SubCommand {
 	case SystemctlSubCommandNotSet:
-		return "", fmt.Errorf("sub command is not set")
+		return "", errors.New("sub command is not set")
 	case SystemctlSubCommandDaemonReload:
 		cmd.WriteString("daemon-reload")
 	case SystemctlSubCommandIsActive:
-		cmd.WriteString(fmt.Sprintf("is-active %s", unitName))
+		cmd.WriteString("is-active " + unitName)
 	case SystemctlSubCommandEnable:
-		cmd.WriteString(fmt.Sprintf("enable %s", unitName))
+		cmd.WriteString("enable " + unitName)
 	case SystemctlSubCommandKill:
-		cmd.WriteString(fmt.Sprintf("kill %s", unitName))
+		cmd.WriteString("kill " + unitName)
 	case SystemctlSubCommandListUnits:
 		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
 	case SystemctlSubCommandReload:
-		cmd.WriteString(fmt.Sprintf("reload %s", unitName))
+		cmd.WriteString("reload " + unitName)
 	case SystemctlSubCommandRestart:
-		cmd.WriteString(fmt.Sprintf("restart %s", unitName))
+		cmd.WriteString("restart " + unitName)
 	case SystemctlSubCommandShow:
-		cmd.WriteString(fmt.Sprintf("show %s", unitName))
+		cmd.WriteString("show " + unitName)
 	case SystemctlSubCommandStart:
-		cmd.WriteString(fmt.Sprintf("start %s", unitName))
+		cmd.WriteString("start " + unitName)
 	case SystemctlSubCommandStatus:
 		cmd.WriteString("status")
 		if unitName != "" {
-			cmd.WriteString(fmt.Sprintf(" %s", unitName))
+			cmd.WriteString(" " + unitName)
 		}
 	case SystemctlSubCommandStop:
-		cmd.WriteString(fmt.Sprintf("stop %s", unitName))
+		cmd.WriteString("stop " + unitName)
 	default:
 		return "", fmt.Errorf("unknown command: %d", c.SubCommand)
 	}
 	if c.Pattern != "" {
-		cmd.WriteString(fmt.Sprintf(" %s", c.Pattern))
+		cmd.WriteString(" " + c.Pattern)
 	}
 
 	return cmd.String(), nil

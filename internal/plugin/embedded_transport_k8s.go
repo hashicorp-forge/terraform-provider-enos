@@ -1,8 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -140,7 +144,7 @@ func (em *embeddedTransportK8Sv1) Validate(ctx context.Context) error {
 	} {
 		if _, ok := prop.Get(); !ok {
 			return ValidationError(
-				fmt.Sprintf("missing value for required attribute: %s", name),
+				"missing value for required attribute: "+name,
 				"transport", "kubernetes", name,
 			)
 		}
@@ -212,7 +216,7 @@ func (em *embeddedTransportK8Sv1) debug() string {
 		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
-	return fmt.Sprintf("Kubernetes Transport Config:\n%s", strings.Join(vals, "\n"))
+	return "Kubernetes Transport Config:\n" + strings.Join(vals, "\n")
 }
 
 func (em *embeddedTransportK8Sv1) k8sClient() (kubernetes.Client, error) {
@@ -220,13 +224,13 @@ func (em *embeddedTransportK8Sv1) k8sClient() (kubernetes.Client, error) {
 
 	kubeconfig, ok := em.KubeConfigBase64.Get()
 	if !ok {
-		return nil, fmt.Errorf("failed to create kubernetes client, 'kubeconfig_base64' was not configured")
+		return nil, errors.New("failed to create kubernetes client, 'kubeconfig_base64' was not configured")
 	}
 	cfg.KubeConfigBase64 = kubeconfig
 
 	contextName, ok := em.ContextName.Get()
 	if !ok {
-		return nil, fmt.Errorf("failed to create kubernetes client, 'context_name' was not configured")
+		return nil, errors.New("failed to create kubernetes client, 'context_name' was not configured")
 	}
 	cfg.ContextName = contextName
 

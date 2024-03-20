@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -101,7 +104,7 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 	resolver := newPublicIPResolver()
 	err = resolver.resolve(ctx, defaultResolvers()...)
 	if len(resolver.ips()) == 0 {
-		err = errors.Join(err, fmt.Errorf("unable to resolve public ip address"))
+		err = errors.Join(err, errors.New("unable to resolve public ip address"))
 	}
 	if err != nil {
 		res.Diagnostics = append(res.Diagnostics,
@@ -127,11 +130,32 @@ func (s *environmentStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`The ^enos_environment^ datasource is a datasource that we can use to pass environment specific
+information into our Terraform run. As enos relies on SSH to execute the bulk of it's actions, a
+common problem is granting access to the host executing the Terraform run. As such, the
+enos_environment resource can be used to determine our external IP addresses so that we can dynamically
+generate security groups that allow only access from our end.
+
+^^^hcl
+data "enos_environment" "localhost" { }
+
+module "security_group" {
+  source = "terraform-aws-modules/security-group/aws/modules/ssh"
+
+  name        = "enos_core_example"
+  description = "Enos provider core example security group"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress_cidr_blocks = [for ip in data.enos_environment.localhost.public_ipv4_addresses : "${ip}/32"]
+}
+^^^`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: datasourceStaticIDDescription,
 				},
 				{
 					Name:       "public_ip_address",
@@ -144,21 +168,24 @@ func (s *environmentStateV1) Schema() *tfprotov6.Schema {
 					Type: tftypes.List{
 						ElementType: tftypes.String,
 					},
-					Computed: true,
+					Computed:    true,
+					Description: `All public IP addresses of the host executing Terraform. NOTE: can include both ipv4 and ipv6 addresses`,
 				},
 				{
 					Name: "public_ipv4_addresses",
 					Type: tftypes.List{
 						ElementType: tftypes.String,
 					},
-					Computed: true,
+					Computed:    true,
+					Description: `The public IPv4 addresses of the host executing Terraform`,
 				},
 				{
 					Name: "public_ipv6_addresses",
 					Type: tftypes.List{
 						ElementType: tftypes.String,
 					},
-					Computed: true,
+					Computed:    true,
+					Description: "The public IPv6 addresses of the host executing Terraform",
 				},
 			},
 		},

@@ -1,6 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
@@ -27,7 +31,7 @@ func CheckStateHasSystemdEnabledAndRunningProperties() CheckStater {
 func CheckStateNodeIsHealthy() CheckStater {
 	return func(s *State) error {
 		if s.HealthNodeResponse == nil || s.HealthNodeResponse.Nodes == nil {
-			return fmt.Errorf("node health was not found in state")
+			return errors.New("node health was not found in state")
 		}
 
 		if n := len(s.HealthNodeResponse.Nodes); n != 1 {
@@ -46,7 +50,7 @@ func CheckStateNodeIsHealthy() CheckStater {
 func CheckStateClusterHasLeader() CheckStater {
 	return func(s *State) error {
 		if s.RaftConfigurationResponse == nil || s.RaftConfigurationResponse.Servers == nil {
-			return fmt.Errorf("no raft servers were found in state")
+			return errors.New("no raft servers were found in state")
 		}
 
 		for i := range s.RaftConfigurationResponse.Servers {
@@ -67,7 +71,7 @@ func CheckStateClusterHasLeader() CheckStater {
 func CheckStateClusterHasMinNHealthyNodes(min uint) CheckStater {
 	return func(s *State) error {
 		if s.HealthStatePassingResponse == nil || s.HealthStatePassingResponse.Nodes == nil {
-			return fmt.Errorf("node health was not found in state")
+			return errors.New("node health was not found in state")
 		}
 
 		healthy := uint(0)
@@ -93,7 +97,7 @@ func CheckStateClusterHasMinNHealthyNodes(min uint) CheckStater {
 func CheckStateClusterHasMinNVoters(min uint) CheckStater {
 	return func(s *State) error {
 		if s.RaftConfigurationResponse == nil || s.RaftConfigurationResponse.Servers == nil {
-			return fmt.Errorf("no raft servers were found in state")
+			return errors.New("no raft servers were found in state")
 		}
 
 		voters := uint(0)

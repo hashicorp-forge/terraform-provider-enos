@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ssh
 
 import (
@@ -211,7 +214,7 @@ func (t *transport) Copy(ctx context.Context, src it.Copyable, dst string) (err 
 
 	go copyFile()
 
-	err = session.Run(fmt.Sprintf("scp -tr %s", dst))
+	err = session.Run("scp -tr " + dst)
 	if err != nil {
 		return fmt.Errorf("starting scp: %w", err)
 	}

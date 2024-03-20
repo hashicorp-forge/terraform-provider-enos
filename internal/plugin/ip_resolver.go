@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -225,7 +228,7 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 
 	switch len(resolvers) {
 	case 0:
-		return fmt.Errorf("no resolvers have been provided")
+		return errors.New("no resolvers have been provided")
 	case 1:
 		ips, err := resolvers[0](ctx)
 		if err != nil {

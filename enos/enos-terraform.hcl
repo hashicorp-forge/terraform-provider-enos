@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 terraform_cli "default" {
   credentials "app.terraform.io" {
     token = var.tfc_api_token

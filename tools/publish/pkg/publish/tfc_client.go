@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package publish
 
 import (
@@ -80,11 +83,11 @@ func NewTFCClient(opts ...TFCClientOpt) (*TFCClient, error) {
 	}
 
 	if client.token == "" {
-		return client, fmt.Errorf("you must supply a token")
+		return client, errors.New("you must supply a token")
 	}
 
 	if client.org == "" {
-		return client, fmt.Errorf("you must supply an org")
+		return client, errors.New("you must supply an org")
 	}
 
 	return client, nil
@@ -473,7 +476,7 @@ func (c *TFCClient) DoRequest(ctx context.Context, tfcReq *TFCRequest) (*http.Re
 	)
 
 	req, _ := http.NewRequestWithContext(ctx, tfcReq.HTTPMethod, reqURL, tfcReq.Body)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/vnd.api+json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -709,7 +712,7 @@ func (c *TFCClient) FindProviderVersion(
 
 	if !providerversion.SHASigUploaded {
 		providerversion.SHASumsSigURL = providerVersionBody.Data.Links.ShasumssigUpload
-		sha256sigPath := fmt.Sprintf("%s.sig", sha256sumsPath)
+		sha256sigPath := sha256sumsPath + ".sig"
 		err = c.uploadFile(ctx, sha256sigPath, providerversion.SHASumsSigURL)
 		if err != nil {
 			return providerversion, fmt.Errorf("failed to upload shasums sig file: %w", err)
@@ -798,7 +801,7 @@ func (c *TFCClient) CreateProviderVersion(
 	}
 
 	// Upload Shasms signature file
-	sha256sigPath := fmt.Sprintf("%s.sig", sha256sumsPath)
+	sha256sigPath := sha256sumsPath + ".sig"
 	err = c.uploadFile(ctx, sha256sigPath, providerVersionBody.Data.Links.ShasumssigUpload)
 	if err != nil {
 		return fmt.Errorf("failed to upload shasums sig file for version created: %w", err)

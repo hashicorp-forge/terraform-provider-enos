@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
@@ -137,11 +140,11 @@ func WithDeleteFilePath(path string) DeleteFileRequestOpt {
 // a superuser — retrying these operations if necessary.
 func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error {
 	if file == nil {
-		return fmt.Errorf("no file copy request provided")
+		return errors.New("no file copy request provided")
 	}
 
 	if file.Destination == "" {
-		return fmt.Errorf("you must supply a destination path")
+		return errors.New("you must supply a destination path")
 	}
 
 	tmpPath := filepath.Join(file.TmpDir, fmt.Sprintf("%s-%s",
@@ -197,13 +200,13 @@ func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error
 		cmd := fmt.Sprintf(`mv %s %s`, tmpPath, file.Destination)
 		stdout, stderr, err = tr.Run(ctx, command.New(cmd))
 		if err != nil {
-			err = WrapErrorWith(err, stdout, stderr, fmt.Sprintf("moving file to destination path, cmd: %s", cmd))
+			err = WrapErrorWith(err, stdout, stderr, "moving file to destination path, cmd: "+cmd)
 			cmd = fmt.Sprintf(`sudo mv %s %s`, tmpPath, file.Destination)
 			stdout, stderr, err1 := tr.Run(ctx, command.New(cmd))
 			if err1 != nil {
 				err1 = WrapErrorWith(
 					err1, stdout, stderr,
-					fmt.Sprintf("moving file to destination path with sudo, cmd: %s", cmd),
+					"moving file to destination path with sudo, cmd: "+cmd,
 				)
 
 				return res, errors.Join(err, err1)
@@ -230,12 +233,12 @@ func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error
 // DeleteFile deletes a file on the remote host, retrying if necessary.
 func DeleteFile(ctx context.Context, tr it.Transport, req *DeleteFileRequest) error {
 	if req == nil {
-		return fmt.Errorf("no file delete request provided")
+		return errors.New("no file delete request provided")
 	}
 
 	rmFile := func(ctx context.Context) (interface{}, error) {
 		var res interface{}
-		stdout, stderr, err := tr.Run(ctx, command.New(fmt.Sprintf("rm -r %[1]s || sudo rm -r %[1]s", req.Path)))
+		stdout, stderr, err := tr.Run(ctx, command.New("rm -r "+req.Path+" || sudo rm -r "+req.Path))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
 		}

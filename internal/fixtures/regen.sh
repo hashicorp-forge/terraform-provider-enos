@@ -1,4 +1,7 @@
 #!/bin/bash -e
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 
 openssl genrsa -out ssh.pem 4096
 openssl rsa -in ssh.pem -pubout -out ssh.pub

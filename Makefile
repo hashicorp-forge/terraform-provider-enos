@@ -1,5 +1,7 @@
 GO_VERSION=$$(cat .go-version)
 
+# PROVIDER_HOSTNAME=registry.terraform.io
+# PROVIDER_NAMESPACE=hashicorp-forge
 PROVIDER_HOSTNAME=app.terraform.io
 PROVIDER_NAMESPACE=hashicorp-qti
 PROVIDER_NAME?=enos
@@ -17,15 +19,9 @@ CI?=false
 LINT_OUT_FORMAT?=colored-line-number
 .PHONY: HASUPX
 HASUPX:= $(shell upx dot 2> /dev/null)
+BUILD_DARWIN_FC?=false
 TEST?=./...
 TEST_BLD_DIR=./test-build
-
-# Heavy sigh, sed uses slightly different syntax on linux than macos, here we setup the opts assuming
-# CI=true is linux and CI=false is macos
-SED_OPTS=-i ''
-ifeq ($(CI), true)
-SED_OPTS=-i -e
-endif
 
 # Make sure our shell isn't set to /bin/sh because we use pushd/popd
 SHELL = /bin/bash
@@ -63,18 +59,26 @@ flight-control: flight-control-build flight-control-pack
 
 .PHONY: flight-control-build
 flight-control-build:
+ifeq ($(BUILD_DARWIN_FC), true)
+	# Don't build the Darwin flight-control binaries by default since we cannot pack them and we don't
+	# actually test against macOS targets right now. Building these will also cause some tests to fail
+	# if you don't remove them from internal/flight-control/binaries.
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_darwin_amd64 ./command/enos-flight-control
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_darwin_amd64 ./command/enos-flight-control
+endif
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_amd64 ./command/enos-flight-control
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_arm64 ./command/enos-flight-control
 
 .PHONY: flight-control-pack
 flight-control-pack:
 ifndef HASUPX
-	$(error "upx is required to pack enos-flight-control - get it via `brew install upx`")
+	@echo "upx was not found, enos-flight-control binaries will not be packed"
+	exit 0
 endif
-	pushd ./internal/flightcontrol/binaries || exit 1; \
-	upx -q -9 *; \
-	popd || exit 1 \
+	# We also can't currently safely pack macOS for now, see https://github.com/upx/upx/issues/612
+	upx -q -9 \
+    ./internal/flightcontrol/binaries/enos-flight-control_linux_amd64 \
+    ./internal/flightcontrol/binaries/enos-flight-control_linux_arm64; \
 
 .PHONY: test
 test:

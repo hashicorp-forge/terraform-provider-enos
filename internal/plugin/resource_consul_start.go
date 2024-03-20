@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -235,49 +238,75 @@ func (s *consulStartStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_consul_start^ resource is capable of configuring a Consul service on a host. It handles creating the necessary configuration, configures licensing for Consul Enteprise, can manage systemd for install bundles, and starts the consul service.
+
+# TODO(consul) add an example
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "bin_path", // where the consul binary is
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "bin_path", // where the consul binary is
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The fully qualified path to the Consul binary",
 				},
 				{
-					Name:     "config",
-					Type:     s.Config.Terraform5Type(),
-					Optional: true,
+					Name:            "config",
+					Type:            s.Config.Terraform5Type(),
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: `
+|key|type|description|
+|config|object|The consul configuration object|
+|config.bind_addr|string|The Consul [bind_addr](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr) value|
+|config.datacenter|string|The Consul [datacenter](https://developer.hashicorp.com/consul/docs/agent/config/config-files#datacenter) value|
+|config.data_dir|string|The Consul [data_dir](https://developer.hashicorp.com/consul/docs/agent/config/config-files#data_dir) value|
+|config.retry_join|[]string|The Consul [retry_join](https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join) value|
+|config.bootstrap_expect|number|The Consul [bootstrap_expect](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bootstrap_expect) value|
+|config.server|bool|The Consul [server](https://developer.hashicorp.com/consul/docs/agent/config/config-files#server_rpc_port) value|
+|config.log_file|string|The Consul [log_file](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_file) value|
+|config.log_level|string|The Consul [log_level](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_level) value|
+`,
 				},
 				{
-					Name:     "config_dir", // where to write consul config
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "config_dir", // where to write consul config
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The directory where the consul configuration resides",
 				},
 				{
-					Name:     "data_dir", // where to write consul data
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "data_dir", // where to write consul data
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The directory where Consul state will be stored",
 				},
 				{
-					Name:      "license", // the consul license
-					Type:      tftypes.String,
-					Optional:  true,
-					Sensitive: true,
+					Name:        "license", // the consul license
+					Type:        tftypes.String,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "A Consul Enterprise license. This is only required if you are starting a Consul Enterprise cluster",
 				},
 				{
-					Name:     "unit_name", // sysmted unit name
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "unit_name", // sysmted unit name
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of the systemd unit to use",
 				},
 				{
-					Name:     "username", // consul username
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "username", // consul username
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of the local user for the consul service",
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}
@@ -600,7 +629,7 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 			return fmt.Errorf("consul license validation failed, due to: %w", err)
 		}
 
-		unit["Service"]["Environment"] = fmt.Sprintf("CONSUL_LICENSE_PATH=%s", licensePath)
+		unit["Service"]["Environment"] = "CONSUL_LICENSE_PATH=" + licensePath
 	}
 
 	sysd := systemd.NewClient(transport, log.NewLogger(ctx))

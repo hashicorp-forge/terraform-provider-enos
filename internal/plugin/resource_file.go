@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -239,49 +243,81 @@ func (fs *fileStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_file^ resource is capable of copying a local file to a remote destination
+over an Enos transport.
+
+When an SSH transport is used the resource is also capable of using the SSH agent. It will attempt
+to connect to the agent socket as defined with the ^SSH_AUTH_SOCK^ environment variable.
+
+^^^hcl
+resource "enos_file" "foo" {
+  source      = "/local/path/to/file.txt"
+  destination = "/remote/destination/file.txt"
+  content     = data.template_file.some_template.rendered
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "sum",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "sum",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The SHA 256 sum of the source file. If the sum changes between runs the file will be uploaded again",
 				},
 				{
-					Name:     "source",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "source",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The file path to the source file to copy",
 				},
 				{
-					Name:     "destination",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "destination",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The file path on the remote host you wish to copy the file to",
 				},
 				{
-					Name:      "content",
-					Type:      tftypes.String,
-					Optional:  true,
-					Sensitive: true,
+					Name:        "content",
+					Type:        tftypes.String,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "If the file does not exist locally you can provide the content as a string value and it will be written to the remote destination",
 				},
 				{
-					Name:     "tmp_dir",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "tmp_dir",
+					Type:        tftypes.String,
+					Description: "The location on disk to use for temporary files",
+					Optional:    true,
 				},
 				{
-					Name:     "chmod",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "chmod",
+					Type:        tftypes.String,
+					Description: "Configure the destination file mode",
+					Optional:    true,
 				},
 				{
-					Name:     "chown",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "chown",
+					Type:        tftypes.String,
+					Description: "Configure the destination file owner",
+					Optional:    true,
 				},
-				fs.Transport.SchemaAttributeTransport(),
+				fs.Transport.SchemaAttributeTransport(supportsAll),
 			},
 		},
 	}
@@ -399,7 +435,7 @@ func (fs *fileStateV1) openSourceOrContent() (it.Copyable, string, error) {
 		srcType = "content"
 		src = tfile.NewReader(cntVal)
 	} else {
-		return src, srcType, fmt.Errorf("invalid configuration, you must provide a either a source file or content")
+		return src, srcType, errors.New("invalid configuration, you must provide a either a source file or content")
 	}
 
 	return src, srcType, nil

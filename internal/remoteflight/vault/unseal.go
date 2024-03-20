@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -105,12 +108,12 @@ func Unseal(ctx context.Context, tr it.Transport, req *UnsealRequest) (*UnsealRe
 
 	binPath := req.BinPath
 	if binPath == "" {
-		return nil, fmt.Errorf("you must supply a vault bin path")
+		return nil, errors.New("you must supply a vault bin path")
 	}
 
 	vaultAddr := req.VaultAddr
 	if vaultAddr == "" {
-		return nil, fmt.Errorf("you must supply a vault listen address")
+		return nil, errors.New("you must supply a vault listen address")
 	}
 
 	var err error

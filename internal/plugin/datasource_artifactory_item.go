@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -149,52 +152,112 @@ func (s *artifactoryItemStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_artifactory_item^ datasource is a datasource that we can use to search for items in
+artifactory. This is useful for finding build artifact URLs that we can install on targets for testing.
+The datasource will return URLs to all matching items. The more specific your search criteria, the
+fewer results you'll receive.
+
+Note: the underlying implementation uses AQL to search for artifacts and uses the ^$match^ operator
+for every criteria. This means that you can use wildcards ^*^ for any field. See the [AQL developer guide](https://www.jfrog.com/confluence/display/JFROG/Artifactory+Query+Language) for more information.
+^^^hcl
+data "enos_artifactory_item" "vault" {
+  username = "some-user@hashicorp.com"
+  token    = "1234abcd"
+
+  host = "https://artifactory.hashicorp.engineering/artifactory"
+  repo = "hashicorp-packagespec-buildcache-local*"
+  path = "cache-v1/vault-enterprise/*"
+  name = "*.zip"
+
+  properties = {
+    "EDITION"         = "ent"
+    "GOARCH"          = "amd64"
+    "GOOS"            = "linux"
+    "artifactType"    = "package"
+    "productRevision" = "f45845666b4e552bfc8ca775834a3ef6fc097fe0"
+    "productVersion"  = "1.7.0"
+  }
+}
+
+resource "enos_remote_exec" "download_vault" {
+  inline  = ["curl -f --user some-user@hashicorp.com:1234abcd -o /tmp/vault.zip -X GET ${data.enos_artifactory_item.vault.results[0].url}"]
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+^^^`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: datasourceStaticIDDescription,
 				},
 				{
-					Name:     "username",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "username",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The Artifactory API user name. Depending on your login scheme this is likely an email address",
 				},
 				{
-					Name:      "token",
-					Type:      tftypes.String,
-					Required:  true,
-					Sensitive: true,
+					Name:        "token",
+					Type:        tftypes.String,
+					Required:    true,
+					Sensitive:   true,
+					Description: "The Artifactory API token. You can sign into Artifactory and generate one.",
 				},
 				{
-					Name:     "host",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "host",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The Artifactory API host. It should be the fully qualified base URL",
 				},
 				{
-					Name:     "repo",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "repo",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The Artifactory repository you want to search in",
 				},
 				{
-					Name:     "path",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "path",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The sub-path inside the Artifactory repository to search in",
 				},
 				{
-					Name:     "name",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "name",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of the artifact that you're looking for",
 				},
 				{
-					Name:     "properties",
-					Type:     tftypes.Map{ElementType: tftypes.String},
-					Optional: true,
+					Name:        "properties",
+					Type:        tftypes.Map{ElementType: tftypes.String},
+					Optional:    true,
+					Description: "A map of properties to match on",
 				},
 				{
-					Name:     "results",
-					Type:     s.Results.TFType(),
-					Computed: true,
+					Name:            "results",
+					Type:            s.Results.TFType(),
+					Computed:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: `
+It will return a list of results
+|key|description|
+|results|Items that were found that match the given search criteria|
+|results.name|The item name|
+|results.type|The item type|
+|results.url|The fully qualified URL to the item|
+|results.sha256|The SHA256 sum of the item|
+|results.size|The size of the item|
+`,
 				},
 			},
 		},

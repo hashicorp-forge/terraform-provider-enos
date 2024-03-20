@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -64,17 +67,17 @@ func GetStatus(ctx context.Context, tr it.Transport, req *CLIRequest) (*StatusRe
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if err == nil {
 		var err1 error
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s status -format=json", req.BinPath),
+			req.BinPath+" status -format=json",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 		))
 
@@ -105,14 +108,14 @@ func GetStatus(ctx context.Context, tr it.Transport, req *CLIRequest) (*StatusRe
 
 		// Deserialize the body
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault status: vault status"), err)
+		return nil, errors.Join(errors.New("get vault status: vault status"), err)
 	}
 
 	return res, err
@@ -123,26 +126,26 @@ func GetStatus(ctx context.Context, tr it.Transport, req *CLIRequest) (*StatusRe
 // diverge, an error will be returned.
 func (s *StatusResponse) IsSealed() (bool, error) {
 	if s == nil {
-		return true, fmt.Errorf("state does not include status body")
+		return true, errors.New("state does not include status body")
 	}
 
 	switch s.StatusCode {
 	case StatusInitializedUnsealed:
 		if s.Sealed {
-			return true, fmt.Errorf("status response does not match status code, expected sealed=false, got sealed=true")
+			return true, errors.New("status response does not match status code, expected sealed=false, got sealed=true")
 		}
 
 		return false, nil
 	case StatusError:
-		return true, fmt.Errorf("unable to determine seal status because status returned an error exit code")
+		return true, errors.New("unable to determine seal status because status returned an error exit code")
 	case StatusSealed:
 		if !s.Sealed {
-			return true, fmt.Errorf("status response does not match status code, expected sealed=true, got sealed=false")
+			return true, errors.New("status response does not match status code, expected sealed=true, got sealed=false")
 		}
 
 		return true, nil
 	case StatusUnknown:
-		return true, fmt.Errorf("unable to determine vault status")
+		return true, errors.New("unable to determine vault status")
 	default:
 		return true, fmt.Errorf("unable to determine vault status, unexpected exit code %s", s.StatusCode)
 	}

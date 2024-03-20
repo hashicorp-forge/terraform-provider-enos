@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -53,7 +56,6 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	assert.Equal(t, dir, newDir)
 }
 
-//nolint:paralleltest// because our test modifies the environment
 func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	debugDir := t.TempDir()
 
@@ -83,7 +85,6 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	resetEnv(t)
 }
 
-//nolint:paralleltest// because our test modifies the environment
 func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 	debugDir := t.TempDir()
 

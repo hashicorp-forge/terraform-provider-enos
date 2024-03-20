@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/enos-provider/internal/diags"
@@ -82,7 +86,7 @@ func (t *transportResourceUtil) UpgradeResourceState(
 			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
 				Summary:  "upgrade error",
-				Detail:   fmt.Sprintf("unable to map version 1 to the current state, due to: %s", err.Error()),
+				Detail:   "unable to map version 1 to the current state, due to: " + err.Error(),
 			})
 
 			return
@@ -100,7 +104,7 @@ func (t *transportResourceUtil) UpgradeResourceState(
 	default:
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 			"Upgrade State Error",
-			fmt.Errorf("the provider doesn't know how to upgrade from the current state version"),
+			errors.New("the provider doesn't know how to upgrade from the current state version"),
 		))
 	}
 }
@@ -178,7 +182,7 @@ func (t *transportResourceUtil) ReadUnmarshalAndBuildTransport(
 		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Read Error",
-			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
+			Detail:   "Failed to get provider config, due to: " + err.Error(),
 		})
 
 		return nil
@@ -237,7 +241,7 @@ func (t *transportResourceUtil) PlanUnmarshalVerifyAndBuildTransport(
 		res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Plan Error",
-			Detail:   fmt.Sprintf("Failed to get provider config, due to: %s", err.Error()),
+			Detail:   "Failed to get provider config, due to: " + err.Error(),
 		})
 
 		return nil

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -162,11 +165,11 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 				// check that there was one call to load an image
 				if test.expectedLoadImageRequest != nil {
 					assert.Len(tt, mockKindClient.loadImageRequests, 1)
-					assert.Equal(tt, mockKindClient.loadImageRequests[0], *test.expectedLoadImageRequest)
+					assert.Equal(tt, *test.expectedLoadImageRequest, mockKindClient.loadImageRequests[0])
 					assert.Empty(tt, mockKindClient.loadImageArchiveRequests)
 				} else if test.expectedLoadImageArchiveRequest != nil {
 					assert.Len(tt, mockKindClient.loadImageArchiveRequests, 1)
-					assert.Equal(tt, mockKindClient.loadImageArchiveRequests[0], *test.expectedLoadImageArchiveRequest)
+					assert.Equal(tt, *test.expectedLoadImageArchiveRequest, mockKindClient.loadImageArchiveRequests[0])
 					assert.Empty(tt, mockKindClient.loadImageRequests)
 				}
 

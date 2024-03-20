@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -129,7 +132,7 @@ func (em *embeddedTransportNomadv1) Validate(ctx context.Context) error {
 	} {
 		if _, ok := prop.Get(); !ok {
 			return ValidationError(
-				fmt.Sprintf("missing value for required attribute: %s", name),
+				"missing value for required attribute: "+name,
 				"transport", "nomad", name,
 			)
 		}
@@ -199,7 +202,7 @@ func (em *embeddedTransportNomadv1) debug() string {
 		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
-	return fmt.Sprintf("Nomad Transport Config:\n%s", strings.Join(vals, "\n"))
+	return "Nomad Transport Config:\n" + strings.Join(vals, "\n")
 }
 
 // nomadClient creates a nomad client for this transport.

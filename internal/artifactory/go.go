@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package artifactory
 
 // supportedVaultTargets is our currently supported Vault build targets.

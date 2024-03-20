@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -308,11 +311,18 @@ func (s *localKindClusterStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_local_kind_cluster^ can be used to create a [kind cluster](https://kind.sigs.k8s.io/)	locally.
+
+TODO(kind) add an example
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
 					Name:        "name",
@@ -477,7 +487,7 @@ func (s *localKindClusterStateV1) readLocalKindCluster(ctx context.Context) erro
 
 	name, ok := s.Name.Get()
 	if !ok {
-		return fmt.Errorf("encountered error reading kube config, missing 'name' attribute")
+		return errors.New("encountered error reading kube config, missing 'name' attribute")
 	}
 	provider := cluster.NewProvider(cluster.ProviderWithLogger(cmd.NewLogger()))
 

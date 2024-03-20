@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 locals {
   consul_bin_path = "${var.consul_install_dir}/consul"
   key_shares = {

@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kind
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -116,7 +120,7 @@ func NewLocalClient(logger log.Logger) Client {
 // CreateCluster creates a new kind cluster locally and returns the cluster info if successful.
 func (c *localClient) CreateCluster(request CreateKindClusterRequest) (ClusterInfo, error) {
 	if len(strings.TrimSpace(request.Name)) == 0 {
-		return EmptyClusterInfo, fmt.Errorf("cannot create a cluster with an empty cluster 'name'")
+		return EmptyClusterInfo, errors.New("cannot create a cluster with an empty cluster 'name'")
 	}
 
 	logFields := map[string]interface{}{"name": request.Name}
@@ -181,7 +185,7 @@ func GetClusterInfo(name string) (ClusterInfo, error) {
 // DeleteCluster Deletes a local kind cluster.
 func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 	if len(strings.TrimSpace(request.Name)) == 0 {
-		return fmt.Errorf("cannot delete cluster without cluster 'name'")
+		return errors.New("cannot delete cluster without cluster 'name'")
 	}
 
 	kubeConfigPath, err := kubernetes.GetKubeConfigPath(request.KubeConfigPath)

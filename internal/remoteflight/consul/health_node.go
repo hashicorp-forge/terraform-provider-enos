@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
@@ -91,15 +94,15 @@ func GetHealthNode(ctx context.Context, tr it.Transport, req *HealthNodeRequest)
 	res := &HealthNodeResponse{Nodes: make([]*NodeHealth, 0)}
 
 	if req.FlightControlPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply an enos-flight-control path"))
+		err = errors.Join(err, errors.New("you must supply an enos-flight-control path"))
 	}
 
 	if req.ConsulAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a consul listen address"))
+		err = errors.Join(err, errors.New("you must supply a consul listen address"))
 	}
 
 	if req.NodeName == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a node name"))
+		err = errors.Join(err, errors.New("you must supply a node name"))
 	}
 
 	if err == nil {
@@ -117,14 +120,14 @@ func GetHealthNode(ctx context.Context, tr it.Transport, req *HealthNodeRequest)
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), &res.Nodes))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("read /v1/health/node"), err)
+		return nil, errors.Join(errors.New("read /v1/health/node"), err)
 	}
 
 	return res, nil

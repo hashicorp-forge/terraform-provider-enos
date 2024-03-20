@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -212,7 +215,7 @@ func (p GetPodLogsResponse) GetLogFileName() string {
 	parts := []string{p.ContextName, p.Namespace, p.Pod, p.Container}
 
 	filename := strings.Join(parts, "_")
-	filename = fmt.Sprintf("%s.log", filename)
+	filename = filename + ".log"
 
 	return filename
 }
@@ -347,7 +350,7 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 
 	pods, ok := result.([]v1.Pod)
 	if !ok {
-		return nil, fmt.Errorf("failed to process pod query result")
+		return nil, errors.New("failed to process pod query result")
 	}
 
 	podInfos := make([]PodInfo, len(pods))
@@ -365,7 +368,7 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 
 func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInfo, error) {
 	if strings.TrimSpace(req.Name) == "" {
-		return nil, fmt.Errorf("cannot get pod info without the pod name")
+		return nil, errors.New("cannot get pod info without the pod name")
 	}
 
 	namespace := req.Namespace
@@ -391,7 +394,7 @@ func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInf
 
 func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLogsResponse, error) {
 	if strings.TrimSpace(req.Pod) == "" {
-		return nil, fmt.Errorf("cannot get pod logs without providing a pod name")
+		return nil, errors.New("cannot get pod logs without providing a pod name")
 	}
 
 	namespace := req.Namespace
@@ -592,7 +595,7 @@ func (p *Pods) String() string {
 
 	for i := range p.Items {
 		i := i
-		out.WriteString(fmt.Sprintf("%s\n", p.Items[i].ObjectMeta.Name))
+		out.WriteString(p.Items[i].ObjectMeta.Name + "\n")
 		out.WriteString(fmt.Sprintf("  Name: %s\n", p.Items[i].ObjectMeta.Name))
 		out.WriteString(fmt.Sprintf("  Namespace: %s\n", p.Items[i].ObjectMeta.Namespace))
 		out.WriteString(fmt.Sprintf("  Node Name: %s\n", p.Items[i].Spec.NodeName))
@@ -687,7 +690,7 @@ func (p *Pods) String() string {
 
 func containerToString(container v1.Container) string {
 	out := new(strings.Builder)
-	out.WriteString(fmt.Sprintf("%s\n", container.Name))
+	out.WriteString(container.Name + "\n")
 	out.WriteString(fmt.Sprintf("  Name: %s\n", container.Name))
 	out.WriteString(fmt.Sprintf("  Image: %s\n", container.Image))
 	out.WriteString(fmt.Sprintf("  Command: %s\n", strings.Join(container.Command, " ")))
@@ -742,7 +745,7 @@ func containerToString(container v1.Container) string {
 
 func contianerStatusToString(status v1.ContainerStatus) string {
 	out := new(strings.Builder)
-	out.WriteString(fmt.Sprintf("%s\n", status.Name))
+	out.WriteString(status.Name + "\n")
 	out.WriteString(fmt.Sprintf("  Name: %s\n", status.Name))
 	out.WriteString(fmt.Sprintf("  Image: %s\n", status.Image))
 	out.WriteString(fmt.Sprintf("  Image ID: %s\n", status.ImageID))

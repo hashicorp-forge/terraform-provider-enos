@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 output "remote_exec_all_stdout" {
   value = enos_remote_exec.all.stdout
 }

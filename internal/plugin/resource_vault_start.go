@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -319,56 +322,154 @@ func (s *vaultStartStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_vault_start^ resource is capable of configuring and starting a Vault
+service. It handles creating the configuration directory, the configuration file,
+the license file, the systemd unit, and starting the service.
+
+*NOTE: Until recently we were not able to implement optional attributes for the config attribute.
+As such, you will need to provide _all_ values except for ^seals^. Eventually all of the attributes*
+
+^^^hcl
+resource "enos_vault_start" "vault" {
+  bin_path       = "/opt/vault/bin/vault"
+
+  config_dir     = "/etc/vault.d"
+
+  config         = {
+    api_addr     = "${aws_instance.target.private_ip}:8200"
+    cluster_addr = "${aws_instance.target.private_ip}:8201"
+    listener     = {
+      type       = "tcp"
+      attributes = {
+        address     = "0.0.0.0:8200"
+        tls_disable = "true"
+      }
+    }
+    storage = {
+      type       = "consul"
+      attributes = {
+        address = "127.0.0.1:8500"
+        path    = "vault"
+      }
+    }
+    seal = {
+      type       = "awskms"
+      attributes = {
+        kms_key_id = data.aws_kms_key.kms_key.id
+      }
+    }
+    ui = true
+  }
+
+  license   = var.vault_license
+
+  unit_name = "vault"
+
+  username  = "vault"
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "bin_path", // where the vault binary is
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "bin_path", // where the vault binary is
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The fully qualified path to the vault binary",
 				},
 				{
-					Name:     "config",
-					Type:     s.Config.Terraform5Type(),
-					Required: true,
+					Name:            "config",
+					Type:            s.Config.Terraform5Type(),
+					Required:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: docCaretToBacktick(`
+|key|type|description|
+|config|object|Vault configuration|
+|config.api_addr|string|The Vault [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) value|
+|config.cluster_addr|string|The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value|
+|config.cluster_name|string|The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value|
+|config.listener|object|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza|
+|config.listener.type|string|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener|
+|config.listener.attributes|object|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener|
+|config.log_level|string|The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)|
+|config.storage|object|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza|
+|config.storage.type|string|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type|
+|config.storage.attributes|object|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type|
+|config.seal|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza|
+|config.seal.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
+|config.seal.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
+|config.seals|Vault Enterprise [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) configuration. Cannot be used in conjunction with ^config.seal^. Up to three seals can be defined but only one is required.|
+|config.seals.primary|The primary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Primary has priority 1|
+|config.seals.primary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
+|config.seals.primary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
+|config.seals.secondary|The secondary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Secondary has priority 2|
+|config.seals.secondary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
+|config.seals.secondary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
+|config.seals.tertiary|The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3|
+|config.seals.tertiary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
+|config.seals.tertiary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
+`),
 				},
 				{
-					Name:     "config_dir", // where to write vault config
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "config_dir", // where to write vault config
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The path where Vault configuration will reside",
 				},
 				{
-					Name:      "license", // the vault license
-					Type:      tftypes.String,
-					Optional:  true,
-					Sensitive: true,
+					Name:        "license", // the vault license
+					Type:        tftypes.String,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "The Vault Enterprise license",
 				},
 				{
-					Name: "status", // the vault status code
-					// 0 - Initialized, Unsealed
-					// 1 - Error
-					// 2 - Sealed
-					// 9 - Unknown - we couldn't get the status
-					Type:     tftypes.Number,
-					Computed: true,
+					Name:            "status", // the vault status code
+					Type:            tftypes.Number,
+					Computed:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: `
+The Vault status code returned when starting the service.
+
+|code|meaning|
+|0|Initialized, Unsealed|
+|1|Error|
+|2|Sealed|
+|9|Unknown, we couldn't get the status from Vault|
+`,
 				},
 				{
-					Name:     "unit_name", // sysmted unit name
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "unit_name", // sysmted unit name
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The systemd unit name",
 				},
 				{
-					Name:     "manage_service",
-					Type:     tftypes.Bool,
-					Optional: true,
+					Name:        "manage_service",
+					Type:        tftypes.Bool,
+					Optional:    true,
+					Description: "Whether or not Enos will be responsible for creating and managing the systemd unit for Vault",
 				},
 				{
-					Name:     "username", // vault username
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "username", // vault username
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The local service user name",
 				},
 				{
 					Name:        "environment",
@@ -376,7 +477,7 @@ func (s *vaultStartStateV1) Schema() *tfprotov6.Schema {
 					Type:        tftypes.Map{ElementType: tftypes.String},
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}
@@ -605,7 +706,7 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 		//lint:ignore SA1019 we have to use this internnal only API to determine DynamicPseudoType types.
 		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
 		if err != nil {
-			panic(fmt.Sprintf("unable to marshal the vault config block to the wire format: %s", err.Error()))
+			panic("unable to marshal the vault config block to the wire format: " + err.Error())
 		}
 		matches := impliedTypeRegexp.FindStringSubmatch(string(msgpackBytes))
 		if len(matches) > 1 {
@@ -620,7 +721,7 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 			case "object":
 				attrsVal = terraform5Value(s.AttrsValues)
 			default:
-				panic(fmt.Sprintf("%s is not a support dynamic type for the vault config block", matches[1]))
+				panic(matches[1] + " is not a support dynamic type for the vault config block")
 			}
 		}
 	}
@@ -797,7 +898,7 @@ func (s *vaultSealsConfig) Set(name string, set *vaultConfigBlockSet) error {
 
 func (s *vaultSealsConfig) SetSeals(sets map[string]*vaultConfigBlockSet) error {
 	if s == nil {
-		return fmt.Errorf("cannot set seal config for nil vaultSealsConfig")
+		return errors.New("cannot set seal config for nil vaultSealsConfig")
 	}
 
 	for name, set := range sets {
@@ -1002,7 +1103,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 				return nil, errors.New("ClusterName not found in Vault config")
 			}
 			storageBlock.AppendBlock("retry_join", []string{}).
-				AppendAttribute("auto_join", fmt.Sprintf("provider=aws tag_key=Type tag_value=%s", clusterName)).
+				AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
 				AppendAttribute("auto_join_scheme", "http")
 		}
 	}

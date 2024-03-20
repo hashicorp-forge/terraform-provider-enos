@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -202,64 +205,81 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+^enos_boundary_start^ is a resource that starts a Boundary cluster.
+
+TODO(boundary) add an example for start
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "bin_name",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "bin_name",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of boundary binary we're going to use when starting the cluster",
 				},
 				{
-					Name:     "bin_path",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "bin_path",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The path to the directory with binary we're going to use when starting the cluster",
 				},
 				{
-					Name:     "config_path",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "config_path",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The path to the Boundary configuration to use when starting the cluster",
 				},
 				{
-					Name:     "config_name",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "config_name",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of a Boundary configuration to use when starting the cluster",
 				},
 				{
-					Name:      "license",
-					Type:      tftypes.String,
-					Optional:  true,
-					Sensitive: true,
+					Name:        "license",
+					Type:        tftypes.String,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "The path to a license for Boundary Enterprise",
 				},
 				{
-					Name:     "status",
-					Type:     tftypes.Number,
-					Computed: true,
+					Name:        "status",
+					Type:        tftypes.Number,
+					Computed:    true,
+					Description: "The status code received when starting the cluster",
 				},
 				{
-					Name:     "unit_name",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "unit_name",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The name of the systemd unit",
 				},
 				{
-					Name:     "manage_service",
-					Type:     tftypes.Bool,
-					Optional: true,
+					Name:        "manage_service",
+					Type:        tftypes.Bool,
+					Optional:    true,
+					Description: "Whether or not Enos should supply a systemd unit for the service",
 				},
 				{
-					Name:     "username",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "username",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The local username for the Boundary service",
 				},
 				{
-					Name:     "recording_storage_path",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "recording_storage_path",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The path to use for storage when recording",
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}

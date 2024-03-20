@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -248,16 +251,40 @@ func (s *vaultInitStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_vault_init^ resource is capable initializing a Vault cluster.
+
+^^^hcl
+resource "enos_vault_init" "vault" {
+  bin_path   = "/opt/vault/bin/vault"
+  vault_addr = enos_vault_start.vault.config.api_addr
+
+  recovery_shares    = 5
+  recovery_threshold = 3
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "bin_path",
-					Type:     tftypes.String,
-					Required: true,
+					Name:        "bin_path",
+					Type:        tftypes.String,
+					Required:    true,
+					Description: "The fully qualified path to the vault binary",
 				},
 				{
 					Name:        "unit_name",
@@ -266,115 +293,146 @@ func (s *vaultInitStateV1) Schema() *tfprotov6.Schema {
 					Optional:    true,
 				},
 				{
-					Name:     "vault_addr",
-					Type:     tftypes.String,
-					Required: true,
+					Name:            "vault_addr",
+					Type:            tftypes.String,
+					Required:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) of the Vault cluster",
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsAll),
 				// Input args
 				{
-					Name:     "key_shares",
-					Type:     tftypes.Number,
-					Optional: true,
+					Name:            "key_shares",
+					Type:            tftypes.Number,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The number of [key shares](https://developer.hashicorp.com/vault/docs/commands/operator/init#key-shares)",
 				},
 				{
-					Name:     "key_threshold",
-					Type:     tftypes.Number,
-					Optional: true,
+					Name:            "key_threshold",
+					Type:            tftypes.Number,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The [key threshold](https://developer.hashicorp.com/vault/docs/commands/operator/init#key-threshold)",
 				},
 				{
-					Name:     "pgp_keys",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
+					Name:            "pgp_keys",
+					Type:            tftypes.List{ElementType: tftypes.String},
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "A list of [pgp keys](https://developer.hashicorp.com/vault/docs/commands/operator/init#pgp-keys)",
 				},
 				{
-					Name:     "root_token_pgp_key",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:            "root_token_pgp_key",
+					Type:            tftypes.String,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The root token [pgp keys](https://developer.hashicorp.com/vault/docs/commands/operator/init#root-token-pgp-key)",
 				},
 				{
-					Name:     "recovery_shares",
-					Type:     tftypes.Number,
-					Optional: true,
+					Name:            "recovery_shares",
+					Type:            tftypes.Number,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The number of [recovery shares](https://developer.hashicorp.com/vault/docs/commands/operator/init#recovery-shares)",
 				},
 				{
-					Name:     "recovery_threshold",
-					Type:     tftypes.Number,
-					Optional: true,
+					Name:            "recovery_threshold",
+					Type:            tftypes.Number,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The [recovery threshold](https://developer.hashicorp.com/vault/docs/commands/operator/init#recovery-threshold)",
 				},
 				{
-					Name:     "recovery_pgp_keys",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
+					Name:            "recovery_pgp_keys",
+					Type:            tftypes.List{ElementType: tftypes.String},
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "A list of [recovery pgp keys](https://developer.hashicorp.com/vault/docs/commands/operator/init#recovery-pgp-keys)",
 				},
 				{
-					Name:     "stored_shares",
-					Type:     tftypes.Number,
-					Optional: true,
+					Name:            "stored_shares",
+					Type:            tftypes.Number,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The number of [stored shares](https://developer.hashicorp.com/vault/docs/commands/operator/init#stored-shares)",
 				},
 				{
-					Name:     "consul_auto",
-					Type:     tftypes.Bool,
-					Optional: true,
+					Name:            "consul_auto",
+					Type:            tftypes.Bool,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "Whether to enable or disable [consul auto discovery](https://developer.hashicorp.com/vault/docs/commands/operator/init#consul-auto)",
 				},
 				{
-					Name:     "consul_service",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:            "consul_service",
+					Type:            tftypes.String,
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The name of the [consul service](https://developer.hashicorp.com/vault/docs/commands/operator/init#consul-service)",
 				},
 				// outputs
 				{
-					Name:     "unseal_keys_b64",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
-					Computed: true,
+					Name:        "unseal_keys_b64",
+					Type:        tftypes.List{ElementType: tftypes.String},
+					Optional:    true,
+					Computed:    true,
+					Description: "The generated unseal keys in base 64",
 				},
 				{
-					Name:     "unseal_keys_hex",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
-					Computed: true,
+					Name:        "unseal_keys_hex",
+					Type:        tftypes.List{ElementType: tftypes.String},
+					Optional:    true,
+					Computed:    true,
+					Description: "The generated unseal keys in hex",
 				},
 				{
-					Name:     "unseal_keys_shares",
-					Type:     tftypes.Number,
-					Optional: true,
-					Computed: true,
+					Name:        "unseal_keys_shares",
+					Type:        tftypes.Number,
+					Optional:    true,
+					Computed:    true,
+					Description: "The number of unseal key shares",
 				},
 				{
-					Name:     "unseal_keys_threshold",
-					Type:     tftypes.Number,
-					Optional: true,
-					Computed: true,
+					Name:        "unseal_keys_threshold",
+					Type:        tftypes.Number,
+					Optional:    true,
+					Computed:    true,
+					Description: "The number of unseal key shares required to unseal",
 				},
 				{
-					Name:     "recovery_keys_b64",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
-					Computed: true,
+					Name:        "recovery_keys_b64",
+					Type:        tftypes.List{ElementType: tftypes.String},
+					Optional:    true,
+					Computed:    true,
+					Description: "The root token",
 				},
 				{
-					Name:     "recovery_keys_hex",
-					Type:     tftypes.List{ElementType: tftypes.String},
-					Optional: true,
-					Computed: true,
+					Name:        "recovery_keys_hex",
+					Type:        tftypes.List{ElementType: tftypes.String},
+					Optional:    true,
+					Computed:    true,
+					Description: "The generated recovery keys in base 64",
 				},
 				{
 					Name: "recovery_keys_shares",
 					Type: tftypes.Number, Optional: true,
-					Computed: true,
+					Computed:    true,
+					Description: "The generated recovery keys in hex",
 				},
 				{
-					Name:     "recovery_keys_threshold",
-					Type:     tftypes.Number,
-					Optional: true,
-					Computed: true,
+					Name:        "recovery_keys_threshold",
+					Type:        tftypes.Number,
+					Optional:    true,
+					Computed:    true,
+					Description: "The number of recovery key shares",
 				},
 				{
-					Name:     "root_token",
-					Type:     tftypes.String,
-					Optional: true,
-					Computed: true,
+					Name:        "root_token",
+					Type:        tftypes.String,
+					Optional:    true,
+					Computed:    true,
+					Description: "The number of recovery key shares required to recovery",
 				},
 			},
 		},

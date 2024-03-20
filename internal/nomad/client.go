@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package nomad
 
 import (
@@ -44,7 +47,7 @@ func (r *GetTaskLogsResponse) GetLogFileName() string {
 	parts = append(parts, r.Allocation, r.Task)
 
 	result := strings.Join(parts, "_")
-	result = fmt.Sprintf("%s.log", result)
+	result = result + ".log"
 
 	return result
 }

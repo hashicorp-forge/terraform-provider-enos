@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package publish
 
 import (
@@ -5,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -212,7 +216,7 @@ func (a *Artifacts) WriteMetadata() error {
 	}
 
 	for version, release := range a.releases {
-		path := filepath.Join(a.dir, fmt.Sprintf("%s.json", version))
+		path := filepath.Join(a.dir, version+".json")
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o755)
 		if err != nil {
 			return err
@@ -240,7 +244,7 @@ func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, si
 	)
 
 	for version, releases := range a.tfcMetadata {
-		shaPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS", version))
+		shaPath := filepath.Join(a.dir, version+"_SHA256SUMS")
 
 		shaFile, err := os.OpenFile(shaPath, os.O_RDWR|os.O_CREATE, 0o755)
 		if err != nil {
@@ -264,7 +268,7 @@ func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, si
 			continue
 		}
 
-		sigPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS.sig", version))
+		sigPath := filepath.Join(a.dir, version+"_SHA256SUMS.sig")
 		err = a.WriteDetachedSignature(ctx, shaPath, sigPath, identityName)
 		if err != nil {
 			return err
@@ -308,7 +312,7 @@ func (a *Artifacts) PublishToTFC(ctx context.Context, tfcreq *TFCUploadReq) erro
 
 	for version, releases := range a.tfcMetadata {
 		providerVersion := version
-		sha256sumsPath := filepath.Join(a.dir, fmt.Sprintf("%s_SHA256SUMS", providerVersion))
+		sha256sumsPath := filepath.Join(a.dir, providerVersion+"_SHA256SUMS")
 
 		err = tfcclient.FindOrCreateVersion(ctx, tfcreq.TFCOrg, tfcreq.ProviderName, providerVersion, tfcreq.GPGKeyID, sha256sumsPath)
 		if err != nil {
@@ -526,7 +530,7 @@ func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3C
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	key := aws.String(filepath.Join(providerID, fmt.Sprintf("%s.json", version)))
+	key := aws.String(filepath.Join(providerID, version+".json"))
 
 	a.log.Debugw(
 		"attempting to get remote mirror file from bucket",
@@ -570,7 +574,7 @@ func (a *Artifacts) HasVersion(ctx context.Context, version string) (bool, error
 	)
 
 	if a.idx == nil {
-		return false, fmt.Errorf("no index")
+		return false, errors.New("no index")
 	}
 
 	_, ok := a.idx.Versions[version]
@@ -589,7 +593,7 @@ func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx conte
 	}
 
 	filesToCopy := map[string]string{
-		path.Join(srcBucketName, providerID, fmt.Sprintf("%s.json", version)): path.Join(providerID, fmt.Sprintf("%s.json", version)),
+		path.Join(srcBucketName, providerID, version+".json"): path.Join(providerID, version+".json"),
 	}
 	for _, archive := range a.releases[version].Archives {
 		filesToCopy[path.Join(srcBucketName, providerID, archive.URL)] = path.Join(providerID, archive.URL)

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -185,7 +188,7 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 	case "kubernetes":
 		k, ok := tr.(*k8s.Transport)
 		if !ok {
-			return state, fmt.Errorf("getting the kubernetes pods state: type mismatch between transport")
+			return state, errors.New("getting the kubernetes pods state: type mismatch between transport")
 		}
 
 		req.ListPodsRequest.Namespace = k.Namespace
@@ -346,7 +349,7 @@ func WaitForState(ctx context.Context, tr it.Transport, req *StateRequest, check
 		}
 
 		if state == nil {
-			return nil, errors.Join(err, fmt.Errorf("no state data found"))
+			return nil, errors.Join(err, errors.New("no state data found"))
 		}
 
 		for _, check := range checks {
@@ -428,19 +431,19 @@ func (s *State) printStateField(w io.Writer, f fmt.Stringer, fn string) {
 // error will be returned.
 func (s *State) IsSealed() (bool, error) {
 	if s == nil {
-		return true, fmt.Errorf("state is unknown")
+		return true, errors.New("state is unknown")
 	}
 
 	if s.Status == nil {
-		return true, fmt.Errorf("state does not include 'vault status' response")
+		return true, errors.New("state does not include 'vault status' response")
 	}
 
 	if s.Health == nil {
-		return false, fmt.Errorf("state has no /v1/sys/health data")
+		return false, errors.New("state has no /v1/sys/health data")
 	}
 
 	if s.SealStatus == nil {
-		return false, fmt.Errorf("state has no /v1/sys/seal-status data")
+		return false, errors.New("state has no /v1/sys/seal-status data")
 	}
 
 	statusSealed, err := s.Status.IsSealed()
@@ -478,15 +481,15 @@ func (s *State) IsSealed() (bool, error) {
 // an error will be returned.
 func (s *State) IsInitialized() (bool, error) {
 	if s == nil {
-		return false, fmt.Errorf("state is unknown")
+		return false, errors.New("state is unknown")
 	}
 
 	if s.Status == nil {
-		return true, fmt.Errorf("state does not include 'vault status' response")
+		return true, errors.New("state does not include 'vault status' response")
 	}
 
 	if s.Health == nil {
-		return false, fmt.Errorf("state has no /v1/sys/health data")
+		return false, errors.New("state has no /v1/sys/health data")
 	}
 
 	// Make sure our endpoints agree about being initialized
@@ -504,11 +507,11 @@ func (s *State) IsInitialized() (bool, error) {
 // replication is enabled.
 func (s *State) ReplicationEnabled() (bool, error) {
 	if s == nil {
-		return false, fmt.Errorf("state is unknown")
+		return false, errors.New("state is unknown")
 	}
 
 	if s.Health == nil {
-		return false, fmt.Errorf("state has no /v1/sys/health data")
+		return false, errors.New("state has no /v1/sys/health data")
 	}
 
 	if s.Health.ReplicationDRMode != ReplicationModeUnset &&
@@ -529,11 +532,11 @@ func (s *State) ReplicationEnabled() (bool, error) {
 // HAEnabled checks whether or not the state includes status infroatmion and if HA is enabled.
 func (s *State) HAEnabled() (bool, error) {
 	if s == nil {
-		return false, fmt.Errorf("state is unknown")
+		return false, errors.New("state is unknown")
 	}
 
 	if s.Status == nil {
-		return true, fmt.Errorf("state does not include 'vault status' response")
+		return true, errors.New("state does not include 'vault status' response")
 	}
 
 	return s.Status.HAEnabled, nil
@@ -542,15 +545,15 @@ func (s *State) HAEnabled() (bool, error) {
 // StorageType gets the storage type from the seal status data.
 func (s *State) StorageType() (string, error) {
 	if s == nil {
-		return "", fmt.Errorf("state is unknown")
+		return "", errors.New("state is unknown")
 	}
 
 	if s.SealStatus == nil {
-		return "", fmt.Errorf("state has no /v1/sys/seal-status response data")
+		return "", errors.New("state has no /v1/sys/seal-status response data")
 	}
 
 	if s.SealStatus.Data == nil {
-		return "", fmt.Errorf("state has no /v1/sys/seal-status data")
+		return "", errors.New("state has no /v1/sys/seal-status data")
 	}
 
 	return s.SealStatus.Data.StorageType, nil
@@ -559,11 +562,11 @@ func (s *State) StorageType() (string, error) {
 // StatusCode gets the status code from the 'vault status' response.
 func (s *State) StatusCode() (StatusCode, error) {
 	if s == nil {
-		return StatusUnknown, fmt.Errorf("state is unknown")
+		return StatusUnknown, errors.New("state is unknown")
 	}
 
 	if s.Status == nil {
-		return StatusUnknown, fmt.Errorf("state does not include 'vault status' response")
+		return StatusUnknown, errors.New("state does not include 'vault status' response")
 	}
 
 	return s.Status.StatusCode, nil

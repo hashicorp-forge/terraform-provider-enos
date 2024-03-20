@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package retry
 
 import (
@@ -24,7 +27,7 @@ const MaxRetriesUnlimited int = -1
 // and if it should, sleeps the appropriate duration as specified by Interval() before retrying.
 func Retry(ctx context.Context, req Retryable) (any, error) {
 	if req == nil {
-		return nil, fmt.Errorf("no retryable request")
+		return nil, errors.New("no retryable request")
 	}
 
 	var res any

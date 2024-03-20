@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -203,21 +206,48 @@ func (s *vaultUnsealStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_vault_unseal^ resource will unseal a running Vault cluster. For Vaults clusters configured
+with a shamir it uses ^enos_vault_init.unseal_keys_hex^ and passes them to the appropriate
+^vault operator unseal^ command to unseal the cluster. For auto-unsealed Vaults clusters this
+resource simply performs a seal status check loop to ensure the cluster reaches an unsealed state
+
+^^^hcl
+resource "enos_vault_unseal" "vault" {
+  depends_on  = [enos_vault_init.vault]
+  bin_path   = "/opt/vault/bin/vault"
+  vault_addr  = enos_vault_start.vault.config.api_addr
+  seal_type   = enos_vault_start.vault.config.seal.type
+  unseal_keys = enos_vault_init.vault.unseal_keys_hex
+
+  transport = {
+    ssh = {
+      host = aws_instance.vault_instance.public_ip
+    }
+  }
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     s.ID.TFType(),
-					Computed: true,
+					Name:        "id",
+					Type:        s.ID.TFType(),
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "bin_path",
-					Type:     s.BinPath.TFType(),
-					Required: true,
+					Name:        "bin_path",
+					Type:        s.BinPath.TFType(),
+					Required:    true,
+					Description: "The fully qualified path to the vault binary",
 				},
 				{
-					Name:     "seal_type",
-					Type:     s.SealType.TFType(),
-					Optional: true,
+					Name:            "seal_type",
+					Type:            s.SealType.TFType(),
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The `seal_type` from `enos_vault_start`. If using HA Seal provide the primary seal type",
 				},
 				{
 					Name:        "unit_name",
@@ -225,17 +255,21 @@ func (s *vaultUnsealStateV1) Schema() *tfprotov6.Schema {
 					Type:        tftypes.String,
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsAll),
 				{
-					Name:      "unseal_keys",
-					Type:      s.UnsealKeys.TFType(),
-					Required:  true,
-					Sensitive: true,
+					Name:            "unseal_keys",
+					Type:            s.UnsealKeys.TFType(),
+					Required:        true,
+					Sensitive:       true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "A list of `unseal_keys_hex` (or b64) provided by the output of `enos_vault_init`. This is only required for shamir seals",
 				},
 				{
-					Name:     "vault_addr",
-					Type:     s.VaultAddr.TFType(),
-					Required: true,
+					Name:            "vault_addr",
+					Type:            s.VaultAddr.TFType(),
+					Required:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description:     "The configured `api_addr` from `enos_vault_start`",
 				},
 			},
 		},

@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_security_group" "enos_vault_sg" {
   name        = "vault-sg-${random_string.cluster_id.result}"
   description = "SSH and Vault Traffic"

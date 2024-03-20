@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -231,7 +234,7 @@ func (em *embeddedTransportSSHv1) debug() string {
 		vals[i] = fmt.Sprintf("%*s : %s", maxWidth, name, val)
 	}
 
-	return fmt.Sprintf("SSH Transport Config:\n%s", strings.Join(vals, "\n"))
+	return "SSH Transport Config:\n" + strings.Join(vals, "\n")
 }
 
 // systemdClient creates a new systemd client for this transport.

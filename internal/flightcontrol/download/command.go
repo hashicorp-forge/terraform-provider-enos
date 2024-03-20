@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package download
 
 import (
@@ -118,7 +121,7 @@ func (a *CommandArgs) Parse(args []string) error {
 	}
 
 	if !a.writeStdout && a.destination == "" {
-		return fmt.Errorf("you must provide either a destination or stdout")
+		return errors.New("you must provide either a destination or stdout")
 	}
 
 	return nil

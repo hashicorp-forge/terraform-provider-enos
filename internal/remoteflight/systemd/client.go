@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package systemd
 
 import (
@@ -61,7 +64,7 @@ func (c *client) GetUnitJournal(ctx context.Context, req *GetUnitJournalRequest)
 	remoteflight.GetLogsResponse,
 	error,
 ) {
-	stdout, stderr, err := c.transport.Run(ctx, command.New(fmt.Sprintf("journalctl -x -u %s", req.Unit)))
+	stdout, stderr, err := c.transport.Run(ctx, command.New("journalctl -x -u "+req.Unit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get systemd logs, due to: %w", err)
 	}
@@ -89,7 +92,7 @@ func (c *client) CreateUnitFile(ctx context.Context, req *CreateUnitFileRequest)
 	}
 
 	if req.UnitPath == "" {
-		return fmt.Errorf("you must provide a unit destination path")
+		return errors.New("you must provide a unit destination path")
 	}
 
 	copyOpts := []remoteflight.CopyFileRequestOpt{
@@ -237,7 +240,7 @@ func (c *client) ShowProperties(ctx context.Context, unit string) (UnitPropertie
 	))
 
 	if res.Stdout == "" {
-		err = errors.Join(err, fmt.Errorf("no show result was written to STDOUT"))
+		err = errors.Join(err, errors.New("no show result was written to STDOUT"))
 	}
 
 	var props UnitProperties

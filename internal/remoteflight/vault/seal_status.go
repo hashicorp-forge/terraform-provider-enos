@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -92,11 +95,11 @@ func GetSealStatus(ctx context.Context, tr it.Transport, req *SealStatusRequest)
 	}
 
 	if req.FlightControlPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply an enos-flight-control path"))
+		err = errors.Join(err, errors.New("you must supply an enos-flight-control path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if err == nil {
@@ -110,7 +113,7 @@ func GetSealStatus(ctx context.Context, tr it.Transport, req *SealStatusRequest)
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 
@@ -125,7 +128,7 @@ func GetSealStatus(ctx context.Context, tr it.Transport, req *SealStatusRequest)
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get vault seal status: vault read sys/seal-status"), err)
+		return nil, errors.Join(errors.New("get vault seal status: vault read sys/seal-status"), err)
 	}
 
 	return res, nil
@@ -146,11 +149,11 @@ func (r *SealStatusRequest) String() string {
 // IsSealed checks whether or not the status of the cluster is sealed.
 func (s *SealStatusResponse) IsSealed() (bool, error) {
 	if s == nil {
-		return true, fmt.Errorf("seal response is nil")
+		return true, errors.New("seal response is nil")
 	}
 
 	if s.Data == nil {
-		return true, fmt.Errorf("seal response does not have seal data")
+		return true, errors.New("seal response does not have seal data")
 	}
 
 	return s.Data.Sealed, nil

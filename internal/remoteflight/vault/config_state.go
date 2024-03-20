@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -93,20 +96,20 @@ func GetConfigStateSanitized(ctx context.Context, tr it.Transport, req *CLIReque
 	}
 
 	if req.BinPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault bin path"))
+		err = errors.Join(err, errors.New("you must supply a vault bin path"))
 	}
 
 	if req.VaultAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault listen address"))
+		err = errors.Join(err, errors.New("you must supply a vault listen address"))
 	}
 
 	if req.Token == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a vault token for the /v1/sys/config/state/sanitized endpoint"))
+		err = errors.Join(err, errors.New("you must supply a vault token for the /v1/sys/config/state/sanitized endpoint"))
 	}
 
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(
-			fmt.Sprintf("%s read -format=json sys/config/state/sanitized", req.BinPath),
+			req.BinPath+" read -format=json sys/config/state/sanitized",
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
@@ -119,14 +122,14 @@ func GetConfigStateSanitized(ctx context.Context, tr it.Transport, req *CLIReque
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no body was written to stdout"))
+			err = errors.Join(err, errors.New("no body was written to stdout"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("get config state sanitized: vault read sys/config/state/sanitized"))
+		return nil, errors.Join(errors.New("get config state sanitized: vault read sys/config/state/sanitized"))
 	}
 
 	return res, nil

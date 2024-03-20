@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package flightcontrol
 
 import (
@@ -19,7 +22,8 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 		{
 			Platform:     "darwin",
 			Architecture: "amd64",
-			Supported:    true,
+			// https://github.com/upx/upx/issues/612 false while this is sorted out
+			Supported: false,
 		},
 		{
 			Platform:     "linux",
@@ -82,7 +86,6 @@ func TestSupportedTargets(t *testing.T) {
 	targets, err := SupportedTargets()
 	require.NoError(t, err)
 	require.EqualValues(t, map[string][]string{
-		"darwin": {"amd64"},
-		"linux":  {"amd64", "arm64"},
+		"linux": {"amd64", "arm64"},
 	}, targets)
 }

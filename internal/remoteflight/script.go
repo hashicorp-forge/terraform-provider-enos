@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package remoteflight
 
 import (
@@ -37,7 +40,7 @@ func NewRunScriptRequest(opts ...RunScriptRequestOpt) *RunScriptRequest {
 		NoCleanup: false,
 		Sudo:      false,
 		CopyFileRequest: &CopyFileRequest{
-			Destination: fmt.Sprintf("/tmp/remoteflight_run_script_%s", random.ID()),
+			Destination: "/tmp/remoteflight_run_script_" + random.ID(),
 			TmpDir:      "/tmp",
 			// without this, the script will be run infinite times and block forever if it fails
 			RetryOpts: []retry.RetrierOpt{
@@ -134,7 +137,7 @@ func RunScript(ctx context.Context, tr it.Transport, req *RunScriptRequest) (*Ru
 
 	cmd := req.CopyFileRequest.Destination
 	if req.Sudo {
-		cmd = fmt.Sprintf("sudo %s", cmd)
+		cmd = "sudo " + cmd
 	}
 	stdout, stderr, err1 := tr.Run(ctx, command.New(cmd, command.WithEnvVars(req.Env)))
 	err = errors.Join(err, err1)
@@ -150,7 +153,7 @@ func RunScript(ctx context.Context, tr it.Transport, req *RunScriptRequest) (*Ru
 	}
 
 	stdout, stderr, err1 = tr.Run(
-		ctx, command.New(fmt.Sprintf("rm -f %s", req.CopyFileRequest.Destination), command.WithEnvVars(req.Env)),
+		ctx, command.New("rm -f "+req.CopyFileRequest.Destination, command.WithEnvVars(req.Env)),
 	)
 	err = errors.Join(err, err1)
 	err = errors.Join(err, ui.Append(stdout, stderr))

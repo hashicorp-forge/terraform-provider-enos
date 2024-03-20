@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_instance" "consul_instance" {
   for_each               = toset([for idx in range(var.instance_count) : tostring(idx)])
   ami                    = var.ami_id

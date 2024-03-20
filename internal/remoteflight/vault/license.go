@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -78,7 +82,7 @@ func WithSetLegacyLicenseRequestToken(token string) SetLegacyLicenseRequestOpt {
 // SetLegacyLicense sets the vault license using the /sys/license endpoint.
 func SetLegacyLicense(ctx context.Context, tr it.Transport, req *SetLegacyLicenseRequest) error {
 	if req.LicensePath == "" && req.LicenseContent == "" {
-		return fmt.Errorf("you must provide a license path or content")
+		return errors.New("you must provide a license path or content")
 	}
 
 	if req.LicensePath != "" {

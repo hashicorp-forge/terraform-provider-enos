@@ -1,8 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package k8s
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"path/filepath"
 
@@ -68,7 +70,7 @@ func (t Transport) Copy(ctx context.Context, src it.Copyable, dst string) error 
 	}
 
 	request := t.Client.NewExecRequest(kubernetes.ExecRequestOpts{
-		Command:   fmt.Sprintf("tar -xmf - -C %s", filepath.Dir(dst)),
+		Command:   "tar -xmf - -C " + filepath.Dir(dst),
 		StdIn:     true,
 		Namespace: t.Namespace,
 		Pod:       t.Pod,

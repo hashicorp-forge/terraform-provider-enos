@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -409,35 +412,100 @@ func (s *bundleInstallStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			//nolint:dupword
+			Description: docCaretToBacktick(`
+The enos bundle install resource is capable of installing HashiCorp release bundles, Debian packages,
+or RPM packages, from a local path, releases.hashicorp.com, or from Artifactory directly onto a
+remote node. While it is possible to use to install any debian or RPM packages from Artifactory or
+from a local source, it has been designed for HashiCorp's release workflow.
+
+While all local artifact, releases.hashicorp.com, and Artifactory methods of install are supported,
+only one can be configured at a time.
+
+^^^hcl
+resource "enos_bundle_install" "vault" {
+  # the destination is the directory when the binary will be placed
+  destination = "/opt/vault/bin"
+
+  # install from releases.hashicorp.com
+  release = {
+    product  = "vault"
+    version  = "1.7.0"
+    edition  = "ent"
+  }
+
+  # install from a local bundle
+  path = "/path/to/bundle.zip"
+
+  # install from artifactory
+  artifactory = {
+    username = "rcragun@hashicorp.com"
+    token    = "1234abcd.."
+    sha256   = "e1237bs.."
+    url      = "https:/artifactory.hashicorp.engineering/artifactory/...bundle.zip"
+  }
+
+  transport = {
+    ssh = {
+      host             = "192.168.0.1"
+      user             = "ubuntu"
+      private_key_path = "/path/to/private/key.pem"
+    }
+  }
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
 					Name: "destination",
 					Type: tftypes.String,
 					// Required when using a zip bundle, optional for RPM and Deb artifacts
-					Optional: true,
+					Optional:    true,
+					Description: "The destination directory of the installed binary, eg: /usr/local/bin/. This is required if the artifact is a zip archive and optional when installing RPM or Deb packages",
 				},
 				{
-					Name:     "path",
-					Type:     tftypes.String,
-					Optional: true,
+					Name:        "path",
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The local path to a zip archive install bundle.",
 				},
 				{
-					Name:      "artifactory",
-					Type:      s.ArtifactoryTerraform5Type(),
-					Sensitive: true, // mask the token
-					Optional:  true,
+					Name:            "artifactory",
+					Type:            s.ArtifactoryTerraform5Type(),
+					Sensitive:       true, // mask the token
+					Optional:        true,
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: `
+|key|type|description|
+|artifactory|object|Artifactory access information if the package or bundle is in Artifactory|
+|artifactory.username|string|The Artifactory API username. This will likely be your hashicorp email address|
+|artifactory.token|string|The Artifactory API token. You can sign into Artifactory and generate one|
+|artifactory.url|string|The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL|
+|artifactory.sha256|string|The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed|
+`,
 				},
 				{
 					Name:     "release",
 					Type:     s.ReleaseTerraform5Type(),
 					Optional: true,
+
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: `
+|key|type|description|
+|release|object|The releases.hashicorp.com data|
+|release.product|string|The product name that you wish to install, eg: 'vault' or 'consul'|
+|release.version|string|The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')|
+|release.edition|string|The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc.|
+`,
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}
@@ -514,7 +582,7 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 				return ValidationError("you must supply a vault edition", "release", "edition")
 			}
 			if !artifactory.SupportedVaultEdition(ed) {
-				return ValidationError(fmt.Sprintf("unsupported vault edition: %s", ed), "release", "edition")
+				return ValidationError("unsupported vault edition: "+ed, "release", "edition")
 			}
 		}
 	}

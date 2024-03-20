@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_instance" "vault_instance" {
   for_each               = local.vault_instances
   ami                    = var.ami_id

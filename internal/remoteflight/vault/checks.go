@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package vault
 
 import (
@@ -45,7 +48,7 @@ func CheckStateAllPodsHavePhase(phase v1.PodPhase) CheckStater {
 			s.PodList.Pods == nil ||
 			s.PodList.Pods.Items == nil ||
 			len(s.PodList.Pods.Items) < 1 {
-			return fmt.Errorf("checking kubernetes for pod phases: no pods found in state")
+			return errors.New("checking kubernetes for pod phases: no pods found in state")
 		}
 
 		var err error
@@ -111,7 +114,7 @@ func CheckStateAllContainersAreReady() CheckStater {
 			s.PodList.Pods == nil ||
 			s.PodList.Pods.Items == nil ||
 			len(s.PodList.Pods.Items) < 1 {
-			return fmt.Errorf("checking all containers in kubernetes states are Ready")
+			return errors.New("checking all containers in kubernetes states are Ready")
 		}
 
 		var err error
@@ -127,7 +130,7 @@ func CheckStateAllContainersAreReady() CheckStater {
 
 		if err != nil {
 			return errors.Join(
-				fmt.Errorf("checking all containers in kubernetes state are ready"),
+				errors.New("checking all containers in kubernetes state are ready"),
 				err,
 			)
 		}
@@ -236,7 +239,7 @@ func CheckStateIsInitialized() CheckStater {
 			return nil
 		}
 
-		return fmt.Errorf("checking vault init state, expected initialized, vault is not initialized")
+		return errors.New("checking vault init state, expected initialized, vault is not initialized")
 	}
 }
 
@@ -249,7 +252,7 @@ func CheckStateIsUnsealed() CheckStater {
 		}
 
 		if sealed {
-			return fmt.Errorf("checking vault seal state, expected unsealed, vault is sealed")
+			return errors.New("checking vault seal state, expected unsealed, vault is sealed")
 		}
 
 		return nil
@@ -265,7 +268,7 @@ func CheckStateIsSealed() CheckStater {
 		}
 
 		if !sealed {
-			return fmt.Errorf("checking vault seal state, expected sealed, vault is unsealed")
+			return errors.New("checking vault seal state, expected sealed, vault is unsealed")
 		}
 
 		return nil
@@ -308,11 +311,11 @@ func CheckStateHasSealType(stype SealType) CheckStater {
 func CheckStateHasHealthStatusOf(statuses ...HealthStatus) CheckStater {
 	return func(s *State) error {
 		if len(statuses) < 1 {
-			return fmt.Errorf("checking vault health status: no desired statuses were given")
+			return errors.New("checking vault health status: no desired statuses were given")
 		}
 
 		if s.Health == nil {
-			return fmt.Errorf("checking vault health status: state has no /v1/sys/health data")
+			return errors.New("checking vault health status: state has no /v1/sys/health data")
 		}
 
 		if s.Health.StatusIsOneOf(statuses...) {
@@ -331,14 +334,14 @@ func CheckStateHasHealthStatusOf(statuses ...HealthStatus) CheckStater {
 func CheckStateHasEnableUIInConfig() CheckStater {
 	return func(s *State) error {
 		if s.ConfigSanitized == nil || s.ConfigSanitized.Data == nil {
-			return fmt.Errorf("checking if vault UI is enabled: no configuration data was found in state")
+			return errors.New("checking if vault UI is enabled: no configuration data was found in state")
 		}
 
 		if s.ConfigSanitized.Data.EnableUI {
 			return nil
 		}
 
-		return fmt.Errorf("checking vault UI is enabled: vault UI is disabled")
+		return errors.New("checking vault UI is enabled: vault UI is disabled")
 	}
 }
 
@@ -347,7 +350,7 @@ func CheckStateHasEnableUIInConfig() CheckStater {
 func CheckStateHasMatchingListenerInConfig(listener *ConfigListener) CheckStater {
 	return func(s *State) error {
 		if s.ConfigSanitized == nil || s.ConfigSanitized.Data == nil {
-			return fmt.Errorf("checking if vault config has matching listener: no configuration data was found in state")
+			return errors.New("checking if vault config has matching listener: no configuration data was found in state")
 		}
 
 		for i := range s.ConfigSanitized.Data.Listeners {
@@ -381,7 +384,7 @@ func CheckStateHasMatchingListenerInConfig(listener *ConfigListener) CheckStater
 func CheckStateHasHAActiveNode() CheckStater {
 	return func(s *State) error {
 		if s.HAStatus == nil || s.HAStatus.Data == nil || s.HAStatus.Data.Nodes == nil {
-			return fmt.Errorf("checking vault HA status for active node: no active nodes were found in state")
+			return errors.New("checking vault HA status for active node: no active nodes were found in state")
 		}
 
 		for i := range s.HAStatus.Data.Nodes {
@@ -391,7 +394,7 @@ func CheckStateHasHAActiveNode() CheckStater {
 			}
 		}
 
-		return fmt.Errorf("checking vault HA status for active node: no active nodes were found in state")
+		return errors.New("checking vault HA status for active node: no active nodes were found in state")
 	}
 }
 
@@ -455,7 +458,7 @@ func CheckStateHasMinNRaftVoters(min uint) CheckStater {
 func CheckStateHasRaftLeader() CheckStater {
 	return func(s *State) error {
 		if s.RaftConfig == nil || s.RaftConfig.Data == nil || s.RaftConfig.Data.Config == nil {
-			return fmt.Errorf("checking if vault has a raft leader: no raft config data was found in state")
+			return errors.New("checking if vault has a raft leader: no raft config data was found in state")
 		}
 
 		for i := range s.RaftConfig.Data.Config.Servers {
@@ -465,7 +468,7 @@ func CheckStateHasRaftLeader() CheckStater {
 			}
 		}
 
-		return fmt.Errorf("checking if vault has a raft leader: unable to find raft leader")
+		return errors.New("checking if vault has a raft leader: unable to find raft leader")
 	}
 }
 
@@ -533,14 +536,14 @@ func CheckStateHasMinNAutopilotHealthyNodes(min uint) CheckStater {
 func CheckStateAutopilotIsHealthy() CheckStater {
 	return func(s *State) error {
 		if s.AutopilotState == nil || s.AutopilotState.Data == nil {
-			return fmt.Errorf("checking if vault autopilot is healthy: no autopilot data was found in state")
+			return errors.New("checking if vault autopilot is healthy: no autopilot data was found in state")
 		}
 
 		if s.AutopilotState.Data.Healthy {
 			return nil
 		}
 
-		return fmt.Errorf("checking if vault autopilot is healthy: autopilot is not healthy")
+		return errors.New("checking if vault autopilot is healthy: autopilot is not healthy")
 	}
 }
 
@@ -548,7 +551,7 @@ func CheckStateAutopilotIsHealthy() CheckStater {
 func CheckStateAutopilotHasLeader() CheckStater {
 	return func(s *State) error {
 		if s.AutopilotState == nil || s.AutopilotState.Data == nil {
-			return fmt.Errorf("checking if vault has an autopilot leader: no autopilot data was found in state")
+			return errors.New("checking if vault has an autopilot leader: no autopilot data was found in state")
 		}
 
 		for i := range s.AutopilotState.Data.Servers {
@@ -564,7 +567,7 @@ func CheckStateAutopilotHasLeader() CheckStater {
 			}
 		}
 
-		return fmt.Errorf("checking if vault has an autopilot leader: unable to find autopilot leader")
+		return errors.New("checking if vault has an autopilot leader: unable to find autopilot leader")
 	}
 }
 

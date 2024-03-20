@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 apiVersion: v2
 name: ci-test
 description: A sismple helm chart that can be used in CI.

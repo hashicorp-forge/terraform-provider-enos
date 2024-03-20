@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -235,11 +238,79 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_kubernetes_pods^ datasource can be used to query a kubernetes cluster for pods, using
+label and field selectors. Details on the syntax for label and field selectors can be seen [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
+The query will return a list of ^PodInfo^ objects, which has the following schema:
+
+^^^
+PodInfo{
+  Name       string
+  Namespace  string
+  Containers []string
+}
+^^^
+**Important Note:**
+
+As this is a datasource it will be run during plan time, unless the datasource
+depends on information not available till apply. Therefore, if this datasource is used in a module
+where the kubernetes cluster is being created at the same time, you must make the datasource depend
+either directly or indirectly on the resources required for the cluster to be created and the app
+to be deployed.
+
+Here's an example configuration, with some boilerplate excluded, creates a kind clutser, deploys a
+helm chart and queries for pods:
+
+^^^terraform
+resource "enos_local_kind_cluster" "test" {
+  name            = "test"
+  kubeconfig_path = "./kubeconfig"
+}
+
+resource "helm_release" "test" {
+  name  = "test"
+  chart = "${path.module}/helm/test"
+
+  namespace        = "test"
+  create_namespace = true
+
+  wait = true
+
+  depends_on = [enos_local_kind_cluster.test]
+}
+
+data "enos_kubernetes_pods" "test" {
+  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
+  context_name      = enos_local_kind_cluster.test.context_name
+  namespace         = helm_release.test.namespace
+  label_selectors = [
+    "app.kubernetes.io/instance=ci-test",
+    "app.kubernetes.io/name=ci-test"
+  ]
+}
+
+resource "enos_remote_exec" "create_file" {
+  for_each = data.enos_kubernetes_pods.test.transports
+  inline = ["touch /tmp/some_file"]
+
+  transport = {
+    kubernetes = each.value
+  }
+}
+^^^
+
+In this example, the datasource only runs at apply time due to these implicit dependencies:
+^^^terraform
+  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
+  context_name      = enos_local_kind_cluster.test.context_name
+^^^`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
 					Name:        "kubeconfig_base64",
@@ -250,37 +321,39 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 				},
 				{
 					Name:        "context_name",
-					Description: "The name of the cluster context to connect to",
+					Description: "The name of the cluster context to connect to. The context must exist in cluster",
 					Type:        tftypes.String,
 					Required:    true,
 				},
 				{
 					Name:        "namespace",
-					Description: "The namespace to query the pods in.",
+					Description: "The namespace to query the pods in. If not set we'll query all namespaces",
 					Type:        tftypes.String,
 					Optional:    true,
 				},
 				{
-					Name:        "label_selectors",
-					Description: "Label selectors to use when querying pods, see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
-					Type:        tftypes.List{ElementType: tftypes.String},
-					Optional:    true,
+					Name:            "label_selectors",
+					Description:     "Label selectors to use when querying pods, see [k8s docs](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)",
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Type:            tftypes.List{ElementType: tftypes.String},
+					Optional:        true,
 				},
 				{
-					Name:        "field_selectors",
-					Description: "Field selectors to use when querying pods, see https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/",
-					Type:        tftypes.List{ElementType: tftypes.String},
-					Optional:    true,
+					Name:            "field_selectors",
+					Description:     "Field selectors to use when querying pods, see [k8s docs](https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/)",
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Type:            tftypes.List{ElementType: tftypes.String},
+					Optional:        true,
 				},
 				{
 					Name:        "expected_pod_count",
-					Description: "The number of pods that are expected to be found matching the query.",
+					Description: "The number of pods that are expected to be found matching the query",
 					Type:        tftypes.Number,
 					Optional:    true,
 				},
 				{
 					Name:        "wait_timeout",
-					Description: "The amount of time to wait for the pods found in the query to be in the 'Running' state. If not provided a default of 1m will be used.",
+					Description: "The amount of time to wait for the pods found in the query to be in the 'Running' state. If not provided a default of 1m will be used",
 					Type:        tftypes.String,
 					Optional:    true,
 				},
@@ -291,11 +364,11 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 					Computed:    true,
 				},
 				{
-					Name: "transports",
-					Description: "A list of transport blocks for all the pods (and their containers) that match the search. " +
-						"The values can be used for the transport argument of any resource that requires Kubernetes transport.",
-					Type:     s.Transports.TFType(),
-					Computed: true,
+					Name:            "transports",
+					DescriptionKind: k8sTransportDescriptionKind,
+					Description:     k8sTransportDescription,
+					Type:            s.Transports.TFType(),
+					Computed:        true,
 				},
 			},
 		},

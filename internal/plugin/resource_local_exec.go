@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -250,59 +253,84 @@ func (s *localExecStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The enos local exec resource is capable of running scripts or commands locally.
+
+^^^hcl
+resource "enos_local_exec" "foo" {
+  environment = {
+    FOO = "foo"
+  }
+
+  inline  = ["touch /tmp/inline.txt"]
+  scripts = ["/local/path/to/script.sh"]
+  content = data.template_file.some_template.rendered
+}
+^^^
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "sum",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "sum",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "A digest of the inline commands, source files, and environment variables. If the sum changes between runs all commands will execute again",
 				},
 				{
 					Name: "environment",
 					Type: tftypes.Map{
 						ElementType: tftypes.String,
 					},
-					Optional:  true,
-					Sensitive: true,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "A map of key/value pairs to set as environment variable before running the commands or scripts. These values will be exported as environment variables when the commands are executed",
 				},
 				{
-					Name:     "inherit_environment",
-					Type:     tftypes.Bool,
-					Optional: true,
+					Name:        "inherit_environment",
+					Type:        tftypes.Bool,
+					Optional:    true,
+					Description: "Whether to inherit the all the environment variables of the current shell when running the local exec script",
 				},
 				{
 					Name: "inline",
 					Type: tftypes.List{
 						ElementType: tftypes.String,
 					},
-					Optional: true,
+					Optional:    true,
+					Description: "An array of commands to run",
 				},
 				{
 					Name: "scripts",
 					Type: tftypes.List{
 						ElementType: tftypes.String,
 					},
-					Optional: true,
+					Optional:    true,
+					Description: "An array of paths to scripts to run",
 				},
 				{
-					Name:      "content",
-					Type:      tftypes.String,
-					Optional:  true,
-					Sensitive: true,
+					Name:        "content",
+					Type:        tftypes.String,
+					Optional:    true,
+					Sensitive:   true,
+					Description: "A string that represents a script body to execute",
 				},
 				{
-					Name:     "stderr",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "stderr",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The aggregate STDERR of all inline commnads, scripts, or content. If nothing is output this value will be set to a blank string",
 				},
 				{
-					Name:     "stdout",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "stdout",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The aggregate STDOUT of all inline commnads, scripts, or content. If nothing is output this value will be set to a blank string",
 				},
 			},
 		},

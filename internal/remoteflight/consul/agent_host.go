@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
@@ -76,11 +79,11 @@ func GetAgentHost(ctx context.Context, tr it.Transport, req *AgentHostRequest) (
 	res := &AgentHostResponse{Host: &AgentHostResponseHost{}}
 
 	if req.FlightControlPath == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply an enos-flight-control path"))
+		err = errors.Join(err, errors.New("you must supply an enos-flight-control path"))
 	}
 
 	if req.ConsulAddr == "" {
-		err = errors.Join(err, fmt.Errorf("you must supply a consul listen address"))
+		err = errors.Join(err, errors.New("you must supply a consul listen address"))
 	}
 
 	if err == nil {
@@ -98,14 +101,14 @@ func GetAgentHost(ctx context.Context, tr it.Transport, req *AgentHostRequest) (
 
 		// Deserialize the body onto our response.
 		if stdout == "" {
-			err = errors.Join(err, fmt.Errorf("no JSON body was written to STDOUT"))
+			err = errors.Join(err, errors.New("no JSON body was written to STDOUT"))
 		} else {
 			err = errors.Join(err, json.Unmarshal([]byte(stdout), res))
 		}
 	}
 
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("read /v1/agent/host"), err)
+		return nil, errors.Join(errors.New("read /v1/agent/host"), err)
 	}
 
 	return res, nil

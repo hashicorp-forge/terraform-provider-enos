@@ -1,8 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package boundary
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -132,10 +136,10 @@ func WithInitRequestLicense(license string) InitRequestOpt {
 // Validate validates that the init request has the required fields.
 func (r *InitRequest) Validate() error {
 	if r.BinPath == "" {
-		return fmt.Errorf("no binary path has been supplied")
+		return errors.New("no binary path has been supplied")
 	}
 	if r.ConfigPath == "" {
-		return fmt.Errorf("no config path has been supplied")
+		return errors.New("no config path has been supplied")
 	}
 	// License is optional for OSS, required for Enterprise
 	return nil
@@ -169,7 +173,7 @@ func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse
 	}
 
 	if stdout == "" {
-		return res, fmt.Errorf("boundary init failed to return output")
+		return res, errors.New("boundary init failed to return output")
 	}
 
 	err = json.Unmarshal([]byte(stdout), &res)

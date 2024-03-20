@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package plugin
 
 import (
@@ -324,48 +327,85 @@ func (s *hostInfoStateV1) Schema() *tfprotov6.Schema {
 	return &tfprotov6.Schema{
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
+			DescriptionKind: tfprotov6.StringKindMarkdown,
+			Description: docCaretToBacktick(`
+The ^enos_host_info^ resource can be used to determine information about a target host. While it is intended
+to be used against SSH targets, if the required utilities are present in a container other transports ought
+to work as well.
+
+resource "enos_host_info" "target" {
+  transport = {
+    ssh = {
+      host = "192.168.0.1"
+    }
+  }
+}
+
+resource "enos_remote_exec" "install_my_thing" {
+	environment = {
+	  DISTRO         = enos_host_info.target.distro
+	  DISTRO_VERSION = enos_host_info.target.distro_version
+	}
+
+  scripts = ["/my/thing/installer.sh"]
+
+  transport = {
+    ssh = {
+      host = "192.168.0.1"
+    }
+  }
+}
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
-					Name:     "id",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "id",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: resourceStaticIDDescription,
 				},
 				{
-					Name:     "arch",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "arch",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The machine architecture of the target. Equivalent of uname -m",
 				},
 				{
-					Name:     "distro",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "distro",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The software distribution of the target. Equivalent of /etc/os-release or lsb_release",
 				},
 				{
-					Name:     "distro_version",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "distro_version",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The software distribution version of the target. Equivalent of /etc/os-release or lsb_release",
 				},
 				{
-					Name:     "hostname",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "hostname",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The local hostname of the target. Equivalent of uname -n",
 				},
 				{
-					Name:     "pid1",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "pid1",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The process manager of the target. Equivalent of ps -p 1 -c -o command=",
 				},
 				{
-					Name:     "platform",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "platform",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The platform of the target. Equivalent of uname -s",
 				},
 				{
-					Name:     "platform_version",
-					Type:     tftypes.String,
-					Computed: true,
+					Name:        "platform_version",
+					Type:        tftypes.String,
+					Computed:    true,
+					Description: "The platform version of the target. Equivalent of uname -r",
 				},
-				s.Transport.SchemaAttributeTransport(),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}

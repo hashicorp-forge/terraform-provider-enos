@@ -1,7 +1,11 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -38,15 +42,15 @@ func snakeToCamel(str string) string {
 
 func newTemp(name string) Temp {
 	tmp := Temp{BaseName: name}
-	tmp.Name = fmt.Sprintf("enos_%s", tmp.BaseName)
+	tmp.Name = "enos_" + tmp.BaseName
 
 	camel := snakeToCamel(tmp.BaseName)
 	f, n := utf8.DecodeRuneInString(camel)
 
 	tmp.Struct = string(unicode.ToLower(f)) + camel[n:]
 	tmp.StructCap = string(unicode.ToUpper(f)) + camel[n:]
-	tmp.State = fmt.Sprintf("%sStateV1", tmp.Struct)
-	tmp.StateCap = fmt.Sprintf("%sStateV1", tmp.StructCap)
+	tmp.State = tmp.Struct + "StateV1"
+	tmp.StateCap = tmp.StructCap + "StateV1"
 
 	return tmp
 }
@@ -59,11 +63,11 @@ func main() {
 
 	flag.Parse()
 	if *name == "" {
-		exit(fmt.Errorf("you must provide a name"))
+		exit(errors.New("you must provide a name"))
 	}
 
 	if *pluginType != "resource" && *pluginType != "datasource" {
-		exit(fmt.Errorf("you must provide a valid source type: 'resource' or 'datasource'"))
+		exit(errors.New("you must provide a valid source type: 'resource' or 'datasource'"))
 	}
 
 	temp := newTemp(*name)
