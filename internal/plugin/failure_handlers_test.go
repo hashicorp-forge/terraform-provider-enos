@@ -14,16 +14,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/nomad"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/mock"
 	"github.com/hashicorp/nomad/api"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/nomad"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/mock"
 )
 
 type mockSystemdClient struct {

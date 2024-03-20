@@ -1,6 +1,6 @@
-module github.com/hashicorp/enos-provider
+module github.com/hashicorp-forge/terraform-provider-enos
 
-go 1.21
+go 1.22
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2

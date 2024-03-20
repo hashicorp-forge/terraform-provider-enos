@@ -10,9 +10,9 @@ import (
 
 	"github.com/blang/semver"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // Version takes a context, transport, and path to the vault binary on a

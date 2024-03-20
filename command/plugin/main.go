@@ -6,9 +6,10 @@ package main
 import (
 	flag "github.com/spf13/pflag"
 
-	"github.com/hashicorp/enos-provider/internal/plugin"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6/tf6server"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/plugin"
 )
 
 const defaultProviderName = "app.terraform.io/hashicorp-qti/enos"

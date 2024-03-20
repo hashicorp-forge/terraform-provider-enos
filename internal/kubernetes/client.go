@@ -26,11 +26,11 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
 
-	"github.com/hashicorp/enos-provider/internal/retry"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/hashicorp/enos-provider/tools/publish/pkg/publish"
+	"github.com/hashicorp-forge/terraform-provider-enos/tools/publish/pkg/publish"
 )
 
 var tfcUploadCfg = &publish.TFCUploadReq{}

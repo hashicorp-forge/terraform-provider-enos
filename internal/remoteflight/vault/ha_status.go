@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // HAStatusResponse is the JSON stdout result of /v1/sys/ha-status.

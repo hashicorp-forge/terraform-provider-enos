@@ -25,7 +25,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/mod/sumdb/dirhash"
 
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // NewArtifacts takes the name of the terraform provider and returns a new

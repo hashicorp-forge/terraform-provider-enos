@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // TestSSH tests the SSH transport.

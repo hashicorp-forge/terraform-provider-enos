@@ -6,7 +6,7 @@ package kubernetes
 import (
 	"context"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // MockClient a mock Kubernetes Client.

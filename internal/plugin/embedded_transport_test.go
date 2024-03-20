@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )

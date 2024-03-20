@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 func TestProviderSchemaMarshalRoundtrip(t *testing.T) {

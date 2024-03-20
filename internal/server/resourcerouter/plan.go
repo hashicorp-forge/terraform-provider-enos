@@ -7,10 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 // PlanResourceChangeRequest An adapter type that mirrors the type tfproto6.PlanResourceChangeRequest

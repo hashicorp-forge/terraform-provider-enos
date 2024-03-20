@@ -14,8 +14,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
 )
 
 func TestCheckStateHasSystemdEnabledAndRunningProperties(t *testing.T) {

@@ -6,7 +6,7 @@ package file
 import (
 	"errors"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // errorCopyable implement Copyable and throws an error on read and seek methods.

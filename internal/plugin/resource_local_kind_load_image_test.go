@@ -12,11 +12,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/hashicorp/enos-provider/internal/docker"
-	"github.com/hashicorp/enos-provider/internal/kind"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/docker"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kind"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 )
 
 var (

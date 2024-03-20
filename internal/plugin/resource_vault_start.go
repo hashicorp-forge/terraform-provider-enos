@@ -14,20 +14,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/hcl"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/vault"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 const (

@@ -9,15 +9,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/docker"
-	"github.com/hashicorp/enos-provider/internal/kind"
-	"github.com/hashicorp/enos-provider/internal/log"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/docker"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kind"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 type kindClientFactory func(logger log.Logger) kind.Client

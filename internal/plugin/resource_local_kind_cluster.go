@@ -15,20 +15,21 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cmd"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 
-	"github.com/hashicorp/enos-provider/internal/kind"
-	"github.com/hashicorp/enos-provider/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kind"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 )
 
 type localKindCluster struct {

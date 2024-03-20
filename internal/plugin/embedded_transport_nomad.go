@@ -10,10 +10,11 @@ import (
 	"strings"
 	"text/template"
 
-	nomadapi "github.com/hashicorp/enos-provider/internal/nomad"
-	"github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/nomad"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	nomadapi "github.com/hashicorp-forge/terraform-provider-enos/internal/nomad"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/nomad"
 )
 
 type nomadClientFactory func(cfg nomadapi.ClientCfg) (nomadapi.Client, error)

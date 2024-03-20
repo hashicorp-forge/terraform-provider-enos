@@ -8,10 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 var transportUtil = &transportResourceUtil{}

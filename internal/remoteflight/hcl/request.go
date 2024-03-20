@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // CreateHCLConfigFileRequest is an HCL config create request.

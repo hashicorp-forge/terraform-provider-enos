@@ -12,10 +12,11 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // transportClientFactory Factory function for creating transport clients, can be overridden in tests.

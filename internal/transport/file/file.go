@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 type copyableFile struct {

@@ -10,14 +10,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/nomad"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/nomad"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
 )
 
 // FailureHandler A function that can be used to handle state plan/apply failures and enhance

@@ -10,14 +10,15 @@ import (
 
 	"github.com/asaskevich/govalidator"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 
-	"github.com/hashicorp/enos-provider/internal/artifactory"
-	"github.com/hashicorp/enos-provider/internal/server/datarouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/artifactory"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
 )
 
 type artifactoryItem struct {
