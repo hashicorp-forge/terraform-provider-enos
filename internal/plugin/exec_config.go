@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // execConfig User provided configuration for an exec Resource.

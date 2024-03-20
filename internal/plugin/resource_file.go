@@ -9,14 +9,15 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 type file struct {
@@ -250,22 +251,6 @@ over an Enos transport.
 
 When an SSH transport is used the resource is also capable of using the SSH agent. It will attempt
 to connect to the agent socket as defined with the ^SSH_AUTH_SOCK^ environment variable.
-
-^^^hcl
-resource "enos_file" "foo" {
-  source      = "/local/path/to/file.txt"
-  destination = "/remote/destination/file.txt"
-  content     = data.template_file.some_template.rendered
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -317,7 +302,7 @@ resource "enos_file" "foo" {
 					Description: "Configure the destination file owner",
 					Optional:    true,
 				},
-				fs.Transport.SchemaAttributeTransport(supportsAll),
+				fs.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 			},
 		},
 	}

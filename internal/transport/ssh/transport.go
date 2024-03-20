@@ -18,7 +18,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // Opt is a functional option for the SSH transport.

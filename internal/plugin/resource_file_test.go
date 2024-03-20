@@ -10,9 +10,10 @@ import (
 	"testing"
 	"text/template"
 
-	state "github.com/hashicorp/enos-provider/internal/server/state"
-	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+
+	state "github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

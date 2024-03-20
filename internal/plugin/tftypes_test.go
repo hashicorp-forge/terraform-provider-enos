@@ -6,7 +6,6 @@ package plugin
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -487,8 +486,8 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 			t.Parallel()
 			objs := test.in()
 			if !objs.TFValue().Equal(test.value) {
-				t.Log(spew.Sdump(objs.TFValue()))
-				t.Log(spew.Sdump(test.value))
+				t.Logf("%+v", objs.TFValue())
+				t.Logf("%+v", test.value)
 				t.FailNow()
 			}
 			require.True(t, objs.TFValue().Equal(test.value))

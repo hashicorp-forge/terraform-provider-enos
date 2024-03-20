@@ -9,7 +9,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
 )
 
 // CheckStateHasStatusCode checks that the vault status code matches the given code.

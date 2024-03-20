@@ -8,8 +8,8 @@ import (
 
 	"github.com/mitchellh/cli"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/download"
-	"github.com/hashicorp/enos-provider/internal/flightcontrol/zip"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/flightcontrol/download"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/flightcontrol/zip"
 )
 
 var ui = &cli.BasicUi{

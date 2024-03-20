@@ -9,9 +9,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/server"
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -61,7 +61,7 @@ func (p *Provider) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			Version: 1,
 			Attributes: []*tfprotov6.SchemaAttribute{
-				p.config.Transport.SchemaAttributeTransport(supportsAll),
+				p.config.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				{
 					Name:     "debug_data_root_dir",
 					Type:     tftypes.String,

@@ -5,13 +5,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/hashicorp/enos-provider/tools/publish/pkg/publish"
+	"github.com/hashicorp-forge/terraform-provider-enos/tools/publish/pkg/publish"
 )
 
 var tfcUploadCfg = &publish.TFCUploadReq{}
@@ -63,11 +62,4 @@ func runTFCUploadCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(publish.PublishToTFC(ctx, tfcUploadCfg))
 
 	os.Exit(0)
-}
-
-func exitIfErr(err error) {
-	if err != nil {
-		fmt.Printf("ERROR: %s", err.Error())
-		os.Exit(1)
-	}
 }

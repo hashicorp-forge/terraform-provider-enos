@@ -9,9 +9,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // AgentHostRequest is a consul /v1/agent/host request.

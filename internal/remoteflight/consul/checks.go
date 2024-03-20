@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
 )
 
 // CheckStateHasSystemdEnabledAndRunningProperties checks that the consul systemd service

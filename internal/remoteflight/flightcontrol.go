@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/hashicorp/enos-provider/internal/flightcontrol"
-	"github.com/hashicorp/enos-provider/internal/retry"
-	"github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/flightcontrol"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // DefaultFlightControlPath is the default location of our binary.

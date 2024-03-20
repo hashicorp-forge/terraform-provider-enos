@@ -11,19 +11,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/consul"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/consul"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/hcl"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 type consulStart struct {
@@ -241,8 +242,6 @@ func (s *consulStartStateV1) Schema() *tfprotov6.Schema {
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
 The ^enos_consul_start^ resource is capable of configuring a Consul service on a host. It handles creating the necessary configuration, configures licensing for Consul Enteprise, can manage systemd for install bundles, and starts the consul service.
-
-# TODO(consul) add an example
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -262,18 +261,16 @@ The ^enos_consul_start^ resource is capable of configuring a Consul service on a
 					Type:            s.Config.Terraform5Type(),
 					Optional:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
-					Description: `
-|key|type|description|
-|config|object|The consul configuration object|
-|config.bind_addr|string|The Consul [bind_addr](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr) value|
-|config.datacenter|string|The Consul [datacenter](https://developer.hashicorp.com/consul/docs/agent/config/config-files#datacenter) value|
-|config.data_dir|string|The Consul [data_dir](https://developer.hashicorp.com/consul/docs/agent/config/config-files#data_dir) value|
-|config.retry_join|[]string|The Consul [retry_join](https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join) value|
-|config.bootstrap_expect|number|The Consul [bootstrap_expect](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bootstrap_expect) value|
-|config.server|bool|The Consul [server](https://developer.hashicorp.com/consul/docs/agent/config/config-files#server_rpc_port) value|
-|config.log_file|string|The Consul [log_file](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_file) value|
-|config.log_level|string|The Consul [log_level](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_level) value|
-`,
+					Description: docCaretToBacktick(`
+- ^config.bind_addr^ (String) The Consul [bind_addr](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr) value
+- ^config.datacenter^ (String) The Consul [datacenter](https://developer.hashicorp.com/consul/docs/agent/config/config-files#datacenter) value
+- ^config.data_dir^ (String) The Consul [data_dir](https://developer.hashicorp.com/consul/docs/agent/config/config-files#data_dir) value
+- ^config.retry_join^ (List of String) The Consul [retry_join](https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join) value
+- ^config.bootstrap_expect^ (Number) The Consul [bootstrap_expect](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bootstrap_expect) value
+- ^config.server^ (Bool) The Consul [server](https://developer.hashicorp.com/consul/docs/agent/config/config-files#server_rpc_port) value
+- ^config.log_file^ (String) The Consul [log_file](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_file) value
+- ^config.log_level^ (String) The Consul [log_level](https://developer.hashicorp.com/consul/docs/agent/config/config-files#log_level) value
+`),
 				},
 				{
 					Name:        "config_dir", // where to write consul config

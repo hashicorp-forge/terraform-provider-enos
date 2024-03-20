@@ -1,0 +1,65 @@
+---
+name: run-samples
+
+on:
+  workflow_dispatch:
+    inputs:
+      download:
+        type: string
+        required: false
+      max:
+        type: number
+        default: 8
+      min:
+        type: number
+        default: 1
+      sample-name:
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      download:
+        type: string
+        required: false
+      max:
+        type: number
+        default: 8
+      min:
+        type: number
+        default: 1
+      sample-name:
+        required: true
+        type: string
+
+jobs:
+  sample:
+    name: sample observe
+    runs-on: ubuntu-latest
+    outputs:
+      sample: ${{ steps.metadata.outputs.sample }}
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - id: metadata
+        run: |
+          sample_seed=$(date +%s%N)
+          sample=$(enos scenario sample observe ${{ inputs.sample-name }} --chdir ./enos --min ${{ inputs.min }} --max ${{ inputs.max }} --seed "${sample_seed}" --format json | jq -c ".observation.elements")
+          {
+            echo "sample=${sample}"
+            echo "sample-seed=${sample_seed}" # This isn't used outside of here but is nice to know for duplicating observations
+          } | tee -a "$GITHUB_OUTPUT"
+
+  run:
+    needs: sample
+    name: run ${{ matrix.scenario.id.filter }}
+    strategy:
+      fail-fast: false # don't fail as that can skip required cleanup steps for jobs
+      matrix:
+        include: ${{ fromJSON(needs.sample.outputs.sample) }}
+    uses: ./.github/workflows/run-scenario.yml
+    secrets: inherit
+    with:
+      scenario-filter: ${{ matrix.scenario.id.filter }}
+      download: ${{ inputs.download }}

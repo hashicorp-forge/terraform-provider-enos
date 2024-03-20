@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // UnzipRequest performs a remote flight control unzip.

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/retry"
-	"github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // DownloadRequest performs a remote flight control download.

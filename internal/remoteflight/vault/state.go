@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	"github.com/hashicorp/enos-provider/internal/retry"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/k8s"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/k8s"
 )
 
 // State represents the state of a node in a vault cluster.

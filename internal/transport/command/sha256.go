@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // SHA256 returns the SHA256 sum of the command.

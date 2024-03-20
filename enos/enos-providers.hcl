@@ -37,15 +37,9 @@ provider "helm" "kind_dev" {
   }
 }
 
-provider "helm" "kind_enos" {
+provider "helm" "kind_prod" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_kind_enos"))
-  }
-}
-
-provider "helm" "kind_enosdev" {
-  kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_kind_enosdev"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_kind_prod"))
   }
 }
 
@@ -55,15 +49,9 @@ provider "helm" "ce_dev" {
   }
 }
 
-provider "helm" "ce_enos" {
+provider "helm" "ce_prod" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_ce_enos"))
-  }
-}
-
-provider "helm" "ce_enosdev" {
-  kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_ce_enosdev"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_ce_prod"))
   }
 }
 
@@ -73,15 +61,9 @@ provider "helm" "ent_dev" {
   }
 }
 
-provider "helm" "ent_enos" {
+provider "helm" "ent_prod" {
   kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_ent_enos"))
-  }
-}
-
-provider "helm" "ent_enosdev" {
-  kubernetes {
-    config_path = abspath(joinpath(path.root, "kubeconfig_ent_enosdev"))
+    config_path = abspath(joinpath(path.root, "kubeconfig_ent_prod"))
   }
 }
 

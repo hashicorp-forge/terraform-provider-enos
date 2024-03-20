@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 module "aws_infra" {
-  source = "app.terraform.io/hashicorp-qti/aws-infra/enos"
+  source = "./modules/infra"
 
   project_name = "enos-provider"
   environment  = "ci"
@@ -10,7 +10,7 @@ module "aws_infra" {
 }
 
 module "aws_ssh_consul_cluster" {
-  // source = "app.terraform.io/hashicorp-qti/aws-consul/enos"
+  // source = "registry.terraform.io/hashicorp-forge/aws-consul/enos"
   // source = "../../terraform-enos-aws-consul"
   source = "./modules/aws_ssh_consul_cluster"
 
@@ -23,32 +23,10 @@ module "aws_ssh_consul_cluster" {
   consul_release = var.consul_release
 }
 
-module "aws_ssh_consul_cluster_enosdev" {
-  source = "./modules/aws_ssh_consul_cluster_enosdev"
-
-  project_name    = "enos-provider"
-  environment     = "ci"
-  common_tags     = var.tags
-  ssh_aws_keypair = "enos-ci-ssh-key"
-
-
-  consul_license = null
-  consul_release = var.consul_release
-}
-
 module "aws_ssh_vault_cluster" {
-  // source = "app.terraform.io/hashicorp-qti/aws-vault/enos"
+  // source = "registry.terraform.io/hashicorp-forge/aws-vault/enos"
   // source = "../../terraform-enos-aws-vault"
   source = "./modules/aws_ssh_vault_cluster"
-
-  project_name    = "enos-provider"
-  environment     = "ci"
-  common_tags     = var.tags
-  ssh_aws_keypair = "enos-ci-ssh-key"
-}
-
-module "aws_ssh_vault_cluster_enosdev" {
-  source = "./modules/aws_ssh_vault_cluster_enosdev"
 
   project_name    = "enos-provider"
   environment     = "ci"
@@ -63,10 +41,6 @@ module "az_finder" {
 
 module "create_kind_cluster" {
   source = "./modules/create_kind_cluster"
-}
-
-module "create_kind_cluster_enosdev" {
-  source = "./modules/create_kind_cluster_enosdev"
 }
 
 module "create_vpc" {
@@ -103,30 +77,14 @@ module "k8s_deploy_vault" {
   vault_instance_count = var.instance_count
 }
 
-module "k8s_deploy_vault_enosdev" {
-  source = "./modules/k8s_deploy_vault_enosdev"
-
-  vault_instance_count = var.instance_count
-}
-
 module "k8s_verify_write_data" {
   source = "./modules/k8s_vault_verify_write_data"
 
   vault_instance_count = var.instance_count
 }
 
-module "k8s_verify_write_data_enosdev" {
-  source = "./modules/k8s_vault_verify_write_data_enosdev"
-
-  vault_instance_count = var.instance_count
-}
-
 module "kind_create_test_cluster" {
   source = "./modules/kind_create_test_cluster"
-}
-
-module "kind_create_test_cluster_enosdev" {
-  source = "./modules/kind_create_test_cluster_enosdev"
 }
 
 module "read_file" {
@@ -153,8 +111,4 @@ module "test_host_info" {
 
 module "test_kind_container" {
   source = "./modules/test_kind_container"
-}
-
-module "test_kind_container_enosdev" {
-  source = "./modules/test_kind_container_enosdev"
 }

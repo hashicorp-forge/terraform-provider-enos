@@ -6,8 +6,9 @@ package plugin
 import (
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 type TFType interface {

@@ -6,7 +6,7 @@ package systemd
 import (
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
 )
 
 type GetUnitJournalRequest struct {

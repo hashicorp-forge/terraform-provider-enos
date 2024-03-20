@@ -25,7 +25,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/mod/sumdb/dirhash"
 
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // NewArtifacts takes the name of the terraform provider and returns a new
@@ -43,13 +43,14 @@ func NewArtifacts(name string) *Artifacts {
 
 // Artifacts is a collection of all the artifacts in the repository.
 type Artifacts struct {
-	providerName string
-	idx          *Index
-	releases     map[string]*Release // version -> release
-	mu           sync.Mutex
-	log          *zap.SugaredLogger
-	dir          string
-	tfcMetadata  map[string][]*TFCRelease // version -> []TFCRelease
+	providerName     string
+	idx              *Index
+	releases         map[string]*Release // version -> release
+	mu               sync.Mutex
+	log              *zap.SugaredLogger
+	dir              string
+	tfcMetadata      map[string][]*TFCRelease // version -> []TFCRelease
+	registryManifest *RegistryManifest
 }
 
 // TFCRelease is a collection of TFC release zip binary, platform, architecture,
@@ -75,6 +76,7 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	}
 	defer zipFile.Close()
 
+	// Add the binary to the archive
 	sourceFile, err := os.Open(sourceBinaryPath)
 	if err != nil {
 		return err
@@ -105,6 +107,8 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 		return err
 	}
 
+	// If we have a registry manifest we need to create that as well
+
 	return zipper.Close()
 }
 
@@ -126,6 +130,50 @@ func (a *Artifacts) SHA256Sum(path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", sha256.Sum256(bytes)), nil
+}
+
+// RegistryManifest is the public registry manifest
+// https://developer.hashicorp.com/terraform/registry/providers/publishing#terraform-registry-manifest-file
+type RegistryManifest struct {
+	Version  json.Number `json:"version,omitempty"`
+	Metadata struct {
+		ProtocolVersions []json.Number `json:"protocol_versions,omitempty"`
+	} `json:"metadata,omitempty"`
+	// The rest of the fields we track internally but don't marshal to and from the base and versioned manifest
+	sha256sum     string
+	versionedPath string
+}
+
+// Add the base release manifest into the artifacts.
+func (a *Artifacts) AddReleaseManifest(ctx context.Context, path, version string) error {
+	p, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	man := &RegistryManifest{
+		versionedPath: filepath.Join(a.dir, a.providerName+"_"+version+"_manifest.json"),
+		sha256sum:     fmt.Sprintf("%x", sha256.Sum256(bytes)),
+	}
+	err = json.Unmarshal(bytes, man)
+	if err != nil {
+		return err
+	}
+
+	a.registryManifest = man
+
+	return nil
 }
 
 // AddBinary takes version, platform, arch, and path of a binary and adds it to
@@ -231,7 +279,32 @@ func (a *Artifacts) WriteMetadata() error {
 	return nil
 }
 
-// WriteSHA256SUMS writes the release SHA256SUMS file as required by the TFC.
+func (a *Artifacts) CreateVersionedRegistryManifest(ctx context.Context) error {
+	if a.registryManifest == nil {
+		return errors.New("cannot create a versioned registry manifest unless the base version has been loaded")
+	}
+
+	body, err := json.Marshal(a.registryManifest)
+	if err != nil {
+		return err
+	}
+
+	a.log.Infow(
+		"creating registry manifest",
+		"path", a.registryManifest.versionedPath,
+	)
+
+	f, err := os.Create(a.registryManifest.versionedPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(body)
+
+	return err
+}
+
+// WriteSHA256SUMS writes the release SHA256SUMS file as required by TFC or the public registry.
 func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, sign bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -252,9 +325,18 @@ func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, si
 		}
 		defer shaFile.Close()
 
+		// If we have a registry manifest then add it to the sums
+		if a.registryManifest != nil {
+			_, err := fmt.Fprintf(shaFile, "%s %s\n", a.registryManifest.sha256sum, filepath.Base(a.registryManifest.versionedPath))
+			if err != nil {
+				return err
+			}
+		}
+
+		// Add all the binaries
 		for _, release := range releases {
 			a.log.Infow(
-				"add zip SHA256 to SHASUMS file",
+				"adding zip SHA256 to SHASUMS file",
 				"file", shaPath,
 				"zip", filepath.Base(release.ZipFilePath),
 			)
@@ -268,6 +350,7 @@ func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, si
 			continue
 		}
 
+		// Sign it
 		sigPath := filepath.Join(a.dir, version+"_SHA256SUMS.sig")
 		err = a.WriteDetachedSignature(ctx, shaPath, sigPath, identityName)
 		if err != nil {
@@ -681,6 +764,39 @@ func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Clie
 		_, err = uploader.Upload(ctx, input)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// PublishToGithubReleases publishes the local mirror artifacts to Github Releases in a manner
+// that is compatible with the public Github registry.
+func (a *Artifacts) PublishToGithubRelease(ctx context.Context, req *GithubReleaseCreateReq) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.log.Infow("publishing local artifacts as a Github release")
+
+	client := newGithubClient(
+		withGithubLog(a.log),
+	)
+	rel, _, err := client.createRelease(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	err = client.uploadAsset(ctx, req, rel, a.registryManifest.versionedPath)
+	if err != nil {
+		return err
+	}
+
+	for _, releases := range a.tfcMetadata {
+		for r := range releases {
+			err := client.uploadAsset(ctx, req, rel, releases[r].ZipFilePath)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

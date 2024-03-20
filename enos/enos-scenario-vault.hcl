@@ -7,9 +7,21 @@ scenario "vault" {
     distro        = ["ubuntu", "rhel"]
     arch          = ["amd64", "arm64"]
     edition       = ["ce", "ent"]
-    version       = ["1.8.12", "1.9.10", "1.10.11", "1.11.10", "1.12.6", "1.13.2"]
+    version       = ["1.8.12", "1.9.10", "1.10.11", "1.11.12", "1.12.11", "1.13.13", "1.14.10", "1.15.5"]
     unseal_method = ["shamir", "awskms"]
-    use           = ["dev", "enos", "enosdev"]
+    use           = ["dev", "prod"]
+
+    exclude {
+      backend = ["consul"]
+      # Don't test super old versions with consul because it can be flaky
+      version = ["1.8.12", "1.9.10", "1.10.11"]
+    }
+
+    exclude {
+      unseal_method = ["shamir"]
+      # Don't test super old versions with shamir because it can be flaky
+      version = ["1.8.12", "1.9.10", "1.10.11"]
+    }
   }
 
   locals {
@@ -25,7 +37,6 @@ scenario "vault" {
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
-  terraform     = matrix.use == "enosdev" ? "enosdev" : "default"
   providers = [
     provider.aws.default,
     provider.enos.ubuntu,
@@ -81,7 +92,7 @@ scenario "vault" {
     depends_on = [
       step.infra,
     ]
-    module = matrix.use == "enosdev" ? module.aws_ssh_consul_cluster_enosdev : module.aws_ssh_consul_cluster
+    module = module.aws_ssh_consul_cluster
 
     providers = {
       enos = provider.enos.ubuntu
@@ -101,7 +112,7 @@ scenario "vault" {
     depends_on = [
       step.backend,
     ]
-    module = matrix.use == "enosdev" ? module.aws_ssh_vault_cluster_enosdev : module.aws_ssh_vault_cluster
+    module = module.aws_ssh_vault_cluster
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -128,7 +139,7 @@ scenario "vault" {
     depends_on = [
       step.infra,
     ]
-    module = matrix.use == "enosdev" ? module.aws_ssh_vault_cluster_enosdev : module.aws_ssh_vault_cluster
+    module = module.aws_ssh_vault_cluster
 
     providers = {
       enos = local.enos_provider[matrix.distro]

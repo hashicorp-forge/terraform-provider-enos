@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // KnownServices are list of known HashiCorp services.

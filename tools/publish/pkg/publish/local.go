@@ -133,6 +133,23 @@ func (l *Local) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Client, 
 	return l.artifacts.PublishToRemoteBucket(ctx, s3Client, bucket, providerID)
 }
 
+// Add public registry manifest path to the local mirror. If present we'll inject in into the
+// provider binary archives.
+func (l *Local) AddReleaseManifest(ctx context.Context, path, version string) error {
+	return l.artifacts.AddReleaseManifest(ctx, path, version)
+}
+
+// Create a versions registry manifest.
+func (l *Local) CreateVersionedRegistryManifest(ctx context.Context) error {
+	return l.artifacts.CreateVersionedRegistryManifest(ctx)
+}
+
+// PublishToGithubReleases publishes the local mirror artifacts to Github Releases in a manner
+// that is compatible with the public Github registry.
+func (l *Local) PublishToGithubReleases(ctx context.Context, req *GithubReleaseCreateReq) error {
+	return l.artifacts.PublishToGithubRelease(ctx, req)
+}
+
 // WriteMetadata writes metadata JSON files of the mirror artifacts.
 func (l *Local) WriteMetadata() error {
 	l.mu.Lock()

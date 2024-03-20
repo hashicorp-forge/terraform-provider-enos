@@ -9,9 +9,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/hashicorp/enos-provider/internal/server/datarouter"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 )
 
 // Server is our gRPC ProviderServer.

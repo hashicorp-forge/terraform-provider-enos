@@ -14,15 +14,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
-	"github.com/hashicorp/enos-provider/internal/transport/ssh"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/ssh"
 
-	"github.com/hashicorp/enos-provider/internal/transport/mock"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/mock"
 
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )

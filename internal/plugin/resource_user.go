@@ -8,12 +8,13 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 type user struct {
@@ -345,18 +346,6 @@ func (u *userStateV1) Schema() *tfprotov6.Schema {
 The ^enos_user^ resource can be used to create a local user on a target machine. While it was intended
 to be used for SSH targets, if the container allows local user creation and has the useradd utility
 it might work for running containers.
-
-resource "enos_user" "vault" {
-  name     = "vault"
-  home_dir = "/etc/vault.d"
-  shell    = "/bin/false"
-
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

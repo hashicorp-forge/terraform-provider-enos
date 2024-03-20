@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/random"
-	"github.com/hashicorp/enos-provider/internal/retry"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/enos-provider/internal/ui"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/ui"
 )
 
 // RunScriptRequest copies a file to the remote host.

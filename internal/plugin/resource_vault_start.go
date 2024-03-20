@@ -14,20 +14,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/log"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/hcl"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/hcl"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/vault"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 const (
@@ -329,55 +330,7 @@ service. It handles creating the configuration directory, the configuration file
 the license file, the systemd unit, and starting the service.
 
 *NOTE: Until recently we were not able to implement optional attributes for the config attribute.
-As such, you will need to provide _all_ values except for ^seals^. Eventually all of the attributes*
-
-^^^hcl
-resource "enos_vault_start" "vault" {
-  bin_path       = "/opt/vault/bin/vault"
-
-  config_dir     = "/etc/vault.d"
-
-  config         = {
-    api_addr     = "${aws_instance.target.private_ip}:8200"
-    cluster_addr = "${aws_instance.target.private_ip}:8201"
-    listener     = {
-      type       = "tcp"
-      attributes = {
-        address     = "0.0.0.0:8200"
-        tls_disable = "true"
-      }
-    }
-    storage = {
-      type       = "consul"
-      attributes = {
-        address = "127.0.0.1:8500"
-        path    = "vault"
-      }
-    }
-    seal = {
-      type       = "awskms"
-      attributes = {
-        kms_key_id = data.aws_kms_key.kms_key.id
-      }
-    }
-    ui = true
-  }
-
-  license   = var.vault_license
-
-  unit_name = "vault"
-
-  username  = "vault"
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
+As such, you will need to provide _all_ values except for ^seals^ until we make all config optional.*
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -398,31 +351,29 @@ resource "enos_vault_start" "vault" {
 					Required:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: docCaretToBacktick(`
-|key|type|description|
-|config|object|Vault configuration|
-|config.api_addr|string|The Vault [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) value|
-|config.cluster_addr|string|The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value|
-|config.cluster_name|string|The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value|
-|config.listener|object|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza|
-|config.listener.type|string|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener|
-|config.listener.attributes|object|The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener|
-|config.log_level|string|The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)|
-|config.storage|object|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza|
-|config.storage.type|string|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type|
-|config.storage.attributes|object|The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type|
-|config.seal|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza|
-|config.seal.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
-|config.seal.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
-|config.seals|Vault Enterprise [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) configuration. Cannot be used in conjunction with ^config.seal^. Up to three seals can be defined but only one is required.|
-|config.seals.primary|The primary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Primary has priority 1|
-|config.seals.primary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
-|config.seals.primary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
-|config.seals.secondary|The secondary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Secondary has priority 2|
-|config.seals.secondary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
-|config.seals.secondary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
-|config.seals.tertiary|The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3|
-|config.seals.tertiary.type|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type|
-|config.seals.tertiary.attributes|The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type|
+- ^config.api_addr^ (String) The Vault [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) value
+- ^config.cluster_addr^ (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
+- ^config.cluster_name^ (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
+- ^config.listener^ (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza
+- ^config.listener.type^ (String) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener
+- ^config.listener.attributes^ (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener
+- ^config.log_level^ (String) The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)
+- ^config.storage^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
+- ^config.storage.type^ (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
+- ^config.storage.attributes^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type
+- ^config.seal^ (Object) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
+- ^config.seal.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
+- ^config.seal.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
+- ^config.seals^ (Object) Vault Enterprise [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) configuration. Cannot be used in conjunction with ^config.seal^. Up to three seals can be defined but only one is required.
+- ^config.seals.primary^ (Object) The primary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Primary has priority 1
+- ^config.seals.primary.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
+- ^config.seals.primary.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
+- ^config.seals.secondary^ (Object) The secondary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Secondary has priority 2
+- ^config.seals.secondary.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
+- ^config.seals.secondary.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
+- ^config.seals.tertiary^ (Object) The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3
+- ^config.seals.tertiary.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
+- ^config.seals.tertiary.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
 `),
 				},
 				{
@@ -477,7 +428,7 @@ The Vault status code returned when starting the service.
 					Type:        tftypes.Map{ElementType: tftypes.String},
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(supportsSSH),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 			},
 		},
 	}
@@ -703,7 +654,7 @@ func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
 		// of the raw attribute.
 		//
 		//nolint:staticcheck
-		//lint:ignore SA1019 we have to use this internnal only API to determine DynamicPseudoType types.
+		//lint:ignore SA1019 we have to use this internal only API to determine DynamicPseudoType types.
 		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
 		if err != nil {
 			panic("unable to marshal the vault config block to the wire format: " + err.Error())

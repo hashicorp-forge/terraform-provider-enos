@@ -8,8 +8,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/hashicorp/enos-provider/internal/nomad"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/nomad"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // transport a Nomad based transport implementation.

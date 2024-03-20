@@ -8,11 +8,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/server/datarouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 type environment struct {
@@ -132,24 +133,11 @@ func (s *environmentStateV1) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`The ^enos_environment^ datasource is a datasource that we can use to pass environment specific
-information into our Terraform run. As enos relies on SSH to execute the bulk of it's actions, a
+information into our Terraform run. As enos relies on SSH to execute the bulk of its actions, a
 common problem is granting access to the host executing the Terraform run. As such, the
 enos_environment resource can be used to determine our external IP addresses so that we can dynamically
 generate security groups that allow only access from our end.
-
-^^^hcl
-data "enos_environment" "localhost" { }
-
-module "security_group" {
-  source = "terraform-aws-modules/security-group/aws/modules/ssh"
-
-  name        = "enos_core_example"
-  description = "Enos provider core example security group"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress_cidr_blocks = [for ip in data.enos_environment.localhost.public_ipv4_addresses : "${ip}/32"]
-}
-^^^`),
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:        "id",

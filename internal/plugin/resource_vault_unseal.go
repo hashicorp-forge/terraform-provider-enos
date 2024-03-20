@@ -10,14 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
-	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/vault"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 type vaultUnseal struct {
@@ -212,22 +213,6 @@ The ^enos_vault_unseal^ resource will unseal a running Vault cluster. For Vaults
 with a shamir it uses ^enos_vault_init.unseal_keys_hex^ and passes them to the appropriate
 ^vault operator unseal^ command to unseal the cluster. For auto-unsealed Vaults clusters this
 resource simply performs a seal status check loop to ensure the cluster reaches an unsealed state
-
-^^^hcl
-resource "enos_vault_unseal" "vault" {
-  depends_on  = [enos_vault_init.vault]
-  bin_path   = "/opt/vault/bin/vault"
-  vault_addr  = enos_vault_start.vault.config.api_addr
-  seal_type   = enos_vault_start.vault.config.seal.type
-  unseal_keys = enos_vault_init.vault.unseal_keys_hex
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance.public_ip
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -255,7 +240,7 @@ resource "enos_vault_unseal" "vault" {
 					Type:        tftypes.String,
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(supportsAll),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				{
 					Name:            "unseal_keys",
 					Type:            s.UnsealKeys.TFType(),

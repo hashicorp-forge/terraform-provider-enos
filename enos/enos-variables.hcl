@@ -8,15 +8,9 @@ variable "consul_release" {
   })
   description = "Consul release version and edition to install from releases.hashicorp.com"
   default = {
-    version = "1.15.3"
+    version = "1.18.0"
     edition = "ce"
   }
-}
-
-variable "enosdev_provider_version" {
-  description = "The version of the enosdev provider to install for enosdev scenarios"
-  type        = string
-  default     = "0.4.3"
 }
 
 variable "environment" {
@@ -59,14 +53,8 @@ variable "tags" {
   description = "Tags to add to cloud resources"
   type        = map(string)
   default = {
-    "Project Name" : "enos-provider",
+    "Project Name" : "terraform-provider-enos",
     "Project" : "Enos",
     "Environment" : "ci"
   }
-}
-
-variable "tfc_api_token" {
-  description = "The Terraform Cloud QTI Organization API token."
-  type        = string
-  sensitive   = true
 }

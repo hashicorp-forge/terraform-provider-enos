@@ -12,10 +12,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/k8s"
 )
 
 // InitRequest is the init request.

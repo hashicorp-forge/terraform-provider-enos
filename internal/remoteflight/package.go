@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/random"
-	"github.com/hashicorp/enos-provider/internal/retry"
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
-	tfile "github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
+	tfile "github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
 
 // Package install gets. These are the built-in package getters.

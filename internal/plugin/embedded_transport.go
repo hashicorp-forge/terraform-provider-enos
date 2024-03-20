@@ -12,10 +12,11 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // transportClientFactory Factory function for creating transport clients, can be overridden in tests.
@@ -236,38 +237,26 @@ const (
 	supportsNomad
 )
 
-const supportsAll supportedTransports = supportsSSH | supportsK8s | supportsNomad
-
 // SchemaAttributeTransport is our transport schema configuration attribute.
 // Resources that embed a transport should use this as transport schema.
 func (em *embeddedTransportV1) SchemaAttributeTransport(supports supportedTransports) *tfprotov6.SchemaAttribute {
-	var desc string
-	if supports&supportsAll == supportsAll {
-		desc = transportsDescription
-	} else {
-		b := strings.Builder{}
+	b := strings.Builder{}
 
-		if supports&supportsSSH == supportsSSH {
-			b.WriteString(sshTransportDescription)
-			b.WriteString("\n")
-		}
-		if supports&supportsK8s == supportsK8s {
-			b.WriteString(k8sTransportDescription)
-			b.WriteString("\n")
-		}
-		if supports&supportsNomad == supportsNomad {
-			b.WriteString(sshTransportDescription)
-			b.WriteString("\n")
-		}
-
-		desc = b.String()
+	if supports&supportsSSH == supportsSSH {
+		b.WriteString(sshTransportSchemaMarkdown)
+	}
+	if supports&supportsK8s == supportsK8s {
+		b.WriteString(k8sTransportSchemaMarkdown)
+	}
+	if supports&supportsNomad == supportsNomad {
+		b.WriteString(nomadTransportSchemaMarkdown)
 	}
 
 	return &tfprotov6.SchemaAttribute{
 		Name:            "transport",
 		Type:            em.Terraform5Type(),
 		DescriptionKind: tfprotov6.StringKindMarkdown,
-		Description:     desc,
+		Description:     b.String(),
 		Optional:        true, // We'll handle our own schema validation
 	}
 }

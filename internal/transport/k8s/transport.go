@@ -8,8 +8,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 // Transport is the kubernetes transport. It's public because sometimes callers need to access

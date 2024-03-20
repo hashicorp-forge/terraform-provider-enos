@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/remoteflight/systemd"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/systemd"
 )
 
 func TestStateHasSystemdEnabledAndRunningProperties(t *testing.T) {

@@ -10,14 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/remoteflight/vault"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
-	istrings "github.com/hashicorp/enos-provider/internal/strings"
-	it "github.com/hashicorp/enos-provider/internal/transport"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight/vault"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
+	istrings "github.com/hashicorp-forge/terraform-provider-enos/internal/strings"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 type vaultInit struct {
@@ -254,24 +255,6 @@ func (s *vaultInitStateV1) Schema() *tfprotov6.Schema {
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
 The ^enos_vault_init^ resource is capable initializing a Vault cluster.
-
-^^^hcl
-resource "enos_vault_init" "vault" {
-  bin_path   = "/opt/vault/bin/vault"
-  vault_addr = enos_vault_start.vault.config.api_addr
-
-  recovery_shares    = 5
-  recovery_threshold = 3
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -299,7 +282,7 @@ resource "enos_vault_init" "vault" {
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description:     "The [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) of the Vault cluster",
 				},
-				s.Transport.SchemaAttributeTransport(supportsAll),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				// Input args
 				{
 					Name:            "key_shares",

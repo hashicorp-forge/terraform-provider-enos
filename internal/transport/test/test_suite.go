@@ -16,11 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/hashicorp/enos-provider/internal/transport/file"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
 	"github.com/hashicorp/go-multierror"
+
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // TransportTestSuite a test suite that can be used to test any transport.

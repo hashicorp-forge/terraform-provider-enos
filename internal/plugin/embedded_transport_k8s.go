@@ -11,10 +11,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
-	"github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/k8s"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/k8s"
 )
 
 type k8sTransportBuilder func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error)

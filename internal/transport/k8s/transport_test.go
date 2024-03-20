@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/hashicorp/enos-provider/internal/transport/test"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/test"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
 )
 
 func Test_KubernetesTransport(t *testing.T) {

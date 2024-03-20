@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/enos-provider/internal/diags"
-	"github.com/hashicorp/enos-provider/internal/remoteflight"
-	"github.com/hashicorp/enos-provider/internal/retry"
-	resource "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
-	"github.com/hashicorp/enos-provider/internal/server/state"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
+	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
 )
 
 type hostInfo struct {
@@ -332,29 +333,6 @@ func (s *hostInfoStateV1) Schema() *tfprotov6.Schema {
 The ^enos_host_info^ resource can be used to determine information about a target host. While it is intended
 to be used against SSH targets, if the required utilities are present in a container other transports ought
 to work as well.
-
-resource "enos_host_info" "target" {
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
-
-resource "enos_remote_exec" "install_my_thing" {
-	environment = {
-	  DISTRO         = enos_host_info.target.distro
-	  DISTRO_VERSION = enos_host_info.target.distro_version
-	}
-
-  scripts = ["/my/thing/installer.sh"]
-
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

@@ -4,10 +4,11 @@
 package plugin
 
 import (
-	"github.com/hashicorp/enos-provider/internal/server"
-	dr "github.com/hashicorp/enos-provider/internal/server/datarouter"
-	rr "github.com/hashicorp/enos-provider/internal/server/resourcerouter"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
+	dr "github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
+	rr "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 )
 
 // Server returns a default instance of our ProviderServer.

@@ -3,30 +3,28 @@
 
 scenario "kind" {
   matrix {
-    use = ["dev", "enos", "enosdev"]
+    use = ["dev", "prod"]
   }
 
   locals {
     pod_replica_count = 3
     helm_provider = {
-      "dev"     = provider.helm.kind_dev
-      "enos"    = provider.helm.kind_enos
-      "enosdev" = provider.helm.kind_enosdev
+      "dev"  = provider.helm.kind_dev
+      "prod" = provider.helm.kind_prod
     }
     kubeconfig_path = abspath(joinpath(path.root, "kubeconfig_kind_${matrix.use}"))
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
-  terraform     = matrix.use == "enosdev" ? terraform.k8s_enosdev : terraform.k8s
+  terraform     = terraform.k8s
   providers = [
     provider.enos.default,
     provider.helm.kind_dev,
-    provider.helm.kind_enos,
-    provider.helm.kind_enosdev,
+    provider.helm.kind_prod,
   ]
 
   step "create_kind_cluster" {
-    module = matrix.use == "enosdev" ? module.kind_create_test_cluster_enosdev : module.kind_create_test_cluster
+    module = module.kind_create_test_cluster
 
     variables {
       kubeconfig_path = local.kubeconfig_path
@@ -55,7 +53,7 @@ scenario "kind" {
     depends_on = [
       step.deploy_helm_chart,
     ]
-    module = matrix.use == "enosdev" ? module.test_kind_container_enosdev : module.test_kind_container
+    module = module.test_kind_container
 
     variables {
       kubeconfig_base64 = step.create_kind_cluster.kubeconfig_base64

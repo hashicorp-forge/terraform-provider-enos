@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	it "github.com/hashicorp/enos-provider/internal/transport"
-	"github.com/hashicorp/enos-provider/internal/transport/command"
+	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/command"
 )
 
 // CreateDirectoryRequest creates a directory on remote host.

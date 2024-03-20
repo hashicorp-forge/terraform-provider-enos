@@ -14,11 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/server/datarouter"
-	"github.com/hashicorp/enos-provider/internal/server/resourcerouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 
-	"github.com/hashicorp/enos-provider/internal/server"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )

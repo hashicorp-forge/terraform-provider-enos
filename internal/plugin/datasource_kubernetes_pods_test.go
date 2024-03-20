@@ -13,10 +13,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/enos-provider/internal/server"
-	dr "github.com/hashicorp/enos-provider/internal/server/datarouter"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
+	dr "github.com/hashicorp-forge/terraform-provider-enos/internal/server/datarouter"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 

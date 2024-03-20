@@ -20,13 +20,13 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
 	"sigs.k8s.io/kind/pkg/cmd"
 
-	"github.com/hashicorp/enos-provider/internal/random"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
 
-	"github.com/hashicorp/enos-provider/internal/docker"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/docker"
 
-	"github.com/hashicorp/enos-provider/internal/kubernetes"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/kubernetes"
 
-	"github.com/hashicorp/enos-provider/internal/log"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/log"
 )
 
 const (
