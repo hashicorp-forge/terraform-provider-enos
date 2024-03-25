@@ -30,14 +30,14 @@ jobs:
       - name: Determine enos-provider version
         id: get-version
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
-      - uses: hashicorp/doormat-action@main
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          # This role, its associated IAM policy, the allowed Github workflow
-          # event types and their associated qualifiers are managed via
-          # Terraform in the hashicorp/enos-ci repository. If you wish to allow
-          # AWS credentials for different Github event types, workflows or
-          # branches you'll need to update the role there.
-          aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
+          # The github actions service user creds for this account managed in hashicorp/enos-ci
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-skip-session-tagging: true
       - uses: ./.github/actions/build-provider
       - name: Import gpg key
         uses: crazy-max/ghaction-import-gpg@82a020f1f7f605c65dd2449b392a52c3fcfef7ef # v6.0.0
