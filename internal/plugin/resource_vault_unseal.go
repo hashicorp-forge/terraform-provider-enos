@@ -213,22 +213,6 @@ The ^enos_vault_unseal^ resource will unseal a running Vault cluster. For Vaults
 with a shamir it uses ^enos_vault_init.unseal_keys_hex^ and passes them to the appropriate
 ^vault operator unseal^ command to unseal the cluster. For auto-unsealed Vaults clusters this
 resource simply performs a seal status check loop to ensure the cluster reaches an unsealed state
-
-^^^hcl
-resource "enos_vault_unseal" "vault" {
-  depends_on  = [enos_vault_init.vault]
-  bin_path   = "/opt/vault/bin/vault"
-  vault_addr  = enos_vault_start.vault.config.api_addr
-  seal_type   = enos_vault_start.vault.config.seal.type
-  unseal_keys = enos_vault_init.vault.unseal_keys_hex
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance.public_ip
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -256,7 +240,7 @@ resource "enos_vault_unseal" "vault" {
 					Type:        tftypes.String,
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(supportsAll),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				{
 					Name:            "unseal_keys",
 					Type:            s.UnsealKeys.TFType(),

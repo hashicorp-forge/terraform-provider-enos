@@ -106,19 +106,11 @@ provider "enos" {
 ^^^
 `), transportsDescription)
 
-var k8sTransportDescription = docCaretToBacktick(`
+var (
+	k8sTransportDescription = fmt.Sprintf(docCaretToBacktick(`
 The ^Kubernetes^ transport is used to execute remote commands on a container running in a ^Pod^.
 
-The following is the supported configuration:
-|key|description|type|required|
-|-|-|-|-|
-|transport|the transport configuration|object|yes|
-|transport.kubernetes|the kubernetes transport configuration|object|yes|
-|transport.kubernetes.kubeconfig_base64|base64 encoded kubeconfig|string|yes|
-|transport.kubernetes.context_name|the name of the kube context to access|string|yes|
-|transport.kubernetes.namespace|the namespace of pod to access|string|no, defaults to the ^default^ namespace|
-|transport.kubernetes.pod|the name of the pod to access|string|yes|
-|transport.kubernetes.container|the name of the container to access|string|no, defaults to the default container for the pod|
+%s
 
 Example configuration
 ^^^hcl
@@ -134,21 +126,21 @@ provider "enos" {
   }
 }
 ^^^
-`)
+`), k8sTransportSchemaMarkdown)
+	k8sTransportSchemaMarkdown = docCaretToBacktick(`
+- ^transport.kubernetes^ (Object) the kubernetes transport configuration
+- ^transport.kubernetes.kubeconfig_base64^ (String) base64 encoded kubeconfig
+- ^transport.kubernetes.context_name^ (String) the name of the kube context to access
+- ^transport.kubernetes.namespace^ (String) the namespace of pod to access
+- ^transport.kubernetes.pod^ (String) the name of the pod to access|string
+- ^transport.kubernetes.container^ (String) the name of the container to access`)
+)
 
-var sshTransportDescription = docCaretToBacktick(`
+var (
+	sshTransportDescription = fmt.Sprintf(docCaretToBacktick(`
 The ^SSH^ transport is used to execute remote commands on a target using the secure shell protocol.
 
-|key|description|type|required|
-|-|-|-|-|
-|transport|the transport configuration|object|yes|
-|transport.ssh|the ssh transport configuration|object|yes|
-|transport.ssh.user|the ssh login user|string|yes|
-|transport.ssh.host|the remote host to access|string|yes|
-|transport.ssh.private_key|the private key as a string|string|no|
-|transport.ssh.private_key_path|the path to a private key file|string|no, but if provided overrides the ^private_key^ value (if configured)|
-|transport.ssh.passphrase|a passphrase if the private key requires one|string|no|
-|transport.ssh.passphrase_path|a path to a file with the passphrase for the private key|string|no, but if provided overrides the ^passphrase^ value (if configured)|
+%s
 
 While ^passphrase^ and ^private_key^ are supported, it is suggested to use the ^passphrase_path^
 and ^private_key_path^ options instead, as the raw values will be stored in Terraform state.
@@ -165,21 +157,24 @@ provider "enos" {
   }
 }
 ^^^
-`)
+`), sshTransportSchemaMarkdown)
+	sshTransportSchemaMarkdown = docCaretToBacktick(`
+- ^transport.ssh^ (Object) the ssh transport configuration
+- ^transport.ssh.user^ (String) the ssh login user|string
+- ^transport.ssh.host^ (String) the remote host to access
+- ^transport.ssh.private_key^ (String) the private key as a string
+- ^transport.ssh.private_key_path^ (String) the path to a private key file
+- ^transport.ssh.passphrase^ (String) a passphrase if the private key requires one
+- ^transport.ssh.passphrase_path^ (String) a path to a file with the passphrase for the private key`)
+)
 
-var nomadTransportDescription = docCaretToBacktick(`
+var (
+	nomadTransportDescription = fmt.Sprintf(docCaretToBacktick(`
 The ^Nomad^ transport can be used to execute remote commands on a container running in a ^Task^.
 
 The following is the supported configuration
 
-|key|description|type|required|
-|-|-|-|-|
-|transport|the transport configuration|object|yes|
-|transport.nomad|the nomad transport configuration|object|yes|
-|transport.nomad.host|nomad server host, i.e. http://23.56.78.9:4646|string|yes|
-|transport.nomad.secret_id|the nomad server secret for authenticated connections|string|no|
-|transport.nomad.allocation_id|the allocation id for the allocation to access|string|yes|
-|transport.nomad.task_name|the name of the task within the allocation to access|string|yes|
+%s
 
 Example configuration
 ^^^hcl
@@ -194,4 +189,12 @@ provider "enos" {
   }
 }
 ^^^
-`)
+`), nomadTransportSchemaMarkdown)
+
+	nomadTransportSchemaMarkdown = docCaretToBacktick(`
+- ^transport.nomad^ (Object) the nomad transport configuration
+- ^transport.nomad.host^ (String) nomad server host, i.e. http://23.56.78.9:4646
+- ^transport.nomad.secret_id^ (String) the nomad server secret for authenticated connections
+- ^transport.nomad.allocation_id^ (String) the allocation id for the allocation to access
+- ^transport.nomad.task_name^ (String) the name of the task within the allocation to access`)
+)

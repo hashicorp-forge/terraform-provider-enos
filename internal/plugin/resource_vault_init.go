@@ -255,24 +255,6 @@ func (s *vaultInitStateV1) Schema() *tfprotov6.Schema {
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
 The ^enos_vault_init^ resource is capable initializing a Vault cluster.
-
-^^^hcl
-resource "enos_vault_init" "vault" {
-  bin_path   = "/opt/vault/bin/vault"
-  vault_addr = enos_vault_start.vault.config.api_addr
-
-  recovery_shares    = 5
-  recovery_threshold = 3
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -300,7 +282,7 @@ resource "enos_vault_init" "vault" {
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description:     "The [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) of the Vault cluster",
 				},
-				s.Transport.SchemaAttributeTransport(supportsAll),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				// Input args
 				{
 					Name:            "key_shares",

@@ -243,15 +243,7 @@ func (s *kubernetesPodsStateV1) Schema() *tfprotov6.Schema {
 			Description: docCaretToBacktick(`
 The ^enos_kubernetes_pods^ datasource can be used to query a kubernetes cluster for pods, using
 label and field selectors. Details on the syntax for label and field selectors can be seen [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
-The query will return a list of ^PodInfo^ objects, which has the following schema:
 
-^^^
-PodInfo{
-  Name       string
-  Namespace  string
-  Containers []string
-}
-^^^
 **Important Note:**
 
 As this is a datasource it will be run during plan time, unless the datasource
@@ -259,53 +251,7 @@ depends on information not available till apply. Therefore, if this datasource i
 where the kubernetes cluster is being created at the same time, you must make the datasource depend
 either directly or indirectly on the resources required for the cluster to be created and the app
 to be deployed.
-
-Here's an example configuration, with some boilerplate excluded, creates a kind clutser, deploys a
-helm chart and queries for pods:
-
-^^^terraform
-resource "enos_local_kind_cluster" "test" {
-  name            = "test"
-  kubeconfig_path = "./kubeconfig"
-}
-
-resource "helm_release" "test" {
-  name  = "test"
-  chart = "${path.module}/helm/test"
-
-  namespace        = "test"
-  create_namespace = true
-
-  wait = true
-
-  depends_on = [enos_local_kind_cluster.test]
-}
-
-data "enos_kubernetes_pods" "test" {
-  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
-  context_name      = enos_local_kind_cluster.test.context_name
-  namespace         = helm_release.test.namespace
-  label_selectors = [
-    "app.kubernetes.io/instance=ci-test",
-    "app.kubernetes.io/name=ci-test"
-  ]
-}
-
-resource "enos_remote_exec" "create_file" {
-  for_each = data.enos_kubernetes_pods.test.transports
-  inline = ["touch /tmp/some_file"]
-
-  transport = {
-    kubernetes = each.value
-  }
-}
-^^^
-
-In this example, the datasource only runs at apply time due to these implicit dependencies:
-^^^terraform
-  kubeconfig_base64 = enos_local_kind_cluster.test.kubeconfig_base64
-  context_name      = enos_local_kind_cluster.test.context_name
-^^^`),
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:        "id",
@@ -359,15 +305,21 @@ In this example, the datasource only runs at apply time due to these implicit de
 					Optional:    true,
 				},
 				{
-					Name:        "pods",
-					Description: "A list of PodInfo objects for all the pods that match the search.",
-					Type:        s.Pods.TFType(),
-					Computed:    true,
+					Name:            "pods",
+					DescriptionKind: tfprotov6.StringKindMarkdown,
+					Description: docCaretToBacktick(`
+A list of PodInfo objects for all the pods that match the search."
+- ^pods[].name^ (String) The name of the pod
+- ^pods[].namespace^ (String) The name of the pod
+- ^pods[].containers^ (List of String) The containers in the pod
+`),
+					Type:     s.Pods.TFType(),
+					Computed: true,
 				},
 				{
 					Name:            "transports",
 					DescriptionKind: k8sTransportDescriptionKind,
-					Description:     k8sTransportDescription,
+					Description:     k8sTransportSchemaMarkdown,
 					Type:            s.Transports.TFType(),
 					Computed:        true,
 				},

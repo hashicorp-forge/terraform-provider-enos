@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -63,11 +62,4 @@ func runTFCUploadCmd(cmd *cobra.Command, args []string) {
 	exitIfErr(publish.PublishToTFC(ctx, tfcUploadCfg))
 
 	os.Exit(0)
-}
-
-func exitIfErr(err error) {
-	if err != nil {
-		fmt.Printf("ERROR: %s", err.Error())
-		os.Exit(1)
-	}
 }

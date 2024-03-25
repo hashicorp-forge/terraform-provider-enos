@@ -61,7 +61,7 @@ func (p *Provider) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			Version: 1,
 			Attributes: []*tfprotov6.SchemaAttribute{
-				p.config.Transport.SchemaAttributeTransport(supportsAll),
+				p.config.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 				{
 					Name:     "debug_data_root_dir",
 					Type:     tftypes.String,

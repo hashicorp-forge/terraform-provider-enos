@@ -209,8 +209,6 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
 ^enos_boundary_start^ is a resource that starts a Boundary cluster.
-
-TODO(boundary) add an example for start
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

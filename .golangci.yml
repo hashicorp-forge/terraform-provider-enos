@@ -69,6 +69,7 @@ linters:
   enable-all: true
   disable:
     - containedctx
+    - copyloopvar # until it has an auto-fix option
     - deadcode
     - depguard
     - dogsled

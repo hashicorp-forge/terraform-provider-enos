@@ -1,9 +1,8 @@
+THIS_FILE := $(lastword $(MAKEFILE_LIST))
 GO_VERSION=$$(cat .go-version)
 
-# PROVIDER_HOSTNAME=registry.terraform.io
-# PROVIDER_NAMESPACE=hashicorp-forge
-PROVIDER_HOSTNAME=app.terraform.io
-PROVIDER_NAMESPACE=hashicorp-qti
+PROVIDER_HOSTNAME=registry.terraform.io
+PROVIDER_NAMESPACE=hashicorp-forge
 PROVIDER_NAME?=enos
 PROVIDER_BIN_NAME=terraform-provider-enos
 PROVIDER_BIN_OS?=$$(go env GOOS)
@@ -44,7 +43,17 @@ build-race-detector:
 .PHONY: build-all
 build-all: flight-control build
 
-.PHONY: install
+.PHONY: docs
+docs:
+	type tfplugindocs || go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
+	tfplugindocs generate --examples-dir examples --provider-dir command/plugin --provider-name ${PROVIDER_BIN_NAME} --rendered-website-dir ../../docs --website-source-dir ./templates
+
+.PHONY: check-doc-delta
+check-doc-delta:
+	rm -rf ./docs
+	@$(MAKE) -f $(THIS_FILE) docs
+	@if ! git diff --exit-code; then echo "Documentation need to be regenerated. Run 'make docs' to fix them." && exit 1; fi
+
 install:
 	for binary in $$(ls ./dist | grep ${PROVIDER_BIN_NAME}) ; do \
 	version=$$(echo $$binary | cut -d "_" -f 2); \
@@ -52,6 +61,7 @@ install:
 	arch=$$(echo $$binary | cut -d "_" -f 4); \
 	mkdir -p ~/.terraform.d/plugins/${PROVIDER_HOSTNAME}/${PROVIDER_NAMESPACE}/${PROVIDER_NAME}/$${version}/$${platform}_$${arch}; \
 	cp ./dist/$$binary ~/.terraform.d/plugins/${PROVIDER_HOSTNAME}/${PROVIDER_NAMESPACE}/${PROVIDER_NAME}/$${version}/$${platform}_$${arch}/${PROVIDER_BIN_NAME}; \
+	chmod +x ~/.terraform.d/plugins/${PROVIDER_HOSTNAME}/${PROVIDER_NAMESPACE}/${PROVIDER_NAME}/$${version}/$${platform}_$${arch}/*; \
 done
 
 .PHONY: flight-control

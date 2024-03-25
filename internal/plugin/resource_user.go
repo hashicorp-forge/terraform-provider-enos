@@ -346,18 +346,6 @@ func (u *userStateV1) Schema() *tfprotov6.Schema {
 The ^enos_user^ resource can be used to create a local user on a target machine. While it was intended
 to be used for SSH targets, if the container allows local user creation and has the useradd utility
 it might work for running containers.
-
-resource "enos_user" "vault" {
-  name     = "vault"
-  home_dir = "/etc/vault.d"
-  shell    = "/bin/false"
-
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

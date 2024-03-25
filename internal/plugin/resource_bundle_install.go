@@ -414,48 +414,15 @@ func (s *bundleInstallStateV1) Schema() *tfprotov6.Schema {
 		Version: 1,
 		Block: &tfprotov6.SchemaBlock{
 			DescriptionKind: tfprotov6.StringKindMarkdown,
-			//nolint:dupword
+
 			Description: docCaretToBacktick(`
-The enos bundle install resource is capable of installing HashiCorp release bundles, Debian packages,
+The ^enos_bundle_install^ resource is capable of installing HashiCorp release bundles, Debian packages,
 or RPM packages, from a local path, releases.hashicorp.com, or from Artifactory directly onto a
 remote node. While it is possible to use to install any debian or RPM packages from Artifactory or
 from a local source, it has been designed for HashiCorp's release workflow.
 
 While all local artifact, releases.hashicorp.com, and Artifactory methods of install are supported,
 only one can be configured at a time.
-
-^^^hcl
-resource "enos_bundle_install" "vault" {
-  # the destination is the directory when the binary will be placed
-  destination = "/opt/vault/bin"
-
-  # install from releases.hashicorp.com
-  release = {
-    product  = "vault"
-    version  = "1.7.0"
-    edition  = "ent"
-  }
-
-  # install from a local bundle
-  path = "/path/to/bundle.zip"
-
-  # install from artifactory
-  artifactory = {
-    username = "rcragun@hashicorp.com"
-    token    = "1234abcd.."
-    sha256   = "e1237bs.."
-    url      = "https:/artifactory.hashicorp.engineering/artifactory/...bundle.zip"
-  }
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -484,12 +451,10 @@ resource "enos_bundle_install" "vault" {
 					Optional:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: `
-|key|type|description|
-|artifactory|object|Artifactory access information if the package or bundle is in Artifactory|
-|artifactory.username|string|The Artifactory API username. This will likely be your hashicorp email address|
-|artifactory.token|string|The Artifactory API token. You can sign into Artifactory and generate one|
-|artifactory.url|string|The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL|
-|artifactory.sha256|string|The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed|
+- ^artifactory.username^ (String) The Artifactory API username. This will likely be your hashicorp email address
+- ^artifactory.token^ (String) The Artifactory API token. You can sign into Artifactory and generate one
+- ^artifactory.url^ (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
+- ^artifactory.sha256^ (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed
 `,
 				},
 				{
@@ -499,11 +464,9 @@ resource "enos_bundle_install" "vault" {
 
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: `
-|key|type|description|
-|release|object|The releases.hashicorp.com data|
-|release.product|string|The product name that you wish to install, eg: 'vault' or 'consul'|
-|release.version|string|The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')|
-|release.edition|string|The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc.|
+- ^release.product^ (String) The product name that you wish to install, eg: 'vault' or 'consul'
+- ^release.version^ (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
+- ^release.edition^ (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc.
 `,
 				},
 				s.Transport.SchemaAttributeTransport(supportsSSH),

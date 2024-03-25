@@ -2,12 +2,11 @@
 # SPDX-License-Identifier: MPL-2.0
 
 terraform {
-  required_version = ">= 1.1.2"
+  required_version = ">= 1.2.0"
 
   required_providers {
     enos = {
-      source  = "app.terraform.io/hashicorp-qti/enos"
-      version = ">= 0.4.0"
+      source = "registry.terraform.io/hashicorp-forge/enos"
     }
   }
 }

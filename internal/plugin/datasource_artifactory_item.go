@@ -162,38 +162,7 @@ fewer results you'll receive.
 
 Note: the underlying implementation uses AQL to search for artifacts and uses the ^$match^ operator
 for every criteria. This means that you can use wildcards ^*^ for any field. See the [AQL developer guide](https://www.jfrog.com/confluence/display/JFROG/Artifactory+Query+Language) for more information.
-^^^hcl
-data "enos_artifactory_item" "vault" {
-  username = "some-user@hashicorp.com"
-  token    = "1234abcd"
-
-  host = "https://artifactory.hashicorp.engineering/artifactory"
-  repo = "hashicorp-packagespec-buildcache-local*"
-  path = "cache-v1/vault-enterprise/*"
-  name = "*.zip"
-
-  properties = {
-    "EDITION"         = "ent"
-    "GOARCH"          = "amd64"
-    "GOOS"            = "linux"
-    "artifactType"    = "package"
-    "productRevision" = "f45845666b4e552bfc8ca775834a3ef6fc097fe0"
-    "productVersion"  = "1.7.0"
-  }
-}
-
-resource "enos_remote_exec" "download_vault" {
-  inline  = ["curl -f --user some-user@hashicorp.com:1234abcd -o /tmp/vault.zip -X GET ${data.enos_artifactory_item.vault.results[0].url}"]
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^`),
+`),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
 					Name:        "id",
@@ -250,14 +219,11 @@ resource "enos_remote_exec" "download_vault" {
 					Computed:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: `
-It will return a list of results
-|key|description|
-|results|Items that were found that match the given search criteria|
-|results.name|The item name|
-|results.type|The item type|
-|results.url|The fully qualified URL to the item|
-|results.sha256|The SHA256 sum of the item|
-|results.size|The size of the item|
+- ^results.name^ (String) The item name
+- ^results.type^ (String) The item type
+- ^results.url^ (String) The fully qualified URL to the item
+- ^results.sha256^ (String) The SHA256 sum of the item
+- ^results.size^ (String) The size of the item
 `,
 				},
 			},

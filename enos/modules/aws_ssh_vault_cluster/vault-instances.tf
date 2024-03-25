@@ -248,7 +248,10 @@ resource "enos_vault_unseal" "followers" {
 // an existing cluster to use auto-pilot to upgrade them and they're not using
 // an auto-unseal method.
 resource "enos_vault_unseal" "when_vault_unseal_when_no_init_is_set" {
-  depends_on = [enos_vault_start.followers]
+  depends_on = [
+    enos_vault_start.followers,
+    enos_remote_exec.install_dependencies,
+  ]
   for_each = toset([
     for idx in local.instances : idx
     if var.vault_unseal_when_no_init && !var.vault_init
@@ -277,6 +280,7 @@ resource "enos_remote_exec" "wait_for_leader_in_vault_hosts" {
   depends_on = [
     enos_vault_unseal.leader,
     enos_vault_unseal.followers,
+    enos_remote_exec.install_dependencies,
   ]
   for_each = local.vault_instances
 

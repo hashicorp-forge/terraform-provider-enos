@@ -1,0 +1,86 @@
+---
+name: run-scenario
+
+on:
+  workflow_dispatch:
+    inputs:
+      download:
+        type: string
+        required: false
+      scenario-filter:
+        required: true
+        type: string
+      build-dev:
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      download:
+        type: string
+        required: false
+      scenario-filter:
+        required: true
+        type: string
+      build-dev:
+        type: boolean
+        default: false
+
+jobs:
+  run:
+    name: ${{ inputs.scenario-filter }}
+    runs-on: ubuntu-latest
+    env:
+      ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          # The github actions service user creds for this account managed in hashicorp/enos-ci
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-skip-session-tagging: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # the terraform wrapper will break terraform execution in enos because
+          # it changes the output to text when we expect it to be JSON.
+          terraform_wrapper: false
+      - uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token:
+            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - name: Set up support files
+        run: |
+          mkdir -p enos/support
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > enos/support/enos-ci-ssh-key.pem
+          echo "${{ secrets.VAULT_LICENSE }}" > enos/support/vault.hclic
+          echo "${{ secrets.CONSUL_LICENSE }}" > enos/support/consul.hclic
+          chmod 600 enos/support/enos-ci-ssh-key.pem
+          chmod 600 enos/support/vault.hclic
+          chmod 600 enos/support/consul.hclic
+      - if: inputs.build-dev == true
+        uses: ./.github/actions/build-provider
+        with:
+          target: linux/amd64
+      - if: inputs.download != ''
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        with:
+          path: dist
+          name: ${{ inputs.download }}
+          merge-multiple: true
+      - if: contains(inputs.scenario-filter, 'use:dev')
+        name: TODO(post-publish) Remove implied local mirror install for dev
+        run: make install
+      - run: enos scenario run ${{ inputs.scenario-filter }}
+        working-directory: enos
+      - if: ${{ always() }}
+        run: enos scenario destroy ${{ inputs.scenario-filter }}
+        working-directory: enos
+      - name: Remove enos runtime directories
+        if: ${{ always() }}
+        run: |
+          rm -rf /tmp/enos*
+          rm -rf enos/support
+          rm -rf enos/.enos
+          rm -rf "$HOME/.terraform.d"

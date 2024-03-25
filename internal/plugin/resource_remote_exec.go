@@ -260,35 +260,11 @@ func (s *remoteExecStateV1) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
-The enos remote exec resource is capable of running scripts or commands on a remote instance over an SSH transport.
+The ^enos_remote_exec^ resource is capable of running scripts or commands on a remote instance over an SSH transport.
 
 **Note**
 Inline commands should not include double quotes, since the command will eventually be run as: ^sh -c "<your command>"^.
 If a double quote must be included in the command it should be escaped as follows: ^\\\"^.
-
-The resource is also capable of using the SSH agent. It will attempt to connect to the agent socket as defined with the ^SSH_AUTH_SOCK^ environment variable.
-
-Example
-^^^hcl
-resource "enos_remote_exec" "foo" {
-  environment = {
-    FOO = "foo"
-  }
-
-	# You can use all three of these but it is advise to use one.
-  inline  = ["touch /tmp/inline.txt"]
-  scripts = ["/local/path/to/script.sh"]
-  content = data.template_file.some_template.rendered
-
-  transport = {
-    ssh = {
-      host             = "192.168.0.1"
-      user             = "ubuntu"
-      private_key_path = "/path/to/private/key.pem"
-    }
-  }
-}
-^^^
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
@@ -347,7 +323,7 @@ resource "enos_remote_exec" "foo" {
 					Computed:    true,
 					Description: "The aggregate STDOUT of all inline commnads, scripts, or content. If nothing is output this value will be set to a blank string",
 				},
-				s.Transport.SchemaAttributeTransport(supportsAll),
+				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
 			},
 		},
 	}

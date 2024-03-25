@@ -4,35 +4,31 @@
 scenario "vault_k8s" {
   matrix {
     edition = ["ce", "ent"]
-    use     = ["dev", "enos", "enosdev"]
+    use     = ["dev", "prod"]
   }
 
   locals {
     image_repo = var.image_repository != null ? var.image_repository : matrix.edition == "ce" ? "hashicorp/vault" : "hashicorp/vault-enterprise"
     helm_provider = {
       "ce" = {
-        "dev"     = provider.helm.ce_dev
-        "enos"    = provider.helm.ce_enos
-        "enosdev" = provider.helm.ce_enosdev
+        "dev"  = provider.helm.ce_dev
+        "prod" = provider.helm.ce_prod
       }
       "ent" = {
-        "dev"     = provider.helm.ent_dev
-        "enos"    = provider.helm.ent_enos
-        "enosdev" = provider.helm.ent_enosdev
+        "dev"  = provider.helm.ent_dev
+        "prod" = provider.helm.ent_prod
       }
     }
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
-  terraform     = matrix.use == "enosdev" ? terraform.k8s_enosdev : terraform.k8s
+  terraform     = terraform.k8s
   providers = [
     provider.enos.default,
     provider.helm.ce_dev,
-    provider.helm.ce_enos,
-    provider.helm.ce_enosdev,
+    provider.helm.ce_prod,
     provider.helm.ent_dev,
-    provider.helm.ent_enos,
-    provider.helm.ent_enosdev,
+    provider.helm.ent_prod,
   ]
 
   step "read_license" {
@@ -45,7 +41,7 @@ scenario "vault_k8s" {
   }
 
   step "create_kind_cluster" {
-    module = matrix.use == "enosdev" ? module.create_kind_cluster_enosdev : module.create_kind_cluster
+    module = module.create_kind_cluster
 
     variables {
       kubeconfig_path = abspath(joinpath(path.root, "kubeconfig_${matrix.edition}_${matrix.use}"))
@@ -56,7 +52,7 @@ scenario "vault_k8s" {
     depends_on = [
       step.create_kind_cluster,
     ]
-    module = matrix.use == "enosdev" ? module.k8s_deploy_vault_enosdev : module.k8s_deploy_vault
+    module = module.k8s_deploy_vault
 
     providers = {
       helm = local.helm_provider[matrix.edition][matrix.use]
@@ -77,7 +73,7 @@ scenario "vault_k8s" {
     depends_on = [
       step.deploy_vault,
     ]
-    module = matrix.use == "enosdev" ? module.k8s_verify_write_data_enosdev : module.k8s_verify_write_data
+    module = module.k8s_verify_write_data
 
     variables {
       vault_pods        = step.deploy_vault.vault_pods

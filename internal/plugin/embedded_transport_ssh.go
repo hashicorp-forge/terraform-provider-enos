@@ -51,7 +51,7 @@ var sshAttributes = []string{"user", "host", "private_key", "private_key_path", 
 var sshTransportTmpl = template.Must(template.New("ssh_transport").Parse(`
     ssh = {
       {{range $key, $val := .}}
-      {{if $val.Value}} 
+      {{if $val.Value}}
       {{if eq $key "private_key"}}
       {{$key}} = <<EOF
 {{$val}}

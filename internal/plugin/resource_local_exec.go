@@ -256,19 +256,7 @@ func (s *localExecStateV1) Schema() *tfprotov6.Schema {
 		Block: &tfprotov6.SchemaBlock{
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
-The enos local exec resource is capable of running scripts or commands locally.
-
-^^^hcl
-resource "enos_local_exec" "foo" {
-  environment = {
-    FOO = "foo"
-  }
-
-  inline  = ["touch /tmp/inline.txt"]
-  scripts = ["/local/path/to/script.sh"]
-  content = data.template_file.some_template.rendered
-}
-^^^
+The ^enos_local_exec^ resource is capable of running scripts or commands locally.
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

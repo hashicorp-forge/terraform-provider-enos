@@ -333,29 +333,6 @@ func (s *hostInfoStateV1) Schema() *tfprotov6.Schema {
 The ^enos_host_info^ resource can be used to determine information about a target host. While it is intended
 to be used against SSH targets, if the required utilities are present in a container other transports ought
 to work as well.
-
-resource "enos_host_info" "target" {
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
-
-resource "enos_remote_exec" "install_my_thing" {
-	environment = {
-	  DISTRO         = enos_host_info.target.distro
-	  DISTRO_VERSION = enos_host_info.target.distro_version
-	}
-
-  scripts = ["/my/thing/installer.sh"]
-
-  transport = {
-    ssh = {
-      host = "192.168.0.1"
-    }
-  }
-}
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{

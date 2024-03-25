@@ -8,12 +8,9 @@ description: Build flight-control
 runs:
   using: composite
   steps:
-    - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
-      with:
-        go-version-file: .go-version
     - name: Install upx
       run: |
-        curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
+        curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-amd64_linux.tar.xz
         tar -xvf upx.tar.xz
         sudo mv upx*/upx /usr/local/sbin/
       shell: bash

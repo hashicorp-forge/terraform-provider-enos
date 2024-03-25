@@ -315,8 +315,6 @@ func (s *localKindClusterStateV1) Schema() *tfprotov6.Schema {
 			DescriptionKind: tfprotov6.StringKindMarkdown,
 			Description: docCaretToBacktick(`
 The ^enos_local_kind_cluster^ can be used to create a [kind cluster](https://kind.sigs.k8s.io/)	locally.
-
-TODO(kind) add an example
 `),
 			Attributes: []*tfprotov6.SchemaAttribute{
 				{
