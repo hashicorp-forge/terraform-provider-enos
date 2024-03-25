@@ -35,14 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: ./.github/actions/build-flight-control
-      - uses: hashicorp/doormat-action@main
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          # This role, its associated IAM policy, the allowed Github workflow
-          # event types and their associated qualifiers are managed via
-          # Terraform in the hashicorp/enos-ci repository. If you wish to allow
-          # AWS credentials for different Github event types, workflows or
-          # branches you'll need to update the role there.
-          aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
+          # The github actions service user creds for this account managed in hashicorp/enos-ci
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-skip-session-tagging: true
       - uses: hashicorp/setup-terraform@v2
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -108,14 +108,14 @@ jobs:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           ref: ${{ github.head_ref }}   # checkout the correct branch name
-      - uses: hashicorp/doormat-action@main
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          # This role, its associated IAM policy, the allowed Github workflow
-          # event types and their associated qualifiers are managed via
-          # Terraform in the hashicorp/enos-ci repository. If you wish to allow
-          # AWS credentials for different Github event types, workflows or
-          # branches you'll need to update the role there.
-          aws-role-arn: arn:aws:iam::147451547303:role/enos-provider
+          # The github actions service user creds for this account managed in hashicorp/enos-ci
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-skip-session-tagging: true
       - uses: hashicorp/setup-terraform@v2
         with:
           # the terraform wrapper will break terraform execution in enos because

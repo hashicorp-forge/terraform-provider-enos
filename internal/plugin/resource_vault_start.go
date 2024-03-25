@@ -1088,6 +1088,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 				default:
 				}
 				hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+				hclBuilder.AppendAttribute("enable_multiseal", true)
 			}
 		}
 	}
