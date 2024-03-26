@@ -2,6 +2,7 @@
 ![Release](https://github.com/hashicorp-forge/terraform-provider-enos/actions/workflows/release.yml/badge.svg)
 
 # terraform-provider-enos
+![Enos_2023-transparent (1)](https://github.com/hashicorp-forge/terraform-provider-enos/assets/65058/a53ab096-617e-418b-813d-894f1695ff9a)
 
 A terraform provider that provides resouces for powering Software Quality as Code by writing
 Terraform-based quality requirement scenarios using a composable, modular, and declarative language.
