@@ -9,7 +9,7 @@ variable "ami_id" {
 variable "common_tags" {
   description = "Tags to set for all resources"
   type        = map(string)
-  default     = { "Project" : "enos-provider" }
+  default     = { "Project" : "terraform-provider-enos" }
 }
 
 variable "consul_cluster_tag" {
@@ -57,6 +57,17 @@ variable "consul_release" {
   default = {
     version = "1.15.3"
     edition = "ce"
+  }
+}
+
+variable "config_mode" {
+  type        = string
+  description = "The preferred method for configuring Vault"
+  default     = "file"
+
+  validation {
+    condition     = contains(["file", "env"], var.config_mode)
+    error_message = "The config_mode must be one of 'env', 'file'"
   }
 }
 

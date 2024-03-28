@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +33,9 @@ import (
 )
 
 const (
-	defaultRaftDataDir = "/opt/raft/data"
-	raftStorageType    = "raft"
+	defaultRaftDataDir     = "/opt/raft/data"
+	raftStorageType        = "raft"
+	defaultVaultConfigMode = "file"
 )
 
 type vaultStart struct {
@@ -51,6 +53,7 @@ type vaultStartStateV1 struct {
 	BinPath         *tfString
 	Config          *vaultConfig
 	ConfigDir       *tfString
+	ConfigMode      *tfString
 	License         *tfString
 	Status          *tfNum
 	SystemdUnitName *tfString
@@ -124,6 +127,7 @@ func newVaultStartStateV1() *vaultStartStateV1 {
 		BinPath:         newTfString(),
 		Config:          newVaultConfig(),
 		ConfigDir:       newTfString(),
+		ConfigMode:      newTfString(),
 		License:         newTfString(),
 		Status:          newTfNum(),
 		SystemdUnitName: newTfString(),
@@ -383,6 +387,12 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 					Description: "The path where Vault configuration will reside",
 				},
 				{
+					Name:        "config_mode", // preferred method of configuring vault, file or env
+					Type:        tftypes.String,
+					Optional:    true,
+					Description: "The preferred method of configuring vault. Valid options are 'file' or 'env'",
+				},
+				{
 					Name:        "license", // the vault license
 					Type:        tftypes.String,
 					Optional:    true,
@@ -428,7 +438,7 @@ The Vault status code returned when starting the service.
 					Type:        tftypes.Map{ElementType: tftypes.String},
 					Optional:    true,
 				},
-				s.Transport.SchemaAttributeTransport(supportsSSH | supportsK8s | supportsNomad),
+				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
 	}
@@ -459,6 +469,7 @@ func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
 		"bin_path":       s.BinPath,
 		"config_dir":     s.ConfigDir,
+		"config_mode":    s.ConfigMode,
 		"id":             s.ID,
 		"license":        s.License,
 		"status":         s.Status,
@@ -494,6 +505,7 @@ func (s *vaultStartStateV1) Terraform5Type() tftypes.Type {
 		"bin_path":       s.BinPath.TFType(),
 		"config":         s.Config.Terraform5Type(),
 		"config_dir":     s.ConfigDir.TFType(),
+		"config_mode":    s.ConfigMode.TFType(),
 		"id":             s.ID.TFType(),
 		"license":        s.License.TFType(),
 		"status":         s.Status.TFType(),
@@ -511,6 +523,7 @@ func (s *vaultStartStateV1) Terraform5Value() tftypes.Value {
 		"bin_path":       s.BinPath.TFValue(),
 		"config":         s.Config.Terraform5Value(),
 		"config_dir":     s.ConfigDir.TFValue(),
+		"config_mode":    s.ConfigMode.TFValue(),
 		"id":             s.ID.TFValue(),
 		"license":        s.License.TFValue(),
 		"status":         s.Status.TFValue(),
@@ -883,6 +896,25 @@ func (s *vaultSealsConfig) Value() map[string]*vaultConfigBlock {
 	}
 }
 
+func (s *vaultSealsConfig) needsMultiseal() bool {
+	if s == nil {
+		return false
+	}
+
+	enabled := 0
+	if s.Primary != nil && !s.Primary.Null {
+		enabled++
+	}
+	if s.Secondary != nil && !s.Secondary.Null {
+		enabled++
+	}
+	if s.Tertiary != nil && !s.Tertiary.Null {
+		enabled++
+	}
+
+	return enabled >= 2
+}
+
 func (c *vaultConfig) Terraform5Type() tftypes.Type {
 	return tftypes.Object{
 		AttributeTypes:     c.attrs(),
@@ -977,24 +1009,51 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	return nil
 }
 
-// ToHCLConfig returns the vault config in the remoteflight HCLConfig format.
-func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
+// Render takes a preferred configuration mode (file, env) and return an HCL builder, a make of
+// environment variables, and any errors that are encountered along the way. As not all configuration
+// is settable via environment variables we'll often have to use both the HCL and env variables
+// regardless of the preferred mode. We support two configuration modes to allow us to test
+// both env var and config code paths.
+//
+//nolint:gocyclo,cyclop
+func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string, error) {
+	if configMode != "env" && configMode != "file" {
+		return nil, nil, fmt.Errorf("unsupported config_mode %s, expected 'env' or 'file'", configMode)
+	}
+
 	hclBuilder := hcl.NewBuilder()
+	envVars := map[string]string{}
 
 	if apiAddr, ok := c.APIAddr.Get(); ok {
-		hclBuilder.AppendAttribute("api_addr", apiAddr)
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("api_addr", apiAddr)
+		} else {
+			envVars["VAULT_API_ADDR"] = apiAddr
+		}
 	}
 
 	if clusterAddr, ok := c.ClusterAddr.Get(); ok {
-		hclBuilder.AppendAttribute("cluster_addr", clusterAddr)
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("cluster_addr", clusterAddr)
+		} else {
+			envVars["VAULT_CLUSTER_ADDR"] = clusterAddr
+		}
 	}
 
 	if ui, ok := c.UI.Get(); ok {
-		hclBuilder.AppendAttribute("ui", ui)
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("ui", ui)
+		} else {
+			envVars["VAULT_UI"] = strconv.FormatBool(ui)
+		}
 	}
 
 	if ll, ok := c.LogLevel.Get(); ok {
-		hclBuilder.AppendAttribute("log_level", ll)
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_level", ll)
+		} else {
+			envVars["VAULT_LOG_LEVEL"] = ll
+		}
 	}
 
 	if label, ok := c.Listener.Type.Get(); ok {
@@ -1006,10 +1065,24 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 	// Ignore shamir seals because they don't actually have a config stanza
 	if label, ok := c.Seal.Type.Get(); ok && label != "shamir" {
 		if attrs, ok := c.Seal.Attrs.GetObject(); ok {
-			hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+			if configMode == "file" {
+				hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+			} else {
+				trans := sealAttrEnvVarTranslator{}
+				sealEnvVars, err := trans.ToEnvVars(label, attrs)
+				if err != nil {
+					return nil, nil, err
+				}
+				for k, v := range sealEnvVars {
+					envVars[k] = v
+				}
+			}
 		}
 	}
 
+	if c.Seals.needsMultiseal() {
+		hclBuilder.AppendAttribute("enable_multiseal", true)
+	}
 	for priority, seal := range c.Seals.Value() {
 		if label, ok := seal.Type.Get(); ok && label != "shamir" && label != "none" {
 			if attrs, ok := seal.Attrs.GetObject(); ok {
@@ -1037,8 +1110,20 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 					}
 				default:
 				}
-				hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
-				hclBuilder.AppendAttribute("enable_multiseal", true)
+
+				// Only write our seal config as env variables if we've only been configured with one
+				if !c.Seals.needsMultiseal() && configMode == "env" {
+					trans := sealAttrEnvVarTranslator{}
+					sealEnvVars, err := trans.ToEnvVars(label, attrs)
+					if err != nil {
+						return nil, nil, err
+					}
+					for k, v := range sealEnvVars {
+						envVars[k] = v
+					}
+				} else {
+					hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
+				}
 			}
 		}
 	}
@@ -1052,7 +1137,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 			storageBlock.AppendAttribute("path", defaultRaftDataDir)
 			clusterName, ok := c.ClusterName.Get()
 			if !ok {
-				return nil, errors.New("ClusterName not found in Vault config")
+				return nil, nil, errors.New("ClusterName not found in Vault config")
 			}
 			storageBlock.AppendBlock("retry_join", []string{}).
 				AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
@@ -1060,7 +1145,7 @@ func (c *vaultConfig) ToHCLConfig() (*hcl.Builder, error) {
 		}
 	}
 
-	return hclBuilder, nil
+	return hclBuilder, envVars, nil
 }
 
 func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transport) error {
@@ -1089,11 +1174,11 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 
 	envFilePath := "/etc/vault.d/vault.env"
 
-	var envVars []string
+	envVars := map[string]string{}
 	if environment, ok := s.Environment.Get(); ok {
 		for key, value := range environment {
 			if val, valOk := value.Get(); valOk {
-				envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+				envVars[key] = val
 			}
 		}
 	}
@@ -1119,32 +1204,49 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			return fmt.Errorf("failed to copy vault license, due to: %w", err)
 		}
 
-		envVars = append(envVars, fmt.Sprintf("VAULT_LICENSE_PATH=%s\n", licensePath))
+		envVars["VAULT_LICENSE_PATH"] = licensePath
+	}
+
+	// Render our vault configuration into HCL and/or environment variables.
+	configMode, ok := s.ConfigMode.Get()
+	if configMode == "" || !ok {
+		configMode = defaultVaultConfigMode
+	}
+
+	hclConfig, configEnv, err := s.Config.Render(configMode)
+	if err != nil {
+		return fmt.Errorf("failed to create the vault HCL configuration, due to: %w", err)
+	}
+
+	for k, v := range configEnv {
+		envVars[k] = v
+	}
+
+	// Write our config file
+	err = hcl.CreateHCLConfigFile(ctx, transport, hcl.NewCreateHCLConfigFileRequest(
+		hcl.WithHCLConfigFilePath(configFilePath),
+		hcl.WithHCLConfigChmod("640"),
+		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
+		hcl.WithHCLConfigFile(hclConfig),
+	))
+	if err != nil {
+		return fmt.Errorf("failed to create the vault configuration file, due to: %w", err)
+	}
+
+	// Write our environment variables file.
+	envVarsString := strings.Builder{}
+	for k, v := range envVars {
+		envVarsString.WriteString(k + "=" + v + "\n")
 	}
 
 	err = remoteflight.CopyFile(ctx, transport, remoteflight.NewCopyFileRequest(
 		remoteflight.WithCopyFileDestination(envFilePath),
 		remoteflight.WithCopyFileChmod("644"),
 		remoteflight.WithCopyFileChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-		remoteflight.WithCopyFileContent(tfile.NewReader(strings.Join(envVars, "\n"))),
+		remoteflight.WithCopyFileContent(tfile.NewReader(envVarsString.String())),
 	))
 	if err != nil {
 		return fmt.Errorf("failed to create the vault environment file, due to: %w", err)
-	}
-
-	// Create the vault HCL configuration file
-	config, err := s.Config.ToHCLConfig()
-	if err != nil {
-		return fmt.Errorf("failed to create the vault HCL configuration, due to: %w", err)
-	}
-	err = hcl.CreateHCLConfigFile(ctx, transport, hcl.NewCreateHCLConfigFileRequest(
-		hcl.WithHCLConfigFilePath(configFilePath),
-		hcl.WithHCLConfigChmod("640"),
-		hcl.WithHCLConfigChown(fmt.Sprintf("%s:%s", vaultUsername, vaultUsername)),
-		hcl.WithHCLConfigFile(config),
-	))
-	if err != nil {
-		return fmt.Errorf("failed to create the vault configuration file, due to: %w", err)
 	}
 
 	sysd := systemd.NewClient(transport, log.NewLogger(ctx))
@@ -1255,4 +1357,206 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 	}
 
 	return err
+}
+
+type sealAttrEnvVarTranslator struct{}
+
+func (s *sealAttrEnvVarTranslator) sealAttrToString(attr any) (string, error) {
+	switch t := attr.(type) {
+	case string:
+		s, ok := attr.(string)
+		if !ok {
+			return "", fmt.Errorf("could not cast attr of type %v to string", t)
+		}
+
+		return s, nil
+	case int:
+		return strconv.FormatInt(int64(attr.(int)), 10), nil
+	default:
+		return "", fmt.Errorf("unsupported seal attribute value, got %v for %s, must be string or integer", t, attr)
+	}
+}
+
+// ToEnvVars takes our seal attributes and coverts them into the corresponding vault
+// environment variable key/value pairs.
+func (s *sealAttrEnvVarTranslator) ToEnvVars(seal string, in map[string]any) (map[string]string, error) {
+	if seal == "" {
+		return nil, errors.New("no seal type provided")
+	}
+
+	if len(in) < 1 {
+		return nil, errors.New("no seal attributes provided")
+	}
+
+	switch seal {
+	case "alicloudkms":
+		return s.translateAliCloudKMS(in)
+	case "awskms":
+		return s.translateAWSKMS(in)
+	case "azurekeyvault":
+		return s.translateAzureKeyVault(in)
+	case "gcpckms":
+		return s.translateGCPKMS(in)
+	case "ocikms":
+		return s.translateOCIKMS(in)
+	case "pkcs11":
+		return s.translatePKCS11(in)
+	case "transit":
+		return s.translateTransit(in)
+	default:
+		return nil, fmt.Errorf("%v is not a supported seal type", seal)
+	}
+}
+
+func (s *sealAttrEnvVarTranslator) translateAliCloudKMS(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "alicloudkms"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "kms_key_id":
+			out["VAULT_ALICLOUDKMS_SEAL_KEY_ID"] = v
+		case "name", "priority":
+		default:
+			out["ALICLOUD_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translateAWSKMS(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "awskms"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "kms_key_id":
+			out["VAULT_AWSKMS_SEAL_KEY_ID"] = v
+		case "secret_key":
+			out["AWS_SECRET_ACCESS_KEY"] = v
+		case "name", "priority":
+		default:
+			out["AWS_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translateAzureKeyVault(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "azurekeyvault"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "vault_name", "key_name":
+			out["VAULT_AZUREKEYVAULT_"+strings.ToUpper(k)] = v
+		case "resource":
+			out["AZURE_AD_RESOURCE"] = v
+		case "name", "priority":
+		default:
+			out["AZURE_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translateGCPKMS(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "gcpckms"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "key_ring", "crypto_ring", "crypto_key":
+			out["VAULT_GCPCKMS_SEAL_"+strings.ToUpper(k)] = v
+		case "name", "priority":
+		default:
+			out["GOOGLE_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translatePKCS11(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "pkcs11"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "default_hmac_key_label":
+			out["VAULT_HSM_HMAC_DEFAULT_KEY_LABEL"] = v
+		case "name", "priority":
+		default:
+			out["VAULT_HSM_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translateOCIKMS(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "ocikms"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "key_id":
+			out["VAULT_OCIKMS_SEAL_KEY_ID"] = v
+		case "name", "priority":
+		default:
+			out["VAULT_OCIKMS_"+strings.ToUpper(k)] = v
+		}
+	}
+
+	return out, nil
+}
+
+func (s *sealAttrEnvVarTranslator) translateTransit(in map[string]any) (map[string]string, error) {
+	out := map[string]string{"VAULT_SEAL_TYPE": "transit"}
+
+	for k, v := range in {
+		v, err := s.sealAttrToString(v)
+		if err != nil {
+			return nil, err
+		}
+		switch k {
+		case "address":
+			out["VAULT_ADDR"] = v
+		case "token", "namespace":
+			out["VAULT_"+strings.ToUpper(k)] = v
+		case "key_name", "mount_path", "disable_renewal":
+			out["VAULT_TRANSIT_SEAL_"+strings.ToUpper(k)] = v
+		case "tls_ca_cert", "tls_client_cert", "tls_client_key", "tls_skip_verify":
+			out["VAULT_"+strings.ToUpper(strings.TrimPrefix(k, "tls_"))] = v
+		case "tls_server_name":
+			out["VAULT_TLS_SERVER_NAME"] = v
+		case "key_id_prefix", "name", "priority":
+			// This doesn't have a documented env var equivalent
+		default:
+			return nil, fmt.Errorf("unknown transit seal key: %v", k)
+		}
+	}
+
+	return out, nil
 }

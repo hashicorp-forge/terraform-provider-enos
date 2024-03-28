@@ -244,3 +244,197 @@ func TestAccResourceVaultStart(t *testing.T) {
 		})
 	}
 }
+
+// Test_sealAttrsToEnvVars tests converting our seal attributes into their respective values.
+func Test_sealAttrsToEnvVars(t *testing.T) {
+	t.Parallel()
+
+	for name, test := range map[string]struct {
+		in         map[string]any
+		expected   map[string]string
+		shouldFail bool
+	}{
+		"alicloudkms": {
+			in: map[string]any{
+				"region":     "us-east-1",
+				"access_key": "AKIAIOSFODNN7EXAMPLE",
+				"secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"kms_key_id": "19ec80b0-dfdd-4d97-8164-c6examplekey",
+			},
+			expected: map[string]string{
+				"ALICLOUD_REGION":               "us-east-1",
+				"ALICLOUD_ACCESS_KEY":           "AKIAIOSFODNN7EXAMPLE",
+				"ALICLOUD_SECRET_KEY":           "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"VAULT_ALICLOUDKMS_SEAL_KEY_ID": "19ec80b0-dfdd-4d97-8164-c6examplekey",
+				"VAULT_SEAL_TYPE":               "alicloudkms",
+			},
+		},
+		"awskms": {
+			in: map[string]any{
+				"region":     "us-east-1",
+				"access_key": "0wNEpMMlzy7szvai",
+				"secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"kms_key_id": "19ec80b0-dfdd-4d97-8164-c6examplekey",
+				"endpoint":   "https://vpce-0e1bb1852241f8cc6-pzi0do8n.kms.us-east-1.vpce.amazonaws.com",
+				"priority":   "1",
+				"name":       "primary",
+			},
+			expected: map[string]string{
+				"AWS_REGION":               "us-east-1",
+				"AWS_ACCESS_KEY":           "0wNEpMMlzy7szvai",
+				"AWS_SECRET_ACCESS_KEY":    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"AWS_ENDPOINT":             "https://vpce-0e1bb1852241f8cc6-pzi0do8n.kms.us-east-1.vpce.amazonaws.com",
+				"VAULT_AWSKMS_SEAL_KEY_ID": "19ec80b0-dfdd-4d97-8164-c6examplekey",
+				"VAULT_SEAL_TYPE":          "awskms",
+			},
+		},
+		"azurekeyvault": {
+			in: map[string]any{
+				"tenant_id":     "46646709-b63e-4747-be42-516edeaf1e14",
+				"client_id":     "03dc33fc-16d9-4b77-8152-3ec568f8af6e",
+				"client_secret": "DUJDS3...",
+				"environment":   "AZUREPUBLICCLOUD",
+				"resource":      "vault.azure.net",
+				"vault_name":    "hc-vault",
+				"key_name":      "vault_key",
+				"priority":      "1",
+				"name":          "primary",
+			},
+			expected: map[string]string{
+				"AZURE_TENANT_ID":                "46646709-b63e-4747-be42-516edeaf1e14",
+				"AZURE_CLIENT_ID":                "03dc33fc-16d9-4b77-8152-3ec568f8af6e",
+				"AZURE_CLIENT_SECRET":            "DUJDS3...",
+				"AZURE_ENVIRONMENT":              "AZUREPUBLICCLOUD",
+				"AZURE_AD_RESOURCE":              "vault.azure.net",
+				"VAULT_AZUREKEYVAULT_VAULT_NAME": "hc-vault",
+				"VAULT_AZUREKEYVAULT_KEY_NAME":   "vault_key",
+				"VAULT_SEAL_TYPE":                "azurekeyvault",
+			},
+		},
+		"gcpckms": {
+			in: map[string]any{
+				"credentials": "/usr/vault/vault-project-user-creds.json",
+				"project":     "vault-project",
+				"region":      "global",
+				"key_ring":    "vault-keyring",
+				"crypto_key":  "vault-key",
+				"priority":    "1",
+				"name":        "primary",
+			},
+			expected: map[string]string{
+				"GOOGLE_CREDENTIALS":            "/usr/vault/vault-project-user-creds.json",
+				"GOOGLE_PROJECT":                "vault-project",
+				"GOOGLE_REGION":                 "global",
+				"VAULT_GCPCKMS_SEAL_KEY_RING":   "vault-keyring",
+				"VAULT_GCPCKMS_SEAL_CRYPTO_KEY": "vault-key",
+				"VAULT_SEAL_TYPE":               "gcpckms",
+			},
+		},
+		"pkcs11": {
+			in: map[string]any{
+				"default_key_label":      "ignored",
+				"default_hmac_key_label": "ignored_hmac",
+				"force_rw_session":       "true",
+				"generate_key":           "true",
+				"key_id":                 "0xba5eba11",
+				"hmac_key_id":            "0x33333435363434373537",
+				"hmac_key_label":         "vault-hsm-hmac-key",
+				"hmac_mechanism":         "0x0251",
+				"key_label":              "vault-hsm-key",
+				"lib":                    "/usr/vault/lib/libCryptoki2_64.so",
+				"max_parallel":           1,
+				"mechanism":              "0x1085",
+				"pin":                    "AAAA-BBBB-CCCC-DDDD",
+				"rsa_encrypt_local":      "true",
+				"rsa_oaep_hash":          "sha256",
+				"slot":                   "2305843009213693953",
+				"token_label":            "vault-token-label",
+				"priority":               "1",
+				"name":                   "primary",
+			},
+			expected: map[string]string{
+				"VAULT_HSM_DEFAULT_KEY_LABEL":      "ignored",
+				"VAULT_HSM_FORCE_RW_SESSION":       "true",
+				"VAULT_HSM_GENERATE_KEY":           "true",
+				"VAULT_HSM_HMAC_DEFAULT_KEY_LABEL": "ignored_hmac",
+				"VAULT_HSM_HMAC_KEY_LABEL":         "vault-hsm-hmac-key",
+				"VAULT_HSM_HMAC_KEY_ID":            "0x33333435363434373537",
+				"VAULT_HSM_HMAC_MECHANISM":         "0x0251",
+				"VAULT_HSM_KEY_ID":                 "0xba5eba11",
+				"VAULT_HSM_KEY_LABEL":              "vault-hsm-key",
+				"VAULT_HSM_LIB":                    "/usr/vault/lib/libCryptoki2_64.so",
+				// VAULT_HSM_MAX_PARALLEL might not do anything from the env
+				"VAULT_HSM_MAX_PARALLEL":      "1",
+				"VAULT_HSM_MECHANISM":         "0x1085",
+				"VAULT_HSM_PIN":               "AAAA-BBBB-CCCC-DDDD",
+				"VAULT_HSM_RSA_ENCRYPT_LOCAL": "true",
+				"VAULT_HSM_RSA_OAEP_HASH":     "sha256",
+				"VAULT_HSM_SLOT":              "2305843009213693953",
+				"VAULT_HSM_TOKEN_LABEL":       "vault-token-label",
+				"VAULT_SEAL_TYPE":             "pkcs11",
+			},
+		},
+		"ocikms": {
+			in: map[string]any{
+				"key_id":              "ocid1.key.oc1.iad.afnxza26aag4s.abzwkljsbapzb2nrha5nt3s7s7p42ctcrcj72vn3kq5qx",
+				"crypto_endpoint":     "https://afnxza26aag4s-crypto.kms.us-ashburn-1.oraclecloud.com",
+				"management_endpoint": "https://afnxza26aag4s-management.kms.us-ashburn-1.oraclecloud.com",
+				"auth_type_api_key":   "true",
+				"priority":            "1",
+				"name":                "primary",
+			},
+			expected: map[string]string{
+				"VAULT_OCIKMS_SEAL_KEY_ID":         "ocid1.key.oc1.iad.afnxza26aag4s.abzwkljsbapzb2nrha5nt3s7s7p42ctcrcj72vn3kq5qx",
+				"VAULT_OCIKMS_CRYPTO_ENDPOINT":     "https://afnxza26aag4s-crypto.kms.us-ashburn-1.oraclecloud.com",
+				"VAULT_OCIKMS_MANAGEMENT_ENDPOINT": "https://afnxza26aag4s-management.kms.us-ashburn-1.oraclecloud.com",
+				// VAULT_OCIKMS_AUTH_TYPE_API_KEY may not actually do anything
+				"VAULT_OCIKMS_AUTH_TYPE_API_KEY": "true",
+				"VAULT_SEAL_TYPE":                "ocikms",
+			},
+		},
+		"transit": {
+			in: map[string]any{
+				"address":         "https://vault:8200",
+				"token":           "s.Qf1s5zigZ4OX6akYjQXJC1jY",
+				"disable_renewal": "false",
+				"key_name":        "transit_key_name",
+				"key_id_prefix":   "transit_key_id_prefix",
+				"mount_path":      "transit/",
+				"namespace":       "ns1/",
+				"tls_ca_cert":     "/etc/vault/ca_cert.pem",
+				"tls_client_cert": "/etc/vault/client_cert.pem",
+				"tls_client_key":  "/etc/vault/ca_cert.pem",
+				"tls_server_name": "vault",
+				"tls_skip_verify": "false",
+				"priority":        "1",
+				"name":            "primary",
+			},
+			expected: map[string]string{
+				"VAULT_ADDR":                         "https://vault:8200",
+				"VAULT_TOKEN":                        "s.Qf1s5zigZ4OX6akYjQXJC1jY",
+				"VAULT_TRANSIT_SEAL_DISABLE_RENEWAL": "false",
+				"VAULT_TRANSIT_SEAL_KEY_NAME":        "transit_key_name",
+				"VAULT_TRANSIT_SEAL_MOUNT_PATH":      "transit/",
+				"VAULT_NAMESPACE":                    "ns1/",
+				"VAULT_CA_CERT":                      "/etc/vault/ca_cert.pem",
+				"VAULT_CLIENT_CERT":                  "/etc/vault/client_cert.pem",
+				"VAULT_CLIENT_KEY":                   "/etc/vault/ca_cert.pem",
+				"VAULT_TLS_SERVER_NAME":              "vault",
+				"VAULT_SKIP_VERIFY":                  "false",
+				"VAULT_SEAL_TYPE":                    "transit",
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			trans := sealAttrEnvVarTranslator{}
+			got, err := trans.ToEnvVars(name, test.in)
+			if test.shouldFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.EqualValues(t, test.expected, got)
+		})
+	}
+}
