@@ -100,9 +100,7 @@ resource "enos_vault_start" "leader" {
   ]
   for_each = local.leader
 
-  bin_path       = local.vault_bin_path
-  config_dir     = var.vault_config_dir
-  manage_service = var.manage_service
+  bin_path = local.vault_bin_path
   config = {
     api_addr     = "http://${aws_instance.vault_instance[each.key].private_ip}:8200"
     cluster_addr = "http://${aws_instance.vault_instance[each.key].private_ip}:8201"
@@ -125,11 +123,13 @@ resource "enos_vault_start" "leader" {
     }
     ui = true
   }
-  license   = var.vault_license
-  unit_name = "vault"
-  username  = local.vault_service_user
-
-  environment = var.vault_environment
+  config_dir     = var.vault_config_dir
+  config_mode    = var.config_mode
+  environment    = var.vault_environment
+  license        = var.vault_license
+  manage_service = var.manage_service
+  username       = local.vault_service_user
+  unit_name      = "vault"
 
   transport = {
     ssh = {
@@ -144,9 +144,7 @@ resource "enos_vault_start" "followers" {
   ]
   for_each = local.followers
 
-  bin_path       = local.vault_bin_path
-  config_dir     = var.vault_config_dir
-  manage_service = var.manage_service
+  bin_path = local.vault_bin_path
   config = {
     api_addr     = "http://${aws_instance.vault_instance[each.key].private_ip}:8200"
     cluster_addr = "http://${aws_instance.vault_instance[each.key].private_ip}:8201"
@@ -166,11 +164,13 @@ resource "enos_vault_start" "followers" {
     seal = local.seal[var.unseal_method]
     ui   = true
   }
-  license   = var.vault_license
-  unit_name = "vault"
-  username  = local.vault_service_user
-
-  environment = var.vault_environment
+  config_dir     = var.vault_config_dir
+  config_mode    = var.config_mode
+  environment    = var.vault_environment
+  license        = var.vault_license
+  manage_service = var.manage_service
+  username       = local.vault_service_user
+  unit_name      = "vault"
 
   transport = {
     ssh = {

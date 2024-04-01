@@ -4,6 +4,7 @@
 scenario "vault" {
   matrix {
     backend       = ["consul", "raft"]
+    config_mode   = ["file", "env"]
     distro        = ["ubuntu", "rhel"]
     arch          = ["amd64", "arm64"]
     edition       = ["ce", "ent"]
@@ -147,6 +148,7 @@ scenario "vault" {
 
     variables {
       ami_id             = step.infra.ami_ids[matrix.distro][matrix.arch]
+      config_mode        = matrix.config_mode
       consul_cluster_tag = null
       instance_type      = local.instance_types[matrix.arch]
       kms_key_arn        = step.infra.kms_key_arn

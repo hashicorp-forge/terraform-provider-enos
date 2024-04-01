@@ -54,6 +54,7 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 ### Optional
 
 - `config_dir` (String) The path where Vault configuration will reside
+- `config_mode` (String) The preferred method of configuring vault. Valid options are 'file' or 'env'
 - `environment` (Map of String) An optional map of key/value pairs for additional environment variables to set when running the vault service.
 - `license` (String, Sensitive) The Vault Enterprise license
 - `manage_service` (Boolean) Whether or not Enos will be responsible for creating and managing the systemd unit for Vault
@@ -64,17 +65,6 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `transport.ssh.private_key_path` (String) the path to a private key file
 - `transport.ssh.passphrase` (String) a passphrase if the private key requires one
 - `transport.ssh.passphrase_path` (String) a path to a file with the passphrase for the private key
-- `transport.kubernetes` (Object) the kubernetes transport configuration
-- `transport.kubernetes.kubeconfig_base64` (String) base64 encoded kubeconfig
-- `transport.kubernetes.context_name` (String) the name of the kube context to access
-- `transport.kubernetes.namespace` (String) the namespace of pod to access
-- `transport.kubernetes.pod` (String) the name of the pod to access|string
-- `transport.kubernetes.container` (String) the name of the container to access
-- `transport.nomad` (Object) the nomad transport configuration
-- `transport.nomad.host` (String) nomad server host, i.e. http://23.56.78.9:4646
-- `transport.nomad.secret_id` (String) the nomad server secret for authenticated connections
-- `transport.nomad.allocation_id` (String) the allocation id for the allocation to access
-- `transport.nomad.task_name` (String) the name of the task within the allocation to access
 - `unit_name` (String) The systemd unit name
 - `username` (String) The local service user name
 
