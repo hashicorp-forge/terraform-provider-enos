@@ -1009,7 +1009,7 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	return nil
 }
 
-// Render takes a preferred configuration mode (file, env) and return an HCL builder, a make of
+// Render takes a preferred configuration mode (file, env) and return an HCL builder, a map of
 // environment variables, and any errors that are encountered along the way. As not all configuration
 // is settable via environment variables we'll often have to use both the HCL and env variables
 // regardless of the preferred mode. We support two configuration modes to allow us to test
