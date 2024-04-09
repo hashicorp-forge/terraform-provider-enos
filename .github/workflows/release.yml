@@ -22,7 +22,7 @@ jobs:
       - name: Import gpg key
         uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6.1.0
         with:
-          gpg_private_key: ${{ secrets.GPG_PRIV_SIGNING_KEY }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
       - name: Upload artifacts
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
@@ -64,6 +64,7 @@ jobs:
           gpg --list-signatures
           go run ./tools/publish/cmd github create \
             --dist ./dist \
+            --gpg-key-id "${{ secrets.GPG_KEY_ID }}" \
             --commit "${{ inputs.sha }}" \
             --version "$(cat VERSION)" \
             --manifest-path terraform-registry-manifest.json
