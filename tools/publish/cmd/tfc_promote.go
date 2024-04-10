@@ -83,7 +83,7 @@ func runTFCPromoteCmd(cmd *cobra.Command, args []string) {
 
 	exitIfErr(publishPromote.AddGoBinariesFrom(tfcPromoteCfg.PromoteDir))
 
-	exitIfErr(publishPromote.WriteSHA256Sums(ctx, tfcPromoteCfg.GPGIdentityName, true))
+	exitIfErr(publishPromote.WriteSHA256Sums(ctx, publish.RegistryTypePrivate, tfcPromoteCfg.GPGIdentityName, true))
 
 	uploadCfg := &publish.TFCUploadReq{
 		DistDir:         tfcPromoteCfg.PromoteDir,

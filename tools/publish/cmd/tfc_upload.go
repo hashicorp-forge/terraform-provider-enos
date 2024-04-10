@@ -45,21 +45,21 @@ func runTFCUploadCmd(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), rootCfg.requestTimeout)
 	defer cancel()
 
-	publish := publish.NewLocal(tfcUploadCfg.ProviderName, tfcUploadCfg.BinaryName, publish.WithLocalBinaryRename(tfcUploadCfg.BinaryRename))
-	err := publish.Initialize()
+	mirror := publish.NewLocal(tfcUploadCfg.ProviderName, tfcUploadCfg.BinaryName, publish.WithLocalBinaryRename(tfcUploadCfg.BinaryRename))
+	err := mirror.Initialize()
 	exitIfErr(err)
-	defer publish.Close()
+	defer mirror.Close()
 
 	lvl, err := zapcore.ParseLevel(rootCfg.logLevel)
 	exitIfErr(err)
 
-	exitIfErr(publish.SetLogLevel(lvl))
+	exitIfErr(mirror.SetLogLevel(lvl))
 
-	exitIfErr(publish.AddGoBinariesFrom(tfcUploadCfg.DistDir))
+	exitIfErr(mirror.AddGoBinariesFrom(tfcUploadCfg.DistDir))
 
-	exitIfErr(publish.WriteSHA256Sums(ctx, tfcUploadCfg.GPGIdentityName, true))
+	exitIfErr(mirror.WriteSHA256Sums(ctx, publish.RegistryTypePrivate, tfcUploadCfg.GPGIdentityName, true))
 
-	exitIfErr(publish.PublishToTFC(ctx, tfcUploadCfg))
+	exitIfErr(mirror.PublishToTFC(ctx, tfcUploadCfg))
 
 	os.Exit(0)
 }

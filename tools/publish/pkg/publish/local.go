@@ -159,11 +159,11 @@ func (l *Local) WriteMetadata() error {
 }
 
 // WriteSHA256Sums writes a detached signature of the source file to the outfile.
-func (l *Local) WriteSHA256Sums(ctx context.Context, name string, sign bool) error {
+func (l *Local) WriteSHA256Sums(ctx context.Context, regType RegistryType, name string, sign bool) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	return l.artifacts.WriteSHA256SUMS(ctx, name, sign)
+	return l.artifacts.WriteSHA256SUMS(ctx, regType, name, sign)
 }
 
 // PublishToTFC publishes artifact version to TFC org.

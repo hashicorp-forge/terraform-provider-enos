@@ -4,12 +4,16 @@
 package publish
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -177,5 +181,99 @@ func TestProviderBinariesRoundTrip(t *testing.T) {
 		dfC, err := io.ReadAll(dF)
 		require.NoError(t, err)
 		require.Equal(t, sfC, dfC)
+	}
+}
+
+// TestAddGoBinariesFrom verifies that the local mirror will have all of the required files
+// for a public release.
+// See https://developer.hashicorp.com/terraform/registry/providers/publishing#manually-preparing-a-release
+func TestPublicRegistry(t *testing.T) {
+	t.Parallel()
+
+	gpgident := os.Getenv("TEST_GPG_IDENTITY_NAME")
+	if gpgident == "" {
+		t.Skip("skipping as TEST_GPG_IDENTITY_NAME environement variable is not set to a gpg identity")
+	}
+
+	// Allow a lot of time to handle GPG passphrase pin entry
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	var err error
+
+	// Create our local mirror
+	mirror := NewLocal("enos", "terraform-provider-enos")
+	err = mirror.Initialize()
+	require.NoError(t, err)
+
+	// Add our registry manifest
+	content := `{"version":1,"metadata":{"protocol_versions":["6.0"]}}`
+	path := filepath.Join(dir, "manifest.json")
+	require.NoError(t, os.WriteFile(path, []byte(content), fs.FileMode(0o755)))
+	require.NoError(t, mirror.AddReleaseManifest(ctx, path, "0.5.0"))
+
+	// Add our binaries
+	for _, bin := range []string{
+		"terraform-provider-enos_0.5.0_darwin_amd64",
+		"terraform-provider-enos_0.5.0_darwin_arm64",
+		"terraform-provider-enos_0.5.0_linux_amd64",
+		"terraform-provider-enos_0.5.0_linux_arm64",
+	} {
+		err = os.WriteFile(filepath.Join(dir, bin), []byte(bin), 0o755)
+		require.NoError(t, err)
+	}
+	err = mirror.AddGoBinariesFrom(dir)
+	require.NoError(t, err)
+
+	// Create a manifest
+	require.NoError(t, mirror.CreateVersionedRegistryManifest(ctx))
+
+	// Write the SHA256Sums
+	require.NoError(t, mirror.WriteSHA256Sums(ctx, RegistryTypePublic, gpgident, true))
+
+	// Make sure the mirror has all the expected files
+	for _, blob := range []string{
+		"terraform-provider-enos_0.5.0_linux_amd64.zip",
+		"terraform-provider-enos_0.5.0_linux_arm64.zip",
+		"terraform-provider-enos_0.5.0_darwin_amd64.zip",
+		"terraform-provider-enos_0.5.0_darwin_arm64.zip",
+		"terraform-provider-enos_0.5.0_SHA256SUMS",
+		"terraform-provider-enos_0.5.0_SHA256SUMS.sig",
+		"terraform-provider-enos_0.5.0_manifest.json",
+	} {
+		_, err = os.Stat(filepath.Join(mirror.artifacts.dir, blob))
+		if err != nil {
+			t.Logf("did not find file  matching '%s' in local mirror", blob)
+			files, err1 := os.ReadDir(mirror.artifacts.dir)
+			require.NoError(t, err1)
+			t.Logf("found files %v+", files)
+			t.FailNow()
+		}
+	}
+
+	// Make sure our SHASUMS has a line entry for each blob
+	sums, err := os.Open(filepath.Join(mirror.artifacts.dir, "terraform-provider-enos_0.5.0_SHA256SUMS"))
+	require.NoError(t, err)
+	sbytes, err := io.ReadAll(sums)
+	require.NoError(t, err)
+LOOP:
+	for _, name := range []string{
+		"terraform-provider-enos_0.5.0_linux_amd64.zip",
+		"terraform-provider-enos_0.5.0_linux_arm64.zip",
+		"terraform-provider-enos_0.5.0_darwin_amd64.zip",
+		"terraform-provider-enos_0.5.0_darwin_arm64.zip",
+		"terraform-provider-enos_0.5.0_manifest.json",
+	} {
+		scanner := bufio.NewScanner(bytes.NewBuffer(sbytes))
+		for scanner.Scan() {
+			if strings.Contains(scanner.Text(), name) {
+				break LOOP
+			}
+		}
+		require.NoError(t, scanner.Err())
+		t.Logf("did not find line matchig '%s' in SHA256SUMS", name)
+		t.Logf("content of file:\n%s", string(sbytes))
+		t.FailNow()
 	}
 }
