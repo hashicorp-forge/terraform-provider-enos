@@ -60,6 +60,8 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
       - name: Create a Github release
+        env:
+          GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         run: |
           gpg --list-signatures
           go run ./tools/publish/cmd github create \
