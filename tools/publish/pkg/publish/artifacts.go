@@ -137,7 +137,7 @@ func (a *Artifacts) SHA256Sum(path string) (string, error) {
 type RegistryManifest struct {
 	Version  json.Number `json:"version,omitempty"`
 	Metadata struct {
-		ProtocolVersions []json.Number `json:"protocol_versions,omitempty"`
+		ProtocolVersions []string `json:"protocol_versions,omitempty"`
 	} `json:"metadata,omitempty"`
 	// The rest of the fields we track internally but don't marshal to and from the base and versioned manifest
 	sha256sum     string
