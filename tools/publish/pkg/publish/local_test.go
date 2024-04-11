@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"io/fs"
 	"os"
@@ -213,6 +215,11 @@ func TestPublicRegistry(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(content), fs.FileMode(0o755)))
 	require.NoError(t, mirror.AddReleaseManifest(ctx, path, "0.5.0"))
 
+	// Start tracking our expected SHA256SUMS
+	expectedShas := map[string][32]byte{
+		"terraform-provider-enos_0.5.0_manifest.json": sha256.Sum256([]byte(content)),
+	}
+
 	// Add our binaries
 	for _, bin := range []string{
 		"terraform-provider-enos_0.5.0_darwin_amd64",
@@ -222,7 +229,13 @@ func TestPublicRegistry(t *testing.T) {
 	} {
 		err = os.WriteFile(filepath.Join(dir, bin), []byte(bin), 0o755)
 		require.NoError(t, err)
+		f, err := os.Open(filepath.Join(dir, bin))
+		require.NoError(t, err)
+		bytes, err := io.ReadAll(f)
+		require.NoError(t, err)
+		expectedShas[bin+".zip"] = sha256.Sum256(bytes)
 	}
+
 	err = mirror.AddGoBinariesFrom(dir)
 	require.NoError(t, err)
 
@@ -252,27 +265,26 @@ func TestPublicRegistry(t *testing.T) {
 		}
 	}
 
-	// Make sure our SHASUMS has a line entry for each blob
+	// Make sure our SHASUMS has a line entry for each blob and that it has a matching SHA256SUM
 	sums, err := os.Open(filepath.Join(mirror.artifacts.dir, "terraform-provider-enos_0.5.0_SHA256SUMS"))
 	require.NoError(t, err)
 	sbytes, err := io.ReadAll(sums)
 	require.NoError(t, err)
 LOOP:
-	for _, name := range []string{
-		"terraform-provider-enos_0.5.0_linux_amd64.zip",
-		"terraform-provider-enos_0.5.0_linux_arm64.zip",
-		"terraform-provider-enos_0.5.0_darwin_amd64.zip",
-		"terraform-provider-enos_0.5.0_darwin_arm64.zip",
-		"terraform-provider-enos_0.5.0_manifest.json",
-	} {
+	for name, sha256 := range expectedShas {
 		scanner := bufio.NewScanner(bytes.NewBuffer(sbytes))
 		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), name) {
+			parts := strings.SplitN(scanner.Text(), " ", 2)
+			if len(parts) != 2 {
+				continue
+			}
+
+			if parts[1] == name && parts[0] == hex.EncodeToString(sha256[:]) {
 				break LOOP
 			}
 		}
 		require.NoError(t, scanner.Err())
-		t.Logf("did not find line matchig '%s' in SHA256SUMS", name)
+		t.Logf("did not find line matching '%s %s' in SHA256SUMS", hex.EncodeToString(sha256[:]), name)
 		t.Logf("content of file:\n%s", string(sbytes))
 		t.FailNow()
 	}

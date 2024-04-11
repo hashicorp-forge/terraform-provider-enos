@@ -132,16 +132,12 @@ func (a *Artifacts) SHA256Sum(path string) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(bytes)), nil
 }
 
-// RegistryManifest is the public registry manifest
-// https://developer.hashicorp.com/terraform/registry/providers/publishing#terraform-registry-manifest-file
+// RegistryManifest is the public registry manifest.
 type RegistryManifest struct {
-	Version  json.Number `json:"version,omitempty"`
-	Metadata struct {
-		ProtocolVersions []string `json:"protocol_versions,omitempty"`
-	} `json:"metadata,omitempty"`
-	// The rest of the fields we track internally but don't marshal to and from the base and versioned manifest
 	sha256sum     string
 	versionedPath string
+	// https://developer.hashicorp.com/terraform/registry/providers/publishing#terraform-registry-manifest-file
+	bytes []byte
 }
 
 // Add the base release manifest into the artifacts.
@@ -162,16 +158,11 @@ func (a *Artifacts) AddReleaseManifest(ctx context.Context, path, version string
 		return err
 	}
 
-	man := &RegistryManifest{
+	a.registryManifest = &RegistryManifest{
 		versionedPath: filepath.Join(a.dir, a.providerName+"_"+version+"_manifest.json"),
 		sha256sum:     fmt.Sprintf("%x", sha256.Sum256(bytes)),
+		bytes:         bytes,
 	}
-	err = json.Unmarshal(bytes, man)
-	if err != nil {
-		return err
-	}
-
-	a.registryManifest = man
 
 	return nil
 }
@@ -284,11 +275,6 @@ func (a *Artifacts) CreateVersionedRegistryManifest(ctx context.Context) error {
 		return errors.New("cannot create a versioned registry manifest unless the base version has been loaded")
 	}
 
-	body, err := json.Marshal(a.registryManifest)
-	if err != nil {
-		return err
-	}
-
 	a.log.Infow(
 		"creating registry manifest",
 		"path", a.registryManifest.versionedPath,
@@ -299,7 +285,7 @@ func (a *Artifacts) CreateVersionedRegistryManifest(ctx context.Context) error {
 		return err
 	}
 
-	_, err = f.Write(body)
+	_, err = f.Write(a.registryManifest.bytes)
 
 	return err
 }
