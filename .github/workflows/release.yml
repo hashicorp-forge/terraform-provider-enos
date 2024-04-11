@@ -64,6 +64,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         run: |
           gpg --list-signatures
+          # actions/download-artifact doesn't preserve file permissions. Reset the exec bits.
+          chmod 755 dist/*
           go run ./tools/publish/cmd github create \
             --dist ./dist \
             --gpg-key-id "${{ secrets.GPG_KEY_ID }}" \
