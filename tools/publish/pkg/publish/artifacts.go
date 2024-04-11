@@ -304,20 +304,41 @@ func (a *Artifacts) CreateVersionedRegistryManifest(ctx context.Context) error {
 	return err
 }
 
+type RegistryType string
+
+const (
+	RegistryTypePrivate RegistryType = "private"
+	RegistryTypePublic  RegistryType = "public"
+)
+
 // WriteSHA256SUMS writes the release SHA256SUMS file as required by TFC or the public registry.
-func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, sign bool) error {
+func (a *Artifacts) WriteSHA256SUMS(
+	ctx context.Context,
+	regType RegistryType,
+	gpgIdentityName string,
+	gpgDetachSign bool,
+) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	a.log.Infow(
 		"writing SHA256SUMS file",
-		"GPG signing", sign,
-		"identity name", identityName,
+		"registry type", regType,
+		"gpg DetachSign", gpgDetachSign,
+		"gpg identity name", gpgIdentityName,
 		"artifacts dir", a.dir,
 	)
 
 	for version, releases := range a.tfcMetadata {
-		shaPath := filepath.Join(a.dir, version+"_SHA256SUMS")
+		var shaPath string
+		switch regType {
+		case RegistryTypePrivate:
+			shaPath = filepath.Join(a.dir, version+"_SHA256SUMS")
+		case RegistryTypePublic:
+			shaPath = filepath.Join(a.dir, a.providerName+"_"+version+"_SHA256SUMS")
+		default:
+			return fmt.Errorf("unsupported registry type %s given", regType)
+		}
 
 		shaFile, err := os.OpenFile(shaPath, os.O_RDWR|os.O_CREATE, 0o755)
 		if err != nil {
@@ -346,13 +367,13 @@ func (a *Artifacts) WriteSHA256SUMS(ctx context.Context, identityName string, si
 			}
 		}
 
-		if !sign {
+		if !gpgDetachSign {
 			continue
 		}
 
 		// Sign it
-		sigPath := filepath.Join(a.dir, version+"_SHA256SUMS.sig")
-		err = a.WriteDetachedSignature(ctx, shaPath, sigPath, identityName)
+		sigPath := shaPath + ".sig"
+		err = a.WriteDetachedSignature(ctx, shaPath, sigPath, gpgIdentityName)
 		if err != nil {
 			return err
 		}
@@ -786,9 +807,16 @@ func (a *Artifacts) PublishToGithubRelease(ctx context.Context, req *GithubRelea
 		return err
 	}
 
-	err = client.uploadAsset(ctx, req, rel, a.registryManifest.versionedPath)
-	if err != nil {
-		return err
+	shaPath := filepath.Join(a.dir, a.providerName+"_"+req.Version+"_SHA256SUMS")
+	for _, asset := range []string{
+		a.registryManifest.versionedPath,
+		shaPath,
+		shaPath + ".sig",
+	} {
+		err = client.uploadAsset(ctx, req, rel, asset)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, releases := range a.tfcMetadata {

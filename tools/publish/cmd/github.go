@@ -116,7 +116,7 @@ func runGHReleaseCreateCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = stagedRelease.WriteSHA256Sums(ctx, githubReleaseCreateReq.GPGIdentityName, true)
+	err = stagedRelease.WriteSHA256Sums(ctx, publish.RegistryTypePublic, githubReleaseCreateReq.GPGIdentityName, true)
 	if err != nil {
 		return err
 	}
