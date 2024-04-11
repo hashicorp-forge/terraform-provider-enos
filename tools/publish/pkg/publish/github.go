@@ -82,6 +82,7 @@ func (g *githubClient) uploadAsset(
 	req *GithubReleaseCreateReq,
 	rel *github.RepositoryRelease,
 	path string,
+	mediaType string,
 ) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -89,7 +90,8 @@ func (g *githubClient) uploadAsset(
 	}
 	owner, repo := req.OwnerRepo()
 	opts := &github.UploadOptions{
-		Name: filepath.Base(path),
+		Name:      filepath.Base(path),
+		MediaType: mediaType,
 	}
 
 	g.Log.Infow("uploading github release asset",

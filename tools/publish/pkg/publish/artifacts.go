@@ -95,6 +95,11 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	zipHeader.Method = zip.Deflate
 	zipHeader.Modified = sourceInfo.ModTime()
 	zipHeader.SetMode(sourceInfo.Mode())
+	a.log.Infow("setting header mode for file",
+		"source", sourceBinaryPath,
+		"destination", zipFilePath,
+		"mode", sourceInfo.Mode(),
+	)
 
 	zipper := zip.NewWriter(zipFile)
 	binZip, err := zipper.CreateHeader(zipHeader)
@@ -106,8 +111,6 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	if err != nil {
 		return err
 	}
-
-	// If we have a registry manifest we need to create that as well
 
 	return zipper.Close()
 }
@@ -799,7 +802,7 @@ func (a *Artifacts) PublishToGithubRelease(ctx context.Context, req *GithubRelea
 		shaPath,
 		shaPath + ".sig",
 	} {
-		err = client.uploadAsset(ctx, req, rel, asset)
+		err = client.uploadAsset(ctx, req, rel, asset, "application/octet-stream")
 		if err != nil {
 			return err
 		}
@@ -807,7 +810,7 @@ func (a *Artifacts) PublishToGithubRelease(ctx context.Context, req *GithubRelea
 
 	for _, releases := range a.tfcMetadata {
 		for r := range releases {
-			err := client.uploadAsset(ctx, req, rel, releases[r].ZipFilePath)
+			err := client.uploadAsset(ctx, req, rel, releases[r].ZipFilePath, "application/zip")
 			if err != nil {
 				return err
 			}
