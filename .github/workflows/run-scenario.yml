@@ -46,10 +46,10 @@ jobs:
           # the terraform wrapper will break terraform execution in enos because
           # it changes the output to text when we expect it to be JSON.
           terraform_wrapper: false
-      - uses: hashicorp/action-setup-enos@v1
+      - uses: hashicorp/action-setup-enos@release-0.0.28
         with:
           github-token:
-            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+            ${{ secrets.GITHUB_TOKEN }}
       - name: Set up support files
         run: |
           mkdir -p enos/support

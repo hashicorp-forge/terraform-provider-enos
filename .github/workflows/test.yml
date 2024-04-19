@@ -135,10 +135,7 @@ jobs:
           # the terraform wrapper will break terraform execution in enos because
           # it changes the output to text when we expect it to be JSON.
           terraform_wrapper: false
-      - uses: hashicorp/action-setup-enos@v1
-        with:
-          github-token:
-            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - uses: hashicorp/action-setup-enos@release-0.0.28
       - uses: ./.github/actions/set-up-gofumpt
       - uses: ./.github/actions/set-up-golangci-lint
       - name: Run make fmt-check

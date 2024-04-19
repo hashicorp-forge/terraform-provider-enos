@@ -39,7 +39,7 @@ jobs:
       sample: ${{ steps.metadata.outputs.sample }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: hashicorp/action-setup-enos@v1
+      - uses: hashicorp/action-setup-enos@release-0.0.28
         with:
           github-token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - id: metadata
