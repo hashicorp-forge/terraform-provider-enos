@@ -28,7 +28,7 @@ description: |-
   While passphrase and private_key are supported, it is suggested to use the passphrase_path
   and private_key_path options instead, as the raw values will be stored in Terraform state.
   Example configuration
-  hcl
+  
   provider "enos" {
     transport = {
       ssh = {
@@ -44,7 +44,7 @@ description: |-
   The Kubernetes transport is used to execute remote commands on a container running in a Pod.
   transport.kubernetes (Object) the kubernetes transport configurationtransport.kubernetes.kubeconfig_base64 (String) base64 encoded kubeconfigtransport.kubernetes.context_name (String) the name of the kube context to accesstransport.kubernetes.namespace (String) the namespace of pod to accesstransport.kubernetes.pod (String) the name of the pod to access|stringtransport.kubernetes.container (String) the name of the container to access
   Example configuration
-  hcl
+  
   provider "enos" {
     transport = {
       kubernetes = {
@@ -63,7 +63,7 @@ description: |-
   The following is the supported configuration
   transport.nomad (Object) the nomad transport configurationtransport.nomad.host (String) nomad server host, i.e. http://23.56.78.9:4646transport.nomad.secret_id (String) the nomad server secret for authenticated connectionstransport.nomad.allocation_id (String) the allocation id for the allocation to accesstransport.nomad.task_name (String) the name of the task within the allocation to access
   Example configuration
-  hcl
+  
   provider "enos" {
     transport = {
       nomad = {
@@ -94,7 +94,7 @@ description: |-
   configuration block within the Terraform configuration that is being run.
   For example, If I want to enable debug diagnostics and have them written to ./enos/support/debug,
   I would configure the enos-provider with that directory as the debug_data_root_dir.
-  hcl
+  
   provider "enos" {
     debug_data_root_dir = "./enos/support/debug"
   }

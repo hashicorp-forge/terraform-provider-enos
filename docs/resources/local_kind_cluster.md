@@ -3,7 +3,7 @@
 page_title: "enos_local_kind_cluster Resource - terraform-provider-enos"
 subcategory: ""
 description: |-
-  The enos_local_kind_cluster can be used to create a kind cluster https://kind.sigs.k8s.io/ locally.
+  The enos_local_kind_cluster can be used to create a kind cluster https://kind.sigs.k8s.io/	locally.
 ---
 
 # enos_local_kind_cluster (Resource)

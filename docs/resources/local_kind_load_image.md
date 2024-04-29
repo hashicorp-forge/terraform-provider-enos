@@ -5,7 +5,7 @@ subcategory: ""
 description: |-
   The enos_kind_load_image resource can be used to load a local docker image into a kind cluster. This
   resource is equivalent to issuing the command:
-  shell
+  
   kind load docker-image
   
   See the kind docs here https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster
