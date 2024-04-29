@@ -504,12 +504,19 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 		// Write the systemd unit
 		err = sysd.CreateUnitFile(ctx, systemd.NewCreateUnitFileRequest(
 			systemd.WithUnitUnitPath(fmt.Sprintf("/etc/systemd/system/%s.service", unitName)),
-			systemd.WithUnitChmod("640"),
+			systemd.WithUnitChmod("644"),
 			systemd.WithUnitChown(fmt.Sprintf("%s:%s", boundaryUser, boundaryUser)),
 			systemd.WithUnitFile(unit),
 		))
 		if err != nil {
 			return fmt.Errorf("failed to create the boundary systemd unit, due to: %w", err)
+		}
+
+		_, err := sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
+			systemd.WithSystemctlCommandSubCommand(systemd.SystemctlSubCommandDaemonReload),
+		))
+		if err != nil {
+			return fmt.Errorf("failed to daemon-reload systemd after writing the boundary systemd unit, due to: %w", err)
 		}
 	}
 

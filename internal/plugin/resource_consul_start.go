@@ -642,6 +642,13 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 		return fmt.Errorf("failed to create the consul systemd unit, due to: %w", err)
 	}
 
+	_, err = sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
+		systemd.WithSystemctlCommandSubCommand(systemd.SystemctlSubCommandDaemonReload),
+	))
+	if err != nil {
+		return fmt.Errorf("failed to daemon-reload systemd after writing the consul systemd unit, due to: %w", err)
+	}
+
 	config := s.Config.ToHCLConfig()
 
 	// Create the consul HCL configuration file
