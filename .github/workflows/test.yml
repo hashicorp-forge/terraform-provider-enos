@@ -13,7 +13,7 @@ jobs:
     name: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       # Build all provider targets here to ensure they all compile
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
@@ -21,7 +21,7 @@ jobs:
       - uses: ./.github/actions/build-provider
       - run: ls -al ./dist
       - name: Upload artifacts
-        uses: actions/upload-artifact@1746f4ab65b179e0ea60a494b83293b640dd5bba # v4.3.2
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         with:
           name: test-artifacts
           path: dist
@@ -33,7 +33,7 @@ jobs:
     name: go test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: go.mod
@@ -44,7 +44,7 @@ jobs:
     name: TF_ACC=1 go test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: go.mod
@@ -93,7 +93,7 @@ jobs:
     name: terraform validate examples
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: go.mod
@@ -125,7 +125,7 @@ jobs:
     name: static analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: go.mod
