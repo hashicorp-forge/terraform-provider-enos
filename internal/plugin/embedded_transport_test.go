@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
-
 	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/mock"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -420,7 +420,7 @@ func TestProviderEmbeddedTransportCopy(t *testing.T) {
 			nomad.TaskName.Set("not a task")
 			require.NoError(tt, transportCopy.SetTransportState(nomad))
 
-			requireTransportCfggg(tt, transport, test.config)
+			requireTransportCfg(tt, transport, test.config)
 		})
 	}
 }
@@ -463,7 +463,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 						t.Error("An ssh client should not have been created but was")
 					}
 
-					return nil, nil
+					return mock.New(), nil
 				}
 			}
 			if k8s, ok := transport.K8S(); ok {
@@ -472,7 +472,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 						t.Error("A k8s client should not have been created but was")
 					}
 
-					return nil, nil
+					return mock.New(), nil
 				}
 			}
 			if nomad, ok := transport.Nomad(); ok {
@@ -481,7 +481,7 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 						t.Error("A nomad client should not have been created but was")
 					}
 
-					return nil, nil
+					return mock.New(), nil
 				}
 			}
 
@@ -578,7 +578,7 @@ func (tc transportconfig) toTFValue(t *testing.T) tftypes.Value {
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: types}, values)
 }
 
-func requireTransportCfggg(t *testing.T, transport *embeddedTransportV1, config transportconfig) {
+func requireTransportCfg(t *testing.T, transport *embeddedTransportV1, config transportconfig) {
 	t.Helper()
 
 	for tType, tConfig := range config {

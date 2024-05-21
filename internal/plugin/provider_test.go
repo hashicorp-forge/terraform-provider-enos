@@ -81,7 +81,7 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 
 	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
 
-	requireTransportCfggg(t, provider.config.Transport, transportCfg)
+	requireTransportCfg(t, provider.config.Transport, transportCfg)
 
 	resetEnv(t)
 }
@@ -111,7 +111,7 @@ func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 
 	assert.Equal(t, debugDir, provider.config.DebugDataRootDir.Val)
 
-	requireTransportCfggg(t, provider.config.Transport, transportCfg)
+	requireTransportCfg(t, provider.config.Transport, transportCfg)
 
 	resetEnv(t)
 }
