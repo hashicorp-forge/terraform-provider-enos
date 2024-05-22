@@ -56,7 +56,7 @@ It is intended to be use in conjunction with the [Enos CLI](https://github.com/h
 provide the resources necessary to use Terraform as Enos's execution engine.
 
 The enos provider needs a configured transport to be able to perform commands on remote hosts.
-The provider supports three transports: ^SSH^, ^Kubernetes^ and ^Nodad^. The ^SSH^ transport is
+The provider supports three transports: ^SSH^, ^Kubernetes^ and ^Nomad^. The ^SSH^ transport is
 suitable for executing commands that would normally have been done via ^SSH^, and the ^Kubernetes^
 transport can be used where the command would have been executed via ^kubectl exec^.
 

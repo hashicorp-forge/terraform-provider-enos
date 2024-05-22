@@ -93,7 +93,7 @@ linters:
     - gocritic
     # disabled for now
     - godox
-    - goerr113
+    - err113
     - gofmt
     - goheader
     - golint
@@ -106,6 +106,7 @@ linters:
     - loggercheck
     - maintidx
     - maligned
+    - mnd
     - musttag
     - nakedret
     - nestif

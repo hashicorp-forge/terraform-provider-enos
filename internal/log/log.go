@@ -38,6 +38,7 @@ func (l *logger) With(key string, value interface{}) Logger {
 
 func (l *logger) WithValues(values map[string]interface{}) Logger {
 	for key, value := range values {
+		//nolint:fatcontext // we know we're making it chonky with extra logging
 		l.ctx = tfsdklog.SetField(l.ctx, key, value)
 	}
 
