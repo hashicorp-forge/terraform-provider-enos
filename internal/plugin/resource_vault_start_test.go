@@ -30,10 +30,10 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 			"tls_disable": "true",
 		}, "config", "listener"))
 	vaultCfg.LogLevel.Set("debug")
-	vaultCfg.Storage.Set(newVaultConfigBlockSet("consul", map[string]any{
+	vaultCfg.Storage.Set(newVaultStorageConfigSet("raft", map[string]any{
 		"address": "127.0.0.1:8500",
 		"path":    "vault",
-	}, "config", "storage"))
+	}, map[string]any{"autojoin": &tfString{Val: "provider=aws tag=thing value=foo"}}))
 	vaultCfg.Seal.Set(newVaultConfigBlockSet("awskms", map[string]any{
 		"kms_key_id": "some-key-id",
 	}, "config", "seal"))
@@ -65,7 +65,6 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 
 // TestAccResourceVaultStart tests the vault_start resource.
 func TestAccResourceVaultStart(t *testing.T) {
-	t.Parallel()
 	cfg := template.Must(template.New("enos_vault_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_vault_start" "{{.ID.Value}}" {
@@ -157,10 +156,12 @@ func TestAccResourceVaultStart(t *testing.T) {
 			"tls_disable": "true",
 		}, "config", "listener"))
 	vaultStart.Config.LogLevel.Set("debug")
-	vaultStart.Config.Storage.Set(newVaultConfigBlockSet("consul", map[string]any{
-		"address": "127.0.0.1:8500",
-		"path":    "vault",
-	}, "config", "storage"))
+	vaultStart.Config.Storage.Set(newVaultStorageConfigSet("raft", map[string]any{
+		"path": "vault",
+	}, map[string]any{
+		"auto_join":        "provider=aws tag_key=join tag_value=vault",
+		"auto_join_scheme": "https",
+	}))
 	vaultStart.Config.Seal.Set(newVaultConfigBlockSet("awskms", map[string]any{
 		"kms_key_id": "some-key-id",
 	}, "config", "seal"))
@@ -198,9 +199,10 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.address", regexp.MustCompile(`^0.0.0.0:8200$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.tls_disable", regexp.MustCompile(`^true$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.log_level", regexp.MustCompile(`^debug$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.type", regexp.MustCompile(`^consul$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.address", regexp.MustCompile(`^127.0.0.0:8500$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.type", regexp.MustCompile(`^raft$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", regexp.MustCompile(`^vault$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join_scheme", regexp.MustCompile(`^https$`)),
+			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join", regexp.MustCompile(`^provider=aws tag_key=join tag_value=vault$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.type", regexp.MustCompile(`^awskms$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
 			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].type", regexp.MustCompile(`^awskms$`)),

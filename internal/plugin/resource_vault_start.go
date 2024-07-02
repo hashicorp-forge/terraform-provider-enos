@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,10 +42,7 @@ type vaultStart struct {
 	mu             sync.Mutex
 }
 
-var (
-	_                 resource.Resource = (*vaultStart)(nil)
-	impliedTypeRegexp                   = regexp.MustCompile(`\d*?\[\"(\w*)\",.*]`)
-)
+var _ resource.Resource = (*vaultStart)(nil)
 
 type vaultStartStateV1 struct {
 	ID              *tfString
@@ -71,39 +67,10 @@ type vaultConfig struct {
 	ClusterAddr *tfString
 	Listener    *vaultConfigBlock
 	LogLevel    *tfString
-	Storage     *vaultConfigBlock
+	Storage     *vaultStorageConfig
 	Seal        *vaultConfigBlock // Single seal configuration
 	Seals       *vaultSealsConfig // HA Seal configuration
 	UI          *tfBool
-}
-
-type vaultConfigBlock struct {
-	AttributePaths []string // the attribute path to the vault config block
-	Type           *tfString
-	Attrs          *tfObject
-	AttrsValues    map[string]tftypes.Value
-	AttrsRaw       tftypes.Value
-	Unknown        bool
-	Null           bool
-}
-
-// vaultSealsConfig is the Vault Enterprise HA seals block. It supports up to the
-// maximum of three HA seals.
-type vaultSealsConfig struct {
-	Primary   *vaultConfigBlock
-	Secondary *vaultConfigBlock
-	Tertiary  *vaultConfigBlock
-	Unknown   bool
-	Null      bool
-	// keep these around for marshaling the dynamic value
-	RawValues map[string]tftypes.Value
-	RawValue  tftypes.Value
-}
-
-type vaultConfigBlockSet struct {
-	typ   string
-	attrs map[string]any
-	paths []string
 }
 
 var _ state.State = (*vaultStartStateV1)(nil)
@@ -148,37 +115,8 @@ func newVaultConfig() *vaultConfig {
 		Listener:    newVaultConfigBlock("config", "listener"),
 		Seal:        newVaultConfigBlock("config", "seal"),
 		Seals:       newVaultSealsConfig(),
-		Storage:     newVaultConfigBlock("config", "storage"),
+		Storage:     newVaultStorageConfig(),
 		UI:          newTfBool(),
-	}
-}
-
-func newVaultConfigBlock(attributePaths ...string) *vaultConfigBlock {
-	return &vaultConfigBlock{
-		AttributePaths: attributePaths,
-		Attrs:          newTfObject(),
-		AttrsValues:    map[string]tftypes.Value{},
-		Type:           newTfString(),
-		Unknown:        false,
-		Null:           true,
-	}
-}
-
-func newVaultConfigBlockSet(typ string, attrs map[string]any, paths ...string) *vaultConfigBlockSet {
-	return &vaultConfigBlockSet{
-		typ:   typ,
-		attrs: attrs,
-		paths: paths,
-	}
-}
-
-func newVaultSealsConfig() *vaultSealsConfig {
-	return &vaultSealsConfig{
-		Unknown:   false,
-		Null:      true,
-		Primary:   newVaultConfigBlock("config", "seals", "primary"),
-		Secondary: newVaultConfigBlock("config", "seals", "secondary"),
-		Tertiary:  newVaultConfigBlock("config", "seals", "tertiary"),
 	}
 }
 
@@ -365,6 +303,7 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 - ^config.storage^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - ^config.storage.type^ (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
 - ^config.storage.attributes^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type
+- ^config.storage.retry_join^ (List(Object)) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza
 - ^config.seal^ (Object) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
 - ^config.seal.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - ^config.seal.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
@@ -540,381 +479,6 @@ func (s *vaultStartStateV1) EmbeddedTransport() *embeddedTransportV1 {
 	return s.Transport
 }
 
-func (s *vaultConfigBlock) Set(set *vaultConfigBlockSet) {
-	if s == nil || set == nil {
-		return
-	}
-
-	s.Unknown = false
-	s.Null = false
-	s.AttributePaths = set.paths
-	s.Type.Set(set.typ)
-	s.Attrs.Set(set.attrs)
-}
-
-// FromTerraform5Value unmarshals the value to the struct.
-func (s *vaultConfigBlock) FromTerraform5Value(val tftypes.Value) error {
-	if s == nil {
-		return fmt.Errorf("cannot unmarshal %s into nil vaultConfigBlock", val.String())
-	}
-
-	if val.IsNull() {
-		s.Null = true
-		s.Unknown = false
-
-		return nil
-	}
-
-	if !val.IsKnown() {
-		s.Unknown = true
-
-		return nil
-	}
-
-	s.Null = false
-	s.Unknown = false
-
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
-		return err
-	}
-
-	// Since attributes is a dynamic pseudo type we have to decode it only
-	// if it's known.
-	for k, v := range vals {
-		switch k {
-		case "type":
-			err = s.Type.FromTFValue(v)
-			if err != nil {
-				return err
-			}
-		case "attributes":
-			if !v.IsKnown() {
-				// Attrs are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
-				// dynamic value that we'll know after apply.
-				s.Attrs.Unknown = true
-				continue
-			}
-			if v.IsNull() {
-				// We can't unmarshal null or unknown things
-				continue
-			}
-
-			s.AttrsRaw = v
-			err = v.As(&s.AttrsValues)
-			if err != nil {
-				return err
-			}
-			err = s.Attrs.FromTFValue(v)
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("unsupported attribute in vault config block: %s", k)
-		}
-	}
-
-	return err
-}
-
-// Terraform5Type is the tftypes.Type.
-func (s *vaultConfigBlock) Terraform5Type() tftypes.Type {
-	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"type":       s.Type.TFType(),
-		"attributes": tftypes.DynamicPseudoType,
-	}}
-}
-
-// Terraform5Value is the tftypes.Value.
-func (s *vaultConfigBlock) Terraform5Value() tftypes.Value {
-	if s.Unknown {
-		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
-	}
-
-	if s.Null {
-		return tftypes.NewValue(s.Terraform5Type(), nil)
-	}
-
-	// Sit down, grab a beverage, lets tell a story. What we have here is dynamic
-	// value being passed in from Terraform that should be a map or object. When
-	// we send the value back over the wire to Terraform we have to give it the
-	// same value type that it thinks the dynamic type is. There's just one problem:
-	// at the time of writing the tftypes library does not expose this information.
-	// If you try and determine the type of a DynamicPseudoType it is nil. That
-	// means we have to somehow determine what Terraform _thinks_ the type is without
-	// that information being available. The only place I could find this information
-	// is by taking the raw tftypes.Value and marshaling it to the wire format
-	// to inspect the hidden type information Terraform sent over the wire.
-	//
-	// This is terrible but had to be done until better support for DynamicPseudoType's
-	// as input schema is added to terraform-plugin-go. We also panic a bunch in
-	// here as we have to maintain the State interface which assumes that we
-	// can return the value of the schema without possible errors.
-
-	var attrsVal tftypes.Value
-
-	if s.AttrsRaw.Type() == nil {
-		// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
-		// value.
-		if s.Attrs.Unknown {
-			attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
-		} else {
-			attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-		}
-	} else {
-		// MarshalMsgPack is deprecated but it's by far the easiest way to inspect the serialized value
-		// of the raw attribute.
-		//
-		//nolint:staticcheck
-		//lint:ignore SA1019 we have to use this internal only API to determine DynamicPseudoType types.
-		msgpackBytes, err := s.AttrsRaw.MarshalMsgPack(tftypes.DynamicPseudoType)
-		if err != nil {
-			panic("unable to marshal the vault config block to the wire format: " + err.Error())
-		}
-		matches := impliedTypeRegexp.FindStringSubmatch(string(msgpackBytes))
-		if len(matches) > 1 {
-			switch matches[1] {
-			case "map":
-				var elemType tftypes.Type
-				for _, attr := range s.AttrsValues {
-					elemType = attr.Type()
-					break
-				}
-				attrsVal = tftypes.NewValue(tftypes.Map{ElementType: elemType}, s.AttrsValues)
-			case "object":
-				attrsVal = terraform5Value(s.AttrsValues)
-			default:
-				panic(matches[1] + " is not a support dynamic type for the vault config block")
-			}
-		}
-	}
-
-	return terraform5Value(map[string]tftypes.Value{
-		"type":       s.Type.TFValue(),
-		"attributes": attrsVal,
-	})
-}
-
-// FromTerraform5Value unmarshals the value to the struct.
-func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
-	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vaultSealsConfig", val.String()),
-			"config", "seals",
-		)
-	}
-
-	if val.IsNull() {
-		s.Null = true
-		s.Unknown = false
-
-		return nil
-	}
-
-	if !val.IsKnown() {
-		s.Unknown = true
-
-		return nil
-	}
-
-	s.Null = false
-	s.Unknown = false
-	s.RawValue = val
-	s.RawValues = map[string]tftypes.Value{}
-	err := val.As(&s.RawValues)
-	if err != nil {
-		return AttributePathError(fmt.Errorf("unable to decode object value: %w", err), "config", "seals")
-	}
-
-	// Okay, we've been given either an object or map. Since our input schema is a dynamic pseudo
-	// type, the user can pass whatever they want in and terraform won't enforce any schema rules.
-	// We'll have ensure what we've been passed in matches what we actually support, otherwise
-	// the user could run into a nasty Terraform diagnostic that isn't helpful.
-
-	// Make sure we didn't configure any keys that we don't support.
-	for key := range s.RawValues {
-		switch key {
-		case "primary", "secondary", "tertiary":
-		default:
-			return AttributePathError(fmt.Errorf("unknown configuration '%s', expected 'primary', 'secondary', or 'tertiary'", key),
-				"config", "seals", "primary",
-			)
-		}
-	}
-
-	// We support an object or map. If the user has passed in a map then all thevalue types
-	// all must be the same. We'll tell them to redeclare the value as an object and not use
-	// strings as the keys to ensure we get an object whose attribute values don't all have to be
-	// the same.
-	if s.RawValue.Type().Is(tftypes.Map{}) && len(s.RawValues) > 1 {
-		var lastType tftypes.Type
-		for key, val := range s.RawValues {
-			if lastType == nil {
-				lastType = val.Type()
-				continue
-			}
-
-			if !val.Type().Equal(lastType) {
-				return AttributePathError(fmt.Errorf(
-					"unable to configure more than one seal type as a map value. Try unquoting '%s', and all other seals, to set them as an object attributes", key),
-					"config", "seals", key,
-				)
-			}
-			lastType = val.Type()
-		}
-	}
-
-	primary, ok := s.RawValues["primary"]
-	if ok {
-		err = s.Primary.FromTerraform5Value(primary)
-		if err != nil {
-			return AttributePathError(err, "config", "seals", "primary")
-		}
-	}
-
-	secondary, ok := s.RawValues["secondary"]
-	if ok {
-		err = s.Secondary.FromTerraform5Value(secondary)
-		if err != nil {
-			return AttributePathError(err, "config", "seals", "secondary")
-		}
-	}
-
-	tertiary, ok := s.RawValues["tertiary"]
-	if ok {
-		err = s.Tertiary.FromTerraform5Value(tertiary)
-		if err != nil {
-			return AttributePathError(err, "config", "seals", "secondary")
-		}
-	}
-
-	return nil
-}
-
-// Terraform5Type is the tftypes.Type.
-func (s *vaultSealsConfig) Terraform5Type() tftypes.Type {
-	return tftypes.DynamicPseudoType
-}
-
-// Terraform5Value is the tftypes.Value.
-func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
-	if s.Null {
-		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-	}
-
-	if s.Unknown {
-		return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
-	}
-
-	attrs := map[string]tftypes.Type{}
-	vals := map[string]tftypes.Value{}
-	for name := range s.RawValues {
-		switch name {
-		case "primary":
-			attrs[name] = s.Primary.Terraform5Type()
-			vals[name] = s.Primary.Terraform5Value()
-		case "secondary":
-			attrs[name] = s.Secondary.Terraform5Type()
-			vals[name] = s.Secondary.Terraform5Value()
-		case "tertiary":
-			attrs[name] = s.Tertiary.Terraform5Type()
-			vals[name] = s.Secondary.Terraform5Value()
-		default:
-		}
-	}
-
-	if len(vals) == 0 {
-		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-	}
-
-	// Depending on how many are set, Terraform might pass the configuration over
-	// as a map or object, so we need to handle both.
-	if s.RawValue.Type().Is(tftypes.Map{}) {
-		for _, val := range vals {
-			return tftypes.NewValue(tftypes.Map{ElementType: val.Type()}, vals)
-		}
-	}
-
-	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
-}
-
-func (s *vaultSealsConfig) Set(name string, set *vaultConfigBlockSet) error {
-	if s == nil {
-		return fmt.Errorf("cannot set seal config for %s to nil vaultSealsConfig", name)
-	}
-
-	s.Unknown = false
-	s.Null = false
-
-	switch name {
-	case "primary":
-		s.set(s.Primary, set)
-	case "secondary":
-		s.set(s.Secondary, set)
-	case "tertiary":
-		s.set(s.Tertiary, set)
-	default:
-		return fmt.Errorf("unsupport seals name '%s', must be one of 'primary', 'secondary', 'tertiary'", name)
-	}
-
-	return nil
-}
-
-func (s *vaultSealsConfig) SetSeals(sets map[string]*vaultConfigBlockSet) error {
-	if s == nil {
-		return errors.New("cannot set seal config for nil vaultSealsConfig")
-	}
-
-	for name, set := range sets {
-		err := s.Set(name, set)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *vaultSealsConfig) set(blk *vaultConfigBlock, set *vaultConfigBlockSet) {
-	if blk == nil {
-		nBlk := newVaultConfigBlock()
-		*blk = *nBlk
-	}
-
-	blk.Set(set)
-}
-
-func (s *vaultSealsConfig) Value() map[string]*vaultConfigBlock {
-	if s == nil || s.Unknown || s.Null {
-		return nil
-	}
-
-	return map[string]*vaultConfigBlock{
-		"primary":   s.Primary,
-		"secondary": s.Secondary,
-		"tertiary":  s.Tertiary,
-	}
-}
-
-func (s *vaultSealsConfig) needsMultiseal() bool {
-	if s == nil {
-		return false
-	}
-
-	enabled := 0
-	if s.Primary != nil && !s.Primary.Null {
-		enabled++
-	}
-	if s.Secondary != nil && !s.Secondary.Null {
-		enabled++
-	}
-	if s.Tertiary != nil && !s.Tertiary.Null {
-		enabled++
-	}
-
-	return enabled >= 2
-}
-
 func (c *vaultConfig) Terraform5Type() tftypes.Type {
 	return tftypes.Object{
 		AttributeTypes:     c.attrs(),
@@ -938,8 +502,9 @@ func (c *vaultConfig) attrs() map[string]tftypes.Type {
 
 func (c *vaultConfig) optionalAttrs() map[string]struct{} {
 	return map[string]struct{}{
-		"seal":  {},
-		"seals": {},
+		"seal":    {},
+		"seals":   {},
+		"storage": {},
 	}
 }
 
@@ -964,9 +529,9 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 // FromTerraform5Value unmarshals the value to the struct.
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]interface{}{
-		"cluster_name": c.ClusterName,
 		"api_addr":     c.APIAddr,
 		"cluster_addr": c.ClusterAddr,
+		"cluster_name": c.ClusterName,
 		"log_level":    c.LogLevel,
 		"ui":           c.UI,
 	})
@@ -1128,20 +693,40 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 		}
 	}
 
-	if storageLabel, ok := c.Storage.Type.Get(); ok {
-		storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel})
-		if attrs, ok := c.Storage.Attrs.GetObject(); ok {
-			storageBlock.AppendAttributes(attrs)
-		}
-		if storageLabel == raftStorageType {
-			storageBlock.AppendAttribute("path", defaultRaftDataDir)
-			clusterName, ok := c.ClusterName.Get()
-			if !ok {
-				return nil, nil, errors.New("ClusterName not found in Vault config")
+	if c.Storage != nil && c.Storage.Type != nil {
+		if storageLabel, ok := c.Storage.Type.Get(); ok {
+			storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel})
+			attrs, ok := c.Storage.Attrs.GetObject()
+			if ok { // Add our attributes to the storage block
+				storageBlock.AppendAttributes(attrs)
+
+				if storageLabel == raftStorageType {
+					// Handle integrated storage defaults. We do this for backwards compatibility with older
+					// provider versions. Make sure to only set defaults if the user has not passed in the
+					// keys.
+					if _, ok := attrs["path"]; !ok {
+						storageBlock.AppendAttribute("path", defaultRaftDataDir)
+					}
+
+					retryJoinBlock := storageBlock.AppendBlock("retry_join", []string{})
+					retryJoinAttrs, ok := c.Storage.RetryJoin.GetObject()
+					if ok {
+						// We've been configured with retry_join so we'll set the attrs
+						retryJoinBlock.AppendAttributes(retryJoinAttrs)
+					} else {
+						// The user has not configured retry_join set so we'll use the old defaults for
+						// backwards compat.
+						clusterName, ok := c.ClusterName.Get()
+						if !ok {
+							// This shouldn't ever happen...
+							return nil, nil, errors.New("enos_vault_start.cluster_name must be set")
+						}
+
+						retryJoinBlock.AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
+							AppendAttribute("auto_join_scheme", "http")
+					}
+				}
 			}
-			storageBlock.AppendBlock("retry_join", []string{}).
-				AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
-				AppendAttribute("auto_join_scheme", "http")
 		}
 	}
 
@@ -1308,7 +893,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 			return fmt.Errorf("failed to create the vault systemd unit, due to: %w", err)
 		}
 
-		_, err := sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
+		_, err = sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
 			systemd.WithSystemctlCommandSubCommand(systemd.SystemctlSubCommandDaemonReload),
 		))
 		if err != nil {
