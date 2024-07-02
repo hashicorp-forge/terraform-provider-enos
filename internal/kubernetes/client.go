@@ -325,7 +325,8 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 	var err error
 	var result interface{}
 	if req.WaitTimeout > 0 {
-		retrier, err := retry.NewRetrier(
+		var retrier *retry.Retrier
+		retrier, err = retry.NewRetrier(
 			retry.WithRetrierFunc(queryFunc),
 			retry.WithIntervalFunc(retry.IntervalFibonacci(time.Second)),
 			retry.WithMaxRetries(10), // we will rely on the timeout context below to end the retires
@@ -594,7 +595,6 @@ func (p *Pods) String() string {
 	out := new(strings.Builder)
 
 	for i := range p.Items {
-		i := i
 		out.WriteString(p.Items[i].ObjectMeta.Name + "\n")
 		out.WriteString(fmt.Sprintf("  Name: %s\n", p.Items[i].ObjectMeta.Name))
 		out.WriteString(fmt.Sprintf("  Namespace: %s\n", p.Items[i].ObjectMeta.Namespace))
@@ -624,7 +624,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Spec.InitContainers {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Init Containers:"))
 			}
@@ -632,7 +631,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Status.InitContainerStatuses {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Init Container Status:"))
 			}
@@ -640,7 +638,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Spec.Containers {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Containers:"))
 			}
@@ -648,7 +645,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Status.ContainerStatuses {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Container Status:"))
 			}
@@ -656,7 +652,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Spec.EphemeralContainers {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Ephemeral Containers:"))
 			}
@@ -677,7 +672,6 @@ func (p *Pods) String() string {
 		}
 
 		for ic := range p.Items[i].Status.EphemeralContainerStatuses {
-			ic := ic
 			if ic == 0 {
 				out.WriteString(fmt.Sprintln("  Ephemeral Container Status:"))
 			}
@@ -696,13 +690,11 @@ func containerToString(container v1.Container) string {
 	out.WriteString(fmt.Sprintf("  Command: %s\n", strings.Join(container.Command, " ")))
 	out.WriteString(fmt.Sprintln("  Args:"))
 	for c := range container.Args {
-		c := c
 		out.WriteString(istrings.Indent("    ", container.Args[c]))
 	}
 	out.WriteString(fmt.Sprintln(""))
 	out.WriteString(fmt.Sprintln("  Ports:"))
 	for c := range container.Ports {
-		c := c
 		out.WriteString(fmt.Sprintf("    %s:\n", container.Ports[c].Name))
 		out.WriteString(fmt.Sprintf("      Host Port: %d\n", container.Ports[c].HostPort))
 		out.WriteString(fmt.Sprintf("      Container Port: %d\n", container.Ports[c].ContainerPort))
@@ -711,7 +703,6 @@ func containerToString(container v1.Container) string {
 	}
 	out.WriteString(fmt.Sprintln("  Environment:"))
 	for c := range container.Env {
-		c := c
 		name := container.Env[c].Name
 		value := container.Env[c].Value
 		if source := container.Env[c].ValueFrom; source != nil {

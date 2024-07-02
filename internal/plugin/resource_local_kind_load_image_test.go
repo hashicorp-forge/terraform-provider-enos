@@ -133,7 +133,6 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 			regexp.MustCompile(`Validation Error`),
 		},
 	} {
-		test := test
 		t.Run(test.tmpl.name, func(tt *testing.T) {
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)

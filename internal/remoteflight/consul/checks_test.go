@@ -42,8 +42,6 @@ func TestStateHasSystemdEnabledAndRunningProperties(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -108,8 +106,6 @@ func TestStateNodeIsHealthy(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -159,8 +155,6 @@ func TestStateClusterHasLeader(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -224,8 +218,6 @@ func TestStateClusterHasMinNHealthyNodes(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -289,8 +281,6 @@ func TestStateClusterHasMinNVoters(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

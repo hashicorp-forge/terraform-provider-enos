@@ -25,7 +25,6 @@ func TestInitRequestString(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.expected, func(t *testing.T) {
 			t.Parallel()
 			req := NewInitRequest(test.opts...)
@@ -68,7 +67,6 @@ func TestInitRequestValidate(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			req := NewInitRequest(test.opts...)

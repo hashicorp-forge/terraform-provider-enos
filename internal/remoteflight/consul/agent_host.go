@@ -91,7 +91,7 @@ func GetAgentHost(ctx context.Context, tr it.Transport, req *AgentHostRequest) (
 			req.String(),
 		))
 
-		if err != nil {
+		if err1 != nil {
 			err = errors.Join(err, err1)
 		}
 

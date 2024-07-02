@@ -168,7 +168,6 @@ func (s *ConfigStateSanitizedResponseData) String() string {
 	_, _ = out.WriteString(fmt.Sprintf("Disable Sealwrap: %t\n", s.DisableSealwrap))
 	_, _ = out.WriteString(fmt.Sprintf("Enable UI: %t\n", s.EnableUI))
 	for i := range s.Listeners {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Listeners"))
 		}
@@ -190,7 +189,6 @@ func (s *ConfigStateSanitizedResponseData) String() string {
 	_, _ = out.WriteString(fmt.Sprintf("Plugin Directory: %s\n", s.PluginDirectory))
 	_, _ = out.WriteString(fmt.Sprintf("Raw Storage Endpoint: %t\n", s.RawStorageEndpoint))
 	for i := range s.Seals {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Seals"))
 		}

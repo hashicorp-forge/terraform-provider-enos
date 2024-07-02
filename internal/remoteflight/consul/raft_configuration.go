@@ -97,7 +97,7 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *RaftConfigu
 			req.String(),
 		))
 
-		if err != nil {
+		if err1 != nil {
 			err = errors.Join(err, err1)
 		}
 
@@ -137,7 +137,6 @@ func (r *RaftConfigurationResponse) String() string {
 	out := new(strings.Builder)
 	_, _ = out.WriteString(fmt.Sprintln("Servers"))
 	for i := range r.Servers {
-		i := i
 		_, _ = out.WriteString(istrings.Indent("  ", r.Servers[i].String()))
 	}
 

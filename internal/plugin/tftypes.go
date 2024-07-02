@@ -146,6 +146,7 @@ func encodeTfObjectDynamicPseudoType(
 				elemType = attr.Type()
 				break
 			}
+
 			return tftypes.NewValue(tftypes.Map{ElementType: elemType}, objVals), nil
 		case "object":
 			return terraform5Value(objVals), nil

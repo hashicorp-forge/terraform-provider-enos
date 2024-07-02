@@ -132,7 +132,6 @@ func TestAccSearchAQL(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.Name, func(t *testing.T) {
 			t.Parallel()
 

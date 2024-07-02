@@ -146,7 +146,7 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 		"kubeconfig_base64": newState.KubeConfigBase64,
 	})
 
-	if err := newState.readLocalKindCluster(ctx); err != nil {
+	if err = newState.readLocalKindCluster(ctx); err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 			"Kind Cluster Error",
 			fmt.Errorf("failed to read local kind cluster state, due to: %w", err),

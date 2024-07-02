@@ -110,7 +110,7 @@ func GetHealthNode(ctx context.Context, tr it.Transport, req *HealthNodeRequest)
 			req.String(),
 		))
 
-		if err != nil {
+		if err1 != nil {
 			err = errors.Join(err, err1)
 		}
 

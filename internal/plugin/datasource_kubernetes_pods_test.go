@@ -164,7 +164,6 @@ output "transports_1_container" {
 		{"missing_context", state2, emptyResult, nil, notPresentError},
 		{"invalid_kubeconfig", state3, emptyResult, nil, invalidKubeConfigErr},
 	} {
-		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			buf := bytes.Buffer{}
 			require.NoError(t, cfg.Execute(&buf, test.config))

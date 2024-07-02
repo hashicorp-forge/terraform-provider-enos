@@ -151,7 +151,6 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 		{"partial_k8s_configured", partialK8STransport, partialK8SAttributesExpected, partialK8SConfiguredExpected},
 		{"partial_nomad_configured", partialNomadTransport, partialNomadAttributesExpected, partialNomadConfiguredExpected},
 	} {
-		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			expectedAttributeValues := test.expectedAttributeValues
 			expectedValues := test.expectedValues
@@ -267,7 +266,6 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 		{"no_defaults_multiple_transports", configMultipleTransports, emptyDefaultsTransport, transportconfig{}, true},
 		{"no_defaults_no_transport", configNoTransport, emptyDefaultsTransport, transportconfig{}, true},
 	} {
-		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			// Apply our provider defaults to our transport
 			transport := test.config.build(tt)
@@ -454,7 +452,6 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 		{"only_nomad_config", nomadOnlyConfig, false, false, true, true},
 		{"no_configured_transport", noTransportConfig, true, false, false, false},
 	} {
-		test := test
 		t.Run(test.name, func(tt *testing.T) {
 			transport := test.config.build(tt)
 			if ssh, ok := transport.SSH(); ok {

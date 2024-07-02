@@ -66,8 +66,6 @@ func TestUnitPropertiesHasPropertiesEnabledAndRunning(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -99,8 +97,6 @@ func TestUnitPropertiesFind(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -139,8 +135,6 @@ func TestUnitPropertiesFindProperties(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

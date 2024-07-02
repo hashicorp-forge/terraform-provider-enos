@@ -65,6 +65,7 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 
 // TestAccResourceVaultStart tests the vault_start resource.
 func TestAccResourceVaultStart(t *testing.T) {
+	t.Parallel()
 	cfg := template.Must(template.New("enos_vault_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_vault_start" "{{.ID.Value}}" {

@@ -51,7 +51,6 @@ func TestTFBoolGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
@@ -108,7 +107,6 @@ func TestTFNumGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
@@ -151,7 +149,6 @@ func TestTFStringGetAndValue(t *testing.T) {
 			true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
@@ -207,7 +204,6 @@ func TestTFStringSliceGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
@@ -262,7 +258,6 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
@@ -360,7 +355,6 @@ func TestTFObjectGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			obj := test.in()
@@ -481,7 +475,6 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			objs := test.in()

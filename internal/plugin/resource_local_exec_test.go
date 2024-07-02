@@ -92,7 +92,6 @@ EOF
 	})
 	//nolint:paralleltest// because our resource handles it
 	for _, test := range cases {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			buf := bytes.Buffer{}
 			err := cfg.Execute(&buf, test.state)

@@ -596,7 +596,7 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	})
 	if err != nil {
 		a.log.Warn("index.json does not exist, this could be the first time we're running in this bucket")
-		//nolint:nilerr// it's okay to return nil if the index doesn't exist
+
 		return nil
 	}
 

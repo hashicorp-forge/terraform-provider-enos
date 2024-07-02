@@ -71,7 +71,6 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 			Supported:    false,
 		},
 	} {
-		test := test
 		t.Run(fmt.Sprintf("%s_%s", test.Platform, test.Architecture), func(t *testing.T) {
 			t.Parallel()
 			supported, err := SupportedTarget(test.Platform, test.Architecture)

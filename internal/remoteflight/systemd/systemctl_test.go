@@ -176,7 +176,6 @@ func TestSystemctlCommandString(t *testing.T) {
 			false,
 		},
 	} {
-		test := test
 		t.Run(test.expected, func(t *testing.T) {
 			t.Parallel()
 

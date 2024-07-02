@@ -269,7 +269,6 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 	// all of them. Only return an error if all resolvers are unable to get an
 	// ip address. Return a slice of all unique resolved IP addresses.
 	for i := range resolvers {
-		i := i
 		wg.Add(1)
 
 		go func() {
