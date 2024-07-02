@@ -12,8 +12,9 @@ resource "aws_instance" "vault_instance" {
   tags = merge(
     var.common_tags,
     {
-      Name = "${local.name_suffix}-vault-${var.vault_node_prefix}-${each.key}"
-      Type = local.vault_cluster_tag
+      Name       = "${local.name_suffix}-vault-${var.vault_node_prefix}-${each.key}"
+      retry_join = local.vault_cluster_tag
+      Type       = local.vault_cluster_tag
     },
   )
 }
@@ -115,7 +116,8 @@ resource "enos_vault_start" "leader" {
     log_level = var.vault_log_level
     storage = {
       type       = var.storage_backend
-      attributes = ({ for key, value in local.storage_config[each.key] : key => value })
+      attributes = ({ for key, value in local.storage_attributes[each.key] : key => value })
+      retry_join = try(local.storage_retry_join[var.storage_backend][var.configure_retry_join], null)
     }
     // NOTE: using our seals key here and seal for followers to ensure backwards compat
     seals = {
@@ -159,7 +161,8 @@ resource "enos_vault_start" "followers" {
     }
     storage = {
       type       = var.storage_backend
-      attributes = { for key, value in local.storage_config[each.key] : key => value }
+      attributes = { for key, value in local.storage_attributes[each.key] : key => value }
+      retry_join = try(local.storage_retry_join[var.storage_backend][var.configure_retry_join], null)
     }
     seal = local.seal[var.unseal_method]
     ui   = true

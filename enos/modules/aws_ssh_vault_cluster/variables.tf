@@ -71,6 +71,17 @@ variable "config_mode" {
   }
 }
 
+variable "configure_retry_join" {
+  type        = string
+  description = "Whether or not to configure retry_join"
+  default     = "true"
+
+  validation {
+    condition     = contains(["true", "false"], var.configure_retry_join)
+    error_message = "The configure_retry_join must be one of 'true', 'false'"
+  }
+}
+
 variable "dependencies_to_install" {
   type        = list(string)
   description = "A list of dependencies to install"
