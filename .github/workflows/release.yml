@@ -54,6 +54,9 @@ jobs:
           path: dist
           name: release-artifacts
           merge-multiple: true
+      - run: |
+          ls -al ./dist
+          chmod +x ./dist/*
       - name: Import gpg key
         uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6.1.0
         with:

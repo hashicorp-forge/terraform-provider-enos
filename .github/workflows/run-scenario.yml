@@ -69,6 +69,9 @@ jobs:
           path: dist
           name: ${{ inputs.download }}
           merge-multiple: true
+      - run: |
+          ls -al ./dist
+          chmod +x ./dist/*
       - run: enos scenario run ${{ inputs.scenario-filter }}
         working-directory: enos
       - if: ${{ always() }}
