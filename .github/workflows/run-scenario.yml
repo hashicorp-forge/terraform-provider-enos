@@ -69,9 +69,6 @@ jobs:
           path: dist
           name: ${{ inputs.download }}
           merge-multiple: true
-      - if: contains(inputs.scenario-filter, 'use:dev')
-        name: TODO(post-publish) Remove implied local mirror install for dev
-        run: make install
       - run: enos scenario run ${{ inputs.scenario-filter }}
         working-directory: enos
       - if: ${{ always() }}

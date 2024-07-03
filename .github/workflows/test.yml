@@ -51,8 +51,6 @@ jobs:
       - uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
-      - name: TODO(post-publish) Remove implied local mirror install for dev
-        run: make install
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
           # The github actions service user creds for this account managed in hashicorp/enos-ci
@@ -100,8 +98,6 @@ jobs:
       - uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
-      - name: TODO(post-publish) Make sure the example config uses dev_overrides
-        run: make install
       - uses: hashicorp/setup-terraform@v3
       - name: Run terraform --chdir=examples/* validate
         run: |
