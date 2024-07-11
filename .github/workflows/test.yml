@@ -77,6 +77,9 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
+          # Pin our version of Terraform to 1.8 while an issue with 1.9 erroneously planning
+          # is sorted https://github.com/hashicorp/terraform/issues/35424
+          terraform_version: "~>1.8"
       - name: Create up acceptance target host
         working-directory: enos/modules/go-acceptance-test-target
         run: |
