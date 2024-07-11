@@ -62,11 +62,15 @@ resource "aws_security_group" "this" {
   vpc_id      = data.aws_vpc.this.id
 
   # SSH
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${data.enos_environment.this.public_ip_address}/32"]
+  dynamic "ingress" {
+    for_each = data.enos_environment.this.public_ipv4_addresses
+
+    content {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["${ingress.value}/32"]
+    }
   }
 
   # Allow access to external hosts

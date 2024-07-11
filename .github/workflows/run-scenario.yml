@@ -55,7 +55,7 @@ jobs:
         uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
-      - if: github.event_name == 'workflow_call'
+      - if: github.event_name != 'workflow_dispatch'
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           path: dist
