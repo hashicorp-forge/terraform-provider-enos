@@ -10,7 +10,7 @@ runs:
   steps:
     - name: Install upx
       run: |
-        curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-amd64_linux.tar.xz
+        curl -Lo upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
         tar -xvf upx.tar.xz
         sudo mv upx*/upx /usr/local/sbin/
       shell: bash

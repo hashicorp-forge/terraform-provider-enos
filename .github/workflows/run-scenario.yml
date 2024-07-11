@@ -4,15 +4,10 @@ name: run-scenario
 on:
   workflow_dispatch:
     inputs:
-      download:
-        type: string
-        required: false
       scenario-filter:
+        description: The filter of the scenario to run
         required: true
         type: string
-      build-dev:
-        type: boolean
-        default: false
   workflow_call:
     inputs:
       download:
@@ -21,9 +16,6 @@ on:
       scenario-filter:
         required: true
         type: string
-      build-dev:
-        type: boolean
-        default: false
 
 jobs:
   run:
@@ -59,19 +51,16 @@ jobs:
           chmod 600 enos/support/enos-ci-ssh-key.pem
           chmod 600 enos/support/vault.hclic
           chmod 600 enos/support/consul.hclic
-      - if: inputs.build-dev == true
+      - if: github.event_name == 'workflow_dispatch'
         uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
-      - if: inputs.download != ''
+      - if: github.event_name == 'workflow_call'
         uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: dist
           name: ${{ inputs.download }}
-          merge-multiple: true
-      - run: |
-          ls -al ./dist
-          chmod +x ./dist/*
+      - run: chmod +x ./dist/*
       - run: enos scenario run ${{ inputs.scenario-filter }}
         working-directory: enos
       - if: ${{ always() }}

@@ -11,6 +11,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      linux-amd64-artifact: ${{ steps.outputs.outputs.linux-amd64-artifact }}
+    strategy:
+      fail-fast: true
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        os:
+          - darwin
+          - linux
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
@@ -18,15 +29,21 @@ jobs:
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: go.mod
-      - uses: ./.github/actions/build-provider
-      - name: Upload artifacts
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+      - id: build
+        uses: ./.github/actions/build-provider
         with:
-          name: release-artifacts
-          path: dist
+          target: ${{matrix.os}}/${{ matrix.arch }}
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: ${{ steps.build.outputs.name }}
+          path: dist/${{ steps.build.outputs.name }}
           if-no-files-found: error
           retention-days: 1
-          overwrite: true
+      - id: outputs
+        run: |
+          {
+            echo "linux-amd64-artifact=terraform-provider-enos_$(cat VERSION)_linux_amd64"
+          } | tee -a "$GITHUB_OUTPUT"
 
   test-build-artifacts:
     needs: build
@@ -35,7 +52,7 @@ jobs:
     secrets: inherit
     with:
       sample-name: dev
-      download: release-artifacts
+      download: ${{ needs.build.outputs.linux-amd64-artifact }}
 
   release:
     needs:
@@ -52,7 +69,7 @@ jobs:
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: dist
-          name: release-artifacts
+          name: terraform-provider-enos*
           merge-multiple: true
       - run: |
           ls -al ./dist
