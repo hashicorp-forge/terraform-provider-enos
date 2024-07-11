@@ -235,7 +235,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(errors.New("exceeded 60 second limit")))
+				return nil, wrapErr(drainErrors(errors.New("exceeded client wait connection limit")))
 			default:
 			}
 
@@ -243,7 +243,7 @@ func (c *client) Connect(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil, wrapErr(drainErrors(ctx.Err()))
 			case <-dialTimeout.Done():
-				return nil, wrapErr(drainErrors(errors.New("exceeded 60 second limit")))
+				return nil, wrapErr(drainErrors(errors.New("exceeded client wait connection limit")))
 			case <-dialTicker.C:
 				go dial()
 			case client := <-clientC:
@@ -401,7 +401,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		case <-ctx.Done():
 			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(), "30 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "request timeout exceeded")
 		default:
 		}
 
@@ -409,7 +409,7 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 		case <-ctx.Done():
 			return session, cleanup, wrapErr(drainErrors(), ctx.Err().Error())
 		case <-requestTimeout.Done():
-			return session, cleanup, wrapErr(drainErrors(), "30 second request timeout exceeded")
+			return session, cleanup, wrapErr(drainErrors(), "request timeout exceeded")
 		case <-requestTicker.C:
 			go sendRequest()
 		case <-requestSuccess:

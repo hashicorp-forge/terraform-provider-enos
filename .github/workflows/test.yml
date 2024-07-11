@@ -58,6 +58,9 @@ jobs:
   go-acceptance:
     name: TF_ACC=1 go test
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_ssh_key_name: enos-ci-ssh-key
+      TF_VAR_private_key_path: ./ssh.pem
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
@@ -80,27 +83,32 @@ jobs:
           # Pin our version of Terraform to 1.8 while an issue with 1.9 erroneously planning
           # is sorted https://github.com/hashicorp/terraform/issues/35424
           terraform_version: "1.8.5"
+      - name: Configure ssh keys
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > enos/modules/go-acceptance-test-target/ssh.pem
+          chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
+          chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
+          chmod 600 enos/modules/go-acceptance-test-target/ssh.pem
       - name: Create up acceptance target host
+        id: target-host
         working-directory: enos/modules/go-acceptance-test-target
         run: |
           terraform init
           terraform plan -no-color
           terraform apply -auto-approve
           HOST_IP=$(terraform output instance_public_ip | tr -d \" | tr -d "\n")
-          echo "host_ip=$HOST_IP" >> "$GITHUB_ENV"
-      - name: Configure ssh keys
-        run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
-          chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
-          chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
+          {
+            echo "host_ip=$HOST_IP"
+          } | tee -a "$GITHUB_OUTPUT"
       - run: make test-acc
         env:
           ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
           ENOS_TRANSPORT_USER: ubuntu
           ENOS_TRANSPORT_PRIVATE_KEY_PATH: ./enos-ci-ssh-key.pem
-          ENOS_TRANSPORT_HOST: ${{ env.host_ip }}
+          ENOS_TRANSPORT_HOST: ${{ steps.target-host.outputs.host_ip }}
       - run: terraform destroy -auto-approve
         if: always()
         working-directory: enos/modules/go-acceptance-test-target
