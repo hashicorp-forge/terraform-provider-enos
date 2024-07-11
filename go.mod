@@ -2,8 +2,6 @@ module github.com/hashicorp-forge/terraform-provider-enos
 
 go 1.22.5
 
-toolchain go1.22.5
-
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/aws/aws-sdk-go v1.54.13
