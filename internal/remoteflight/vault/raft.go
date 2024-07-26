@@ -335,7 +335,6 @@ func (s *RaftConfigurationDataConfig) String() string {
 
 	_, _ = out.WriteString(fmt.Sprintln("Servers:"))
 	for i := range s.Servers {
-		i := i
 		_, _ = out.WriteString(istrings.Indent("  ", s.Servers[i].String()))
 	}
 
@@ -429,7 +428,6 @@ func (r *RaftAutopilotStateResponseData) String() string {
 	}
 
 	for i := range r.Voters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Voters"))
 		}
@@ -437,7 +435,6 @@ func (r *RaftAutopilotStateResponseData) String() string {
 	}
 
 	for i := range r.NonVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Nonvoters"))
 		}
@@ -456,7 +453,6 @@ func (r *RaftAutopilotStateRedundancyZone) String() string {
 	out := new(strings.Builder)
 
 	for i := range r.Servers {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Servers"))
 		}
@@ -464,7 +460,6 @@ func (r *RaftAutopilotStateRedundancyZone) String() string {
 	}
 
 	for i := range r.Voters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Voters"))
 		}
@@ -505,7 +500,6 @@ func (r *RaftAutopilotStateUpgradeInfo) String() string {
 	out := new(strings.Builder)
 
 	for i := range r.OtherVersionNonVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Other Version Nonvoters"))
 		}
@@ -513,7 +507,6 @@ func (r *RaftAutopilotStateUpgradeInfo) String() string {
 	}
 
 	for i := range r.OtherVersionVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Other Version Voters"))
 		}
@@ -532,7 +525,6 @@ func (r *RaftAutopilotStateUpgradeInfo) String() string {
 	_, _ = out.WriteString(fmt.Sprintf("Target Version: %s\n", r.TargetVersion))
 
 	for i := range r.TargetVersionNonVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Target Version Nonvoters"))
 		}
@@ -550,7 +542,6 @@ func (r *RaftAutopilotStateUpgradeInfoRedundancyZone) String() string {
 	out := new(strings.Builder)
 
 	for i := range r.TargetVersionNonVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Target Version Nonvoters"))
 		}
@@ -558,7 +549,6 @@ func (r *RaftAutopilotStateUpgradeInfoRedundancyZone) String() string {
 	}
 
 	for i := range r.OtherVersionVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Other Version Voters"))
 		}
@@ -566,7 +556,6 @@ func (r *RaftAutopilotStateUpgradeInfoRedundancyZone) String() string {
 	}
 
 	for i := range r.OtherVersionNonVoters {
-		i := i
 		if i == 0 {
 			_, _ = out.WriteString(fmt.Sprintln("Other Version Nonvoters"))
 		}

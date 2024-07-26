@@ -130,7 +130,7 @@ func (d *artifactoryItem) ReadDataSource(ctx context.Context, req tfprotov6.Read
 
 	newState.ID.Set("static")
 
-	if err := newState.Validate(ctx); err != nil {
+	if err = newState.Validate(ctx); err != nil {
 		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Failure", err))
 		return
 	}

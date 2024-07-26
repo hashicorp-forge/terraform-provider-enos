@@ -354,8 +354,6 @@ func CheckStateHasMatchingListenerInConfig(listener *ConfigListener) CheckStater
 		}
 
 		for i := range s.ConfigSanitized.Data.Listeners {
-			i := i
-
 			if s.ConfigSanitized.Data.Listeners[i].Type != listener.Type {
 				continue
 			}
@@ -388,7 +386,6 @@ func CheckStateHasHAActiveNode() CheckStater {
 		}
 
 		for i := range s.HAStatus.Data.Nodes {
-			i := i
 			if s.HAStatus.Data.Nodes[i].ActiveNode {
 				return nil
 			}
@@ -440,7 +437,6 @@ func CheckStateHasMinNRaftVoters(min uint) CheckStater {
 
 		voters := uint(0)
 		for i := range s.RaftConfig.Data.Config.Servers {
-			i := i
 			if s.RaftConfig.Data.Config.Servers[i].Voter {
 				voters++
 			}
@@ -462,7 +458,6 @@ func CheckStateHasRaftLeader() CheckStater {
 		}
 
 		for i := range s.RaftConfig.Data.Config.Servers {
-			i := i
 			if s.RaftConfig.Data.Config.Servers[i].Leader {
 				return nil
 			}
@@ -514,7 +509,6 @@ func CheckStateHasMinNAutopilotHealthyNodes(min uint) CheckStater {
 
 		healthy := uint(0)
 		for i := range s.AutopilotState.Data.Servers {
-			i := i
 			if s.AutopilotState.Data.Servers[i].Healthy {
 				healthy++
 			}
@@ -555,7 +549,6 @@ func CheckStateAutopilotHasLeader() CheckStater {
 		}
 
 		for i := range s.AutopilotState.Data.Servers {
-			i := i
 			if s.AutopilotState.Data.Servers[i].Status == "leader" {
 				if s.AutopilotState.Data.Servers[i].Name != s.AutopilotState.Data.Leader {
 					return fmt.Errorf("checking if vault has an autopilot leader: mismatch on leader, servers data has %s, data has %s",

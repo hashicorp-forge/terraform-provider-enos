@@ -174,7 +174,8 @@ func getK8sLogs(ctx context.Context, transport *embeddedTransportK8Sv1) ([]remot
 	// to be explicit and get the actual container name.
 	container := transport.Container.Val
 	if container == "" {
-		info, err := client.GetPodInfo(ctx, kubernetes.GetPodInfoRequest{
+		var info *kubernetes.PodInfo
+		info, err = client.GetPodInfo(ctx, kubernetes.GetPodInfoRequest{
 			Namespace: namespace,
 			Name:      pod,
 		})

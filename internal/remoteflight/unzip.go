@@ -31,7 +31,6 @@ type UnzipOpt func(*UnzipRequest) *UnzipRequest
 
 // NewUnzipRequest takes functional options and returns a new unzip request.
 func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
-	var err error
 	ur := &UnzipRequest{
 		FlightControlPath:          DefaultFlightControlPath,
 		FileMode:                   "0755",
@@ -43,9 +42,6 @@ func NewUnzipRequest(opts ...UnzipOpt) *UnzipRequest {
 
 	for _, opt := range opts {
 		ur = opt(ur)
-		if err != nil {
-			return ur
-		}
 	}
 
 	return ur

@@ -177,7 +177,6 @@ func (s *ReplicationDataStatus) String() string {
 	if len(s.KnownSecondaries) > 0 {
 		_, _ = out.WriteString(fmt.Sprintln("Known Secondaries"))
 		for i := range s.KnownSecondaries {
-			i := i
 			_, _ = out.WriteString(fmt.Sprintf("  %s\n", s.KnownSecondaries[i]))
 		}
 	}
@@ -187,7 +186,6 @@ func (s *ReplicationDataStatus) String() string {
 	if len(s.Secondaries) > 0 {
 		_, _ = out.WriteString(fmt.Sprintln("Secondaries"))
 		for i := range s.Secondaries {
-			i := i
 			_, _ = out.WriteString(istrings.Indent("  ", s.Secondaries[i].String()))
 		}
 	}

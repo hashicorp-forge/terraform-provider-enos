@@ -3,14 +3,15 @@
 
 scenario "vault" {
   matrix {
-    backend       = ["consul", "raft"]
-    config_mode   = ["file", "env"]
-    distro        = ["ubuntu", "rhel"]
-    arch          = ["amd64", "arm64"]
-    edition       = ["ce", "ent"]
-    version       = ["1.8.12", "1.9.10", "1.10.11", "1.11.12", "1.12.11", "1.13.13", "1.14.10", "1.15.5"]
-    unseal_method = ["shamir", "awskms"]
-    use           = ["dev", "prod"]
+    backend              = ["consul", "raft"]
+    config_mode          = ["file", "env"]
+    distro               = ["ubuntu", "rhel"]
+    arch                 = ["amd64", "arm64"]
+    edition              = ["ce", "ent"]
+    configure_retry_join = ["true", "false"]
+    use                  = ["dev", "prod"]
+    unseal_method        = ["shamir", "awskms"]
+    version              = ["1.8.12", "1.9.10", "1.10.11", "1.11.12", "1.12.11", "1.13.13", "1.14.10", "1.15.5"]
 
     exclude {
       backend = ["consul"]
@@ -147,14 +148,15 @@ scenario "vault" {
     }
 
     variables {
-      ami_id             = step.infra.ami_ids[matrix.distro][matrix.arch]
-      config_mode        = matrix.config_mode
-      consul_cluster_tag = null
-      instance_type      = local.instance_types[matrix.arch]
-      kms_key_arn        = step.infra.kms_key_arn
-      storage_backend    = "raft"
-      unseal_method      = matrix.unseal_method
-      vault_license      = matrix.edition != "ce" ? step.vault_license.content : null
+      ami_id               = step.infra.ami_ids[matrix.distro][matrix.arch]
+      config_mode          = matrix.config_mode
+      configure_retry_join = matrix.configure_retry_join
+      consul_cluster_tag   = null
+      instance_type        = local.instance_types[matrix.arch]
+      kms_key_arn          = step.infra.kms_key_arn
+      storage_backend      = "raft"
+      unseal_method        = matrix.unseal_method
+      vault_license        = matrix.edition != "ce" ? step.vault_license.content : null
       vault_release = {
         version = local.vault_version
         edition = matrix.edition

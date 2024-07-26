@@ -70,15 +70,12 @@ linters:
   enable-all: true
   disable:
     - containedctx
-    - copyloopvar # until it has an auto-fix option
-    - deadcode
     - depguard
     - dogsled
     - dupl
     - errname
     - errorlint
     - execinquery
-    - exhaustivestruct
     - exhaustruct
     - forbidigo
     - forcetypeassert
@@ -91,39 +88,33 @@ linters:
     - goconst
     # disabled for now
     - gocritic
+    - gocyclo
     # disabled for now
     - godox
     - err113
     - gofmt
     - goheader
-    - golint
     - gomnd
-    - ifshort
+    - gomoddirectives # until we remove our go-cty fork
     - importas
-    - interfacer
     - ireturn
     - lll
     - loggercheck
     - maintidx
-    - maligned
-    - mnd
     - musttag
+    - mnd
     - nakedret
     - nestif
     - nonamedreturns
     - nosprintfhostport
-    - nosnakecase
     - promlinter
     - rowserrcheck
-    - scopelint
     - sqlclosecheck
-    - structcheck
     - tagliatelle
     - testableexamples
     - testpackage
     # disabled because it's not friendly with the terraform test helper
     - tparallel
-    - varcheck
     - varnamelen
     - wrapcheck
     - wsl

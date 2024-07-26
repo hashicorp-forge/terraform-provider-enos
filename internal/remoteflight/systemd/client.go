@@ -207,7 +207,7 @@ func (c *client) RestartService(ctx context.Context, unit string) error {
 	if !props.HasProperties(UnitProperties{
 		"UnitFileStatus": "enabled",
 	}) {
-		err := c.EnableService(ctx, unit)
+		err = c.EnableService(ctx, unit)
 		if err != nil {
 			return fmt.Errorf("restarting %s, systemd properties: %s, %w", unit, props, err)
 		}

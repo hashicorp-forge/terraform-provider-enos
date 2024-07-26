@@ -54,7 +54,6 @@ func CheckStateClusterHasLeader() CheckStater {
 		}
 
 		for i := range s.RaftConfigurationResponse.Servers {
-			i := i
 			if s.RaftConfigurationResponse.Servers[i].Leader {
 				return nil
 			}
@@ -76,7 +75,6 @@ func CheckStateClusterHasMinNHealthyNodes(min uint) CheckStater {
 
 		healthy := uint(0)
 		for i := range s.HealthStatePassingResponse.Nodes {
-			i := i
 			if s.HealthStatePassingResponse.Nodes[i].Status == NodeHealthStatusHealthy {
 				healthy++
 			}
@@ -102,7 +100,6 @@ func CheckStateClusterHasMinNVoters(min uint) CheckStater {
 
 		voters := uint(0)
 		for i := range s.RaftConfigurationResponse.Servers {
-			i := i
 			if s.RaftConfigurationResponse.Servers[i].Voter {
 				voters++
 			}

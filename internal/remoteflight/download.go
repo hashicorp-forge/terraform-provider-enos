@@ -37,7 +37,6 @@ type DownloadOpt func(*DownloadRequest) *DownloadRequest
 
 // NewDownloadRequest takes functional options and returns a new download request.
 func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
-	var err error
 	dr := &DownloadRequest{
 		FlightControlPath: DefaultFlightControlPath,
 		HTTPMethod:        "GET",
@@ -53,9 +52,6 @@ func NewDownloadRequest(opts ...DownloadOpt) *DownloadRequest {
 
 	for _, opt := range opts {
 		dr = opt(dr)
-		if err != nil {
-			return dr
-		}
 	}
 
 	return dr

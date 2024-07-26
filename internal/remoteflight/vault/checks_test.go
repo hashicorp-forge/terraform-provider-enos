@@ -45,8 +45,6 @@ func TestCheckStateHasSystemdEnabledAndRunningProperties(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -145,8 +143,6 @@ func TestCheckStateAllPodsHavePhase(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -236,8 +232,6 @@ func TestCheckStatePodsHasPhase(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -311,8 +305,6 @@ func TestCheckStateAllContainersAreReady(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -406,8 +398,6 @@ func TestCheckStateAllPodContainersAreReady(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -525,8 +515,6 @@ func TestCheckStatePodContainersIsReady(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -579,8 +567,6 @@ func TestCheckStateHasStatusCode(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -651,8 +637,6 @@ func TestCheckStateIsInitialized(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -796,8 +780,6 @@ func TestCheckStateIsUnsealed(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -941,8 +923,6 @@ func TestCheckStateIsSealed(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1069,8 +1049,6 @@ func TestCheckStateSealStateIsKnown(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1141,8 +1119,6 @@ func TestCheckStateHasHealthStatusOf(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1197,8 +1173,6 @@ func TestCheckStateHasEnableUIInConfig(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1310,8 +1284,6 @@ func TestCheckStateHasMatchingListenerInConfig(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1367,8 +1339,6 @@ func TestCheckStateHasHAActiveNode(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1432,8 +1402,6 @@ func TestCheckStateHasMinHANodes(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1497,8 +1465,6 @@ func TestCheckStateHasMinRaftServers(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1562,8 +1528,6 @@ func TestCheckStateHasMinRaftVoters(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1613,8 +1577,6 @@ func TestCheckStateHasRaftLeader(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1679,8 +1641,6 @@ func TestCheckStateHasMinAutopilotServers(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1743,8 +1703,6 @@ func TestCheckStateHasMinAutopilotVoters(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1809,8 +1767,6 @@ func TestCheckStateHasMinAutopilotHealthyNodes(t *testing.T) {
 			false,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1855,8 +1811,6 @@ func TestCheckStateAutopilotIsHealthy(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1921,8 +1875,6 @@ func TestCheckStateAutopilotHasLeader(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1975,8 +1927,6 @@ func TestCheckStateHasStorageType(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2029,8 +1979,6 @@ func TestCheckStateHasSealType(t *testing.T) {
 			true,
 		},
 	} {
-		name := name
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

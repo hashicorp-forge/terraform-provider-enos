@@ -512,7 +512,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 			return fmt.Errorf("failed to create the boundary systemd unit, due to: %w", err)
 		}
 
-		_, err := sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
+		_, err = sysd.RunSystemctlCommand(ctx, systemd.NewRunSystemctlCommand(
 			systemd.WithSystemctlCommandSubCommand(systemd.SystemctlSubCommandDaemonReload),
 		))
 		if err != nil {

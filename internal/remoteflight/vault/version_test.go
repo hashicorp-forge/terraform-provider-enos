@@ -35,7 +35,6 @@ func TestParseVaultVersionInRange(t *testing.T) {
 		{"Vault v1.8.0-rc1 (eba403741e344f9d9b686eaca122a5a3f446d442)", true},
 		{"Vault v1.8.0-rc1+ent.hsm (eba403741e344f9d9b686eaca122a5a3f446d442)", true},
 	} {
-		test := test
 		t.Run(test.version, func(t *testing.T) {
 			t.Parallel()
 			version, err := parseVaultVersion(test.version)
@@ -68,7 +67,6 @@ func TestParseVaultVersion(t *testing.T) {
 		{"Vault v1.8.0-rc1 (eba403741e344f9d9b686eaca122a5a3f446d442)", 1, 8, 0, "", "rc1"},
 		{"Vault v1.8.0-rc1+ent.hsm (eba403741e344f9d9b686eaca122a5a3f446d442)", 1, 8, 0, "ent.hsm", "rc1"},
 	} {
-		test := test
 		t.Run(test.version, func(t *testing.T) {
 			t.Parallel()
 			version, err := parseVaultVersion(test.version)

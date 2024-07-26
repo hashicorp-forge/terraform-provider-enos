@@ -135,9 +135,6 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 
 	// Get the systemd unit properties
 	sysd := systemd.NewClient(tr, log.NewLogger(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("getting the systemd unit properties: %w", err)
-	}
 
 	state.UnitProperties, err = sysd.ShowProperties(ctx, req.SystemdUnitName)
 	if err != nil {

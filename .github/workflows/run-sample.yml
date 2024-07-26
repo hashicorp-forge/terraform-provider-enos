@@ -4,30 +4,34 @@ name: run-samples
 on:
   workflow_dispatch:
     inputs:
-      download:
-        type: string
-        required: false
       max:
+        description: The maximum number of scenarios to sample
         type: number
         default: 8
       min:
+        description: The minimum number of scenarios to sample
         type: number
         default: 1
       sample-name:
+        description: The sample name
         required: true
         type: string
   workflow_call:
     inputs:
       download:
+        description: The name of the artifact to download
         type: string
-        required: false
+        required: true
       max:
+        description: The maximum number of scenarios to sample
         type: number
         default: 8
       min:
+        description: The minimum number of scenarios to sample
         type: number
         default: 1
       sample-name:
+        description: The sample name
         required: true
         type: string
 
@@ -38,7 +42,7 @@ jobs:
     outputs:
       sample: ${{ steps.metadata.outputs.sample }}
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: hashicorp/action-setup-enos@v1
         with:
           github-token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}

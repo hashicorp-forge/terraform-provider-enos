@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"regexp"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -16,8 +19,9 @@ import (
 )
 
 var (
-	nullDSTVal    = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-	unknownDSTVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+	impliedTypeRegexp = regexp.MustCompile(`\d*?\[\"(\w*)\",.*]`)
+	nullDSTVal        = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
+	unknownDSTVal     = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
 )
 
 func unmarshal(state state.Serializable, dyn *tfprotov6.DynamicValue) error {
@@ -103,6 +107,55 @@ func tfStringsSetOrUnknown(args ...*tfString) bool {
 	}
 
 	return false
+}
+
+// Sit down, grab a beverage, lets tell a story.
+//
+// Consider what we have to do when we're dealing with DynamicPseudoType's and Terraform's strict
+// type checking. When Terraform creates a dynamic object during plan/apply it will send the object
+// over the wire as either a map or an object. All good except that tftypes does not expose this
+// information to us but we need to correctly marshal the tfObject to the correct tftypes.Value,
+// otherwise Terraform will crash. The only place I could find this type information is by taking
+// the planned tftypes.Value and marshaling it to the wire format to inspect the hidden type
+// information Terraform sent over the wire, and then using it to create our new value with the
+// correct expected type.
+//
+// This is terrible but had to be done until better support for DynamicPseudoType's as input schema
+// is added to terraform-plugin-go.
+func encodeTfObjectDynamicPseudoType(
+	planVal tftypes.Value,
+	objVals map[string]tftypes.Value,
+) (tftypes.Value, error) {
+	var res tftypes.Value
+
+	// MarshalMsgPack is deprecated but it's by far the easiest way to inspect the serialized value
+	// of the raw attribute.
+	//nolint:staticcheck
+	//lint:ignore SA1019 we have to use this internal only API to determine DynamicPseudoType types.
+	msgpackBytes, err := planVal.MarshalMsgPack(tftypes.DynamicPseudoType)
+	if err != nil {
+		return res, errors.Wrap(err, "unable to marshal the vault config block to the wire format")
+	}
+
+	matches := impliedTypeRegexp.FindStringSubmatch(string(msgpackBytes))
+	if len(matches) >= 1 {
+		switch matches[1] {
+		case "map":
+			var elemType tftypes.Type
+			for _, attr := range objVals {
+				elemType = attr.Type()
+				break
+			}
+
+			return tftypes.NewValue(tftypes.Map{ElementType: elemType}, objVals), nil
+		case "object":
+			return terraform5Value(objVals), nil
+		default:
+			return res, errors.New(matches[1] + " is not a support dynamic type for the vault config block")
+		}
+	}
+
+	return res, fmt.Errorf("unable to determine type, got matches: %v+, in bytes: %s", matches, msgpackBytes)
 }
 
 func newTfBool() *tfBool {

@@ -8,11 +8,9 @@ description: Set up golangci-lint from Github releases
 inputs:
   destination:
     description: "Where to install the golangci-lint binary (default: $HOME/bin/golangci-lint)"
-    type: boolean
     default: "$HOME/bin/golangci-lint"
   version:
     description: "The version to install (default: latest)"
-    type: string
     default: Latest
 
 outputs:

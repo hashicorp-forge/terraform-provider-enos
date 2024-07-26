@@ -217,7 +217,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 	case req.IsCreate():
 		logger.Debug("Loading image into kind cluster")
 
-		if err := plannedState.Validate(ctx); err != nil {
+		if err = plannedState.Validate(ctx); err != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Validation Error", err))
 			return
 		}

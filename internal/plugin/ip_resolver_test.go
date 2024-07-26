@@ -81,7 +81,6 @@ func TestPublicIPAddressResolver_add_ips(t *testing.T) {
 			net.ParseIP("3.4.5.6"),
 		},
 	} {
-		ips := ips
 		wg.Add(1)
 
 		go func() {

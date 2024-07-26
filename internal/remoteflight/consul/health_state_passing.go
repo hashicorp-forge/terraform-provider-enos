@@ -86,7 +86,7 @@ func GetHealthStatePassing(ctx context.Context, tr it.Transport, req *HealthStat
 			req.String(),
 		))
 
-		if err != nil {
+		if err1 != nil {
 			err = errors.Join(err, err1)
 		}
 
@@ -127,7 +127,6 @@ func (n *HealthStatePassingResponse) String() string {
 	_, _ = out.WriteString("Healthy Nodes")
 
 	for i := range n.Nodes {
-		i := i
 		_, _ = out.WriteString(istrings.Indent("  ", n.Nodes[i].String()))
 	}
 

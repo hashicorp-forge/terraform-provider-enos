@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 resource "aws_vpc" "enos_vpc" {
   cidr_block = var.vpc_cidr
   # Enabled for RDS

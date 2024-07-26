@@ -35,7 +35,7 @@ locals {
       attributes = null
     }
   }
-  storage_config = [for idx in local.vault_instances : (var.storage_backend == "raft" ?
+  storage_attributes = [for idx in local.vault_instances : (var.storage_backend == "raft" ?
     merge(
       {
         node_id = "${var.vault_node_prefix}_${idx}"
@@ -47,6 +47,14 @@ locals {
       path    = "vault"
     })
   ]
+  storage_retry_join = {
+    "raft" : {
+      "true" : {
+        auto_join : "provider=aws tag_key=retry_join tag_value=${local.vault_cluster_tag}",
+        auto_join_scheme : "http",
+      },
+    },
+  }
   vault_bin_path         = "${var.vault_install_dir}/vault"
   vault_cluster_tag      = coalesce(var.vault_cluster_tag, "vault-server-${random_string.cluster_id.result}")
   vault_instances        = toset(local.instances)

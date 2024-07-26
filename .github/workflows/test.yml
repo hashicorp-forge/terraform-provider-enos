@@ -12,29 +12,44 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    outputs:
+      linux-amd64-artifact: ${{ steps.outputs.outputs.linux-amd64-artifact }}
+    strategy:
+      fail-fast: true
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        os:
+          - darwin
+          - linux
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-      # Build all provider targets here to ensure they all compile
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: go.mod
-      - uses: ./.github/actions/build-provider
-      - run: ls -al ./dist
-      - name: Upload artifacts
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+      - id: build
+        uses: ./.github/actions/build-provider
         with:
-          name: test-artifacts
-          path: dist
+          target: ${{matrix.os}}/${{ matrix.arch }}
+      - uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
+        with:
+          name: ${{ steps.build.outputs.name }}
+          path: dist/${{ steps.build.outputs.name }}
           if-no-files-found: error
           retention-days: 1
-          overwrite: true
+      - id: outputs
+        run: |
+          {
+            echo "linux-amd64-artifact=terraform-provider-enos_$(cat VERSION)_linux_amd64"
+          } | tee -a "$GITHUB_OUTPUT"
 
   go:
     name: go test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/build-flight-control
@@ -43,16 +58,17 @@ jobs:
   go-acceptance:
     name: TF_ACC=1 go test
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_ssh_key_name: enos-ci-ssh-key
+      TF_VAR_private_key_path: ./ssh.pem
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/build-provider
         with:
           target: linux/amd64
-      - name: TODO(post-publish) Remove implied local mirror install for dev
-        run: make install
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
           # The github actions service user creds for this account managed in hashicorp/enos-ci
@@ -64,27 +80,35 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
+          # Pin our version of Terraform to 1.8 while an issue with 1.9 erroneously planning
+          # is sorted https://github.com/hashicorp/terraform/issues/35424
+          terraform_version: "1.8.5"
+      - name: Configure ssh keys
+        run: |
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > enos/modules/go-acceptance-test-target/ssh.pem
+          chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
+          chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
+          chmod 600 enos/modules/go-acceptance-test-target/ssh.pem
       - name: Create up acceptance target host
+        id: target-host
         working-directory: enos/modules/go-acceptance-test-target
         run: |
           terraform init
           terraform plan -no-color
           terraform apply -auto-approve
           HOST_IP=$(terraform output instance_public_ip | tr -d \" | tr -d "\n")
-          echo "host_ip=$HOST_IP" >> "$GITHUB_ENV"
-      - name: Configure ssh keys
-        run: |
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/plugin/enos-ci-ssh-key.pem
-          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > ./internal/transport/ssh/enos-ci-ssh-key.pem
-          chmod 600 ./internal/plugin/enos-ci-ssh-key.pem
-          chmod 600 ./internal/transport/ssh/enos-ci-ssh-key.pem
+          {
+            echo "host_ip=$HOST_IP"
+          } | tee -a "$GITHUB_OUTPUT"
       - run: make test-acc
         env:
           ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
           ENOS_TRANSPORT_USER: ubuntu
           ENOS_TRANSPORT_PRIVATE_KEY_PATH: ./enos-ci-ssh-key.pem
-          ENOS_TRANSPORT_HOST: ${{ env.host_ip }}
+          ENOS_TRANSPORT_HOST: ${{ steps.target-host.outputs.host_ip }}
       - run: terraform destroy -auto-approve
         if: always()
         working-directory: enos/modules/go-acceptance-test-target
@@ -92,16 +116,16 @@ jobs:
   validate-terraform-examples:
     name: terraform validate examples
     runs-on: ubuntu-latest
+    needs: build
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: go.mod
-      - uses: ./.github/actions/build-provider
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          target: linux/amd64
-      - name: TODO(post-publish) Make sure the example config uses dev_overrides
-        run: make install
+          path: dist
+          name: ${{ needs.build.outputs.linux-amd64-artifact }}
       - uses: hashicorp/setup-terraform@v3
       - name: Run terraform --chdir=examples/* validate
         run: |
@@ -119,14 +143,14 @@ jobs:
     secrets: inherit
     with:
       sample-name: dev
-      download: test-artifacts
+      download: ${{ needs.build.outputs.linux-amd64-artifact }}
 
   static-analysis:
     name: static analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/build-flight-control

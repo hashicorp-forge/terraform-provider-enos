@@ -105,7 +105,6 @@ func (s *HAStatusData) String() string {
 
 	out := new(strings.Builder)
 	for i := range s.Nodes {
-		i := i
 		_, _ = out.WriteString(s.Nodes[i].String())
 	}
 

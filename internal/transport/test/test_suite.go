@@ -81,7 +81,6 @@ func (s *TransportTestSuite) TestRun() {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t1 *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			gotStdout, gotStderr, err := transport.Run(ctx, tt.args.command)
@@ -168,7 +167,6 @@ func (s *TransportTestSuite) TestCopy() {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t1 *testing.T) {
 			err := transport.Copy(tt.args.ctx, tt.args.copyable, tt.args.dst)
 			if tt.wantExitCode != 0 {
@@ -241,7 +239,6 @@ func (s *TransportTestSuite) TestStream() {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t1 *testing.T) {
 			stdOut, stdErr, errC := transport.Stream(tt.args.ctx, tt.args.command)
 

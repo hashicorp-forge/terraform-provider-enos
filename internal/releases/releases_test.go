@@ -59,7 +59,6 @@ func TestBundleURL(t *testing.T) {
 			"https://releases.hashicorp.com/vault/1.7.0+ent/vault_1.7.0+ent_freebsd_386.zip",
 		},
 	} {
-		test := test
 		rel := test.Rel
 		t.Run(fmt.Sprintf("%s_%s_%s_%s_%s", rel.Product, rel.Version, rel.Edition, rel.Platform, rel.Arch), func(t *testing.T) {
 			t.Parallel()
@@ -171,7 +170,6 @@ func TestSHA256(t *testing.T) {
 			"0c7e49ecc0b00202a515f2e819664850aad0ff617991aec03589b725a0540880",
 		},
 	} {
-		test := test
 		rel := test.Rel
 		t.Run(fmt.Sprintf("%s_%s_%s", rel.Edition, rel.Platform, rel.Arch), func(t *testing.T) {
 			t.Parallel()

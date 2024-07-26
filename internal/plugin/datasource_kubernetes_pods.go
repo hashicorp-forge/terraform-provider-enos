@@ -42,11 +42,12 @@ var defaultPodInfoGetter podInfoGetter = func(ctx context.Context, state kuberne
 	}
 
 	if timeout, ok := state.WaitTimeout.Get(); ok {
-		timeout, err := time.ParseDuration(timeout)
+		var timeoutDuration time.Duration
+		timeoutDuration, err = time.ParseDuration(timeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse 'wait_timeout': %s", timeout)
 		}
-		request.WaitTimeout = timeout
+		request.WaitTimeout = timeoutDuration
 	} else {
 		request.WaitTimeout = defaultWaitTimeout
 	}

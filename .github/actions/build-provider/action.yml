@@ -6,39 +6,42 @@ name: Build provider
 description: Build the enos-provider
 inputs:
   target:
-    description: The platform and operation system to build, i.e linux/amd64.. By default all supported targets are built
+    description: The platform and operation system to build, i.e linux/amd64.
     required: true
-    default: all
+    default: linux/amd64
+outputs:
+  arch:
+    description: The target artifact os
+    value: ${{ steps.meta.outputs.arch }}
+  name:
+    description: The target artifact name
+    value: ${{ steps.gen-output.outputs.name }}
+  os:
+    description: The target artifact os
+    value: ${{ steps.meta.outputs.os }}
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/build-flight-control
-    - if: ${{ inputs.target == 'all' || inputs.target == 'linux/amd64' }}
-      name: Build enos-provider linux/amd64
+    - id: meta
+      shell: bash
+      run: |
+        {
+          os=$(cut -d "/" -f1 <<< "${{ inputs.target }}")
+          arch=$(cut -d "/" -f2 <<< "${{ inputs.target }}")
+          echo "os=$os"
+          echo "arch=$arch"
+        } | tee -a "$GITHUB_OUTPUT"
+    - name: Build enos-provider ${{ inputs.target }}
       env:
-        PROVIDER_BIN_OS: linux
-        PROVIDER_BIN_ARCH: amd64
+        PROVIDER_BIN_OS: ${{ steps.meta.outputs.os }}
+        PROVIDER_BIN_ARCH: ${{ steps.meta.outputs.arch }}
       run: make build
       shell: bash
-    - if: ${{ inputs.target == 'all' || inputs.target == 'linux/arm64' }}
-      name: Build enos-provider linux/arm64
-      env:
-        PROVIDER_BIN_OS: linux
-        PROVIDER_BIN_ARCH: arm64
-      run: make build
+    - id: gen-output
       shell: bash
-    - if: ${{ inputs.target == 'all' || inputs.target == 'darwin/amd64' }}
-      name: Build enos-provider darwin/amd64
-      env:
-        PROVIDER_BIN_OS: darwin
-        PROVIDER_BIN_ARCH: amd64
-      run: make build
-      shell: bash
-    - if: ${{ inputs.target == 'all' || inputs.target == 'darwin/arm64' }}
-      name: Build enos-provider darwin/arm64
-      env:
-        PROVIDER_BIN_OS: darwin
-        PROVIDER_BIN_ARCH: arm64
-      run: make build
-      shell: bash
+      run: |
+        {
+          echo "name=$(ls dist)"
+        } | tee -a "$GITHUB_OUTPUT"

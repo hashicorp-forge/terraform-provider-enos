@@ -325,16 +325,16 @@ func TestChangedEnvVars(t *testing.T) {
 
 	remoteExecResource := newRemoteExec()
 	remoteExecResource.stateFactory = func() *remoteExecStateV1 {
-		remoteExecState := newRemoteExecStateV1()
+		state := newRemoteExecStateV1()
 		embeddedTransport := newEmbeddedTransport()
 
 		embeddedTransport.clientFactory = func(ctx context.Context, transport transportState) (it.Transport, error) {
 			clientCreateCount = clientCreateCount + 1
 			return mock.New(), nil
 		}
-		remoteExecState.Transport = embeddedTransport
+		state.Transport = embeddedTransport
 
-		return remoteExecState
+		return state
 	}
 
 	providers := testProviders(t, providerOverrides{resources: []resourcerouter.Resource{remoteExecResource}})
