@@ -41,6 +41,9 @@ type bundleInstallStateV1 struct {
 	Release     *bundleInstallStateV1Release
 	Artifactory *bundleInstallStateV1Artifactory
 	Transport   *embeddedTransportV1
+	Getter      *tfString
+	Installer   *tfString
+	Name        *tfString
 
 	failureHandlers
 }
@@ -86,6 +89,9 @@ func newBundleInstallStateV1() *bundleInstallStateV1 {
 			Version: newTfString(),
 			Edition: newTfString(),
 		},
+		Getter:          newTfString(),
+		Installer:       newTfString(),
+		Name:            newTfString(),
 		Transport:       transport,
 		failureHandlers: fh,
 	}
@@ -159,6 +165,9 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req resource.Pla
 
 	if _, ok := proposedState.ID.Get(); !ok {
 		proposedState.ID.Unknown = true
+		proposedState.Getter.Unknown = true
+		proposedState.Installer.Unknown = true
+		proposedState.Name.Unknown = true
 	}
 
 	// Make sure that we set a default edition if we have a product
@@ -403,7 +412,14 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 		return remoteflight.ErrPackageInstallGetterUnknown
 	}
 
-	_, err = remoteflight.PackageInstall(ctx, client, remoteflight.NewPackageInstallRequest(opts...))
+	res, err := remoteflight.PackageInstall(ctx, client, remoteflight.NewPackageInstallRequest(opts...))
+	if err != nil {
+		return err
+	}
+
+	s.Name.Set(res.Name)
+	s.Getter.Set(string(res.GetterType))
+	s.Installer.Set(string(res.InstallerType))
 
 	return err
 }
@@ -468,6 +484,27 @@ only one can be configured at a time.
 - ^release.version^ (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
 - ^release.edition^ (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc.
 `,
+				},
+				{
+					Name:        "getter",
+					Type:        tftypes.String,
+					Optional:    true,
+					Computed:    true,
+					Description: "The method used to fetch the package",
+				},
+				{
+					Name:        "installer",
+					Type:        tftypes.String,
+					Optional:    true,
+					Computed:    true,
+					Description: "The method used to install the package",
+				},
+				{
+					Name:        "name",
+					Type:        tftypes.String,
+					Optional:    true,
+					Computed:    true,
+					Description: "The name of the artifact that was installed",
 				},
 				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
@@ -578,6 +615,9 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"id":          s.ID,
 		"destination": s.Destination,
 		"path":        s.Path,
+		"getter":      s.Getter,
+		"installer":   s.Installer,
+		"name":        s.Name,
 	})
 	if err != nil {
 		return err
@@ -627,6 +667,9 @@ func (s *bundleInstallStateV1) Terraform5Type() tftypes.Type {
 		"path":        s.Path.TFType(),
 		"artifactory": s.ArtifactoryTerraform5Type(),
 		"release":     s.ReleaseTerraform5Type(),
+		"getter":      s.Getter.TFType(),
+		"installer":   s.Installer.TFType(),
+		"name":        s.Name.TFType(),
 		"transport":   s.Transport.Terraform5Type(),
 	}}
 }
@@ -639,6 +682,9 @@ func (s *bundleInstallStateV1) Terraform5Value() tftypes.Value {
 		"path":        s.Path.TFValue(),
 		"artifactory": s.ArtifactoryTerraform5Value(),
 		"release":     s.ReleaseTerraform5Value(),
+		"getter":      s.Getter.TFValue(),
+		"installer":   s.Installer.TFValue(),
+		"name":        s.Name.TFValue(),
 		"transport":   s.Transport.Terraform5Value(),
 	})
 }

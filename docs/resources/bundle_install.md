@@ -33,6 +33,9 @@ only one can be configured at a time.
 - ^artifactory.url^ (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
 - ^artifactory.sha256^ (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed (see [below for nested schema](#nestedatt--artifactory))
 - `destination` (String) The destination directory of the installed binary, eg: /usr/local/bin/. This is required if the artifact is a zip archive and optional when installing RPM or Deb packages
+- `getter` (String) The method used to fetch the package
+- `installer` (String) The method used to install the package
+- `name` (String) The name of the artifact that was installed
 - `path` (String) The local path to a zip archive install bundle.
 - `release` (Object) - ^release.product^ (String) The product name that you wish to install, eg: 'vault' or 'consul'
 - ^release.version^ (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
