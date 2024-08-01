@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -19,16 +21,16 @@ import (
 
 // Package install gets. These are the built-in package getters.
 var (
-	PackageInstallGetterCopy        = &PackageInstallGetter{"copy", packageInstallGetCopy}
-	PackageInstallGetterReleases    = &PackageInstallGetter{"releases", packageInstallGetDownload}
-	PackageInstallGetterArtifactory = &PackageInstallGetter{"artifactory", packageInstallGetDownload}
-	PackageInstallGetterRepository  = &PackageInstallGetter{"repository", packageInstallGetRepository}
+	PackageInstallGetterCopy        = &PackageInstallGetter{PackageGetterTypeCopy, packageInstallGetCopy}
+	PackageInstallGetterReleases    = &PackageInstallGetter{PackageGetterTypeReleases, packageInstallGetDownload}
+	PackageInstallGetterArtifactory = &PackageInstallGetter{PackageGetterTypeArtifactory, packageInstallGetDownload}
+	PackageInstallGetterRepository  = &PackageInstallGetter{PackageGetterTypeRepository, packageInstallGetRepository}
 )
 
 // Package install methods. These are the built-in pacakage installers.
 var (
 	PackageInstallInstallerZip = &PackageInstallInstaller{
-		Type:    "zip",
+		Type:    PackageInstallerTypeZip,
 		Install: packageInstallZipInstall,
 		CompatibleGetters: []*PackageInstallGetter{
 			PackageInstallGetterCopy,
@@ -37,7 +39,7 @@ var (
 		},
 	}
 	PackageInstallInstallerDEB = &PackageInstallInstaller{
-		Type:    "deb",
+		Type:    PackageInstallerTypeDeb,
 		Install: packageInstallDEBInstall,
 		CompatibleGetters: []*PackageInstallGetter{
 			PackageInstallGetterCopy,
@@ -46,7 +48,7 @@ var (
 		},
 	}
 	PackageInstallInstallerRPM = &PackageInstallInstaller{
-		Type:    "rpm",
+		Type:    PackageInstallerTypeRPM,
 		Install: packageInstallRPMInstall,
 		CompatibleGetters: []*PackageInstallGetter{
 			PackageInstallGetterCopy,
@@ -55,14 +57,14 @@ var (
 		},
 	}
 	PackageInstallInstallerYum = &PackageInstallInstaller{
-		Type:    "yum",
+		Type:    PackageInstallerTypeYum,
 		Install: packageInstallYumInstall,
 		CompatibleGetters: []*PackageInstallGetter{
 			PackageInstallGetterRepository,
 		},
 	}
 	PackageInstallInstallerApt = &PackageInstallInstaller{
-		Type:    "apt",
+		Type:    PackageInstallerTypeApt,
 		Install: packageInstallAptInstall,
 		CompatibleGetters: []*PackageInstallGetter{
 			PackageInstallGetterRepository,
@@ -81,9 +83,26 @@ var (
 	ErrPackageInstallInstallerUnsupported = errors.New("package install method is unsupported")
 )
 
+type (
+	PackageGetterType    string
+	PackageInstallerType string
+)
+
+const (
+	PackageGetterTypeCopy        PackageGetterType    = "copy"
+	PackageGetterTypeReleases    PackageGetterType    = "releases"
+	PackageGetterTypeArtifactory PackageGetterType    = "artifactory"
+	PackageGetterTypeRepository  PackageGetterType    = "repository"
+	PackageInstallerTypeZip      PackageInstallerType = "zip"
+	PackageInstallerTypeDeb      PackageInstallerType = "deb"
+	PackageInstallerTypeRPM      PackageInstallerType = "rpm"
+	PackageInstallerTypeYum      PackageInstallerType = "yum"
+	PackageInstallerTypeApt      PackageInstallerType = "apt"
+)
+
 // PackageInstallInstaller is how a package is going to be installed.
 type PackageInstallInstaller struct {
-	Type              string
+	Type              PackageInstallerType
 	CompatibleGetters []*PackageInstallGetter
 	Install           func(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error
 }
@@ -102,8 +121,8 @@ func (m *PackageInstallInstaller) Compatible(get *PackageInstallGetter) bool {
 
 // PackageInstallGetter is where the package is coming from.
 type PackageInstallGetter struct {
-	Type string
-	Get  func(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error
+	Type PackageGetterType
+	Get  func(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (string, error)
 }
 
 // PackageInstallRequest is a request to install a package on a target machine.
@@ -120,7 +139,11 @@ type PackageInstallRequest struct {
 }
 
 // PackageInstallResponse is the response of the script run.
-type PackageInstallResponse struct{}
+type PackageInstallResponse struct {
+	Name          string
+	GetterType    PackageGetterType
+	InstallerType PackageInstallerType
+}
 
 // PackageInstallRequestOpt is a functional option for running a script.
 type PackageInstallRequestOpt func(*PackageInstallRequest) *PackageInstallRequest
@@ -215,39 +238,46 @@ func WithPackageInstallTemporaryDirectory(dir string) PackageInstallRequestOpt {
 
 // PackageInstall copies the script to the remote host, executes it, and cleans it up.
 func PackageInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (*PackageInstallResponse, error) {
-	res := &PackageInstallResponse{}
-
 	if req.Getter == nil {
-		return res, ErrPackageInstallGetterUnknown
+		return nil, ErrPackageInstallGetterUnknown
 	}
 
 	if req.Installer == nil {
-		return res, ErrPackageInstallInstallerUnknown
+		return nil, ErrPackageInstallInstallerUnknown
 	}
 
 	if !req.Installer.Compatible(req.Getter) {
-		return res, fmt.Errorf("package installer %s is not compatible with package getter %s",
+		return nil, fmt.Errorf("package installer %s is not compatible with package getter %s",
 			req.Installer.Type,
 			req.Getter.Type,
 		)
 	}
 
-	err := req.Getter.Get(ctx, tr, req)
+	name, err := req.Getter.Get(ctx, tr, req)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
-	return res, req.Installer.Install(ctx, tr, req)
+	err = req.Installer.Install(ctx, tr, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PackageInstallResponse{
+		Name:          name,
+		GetterType:    req.Getter.Type,
+		InstallerType: req.Installer.Type,
+	}, nil
 }
 
-func packageInstallGetCopy(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
+func packageInstallGetCopy(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (string, error) {
 	if req.CopyPath == "" {
-		return errors.New("you must supply a path to the get artifact you wish you copy")
+		return "", errors.New("you must supply a path to the get artifact you wish you copy")
 	}
 
 	src, err := tfile.Open(req.CopyPath)
 	if err != nil {
-		return fmt.Errorf("opening artifact to copy to remote host: %w", err)
+		return "", fmt.Errorf("opening artifact to copy to remote host: %w", err)
 	}
 	defer src.Close()
 
@@ -262,13 +292,13 @@ func packageInstallGetCopy(ctx context.Context, tr it.Transport, req *PackageIns
 		WithCopyFileDestination(req.TempArtifactPath),
 	))
 	if err != nil {
-		return fmt.Errorf("copying artifact to remote host: %w", err)
+		return "", fmt.Errorf("copying artifact to remote host: %w", err)
 	}
 
-	return nil
+	return filepath.Base(req.CopyPath), nil
 }
 
-func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
+func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (string, error) {
 	res, err := InstallFlightControl(ctx, tr, NewInstallFlightControlRequest(
 		WithInstallFlightControlRequestUseHomeDir(),
 		WithInstallFlightControlRequestTargetRequest(
@@ -280,7 +310,7 @@ func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *Packag
 		),
 	))
 	if err != nil {
-		return fmt.Errorf("installing flight-control binary to download package: %w", err)
+		return "", fmt.Errorf("installing flight-control binary to download package: %w", err)
 	}
 
 	// TODO: Allow specifying a user so we can ensure that the temp directory
@@ -298,18 +328,24 @@ func packageInstallGetDownload(ctx context.Context, tr it.Transport, req *Packag
 		WithDownloadRequestReplace(true),
 	}
 	opts = append(opts, req.DownloadOpts...)
-	_, err = Download(ctx, tr, NewDownloadRequest(opts...))
+	dReq := NewDownloadRequest(opts...)
+	_, err = Download(ctx, tr, dReq)
 	if err != nil {
-		return fmt.Errorf("downloading artifact to the remote host: %w", err)
+		return "", fmt.Errorf("downloading artifact to the remote host: %w", err)
 	}
 
-	return nil
+	u, err := url.Parse(dReq.URL)
+	if err != nil {
+		return "", fmt.Errorf("parsing artifact URL: %w", err)
+	}
+
+	return path.Base(u.Path), nil
 }
 
-func packageInstallGetRepository(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
+func packageInstallGetRepository(ctx context.Context, tr it.Transport, req *PackageInstallRequest) (string, error) {
 	// TODO: right now this is just a shim because we assume the package repository
 	// has the package. We could eventually check the package repo for the package.
-	return nil
+	return "", nil
 }
 
 func packageInstallZipInstall(ctx context.Context, tr it.Transport, req *PackageInstallRequest) error {
