@@ -49,7 +49,7 @@ If a double quote must be included in the command it should be escaped as follow
 
 ### Read-Only
 
-- `id` (String) The resource identifier is always static
+- `id` (String) A random ID number associated with the resource. This is created a single time during the initial 'apply' phase. It is utilized as a prefix when copying file contents to the remote target
 - `stderr` (String) The aggregate STDERR of all inline commnads, scripts, or content. If nothing is output this value will be set to a blank string
 - `stdout` (String) The aggregate STDOUT of all inline commnads, scripts, or content. If nothing is output this value will be set to a blank string
 - `sum` (String) A digest of the inline commands, source files, and environment variables. If the sum changes between runs all commands will execute again

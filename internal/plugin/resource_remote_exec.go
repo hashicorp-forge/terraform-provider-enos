@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/diags"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
 	resource "github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/state"
@@ -196,7 +197,7 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 		// nothing to do on delete
 		return
 	}
-	plannedState.ID.Set("static")
+	plannedState.ID.Set(random.ID())
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
 	if diags.HasErrors(res.Diagnostics) {
@@ -271,7 +272,7 @@ If a double quote must be included in the command it should be escaped as follow
 					Name:        "id",
 					Type:        tftypes.String,
 					Computed:    true,
-					Description: resourceStaticIDDescription,
+					Description: "A random ID number associated with the resource. This is created a single time during the initial 'apply' phase. It is utilized as a prefix when copying file contents to the remote target",
 				},
 				{
 					Name:        "sum",
@@ -334,7 +335,6 @@ If a double quote must be included in the command it should be escaped as follow
 func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecStateV1, client it.Transport) (ui.UI, error) {
 	var err error
 	ui := ui.NewBuffered()
-	env, _ := state.Env.GetStrings()
 
 	if inline, ok := state.Inline.GetStrings(); ok {
 		for _, cmd := range inline {
@@ -353,7 +353,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 				source := tfile.NewReader(cmd)
 				defer source.Close()
 
-				return r.copyAndRun(ctx, ui, client, source, "inline", env)
+				return r.copyAndRun(ctx, ui, client, source, "inline", state)
 			}
 			if err := exec(cmd); err != nil {
 				return ui, fmt.Errorf("running inline command failed, due to: %w", err)
@@ -370,7 +370,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 				}
 				defer script.Close()
 
-				return r.copyAndRun(ctx, ui, client, script, "script", env)
+				return r.copyAndRun(ctx, ui, client, script, "script", state)
 			}
 
 			if err := exec(path); err != nil {
@@ -383,7 +383,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 		content := tfile.NewReader(cont)
 		defer content.Close()
 
-		err = r.copyAndRun(ctx, ui, client, content, "content", env)
+		err = r.copyAndRun(ctx, ui, client, content, "content", state)
 		if err != nil {
 			return ui, fmt.Errorf("running command content failed, due to: %w", err)
 		}
@@ -395,7 +395,7 @@ func (r *remoteExec) ExecuteCommands(ctx context.Context, state *remoteExecState
 // copyAndRun copies the copyable source to the target using the configured transport,
 // sets the environment variables and executes the content of the source.
 // It returns STDOUT, STDERR, and any errors encountered.
-func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transport, src it.Copyable, srcType string, env map[string]string) error {
+func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transport, src it.Copyable, srcType string, state *remoteExecStateV1) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -417,9 +417,10 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transpo
 	// TODO: Eventually we'll probably have to support /tmp being mounted
 	// with no exec. In those cases we'll have to make this configurable
 	// or find another strategy for executing scripts.
+	env, _ := state.Env.GetStrings()
 	res, err := remoteflight.RunScript(ctx, client, remoteflight.NewRunScriptRequest(
 		remoteflight.WithRunScriptContent(src),
-		remoteflight.WithRunScriptDestination(fmt.Sprintf("/tmp/%s.sh", sha)),
+		remoteflight.WithRunScriptDestination(fmt.Sprintf("/tmp/%s-%s.sh", state.ID.Value(), sha)),
 		remoteflight.WithRunScriptEnv(env),
 		remoteflight.WithRunScriptChmod("0777"),
 	))
