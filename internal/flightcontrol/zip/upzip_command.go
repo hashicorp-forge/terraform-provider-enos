@@ -114,7 +114,7 @@ func (c *UnzipCommand) Unzip() error {
 	}
 	defer archive.Close()
 
-	fileMode := fs.FileMode(c.args.mode)
+	fileMode := fs.FileMode(c.args.mode) //#nosec:G115
 
 	// Make sure we've got a destination directory
 	dstDir, err := os.Open(c.args.destination)
@@ -128,7 +128,7 @@ func (c *UnzipCommand) Unzip() error {
 			return err
 		}
 
-		err = os.MkdirAll(c.args.destination, fs.FileMode(c.args.destinationMode))
+		err = os.MkdirAll(c.args.destination, fs.FileMode(c.args.destinationMode)) //#nosec:G115
 		if err != nil {
 			return err
 		}

@@ -130,7 +130,7 @@ func encodeTfObjectDynamicPseudoType(
 
 	// MarshalMsgPack is deprecated but it's by far the easiest way to inspect the serialized value
 	// of the raw attribute.
-	//nolint:staticcheck
+	//nolint:staticcheck,nolintlint
 	//lint:ignore SA1019 we have to use this internal only API to determine DynamicPseudoType types.
 	msgpackBytes, err := planVal.MarshalMsgPack(tftypes.DynamicPseudoType)
 	if err != nil {

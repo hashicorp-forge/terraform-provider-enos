@@ -40,7 +40,6 @@ func NewTransportTestSuite(transportFn func(t *testing.T) it.Transport) *Transpo
 func (s *TransportTestSuite) TestRun() {
 	t := s.T()
 	transport := s.transportFn(t)
-	t.Parallel()
 
 	type args struct {
 		command it.Command
@@ -117,7 +116,6 @@ func (s *TransportTestSuite) TestRun() {
 func (s *TransportTestSuite) TestCopy() {
 	t := s.T()
 	transport := s.transportFn(t)
-	t.Parallel()
 
 	type args struct {
 		ctx      context.Context
@@ -194,7 +192,6 @@ func (s *TransportTestSuite) TestCopy() {
 func (s *TransportTestSuite) TestStream() {
 	t := s.T()
 	transport := s.transportFn(t)
-	t.Parallel()
 
 	type args struct {
 		ctx     context.Context
