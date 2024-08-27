@@ -197,7 +197,6 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 		// nothing to do on delete
 		return
 	}
-	plannedState.ID.Set(random.ID())
 
 	transport := transportUtil.ApplyValidatePlannedAndBuildTransport(ctx, plannedState, r, res)
 	if diags.HasErrors(res.Diagnostics) {
@@ -207,6 +206,10 @@ func (r *remoteExec) ApplyResourceChange(ctx context.Context, req resource.Apply
 	// If our priorState Sum is blank then we're creating the resource. If
 	// it's not blank and doesn't match the planned state we're updating.
 	_, pok := priorState.ID.Get()
+	if !pok {
+		plannedState.ID.Set(random.ID())
+	}
+
 	priorSum, prsumok := priorState.Sum.Get()
 	plannedSum, plsumok := plannedState.Sum.Get()
 
