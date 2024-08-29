@@ -107,6 +107,7 @@ linters:
     - nestif
     - nonamedreturns
     - nosprintfhostport
+    - predeclared
     - promlinter
     - rowserrcheck
     - sqlclosecheck

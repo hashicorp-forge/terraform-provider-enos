@@ -152,7 +152,7 @@ func (c *Command) Download() error {
 			}
 		}
 
-		dst, err := os.OpenFile(c.args.destination, os.O_RDWR|os.O_CREATE, fs.FileMode(c.args.mode))
+		dst, err := os.OpenFile(c.args.destination, os.O_RDWR|os.O_CREATE, fs.FileMode(c.args.mode)) //#nosec: G115
 		if err != nil {
 			return err
 		}
