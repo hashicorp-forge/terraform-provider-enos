@@ -173,15 +173,15 @@ for every criteria. This means that you can use wildcards ^*^ for any field. See
 				{
 					Name:        "username",
 					Type:        tftypes.String,
-					Required:    true,
-					Description: "The Artifactory API user name. Depending on your login scheme this is likely an email address",
+					Optional:    true,
+					Description: "The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth",
 				},
 				{
 					Name:        "token",
 					Type:        tftypes.String,
 					Required:    true,
 					Sensitive:   true,
-					Description: "The Artifactory API token. You can sign into Artifactory and generate one.",
+					Description: "The Artifactory API Key token or identity token. API keys are deprecated so it is best to use an identity token",
 				},
 				{
 					Name:        "host",
