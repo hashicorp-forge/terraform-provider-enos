@@ -23,11 +23,11 @@ import (
 func TestAccDataSourceArtifactoryItem(t *testing.T) {
 	state := newArtifactoryItemStateV1()
 	_, okacc := os.LookupEnv("TF_ACC")
-	username, okuser := os.LookupEnv("ARTIFACTORY_USER")
+	username, _ := os.LookupEnv("ARTIFACTORY_USER")
 	token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
 
-	if !okacc || !okuser || !oktoken {
-		t.Log(`skipping data "enos_artifactory_item" test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER aren't set`)
+	if !okacc || !oktoken {
+		t.Log(`skipping data "enos_artifactory_item" test because either TF_ACC or ARTIFACTORY_TOKEN are not set`)
 		t.Skip()
 
 		return
@@ -46,7 +46,9 @@ func TestAccDataSourceArtifactoryItem(t *testing.T) {
 	})
 
 	cfg := template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
+	{{if .Username.Value -}}
   username = "{{ .Username.Value }}"
+	{{end -}}
   token    = "{{ .Token.Value }}"
 
   host = "{{ .Host.Value }}"

@@ -89,7 +89,13 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 		return res, fmt.Errorf("generating artifactory search request: %w", err)
 	}
 	areq.Header.Add("Content-Type", "text/plain")
-	areq.SetBasicAuth(c.Username, c.Token)
+	if c.Username == "" {
+		// Identity token
+		areq.Header.Add("Authorization", "Bearer "+c.Token)
+	} else {
+		// API key
+		areq.SetBasicAuth(c.Username, c.Token)
+	}
 
 	ares, err := c.http.Do(areq)
 	if err != nil {
