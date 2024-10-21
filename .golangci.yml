@@ -49,6 +49,8 @@ linters-settings:
       - G110
       # Don't worry about zip file traversals
       - G305
+      # Don't worry about casting int -> uint
+      - G115
     config:
       G306:
         # allow creating files with 0755 permissions
@@ -77,6 +79,7 @@ linters:
     - errorlint
     - execinquery
     - exhaustruct
+    - fatcontext
     - forbidigo
     - forcetypeassert
     - funlen
