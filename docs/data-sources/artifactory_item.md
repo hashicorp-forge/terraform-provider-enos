@@ -29,8 +29,7 @@ for every criteria. This means that you can use wildcards `*` for any field. See
 ### Required
 
 - `host` (String) The Artifactory API host. It should be the fully qualified base URL
-- `token` (String, Sensitive) The Artifactory API token. You can sign into Artifactory and generate one.
-- `username` (String) The Artifactory API user name. Depending on your login scheme this is likely an email address
+- `token` (String, Sensitive) The Artifactory API Key token or identity token. API keys are deprecated so it is best to use an identity token
 
 ### Optional
 
@@ -38,6 +37,7 @@ for every criteria. This means that you can use wildcards `*` for any field. See
 - `path` (String) The sub-path inside the Artifactory repository to search in
 - `properties` (Map of String) A map of properties to match on
 - `repo` (String) The Artifactory repository you want to search in
+- `username` (String) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
 
 ### Read-Only
 
