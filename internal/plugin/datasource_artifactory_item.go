@@ -218,13 +218,13 @@ for every criteria. This means that you can use wildcards ^*^ for any field. See
 					Type:            s.Results.TFType(),
 					Computed:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
-					Description: `
+					Description: docCaretToBacktick(`
 - ^results.name^ (String) The item name
 - ^results.type^ (String) The item type
 - ^results.url^ (String) The fully qualified URL to the item
 - ^results.sha256^ (String) The SHA256 sum of the item
 - ^results.size^ (String) The size of the item
-`,
+`),
 				},
 			},
 		},
