@@ -466,12 +466,12 @@ only one can be configured at a time.
 					Sensitive:       true, // mask the token
 					Optional:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
-					Description: `
+					Description: docCaretToBacktick(`
 - ^artifactory.username^ (String) The Artifactory API username. This will likely be your hashicorp email address
 - ^artifactory.token^ (String) The Artifactory API token. You can sign into Artifactory and generate one
 - ^artifactory.url^ (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
 - ^artifactory.sha256^ (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed
-`,
+`),
 				},
 				{
 					Name:     "release",
@@ -479,11 +479,11 @@ only one can be configured at a time.
 					Optional: true,
 
 					DescriptionKind: tfprotov6.StringKindMarkdown,
-					Description: `
+					Description: docCaretToBacktick(`
 - ^release.product^ (String) The product name that you wish to install, eg: 'vault' or 'consul'
 - ^release.version^ (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
 - ^release.edition^ (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc.
-`,
+`),
 				},
 				{
 					Name:        "getter",

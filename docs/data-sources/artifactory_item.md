@@ -42,11 +42,11 @@ for every criteria. This means that you can use wildcards `*` for any field. See
 ### Read-Only
 
 - `id` (String) The datasource identifier is always static
-- `results` (List of Object) - ^results.name^ (String) The item name
-- ^results.type^ (String) The item type
-- ^results.url^ (String) The fully qualified URL to the item
-- ^results.sha256^ (String) The SHA256 sum of the item
-- ^results.size^ (String) The size of the item (see [below for nested schema](#nestedatt--results))
+- `results` (List of Object) - `results.name` (String) The item name
+- `results.type` (String) The item type
+- `results.url` (String) The fully qualified URL to the item
+- `results.sha256` (String) The SHA256 sum of the item
+- `results.size` (String) The size of the item (see [below for nested schema](#nestedatt--results))
 
 <a id="nestedatt--results"></a>
 ### Nested Schema for `results`
