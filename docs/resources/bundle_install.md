@@ -39,7 +39,7 @@ only one can be configured at a time.
 - `path` (String) The local path to a zip archive install bundle.
 - `release` (Object) - `release.product` (String) The product name that you wish to install, eg: 'vault' or 'consul'
 - `release.version` (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
-- `release.edition` (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips', etc. (see [below for nested schema](#nestedatt--release))
+- `release.edition` (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips1403', etc. (see [below for nested schema](#nestedatt--release))
 - `transport` (Dynamic) - `transport.ssh` (Object) the ssh transport configuration
 - `transport.ssh.user` (String) the ssh login user|string
 - `transport.ssh.host` (String) the remote host to access
