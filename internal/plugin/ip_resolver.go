@@ -300,7 +300,7 @@ func (r *publicIPResolver) v4() []net.IP {
 	r.m.Lock()
 	defer r.m.Unlock()
 
-	if r.v4Ips == nil || len(r.v4Ips) < 1 {
+	if len(r.v4Ips) < 1 {
 		return nil
 	}
 
@@ -327,7 +327,7 @@ func (r *publicIPResolver) v6() []net.IP {
 	r.m.Lock()
 	defer r.m.Unlock()
 
-	if r.v6Ips == nil || len(r.v6Ips) < 1 {
+	if len(r.v6Ips) < 1 {
 		return nil
 	}
 

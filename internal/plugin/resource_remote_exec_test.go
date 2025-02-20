@@ -395,7 +395,7 @@ wrapping_token_creation_path:    sys/replication/performance/primary/secondary-t
 
 	//nolint:gosec// we're okay to use hardcoded tokens in tests
 	tokensFile := "/tmp/tokens"
-	require.NoError(t, client.Copy(context.Background(), tfile.NewReader(tokens), tokensFile))
+	require.NoError(t, client.Copy(t.Context(), tfile.NewReader(tokens), tokensFile))
 
 	cfg := template.Must(template.New("enos_remote_exec").
 		Funcs(transportRenderFunc).

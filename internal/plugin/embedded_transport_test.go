@@ -357,9 +357,9 @@ func TestProviderEmbeddedTransportValidate(t *testing.T) {
 		t.Run(test.name, func(tt *testing.T) {
 			transport := test.config.build(tt)
 			if test.wantErr {
-				require.Error(tt, transport.Validate(context.Background()))
+				require.Error(tt, transport.Validate(t.Context()))
 			} else {
-				require.NoError(tt, transport.Validate(context.Background()))
+				require.NoError(tt, transport.Validate(t.Context()))
 			}
 		})
 	}
@@ -483,10 +483,10 @@ func TestProviderEmbeddedTransportClient(t *testing.T) {
 			}
 
 			if test.wantErr {
-				_, err := transport.Client(context.Background())
+				_, err := transport.Client(t.Context())
 				require.Error(tt, err)
 			} else {
-				_, err := transport.Client(context.Background())
+				_, err := transport.Client(t.Context())
 				require.NoError(tt, err)
 			}
 		})

@@ -30,7 +30,7 @@ func TestAccPublicIPAddressResolver(t *testing.T) {
 	// Test that we can resolve something out of all of our providers
 	t.Run("defaultResolvers_all", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		err := pubip.resolve(ctx, defaultResolvers()...)
 		require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestAccPublicIPAddressResolver(t *testing.T) {
 	// Only warn if they can't resolve an IP address
 	t.Run("defaultResolvers_each", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		for _, resolver := range defaultResolvers() {
 			err := pubip.resolve(ctx, resolver)

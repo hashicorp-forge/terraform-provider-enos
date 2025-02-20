@@ -5,7 +5,6 @@ package publish
 
 import (
 	"archive/zip"
-	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -62,8 +61,8 @@ func TestReleaseManifestVersionRoundTrip(t *testing.T) {
 	content := `{"version":1,"metadata":{"protocol_versions":["6.0"]}}`
 	path := filepath.Join(dir, "manifest.json")
 	require.NoError(t, os.WriteFile(path, []byte(content), fs.FileMode(0o755)))
-	require.NoError(t, artifacts.AddReleaseManifest(context.Background(), path, "0.5.0"))
-	require.NoError(t, artifacts.CreateVersionedRegistryManifest(context.Background()))
+	require.NoError(t, artifacts.AddReleaseManifest(t.Context(), path, "0.5.0"))
+	require.NoError(t, artifacts.CreateVersionedRegistryManifest(t.Context()))
 	f, err := os.Open(artifacts.registryManifest.versionedPath)
 	require.NoError(t, err)
 	got, err := io.ReadAll(f)
