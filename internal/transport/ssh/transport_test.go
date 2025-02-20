@@ -55,7 +55,7 @@ func TestSSH(t *testing.T) {
 		require.NoError(t, err)
 		defer src.Close()
 
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(5*time.Second))
 		defer cancel()
 
 		err = c.Copy(ctx, src, "/tmp/ssh_test_copy")
@@ -67,7 +67,7 @@ func TestSSH(t *testing.T) {
 
 	t.Run("run", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(5*time.Second))
 		defer cancel()
 
 		_, _, err := c.Run(ctx, command.New("printf 'content' > /tmp/ssh_test_run"))
@@ -86,7 +86,7 @@ func TestSSH(t *testing.T) {
 
 	t.Run("run_exit_1", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(5*time.Second))
 		defer cancel()
 
 		_, _, err := c.Run(ctx, command.New("printf 'exit 1' > /tmp/run_exit_1; chmod +x /tmp/run_exit_1; /tmp/run_exit_1"))
@@ -101,7 +101,7 @@ func TestSSH(t *testing.T) {
 	t.Run("nohup", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(15*time.Second))
 		defer cancel()
 
 		// Make sure we can nohup and end our session

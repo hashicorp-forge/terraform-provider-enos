@@ -6,7 +6,6 @@ package retry
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ var (
 func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
 	var attempt int
@@ -56,7 +55,7 @@ func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
 func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
 	var attempt int
@@ -91,7 +90,7 @@ func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 // Test that we do not exceed the max number of retries.
 func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var attempt int
 	maxRetries := 2
@@ -118,7 +117,7 @@ func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
 // Test that if OnlyRetryErrors are passed, only those errors trigger retry.
 func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
 	var attempt int
@@ -153,7 +152,7 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 // Test that if Timeout is set on the context, Retry times out accordingly.
 func TestRetry_Timeout(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
 	var attempt int
@@ -172,13 +171,13 @@ func TestRetry_Timeout(t *testing.T) {
 
 	_, err := Retry(ctx, req)
 
-	assert.True(t, strings.Contains(err.Error(), "context deadline exceeded"))
+	assert.Contains(t, err.Error(), "context deadline exceeded")
 }
 
 // Test that the retry function returns the value that we expect.
 func TestRetry_CorrectValueReturned(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
 	funcToRun := func(ctx context.Context) (interface{}, error) {

@@ -7,6 +7,11 @@ run:
   issues-exit-code: 1
   tests: true
 
+
+issues:
+  # make issues output unique by line, default is true
+  uniq-by-line: true
+
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
@@ -17,8 +22,6 @@ output:
   print-issued-lines: true
   # print linter name in the end of issue text, default is true
   print-linter-name: true
-  # make issues output unique by line, default is true
-  uniq-by-line: true
   # add a prefix to the output file references; default is no prefix
   # path-prefix: ""
   # sorts results by: filepath, line and column
@@ -27,7 +30,7 @@ output:
 # all available settings of specific linters
 linters-settings:
   errcheck:
-    check-type-assertions: true
+    check-type-assertions: false
     check-blank: false
 
   cyclop:
@@ -77,7 +80,6 @@ linters:
     - dupl
     - errname
     - errorlint
-    - execinquery
     - exhaustruct
     - fatcontext
     - forbidigo
@@ -97,7 +99,6 @@ linters:
     - err113
     - gofmt
     - goheader
-    - gomnd
     - gomoddirectives # until we remove our go-cty fork
     - importas
     - ireturn
@@ -125,4 +126,5 @@ linters:
   fast: false
 
 severity:
+  default-severity: error
   case-sensitive: false

@@ -285,7 +285,7 @@ func TestTransportDebugFailureHandler(t *testing.T) {
 				Detail:   "This thing failed",
 			}
 
-			handler(context.Background(), errDiag, tftypes.NewValue(tftypes.String, ""))
+			handler(t.Context(), errDiag, tftypes.NewValue(tftypes.String, ""))
 
 			for key, value := range tt.want {
 				expected := fmt.Sprintf("%s : %s", key, value)
@@ -406,7 +406,7 @@ Error: Failed to find consul`)
 			providerConfig := newProviderConfig()
 			providerConfig.DebugDataRootDir.Set(tt.dir)
 
-			handler(context.Background(), diag, providerConfig.Terraform5Value())
+			handler(t.Context(), diag, providerConfig.Terraform5Value())
 
 			for _, service := range tt.expectedServices {
 				logFile := filepath.Join(tt.dir, tt.expectedLogFileNames[service])
@@ -459,7 +459,7 @@ Taco Failed`)
 	}
 	providerConfig := newProviderConfig()
 
-	handler(context.Background(), diag, providerConfig.Terraform5Value())
+	handler(t.Context(), diag, providerConfig.Terraform5Value())
 
 	logFile := filepath.Join(dir, "taco_cluster_food_tacos_chicken.log")
 

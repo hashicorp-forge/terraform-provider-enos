@@ -93,7 +93,7 @@ func resetEnv(t *testing.T) {
 	unsetAllEnosEnv(t)
 
 	for key, val := range startEnv {
-		require.NoError(t, os.Setenv(key, val))
+		t.Setenv(key, val)
 	}
 }
 
@@ -200,7 +200,7 @@ func setEnvVars(t *testing.T, vars map[string]*tfString) {
 	for key, val := range vars {
 		v, ok := val.Get()
 		if ok {
-			require.NoError(t, os.Setenv(key, v))
+			t.Setenv(key, v)
 		}
 	}
 }

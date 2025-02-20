@@ -4,7 +4,6 @@
 package plugin
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,7 +71,7 @@ func TestDebugDataRootDirFromEnvVar(t *testing.T) {
 	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
 	provider := newProvider()
-	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{
+	resp, err := provider.Configure(t.Context(), &tfprotov6.ConfigureProviderRequest{
 		TerraformVersion: "1.3",
 		Config:           val,
 	})
@@ -102,7 +101,7 @@ func TestDebugDataRootDirFromEnvVarOverridesProviderConfigured(t *testing.T) {
 	t.Setenv(enosDebugDataRootDirEnvVarKey, debugDir)
 
 	provider := newProvider()
-	resp, err := provider.Configure(context.Background(), &tfprotov6.ConfigureProviderRequest{
+	resp, err := provider.Configure(t.Context(), &tfprotov6.ConfigureProviderRequest{
 		TerraformVersion: "1.3",
 		Config:           val,
 	})

@@ -4,7 +4,6 @@
 package artifactory
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -124,7 +123,7 @@ func TestAccSearchAQL(t *testing.T) {
 
 			test.Args = append(test.Args, WithLimit("1"))
 			req := NewSearchAQLRequest(test.Args...)
-			res, err := client.SearchAQL(context.Background(), req)
+			res, err := client.SearchAQL(t.Context(), req)
 			require.NoError(t, err)
 			require.NotEmpty(t, res.Results)
 			if req.Name != "" {

@@ -81,7 +81,7 @@ func (s *TransportTestSuite) TestRun() {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t1 *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			ctx, cancel := context.WithTimeout(t1.Context(), time.Second*10)
 			gotStdout, gotStderr, err := transport.Run(ctx, tt.args.command)
 			cancel()
 			if tt.wantExitCode != 0 {

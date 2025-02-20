@@ -155,7 +155,7 @@ func TestProviderBinariesRoundTrip(t *testing.T) {
 	err = promoteMirror.Initialize()
 	require.NoError(t, err)
 
-	err = promoteMirror.ExtractProviderBinaries(context.Background(), &TFCPromoteReq{
+	err = promoteMirror.ExtractProviderBinaries(t.Context(), &TFCPromoteReq{
 		ProviderVersion:  "0.3.24",
 		DownloadsDir:     uploadMirror.artifacts.dir,
 		PromoteDir:       promoteDir,
@@ -198,7 +198,7 @@ func TestPublicRegistry(t *testing.T) {
 	}
 
 	// Allow a lot of time to handle GPG passphrase pin entry
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
 	dir := t.TempDir()

@@ -329,7 +329,7 @@ func (s *RaftConfigurationDataConfig) String() string {
 	out := new(strings.Builder)
 	_, _ = out.WriteString(fmt.Sprintf("Index: %s\n", s.Index))
 
-	if s.Servers == nil || len(s.Servers) < 1 {
+	if len(s.Servers) < 1 {
 		return out.String()
 	}
 
