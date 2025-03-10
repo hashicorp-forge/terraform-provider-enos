@@ -78,6 +78,7 @@ ifeq ($(BUILD_DARWIN_FC), true)
 endif
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_amd64 ./command/enos-flight-control
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_arm64 ./command/enos-flight-control
+	CGO_ENABLED=0 GOOS=linux GOARCH=s390x go build ${FLIGHTCONTROL_BUILD_TAGS} ${FLIGHTCONTROL_LD_FLAGS} -o internal/flightcontrol/binaries/enos-flight-control_linux_s390x ./command/enos-flight-control
 
 .PHONY: flight-control-pack
 flight-control-pack:
@@ -88,7 +89,7 @@ endif
 	# We also can't currently safely pack macOS for now, see https://github.com/upx/upx/issues/612
 	upx -q -9 \
     ./internal/flightcontrol/binaries/enos-flight-control_linux_amd64 \
-    ./internal/flightcontrol/binaries/enos-flight-control_linux_arm64; \
+    ./internal/flightcontrol/binaries/enos-flight-control_linux_arm64;
 
 .PHONY: test
 test:

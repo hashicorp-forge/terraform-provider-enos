@@ -46,6 +46,11 @@ func TestFlightControlSupportedTarget(t *testing.T) {
 			Supported:    true,
 		},
 		{
+			Platform:     "linux",
+			Architecture: "s390x",
+			Supported:    true,
+		},
+		{
 			Platform:     "freebsd",
 			Architecture: "386",
 			Supported:    false,
@@ -85,6 +90,6 @@ func TestSupportedTargets(t *testing.T) {
 	targets, err := SupportedTargets()
 	require.NoError(t, err)
 	require.EqualValues(t, map[string][]string{
-		"linux": {"amd64", "arm64"},
+		"linux": {"amd64", "arm64", "s390x"},
 	}, targets)
 }
