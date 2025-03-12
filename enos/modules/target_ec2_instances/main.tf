@@ -252,11 +252,6 @@ resource "aws_instance" "targets" {
     encrypted = true
   }
 
-  ebs_block_device {
-    device_name = "/dev/xvdf"
-    encrypted   = true
-  }
-
   tags = merge(
     var.common_tags,
     {
