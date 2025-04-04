@@ -4,12 +4,36 @@
 package artifactory
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
+	"text/template"
 
 	"github.com/stretchr/testify/require"
 )
+
+func EnsureArtifactoryEnvAuth(t *testing.T) (map[string]string, bool) {
+	t.Helper()
+
+	var okacc, oktoken bool
+	vars := map[string]string{}
+
+	_, okacc = os.LookupEnv("TF_ACC")
+	vars["username"], _ = os.LookupEnv("ARTIFACTORY_USER")
+	vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+
+	if !(okacc && oktoken) {
+		t.Logf(`skipping data "enos_artifactory_item" test because TF_ACC(%t), ARTIFACTORY_TOKEN(%t) aren't set`,
+			okacc, oktoken,
+		)
+		t.Skip()
+
+		return vars, false
+	}
+
+	return vars, true
+}
 
 func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 	t.Helper()
@@ -130,6 +154,97 @@ func TestAccSearchAQL(t *testing.T) {
 				require.Contains(t, req.Name, filepath.Ext(res.Results[0].Name))
 			}
 			require.NotEmpty(t, res.Results[0].Name)
+			require.NotEmpty(t, res.Results[0].Path)
+			require.NotEmpty(t, res.Results[0].Repo)
+			require.NotEmpty(t, res.Results[0].SHA256)
+			require.NotEmpty(t, res.Results[0].Size)
+			require.NotEmpty(t, res.Results[0].Type)
+			require.NotEmpty(t, res.Results[0].Properties)
+		})
+	}
+}
+
+// TestAccSearchRawQuery tests a raw query. Here we run it with an "$or" query
+// that is not supported by the standard property based search. We use it to
+// search for artifacts that old and new CRT properties.
+func TestAccSearchRawQuery(t *testing.T) {
+	t.Parallel()
+
+	vars, _ := EnsureArtifactoryEnvAuth(t)
+
+	client := NewClient(
+		WithHost("https://artifactory.hashicorp.engineering/artifactory"),
+		WithUsername(vars["username"]),
+		WithToken(vars["token"]),
+	)
+
+	orQueryTemplate := template.Must(template.New("or").Parse(`
+items.find(
+{
+  "$or": [
+    {
+      "$and":
+      [
+        {"@commit": { "$match": "{{ .SHA }}" }},
+        {"@product-name": { "$match": "vault" }},
+        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"path": { "$match": "vault/*" }},
+        {"name": { "$match": "{{ .Name }}"}}
+      ]
+    },
+    {
+      "$and":
+      [
+        {"@build.number": { "$match": "{{ .SHA }}" }},
+        {"@build.name": { "$match": "vault" }},
+        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"path": { "$match": "vault/*" }},
+        {"name": { "$match": "{{ .Name }}"}}
+      ]
+    }
+  ]
+}).include("*", "property.*") .sort({"$desc": ["modified"]})
+`))
+
+	for _, test := range []struct {
+		Name         string
+		ArtifactName string
+		SHA          string
+	}{
+		// These artifacts have different properties. Search for both and our query
+		// should work for both.
+		{
+			Name:         "new crt fields",
+			ArtifactName: "vault_1.19.1-1_amd64.deb",
+			SHA:          "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
+		},
+		{
+			Name:         "old crt fields",
+			ArtifactName: "vault_1.19.0-1_amd64.deb",
+			SHA:          "ea8260c5893f2f38c3daa7aed07e89d85613844f",
+		},
+	} {
+		t.Run(test.Name, func(t *testing.T) {
+			t.Parallel()
+
+			buf := &bytes.Buffer{}
+			err := orQueryTemplate.Execute(buf, struct {
+				SHA  string
+				Name string
+			}{
+				SHA:  test.SHA,
+				Name: test.ArtifactName,
+			})
+			queryTemplate := template.Must(template.New("query").Parse(buf.String()))
+			require.NoError(t, err)
+			req := NewSearchAQLRequest(
+				WithLimit("1"),
+				WithQueryTemplate(queryTemplate),
+			)
+			res, err := client.SearchAQL(t.Context(), req)
+			require.NoError(t, err)
+			require.NotEmpty(t, res.Results)
+			require.Equal(t, test.ArtifactName, res.Results[0].Name)
 			require.NotEmpty(t, res.Results[0].Path)
 			require.NotEmpty(t, res.Results[0].Repo)
 			require.NotEmpty(t, res.Results[0].SHA256)
