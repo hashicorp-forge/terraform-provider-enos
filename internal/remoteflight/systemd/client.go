@@ -248,7 +248,7 @@ func (c *client) ShowProperties(ctx context.Context, unit string) (UnitPropertie
 		var err1 error
 		props, err1 = decodeUnitPropertiesFromShow(res.Stdout)
 		if err1 != nil {
-			err = errors.Join(err, fmt.Errorf("%w: properties: %s", err, props))
+			err = fmt.Errorf("%w: properties: %s", err1, props)
 		}
 	}
 

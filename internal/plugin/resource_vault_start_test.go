@@ -437,7 +437,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			require.EqualValues(t, test.expected, got)
+			require.Equal(t, test.expected, got)
 		})
 	}
 }

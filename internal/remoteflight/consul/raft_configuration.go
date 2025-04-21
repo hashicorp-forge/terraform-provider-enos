@@ -98,7 +98,7 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *RaftConfigu
 		))
 
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 
 		if stderr != "" {
@@ -135,7 +135,7 @@ func (r *RaftConfigurationResponse) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintln("Servers"))
+	_, _ = fmt.Fprintln(out, "Servers")
 	for i := range r.Servers {
 		_, _ = out.WriteString(istrings.Indent("  ", r.Servers[i].String()))
 	}
@@ -150,12 +150,12 @@ func (s *RaftServer) String() string {
 	}
 
 	out := new(strings.Builder)
-	out.WriteString(fmt.Sprintf("Node: %s\n", s.Node))
-	out.WriteString(fmt.Sprintf("ID: %s\n", s.ID))
-	out.WriteString(fmt.Sprintf("Address: %s\n", s.Address))
-	out.WriteString(fmt.Sprintf("Leader: %t\n", s.Leader))
-	out.WriteString(fmt.Sprintf("ProtocolVersion: %s\n", s.ProtocolVersion))
-	out.WriteString(fmt.Sprintf("Voter: %t\n", s.Voter))
+	fmt.Fprintf(out, "Node: %s\n", s.Node)
+	fmt.Fprintf(out, "ID: %s\n", s.ID)
+	fmt.Fprintf(out, "Address: %s\n", s.Address)
+	fmt.Fprintf(out, "Leader: %t\n", s.Leader)
+	fmt.Fprintf(out, "ProtocolVersion: %s\n", s.ProtocolVersion)
+	fmt.Fprintf(out, "Voter: %t\n", s.Voter)
 
 	return out.String()
 }

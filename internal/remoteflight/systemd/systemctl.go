@@ -181,7 +181,7 @@ func (c *SystemctlCommandReq) String() (string, error) {
 	case SystemctlSubCommandKill:
 		cmd.WriteString("kill " + unitName)
 	case SystemctlSubCommandListUnits:
-		cmd.WriteString(fmt.Sprintf("list-units -t %s", c.Type))
+		fmt.Fprintf(cmd, "list-units -t %s", c.Type)
 	case SystemctlSubCommandReload:
 		cmd.WriteString("reload " + unitName)
 	case SystemctlSubCommandRestart:

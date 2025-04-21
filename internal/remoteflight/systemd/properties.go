@@ -77,7 +77,7 @@ func (s UnitProperties) String() string {
 	out := new(strings.Builder)
 
 	for name, value := range s {
-		_, _ = out.WriteString(fmt.Sprintf("%s=%s\n", name, value))
+		_, _ = fmt.Fprintf(out, "%s=%s\n", name, value)
 	}
 
 	return out.String()

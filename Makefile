@@ -15,7 +15,6 @@ FLIGHTCONTROL_BUILD_TAGS?=-tags osusergo,netgo
 FLIGHTCONTROL_LD_FLAGS?=-ldflags="-extldflags=-static -s -w"
 
 CI?=false
-LINT_OUT_FORMAT?=colored-line-number
 .PHONY: HASUPX
 HASUPX:= $(shell upx dot 2> /dev/null)
 BUILD_DARWIN_FC?=false
@@ -131,11 +130,11 @@ fmt-check-enos:
 
 .PHONY: lint
 lint:
-	golangci-lint run -v --out-format=$(LINT_OUT_FORMAT)
+	golangci-lint run -v
 
 .PHONY: lint-fix
 lint-fix:
-	golangci-lint run -v --out-format=$(LINT_OUT_FORMAT) --fix
+	golangci-lint run -v --fix
 
 .PHONY: clean
 clean:

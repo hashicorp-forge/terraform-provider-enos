@@ -248,8 +248,8 @@ func TestStateClusterHasMinNVoters(t *testing.T) {
 				state := NewState()
 				state.RaftConfigurationResponse = &RaftConfigurationResponse{Servers: make([]*RaftServer, 0)}
 				require.NoError(t, json.Unmarshal(content, &state.RaftConfigurationResponse))
-				cpy := *state.RaftConfigurationResponse.Servers[0]
-				state.RaftConfigurationResponse.Servers = append(state.RaftConfigurationResponse.Servers, &cpy)
+				cpy := *state.Servers[0]
+				state.Servers = append(state.Servers, &cpy)
 
 				return state
 			},

@@ -3,22 +3,73 @@
 page_title: "enos_artifactory_item Data Source - terraform-provider-enos"
 subcategory: ""
 description: |-
-  The enos_artifactory_item datasource is a datasource that we can use to search for items in
+  The enos_artifactory_item datasource is a datasource that you can use to search for items in
   artifactory. This is useful for finding build artifact URLs that we can install on targets for testing.
-  The datasource will return URLs to all matching items. The more specific your search criteria, the
-  fewer results you'll receive.
-  Note: the underlying implementation uses AQL to search for artifacts and uses the $match operator
+  The datasource will return a list of results which include names and urls to all matching items.
+  There are two primary modes for using the datasource for searching. One for a properties based match
+  and another where a query_template is provided.
+  For the properties based search, configure the datasource with a name and list of properties that
+  are expected and the datasource will automatically generate a query where and search with. Each property
+  is included in the items.find() query with a $match operator. The more specific your search criteria,
+  via the path, name, and properties, the fewer results you'll receive.
+  For the query_template, the repo, path, name, and properties attributes are not automatically
+  included in a query for you. Instead, you provide a Go text template which includes the entire query.
+  This is an advanced option for hand crafted artisinal queries. As it is a Go template, you can provide
+  pure text string or include Go text template https://pkg.go.dev/text/template#Template directives.
+  For the latter, you can expect the evaluation context to include an object with the following attributes:
+  Repo          stringPath          stringName          stringProperties    map[string]string
+  For example:
+  
+  query_template = <<EOQ
+  items.find({
+    "repo":           { "$match": "{{ .Repo }}" },
+    "path":           { "$match": "{{ .Path }}" },
+    "name":           { "$match": "{{ .Name }}" },
+    "stat.downloads": { "$gt": "${var.min_download} "}
+  }).include("*", "property.*") .sort({"$desc": ["modified"]})
+  EOQ
+  
+  NOTE: The underlying implementation uses AQL to search for artifacts and uses the $match operator
   for every criteria. This means that you can use wildcards * for any field. See the AQL developer guide https://www.jfrog.com/confluence/display/JFROG/Artifactory+Query+Language for more information.
 ---
 
 # enos_artifactory_item (Data Source)
 
-The `enos_artifactory_item` datasource is a datasource that we can use to search for items in
+The `enos_artifactory_item` datasource is a datasource that you can use to search for items in
 artifactory. This is useful for finding build artifact URLs that we can install on targets for testing.
-The datasource will return URLs to all matching items. The more specific your search criteria, the
-fewer results you'll receive.
+The datasource will return a list of `results` which include `name`s and `url`s to all matching items.
 
-Note: the underlying implementation uses AQL to search for artifacts and uses the `$match` operator
+There are two primary modes for using the datasource for searching. One for a `properties` based match
+and another where a `query_template` is provided.
+
+For the `properties` based search, configure the datasource with a `name` and list of `properties` that
+are expected and the datasource will automatically generate a query where and search with. Each property
+is included in the `items.find()` query with a `$match` operator. The more specific your search criteria,
+via the `path`, `name`, and `properties`, the fewer results you'll receive.
+
+For the `query_template`, the `repo`, `path`, `name`, and `properties` attributes are not automatically
+included in a query for you. Instead, you provide a Go text template which includes the entire query.
+This is an advanced option for hand crafted artisinal queries. As it is a Go template, you can provide
+pure text string or include [Go text template](https://pkg.go.dev/text/template#Template) directives.
+For the latter, you can expect the evaluation context to include an object with the following attributes:
+  - Repo          string
+  - Path          string
+  - Name          string
+  - Properties    map[string]string
+
+For example:
+```hcl
+query_template = <<EOQ
+items.find({
+  "repo":           { "$match": "{{ .Repo }}" },
+  "path":           { "$match": "{{ .Path }}" },
+  "name":           { "$match": "{{ .Name }}" },
+  "stat.downloads": { "$gt": "${var.min_download} "}
+}).include("*", "property.*") .sort({"$desc": ["modified"]})
+EOQ
+```
+
+*NOTE*: The underlying implementation uses AQL to search for artifacts and uses the `$match` operator
 for every criteria. This means that you can use wildcards `*` for any field. See the [AQL developer guide](https://www.jfrog.com/confluence/display/JFROG/Artifactory+Query+Language) for more information.
 
 
@@ -36,6 +87,7 @@ for every criteria. This means that you can use wildcards `*` for any field. See
 - `name` (String) The name of the artifact that you're looking for
 - `path` (String) The sub-path inside the Artifactory repository to search in
 - `properties` (Map of String) A map of properties to match on
+- `query_template` (String) An AQL query to run. When a 'query' is provided all search properties are ignored so you must write the a complete and valid items.find() query
 - `repo` (String) The Artifactory repository you want to search in
 - `username` (String) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
 

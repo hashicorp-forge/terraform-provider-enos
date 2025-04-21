@@ -179,7 +179,7 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *CLIRequest)
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -230,7 +230,7 @@ func GetRaftAutopilotConfiguration(ctx context.Context, tr it.Transport, req *CL
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -281,7 +281,7 @@ func GetRaftAutopilotState(ctx context.Context, tr it.Transport, req *CLIRequest
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -327,13 +327,13 @@ func (s *RaftConfigurationDataConfig) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Index: %s\n", s.Index))
+	_, _ = fmt.Fprintf(out, "Index: %s\n", s.Index)
 
 	if len(s.Servers) < 1 {
 		return out.String()
 	}
 
-	_, _ = out.WriteString(fmt.Sprintln("Servers:"))
+	_, _ = fmt.Fprintln(out, "Servers:")
 	for i := range s.Servers {
 		_, _ = out.WriteString(istrings.Indent("  ", s.Servers[i].String()))
 	}
@@ -348,12 +348,12 @@ func (s *RaftConfigurationServer) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintln("Server"))
-	_, _ = out.WriteString(fmt.Sprintf("  Address: %s\n", s.Address))
-	_, _ = out.WriteString(fmt.Sprintf("  Leader: %t\n", s.Leader))
-	_, _ = out.WriteString(fmt.Sprintf("  Node ID: %s\n", s.NodeID))
-	_, _ = out.WriteString(fmt.Sprintf("  Protocol Version: %s\n", s.ProtocolVersion))
-	_, _ = out.WriteString(fmt.Sprintf("  Voter: %t\n", s.Voter))
+	_, _ = fmt.Fprintln(out, "Server")
+	_, _ = fmt.Fprintf(out, "  Address: %s\n", s.Address)
+	_, _ = fmt.Fprintf(out, "  Leader: %t\n", s.Leader)
+	_, _ = fmt.Fprintf(out, "  Node ID: %s\n", s.NodeID)
+	_, _ = fmt.Fprintf(out, "  Protocol Version: %s\n", s.ProtocolVersion)
+	_, _ = fmt.Fprintf(out, "  Voter: %t\n", s.Voter)
 
 	return out.String()
 }
@@ -374,13 +374,13 @@ func (s *RaftAutopilotConfigurationData) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Cleanup Dead Servers: %t\n", s.CleanupDeadServers))
-	_, _ = out.WriteString(fmt.Sprintf("Dead Server Last Contact Threshold: %s\n", s.DeadServerLastContactThreshold))
-	_, _ = out.WriteString(fmt.Sprintf("Last Contact Threshold: %s\n", s.LastContactThreshold))
-	_, _ = out.WriteString(fmt.Sprintf("Max Trailing Logs: %s\n", s.MaxTrailingLogs))
-	_, _ = out.WriteString(fmt.Sprintf("Min Quorum: %s\n", s.MinQuorum))
-	_, _ = out.WriteString(fmt.Sprintf("Server Stabilization Time: %s\n", s.ServerStabilizationTime))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Upgrade Migration: %t\n", s.DisableUpgradeMigration))
+	_, _ = fmt.Fprintf(out, "Cleanup Dead Servers: %t\n", s.CleanupDeadServers)
+	_, _ = fmt.Fprintf(out, "Dead Server Last Contact Threshold: %s\n", s.DeadServerLastContactThreshold)
+	_, _ = fmt.Fprintf(out, "Last Contact Threshold: %s\n", s.LastContactThreshold)
+	_, _ = fmt.Fprintf(out, "Max Trailing Logs: %s\n", s.MaxTrailingLogs)
+	_, _ = fmt.Fprintf(out, "Min Quorum: %s\n", s.MinQuorum)
+	_, _ = fmt.Fprintf(out, "Server Stabilization Time: %s\n", s.ServerStabilizationTime)
+	_, _ = fmt.Fprintf(out, "Disable Upgrade Migration: %t\n", s.DisableUpgradeMigration)
 
 	return out.String()
 }
@@ -401,44 +401,44 @@ func (r *RaftAutopilotStateResponseData) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Healthy: %t\n", r.Healthy))
-	_, _ = out.WriteString(fmt.Sprintf("Failure Tolerance: %s\n", r.FailureTolerance))
-	_, _ = out.WriteString(fmt.Sprintf("Leader: %s\n", r.Leader))
-	_, _ = out.WriteString(fmt.Sprintf("Optimistic Failure Tolerance: %s\n", r.OptimisticFailureTolerance))
+	_, _ = fmt.Fprintf(out, "Healthy: %t\n", r.Healthy)
+	_, _ = fmt.Fprintf(out, "Failure Tolerance: %s\n", r.FailureTolerance)
+	_, _ = fmt.Fprintf(out, "Leader: %s\n", r.Leader)
+	_, _ = fmt.Fprintf(out, "Optimistic Failure Tolerance: %s\n", r.OptimisticFailureTolerance)
 
 	if len(r.RedundancyZones) > 0 {
-		_, _ = out.WriteString(fmt.Sprintln("Redundancy Zones:"))
+		_, _ = fmt.Fprintln(out, "Redundancy Zones:")
 		for name, val := range r.RedundancyZones {
-			_, _ = out.WriteString(fmt.Sprintf("  %s\n", name))
+			_, _ = fmt.Fprintf(out, "  %s\n", name)
 			_, _ = out.WriteString(istrings.Indent("  ", val.String()))
 		}
 	}
 
 	if len(r.Servers) > 0 {
-		_, _ = out.WriteString(fmt.Sprintln("Servers:"))
+		_, _ = fmt.Fprintln(out, "Servers:")
 		for name, val := range r.Servers {
-			_, _ = out.WriteString(fmt.Sprintf("  %s\n", name))
+			_, _ = fmt.Fprintf(out, "  %s\n", name)
 			_, _ = out.WriteString(istrings.Indent("  ", val.String()))
 		}
 	}
 
 	if r.UpgradeInfo != nil && r.UpgradeInfo.Status != "" {
-		_, _ = out.WriteString(fmt.Sprintln("Upgrade Info:"))
+		_, _ = fmt.Fprintln(out, "Upgrade Info:")
 		_, _ = out.WriteString(istrings.Indent("  ", r.UpgradeInfo.String()))
 	}
 
 	for i := range r.Voters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Voters"))
+			_, _ = fmt.Fprintln(out, "Voters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.Voters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.Voters[i])
 	}
 
 	for i := range r.NonVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Nonvoters"))
+			_, _ = fmt.Fprintln(out, "Nonvoters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.NonVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.NonVoters[i])
 	}
 
 	return out.String()
@@ -454,19 +454,19 @@ func (r *RaftAutopilotStateRedundancyZone) String() string {
 
 	for i := range r.Servers {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Servers"))
+			_, _ = fmt.Fprintln(out, "Servers")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.Servers[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.Servers[i])
 	}
 
 	for i := range r.Voters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Voters"))
+			_, _ = fmt.Fprintln(out, "Voters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.Voters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.Voters[i])
 	}
 
-	_, _ = out.WriteString(fmt.Sprintln(r.FailureTolerance))
+	_, _ = fmt.Fprintln(out, r.FailureTolerance)
 
 	return out.String()
 }
@@ -478,16 +478,16 @@ func (r *RaftAutopilotStateServer) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("ID: %s\n", r.ID))
-	_, _ = out.WriteString(fmt.Sprintf("Name: %s\n", r.Name))
-	_, _ = out.WriteString(fmt.Sprintf("Address: %s\n", r.Address))
-	_, _ = out.WriteString(fmt.Sprintf("Node Status: %s\n", r.NodeStatus))
-	_, _ = out.WriteString(fmt.Sprintf("Last Contact: %s\n", r.LastContact))
-	_, _ = out.WriteString(fmt.Sprintf("Last Term: %s\n", r.LastTerm))
-	_, _ = out.WriteString(fmt.Sprintf("Healthy: %t\n", r.Healthy))
-	_, _ = out.WriteString(fmt.Sprintf("Stable Since: %s\n", r.StableSince))
-	_, _ = out.WriteString(fmt.Sprintf("Status: %s\n", r.Status))
-	_, _ = out.WriteString(fmt.Sprintf("Meta: %s\n", r.Meta))
+	_, _ = fmt.Fprintf(out, "ID: %s\n", r.ID)
+	_, _ = fmt.Fprintf(out, "Name: %s\n", r.Name)
+	_, _ = fmt.Fprintf(out, "Address: %s\n", r.Address)
+	_, _ = fmt.Fprintf(out, "Node Status: %s\n", r.NodeStatus)
+	_, _ = fmt.Fprintf(out, "Last Contact: %s\n", r.LastContact)
+	_, _ = fmt.Fprintf(out, "Last Term: %s\n", r.LastTerm)
+	_, _ = fmt.Fprintf(out, "Healthy: %t\n", r.Healthy)
+	_, _ = fmt.Fprintf(out, "Stable Since: %s\n", r.StableSince)
+	_, _ = fmt.Fprintf(out, "Status: %s\n", r.Status)
+	_, _ = fmt.Fprintf(out, "Meta: %s\n", r.Meta)
 
 	return out.String()
 }
@@ -501,34 +501,34 @@ func (r *RaftAutopilotStateUpgradeInfo) String() string {
 
 	for i := range r.OtherVersionNonVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Other Version Nonvoters"))
+			_, _ = fmt.Fprintln(out, "Other Version Nonvoters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.OtherVersionNonVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.OtherVersionNonVoters[i])
 	}
 
 	for i := range r.OtherVersionVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Other Version Voters"))
+			_, _ = fmt.Fprintln(out, "Other Version Voters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.OtherVersionVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.OtherVersionVoters[i])
 	}
 
 	if len(r.RedundancyZones) > 0 {
-		_, _ = out.WriteString(fmt.Sprintln("Redundancy Zones:"))
+		_, _ = fmt.Fprintln(out, "Redundancy Zones:")
 	}
 	for name, val := range r.RedundancyZones {
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", name))
+		_, _ = fmt.Fprintf(out, "  %s\n", name)
 		_, _ = out.WriteString(istrings.Indent("  ", val.String()))
 	}
 
-	_, _ = out.WriteString(fmt.Sprintf("Status: %s\n", r.Status))
-	_, _ = out.WriteString(fmt.Sprintf("Target Version: %s\n", r.TargetVersion))
+	_, _ = fmt.Fprintf(out, "Status: %s\n", r.Status)
+	_, _ = fmt.Fprintf(out, "Target Version: %s\n", r.TargetVersion)
 
 	for i := range r.TargetVersionNonVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Target Version Nonvoters"))
+			_, _ = fmt.Fprintln(out, "Target Version Nonvoters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.TargetVersionNonVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.TargetVersionNonVoters[i])
 	}
 
 	return out.String()
@@ -543,23 +543,23 @@ func (r *RaftAutopilotStateUpgradeInfoRedundancyZone) String() string {
 
 	for i := range r.TargetVersionNonVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Target Version Nonvoters"))
+			_, _ = fmt.Fprintln(out, "Target Version Nonvoters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.TargetVersionNonVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.TargetVersionNonVoters[i])
 	}
 
 	for i := range r.OtherVersionVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Other Version Voters"))
+			_, _ = fmt.Fprintln(out, "Other Version Voters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.OtherVersionVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.OtherVersionVoters[i])
 	}
 
 	for i := range r.OtherVersionNonVoters {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Other Version Nonvoters"))
+			_, _ = fmt.Fprintln(out, "Other Version Nonvoters")
 		}
-		_, _ = out.WriteString(fmt.Sprintf("  %s\n", r.OtherVersionNonVoters[i]))
+		_, _ = fmt.Fprintf(out, "  %s\n", r.OtherVersionNonVoters[i])
 	}
 
 	return out.String()

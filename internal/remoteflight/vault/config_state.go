@@ -114,7 +114,7 @@ func GetConfigStateSanitized(ctx context.Context, tr it.Transport, req *CLIReque
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to stderr: %s", stderr))
@@ -152,45 +152,45 @@ func (s *ConfigStateSanitizedResponseData) String() string {
 
 	out := new(strings.Builder)
 
-	_, _ = out.WriteString(fmt.Sprintf("API Addr: %s\n", s.APIAddr))
-	_, _ = out.WriteString(fmt.Sprintf("Cache Size: %s\n", s.CacheSize))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster Addr: %s\n", s.ClusterAddr))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster Cipher Suites: %s\n", s.ClusterCipherSuites))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster Name: %s\n", s.ClusterName))
-	_, _ = out.WriteString(fmt.Sprintf("Default Lease TTL: %s\n", s.DefaultLeaseTTL))
-	_, _ = out.WriteString(fmt.Sprintf("Default Max Request Duration: %s\n", s.DefaultMaxRequestDuration))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Cache: %t\n", s.DisableCache))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Clustering: %t\n", s.DisableClustering))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Indexing: %t\n", s.DisableIndexing))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Mlock: %t\n", s.DisableMlock))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Performance Standby: %t\n", s.DisablePerformanceStandby))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Printable Check: %t\n", s.DisablePrintableCheck))
-	_, _ = out.WriteString(fmt.Sprintf("Disable Sealwrap: %t\n", s.DisableSealwrap))
-	_, _ = out.WriteString(fmt.Sprintf("Enable UI: %t\n", s.EnableUI))
+	_, _ = fmt.Fprintf(out, "API Addr: %s\n", s.APIAddr)
+	_, _ = fmt.Fprintf(out, "Cache Size: %s\n", s.CacheSize)
+	_, _ = fmt.Fprintf(out, "Cluster Addr: %s\n", s.ClusterAddr)
+	_, _ = fmt.Fprintf(out, "Cluster Cipher Suites: %s\n", s.ClusterCipherSuites)
+	_, _ = fmt.Fprintf(out, "Cluster Name: %s\n", s.ClusterName)
+	_, _ = fmt.Fprintf(out, "Default Lease TTL: %s\n", s.DefaultLeaseTTL)
+	_, _ = fmt.Fprintf(out, "Default Max Request Duration: %s\n", s.DefaultMaxRequestDuration)
+	_, _ = fmt.Fprintf(out, "Disable Cache: %t\n", s.DisableCache)
+	_, _ = fmt.Fprintf(out, "Disable Clustering: %t\n", s.DisableClustering)
+	_, _ = fmt.Fprintf(out, "Disable Indexing: %t\n", s.DisableIndexing)
+	_, _ = fmt.Fprintf(out, "Disable Mlock: %t\n", s.DisableMlock)
+	_, _ = fmt.Fprintf(out, "Disable Performance Standby: %t\n", s.DisablePerformanceStandby)
+	_, _ = fmt.Fprintf(out, "Disable Printable Check: %t\n", s.DisablePrintableCheck)
+	_, _ = fmt.Fprintf(out, "Disable Sealwrap: %t\n", s.DisableSealwrap)
+	_, _ = fmt.Fprintf(out, "Enable UI: %t\n", s.EnableUI)
 	for i := range s.Listeners {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Listeners"))
+			_, _ = fmt.Fprintln(out, "Listeners")
 		}
 
 		if s.Listeners[i] == nil {
 			continue
 		}
 
-		_, _ = out.WriteString(fmt.Sprintf("  Type: %s\n", s.Listeners[i].Type))
+		_, _ = fmt.Fprintf(out, "  Type: %s\n", s.Listeners[i].Type)
 		if s.Listeners[i].Config != nil {
-			_, _ = out.WriteString(fmt.Sprintf("  Address: %s\n", s.Listeners[i].Config.Address))
-			_, _ = out.WriteString(fmt.Sprintf("  TLS Disable: %s\n", s.Listeners[i].Config.TLSDisable))
+			_, _ = fmt.Fprintf(out, "  Address: %s\n", s.Listeners[i].Config.Address)
+			_, _ = fmt.Fprintf(out, "  TLS Disable: %s\n", s.Listeners[i].Config.TLSDisable)
 		}
 	}
-	_, _ = out.WriteString(fmt.Sprintf("Log Format: %s\n", s.LogFormat))
-	_, _ = out.WriteString(fmt.Sprintf("Log Level: %s\n", s.LogLevel))
-	_, _ = out.WriteString(fmt.Sprintf("Max Lease TTL: %s\n", s.MaxLeaseTTL))
-	_, _ = out.WriteString(fmt.Sprintf("PID File: %s\n", s.PIDFile))
-	_, _ = out.WriteString(fmt.Sprintf("Plugin Directory: %s\n", s.PluginDirectory))
-	_, _ = out.WriteString(fmt.Sprintf("Raw Storage Endpoint: %t\n", s.RawStorageEndpoint))
+	_, _ = fmt.Fprintf(out, "Log Format: %s\n", s.LogFormat)
+	_, _ = fmt.Fprintf(out, "Log Level: %s\n", s.LogLevel)
+	_, _ = fmt.Fprintf(out, "Max Lease TTL: %s\n", s.MaxLeaseTTL)
+	_, _ = fmt.Fprintf(out, "PID File: %s\n", s.PIDFile)
+	_, _ = fmt.Fprintf(out, "Plugin Directory: %s\n", s.PluginDirectory)
+	_, _ = fmt.Fprintf(out, "Raw Storage Endpoint: %t\n", s.RawStorageEndpoint)
 	for i := range s.Seals {
 		if i == 0 {
-			_, _ = out.WriteString(fmt.Sprintln("Seals"))
+			_, _ = fmt.Fprintln(out, "Seals")
 		}
 
 		if s.Seals[i] == nil {
@@ -198,15 +198,15 @@ func (s *ConfigStateSanitizedResponseData) String() string {
 		}
 
 		if s.Seals[i] != nil {
-			_, _ = out.WriteString(fmt.Sprintf(" Disabled: %t\n", s.Seals[i].Disabled))
-			_, _ = out.WriteString(fmt.Sprintf("  Type: %s\n", s.Seals[i].Type))
+			_, _ = fmt.Fprintf(out, " Disabled: %t\n", s.Seals[i].Disabled)
+			_, _ = fmt.Fprintf(out, "  Type: %s\n", s.Seals[i].Type)
 		}
 	}
-	_, _ = out.WriteString(fmt.Sprintln("Storage"))
-	_, _ = out.WriteString(fmt.Sprintf("  Cluster Addr: %s\n", s.Storage.ClusterAddr))
-	_, _ = out.WriteString(fmt.Sprintf("  Disable Clustering: %t\n", s.Storage.DisableClustering))
-	_, _ = out.WriteString(fmt.Sprintf("  Redirect Addr: %s\n", s.Storage.RedirectAddr))
-	_, _ = out.WriteString(fmt.Sprintf("  Type: %s\n", s.Storage.Type))
+	_, _ = fmt.Fprintln(out, "Storage")
+	_, _ = fmt.Fprintf(out, "  Cluster Addr: %s\n", s.Storage.ClusterAddr)
+	_, _ = fmt.Fprintf(out, "  Disable Clustering: %t\n", s.Storage.DisableClustering)
+	_, _ = fmt.Fprintf(out, "  Redirect Addr: %s\n", s.Storage.RedirectAddr)
+	_, _ = fmt.Fprintf(out, "  Type: %s\n", s.Storage.Type)
 
 	return out.String()
 }

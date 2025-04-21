@@ -30,5 +30,5 @@ func TestHostInfoDeserialize(t *testing.T) {
 	got := NewHostInfoResponse()
 	body := testReadSupport(t, "host-info.json")
 	require.NoError(t, json.Unmarshal(body, got))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

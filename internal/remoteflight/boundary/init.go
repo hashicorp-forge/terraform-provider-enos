@@ -148,9 +148,9 @@ func (r *InitRequest) Validate() error {
 // String returns the init request as an init command.
 func (r *InitRequest) String() string {
 	cmd := &strings.Builder{}
-	cmd.WriteString(fmt.Sprintf("%s/%s database init -format json", r.BinPath, r.BinName))
+	fmt.Fprintf(cmd, "%s/%s database init -format json", r.BinPath, r.BinName)
 	// TODO: add the other init options for upgrades
-	cmd.WriteString(fmt.Sprintf(" -config=%s/boundary.hcl", r.ConfigPath))
+	fmt.Fprintf(cmd, " -config=%s/boundary.hcl", r.ConfigPath)
 
 	return cmd.String()
 }

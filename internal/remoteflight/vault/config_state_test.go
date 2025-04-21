@@ -46,5 +46,5 @@ func TestConfigStateSanitizedDeserialize(t *testing.T) {
 	body := testReadSupport(t, "config-sanitized.json")
 	require.NoError(t, json.Unmarshal(body, got))
 
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

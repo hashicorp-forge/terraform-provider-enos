@@ -70,7 +70,7 @@ func NewReplicationRequest(opts ...ReplicationRequestOpt) *ReplicationRequest {
 // WithReplicationRequestBinPath sets the vault binary path.
 func WithReplicationRequestBinPath(path string) ReplicationRequestOpt {
 	return func(u *ReplicationRequest) *ReplicationRequest {
-		u.CLIRequest.BinPath = path
+		u.BinPath = path
 		return u
 	}
 }
@@ -78,7 +78,7 @@ func WithReplicationRequestBinPath(path string) ReplicationRequestOpt {
 // WithReplicationRequestVaultAddr sets the vault address.
 func WithReplicationRequestVaultAddr(addr string) ReplicationRequestOpt {
 	return func(u *ReplicationRequest) *ReplicationRequest {
-		u.CLIRequest.VaultAddr = addr
+		u.VaultAddr = addr
 		return u
 	}
 }
@@ -108,7 +108,7 @@ func GetReplicationStatus(ctx context.Context, tr it.Transport, req *Replication
 			command.WithEnvVar("VAULT_ADDR", req.VaultAddr),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -173,18 +173,18 @@ func (s *ReplicationDataStatus) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Cluster ID: %s\n", s.ClusterID))
+	_, _ = fmt.Fprintf(out, "Cluster ID: %s\n", s.ClusterID)
 	if len(s.KnownSecondaries) > 0 {
-		_, _ = out.WriteString(fmt.Sprintln("Known Secondaries"))
+		_, _ = fmt.Fprintln(out, "Known Secondaries")
 		for i := range s.KnownSecondaries {
-			_, _ = out.WriteString(fmt.Sprintf("  %s\n", s.KnownSecondaries[i]))
+			_, _ = fmt.Fprintf(out, "  %s\n", s.KnownSecondaries[i])
 		}
 	}
-	_, _ = out.WriteString(fmt.Sprintf("Last WAL: %s\n", s.LastWAL))
-	_, _ = out.WriteString(fmt.Sprintf("Merkle Root: %s\n", s.MerkleRoot))
-	_, _ = out.WriteString(fmt.Sprintf("Mode: %s\n", s.Mode))
+	_, _ = fmt.Fprintf(out, "Last WAL: %s\n", s.LastWAL)
+	_, _ = fmt.Fprintf(out, "Merkle Root: %s\n", s.MerkleRoot)
+	_, _ = fmt.Fprintf(out, "Mode: %s\n", s.Mode)
 	if len(s.Secondaries) > 0 {
-		_, _ = out.WriteString(fmt.Sprintln("Secondaries"))
+		_, _ = fmt.Fprintln(out, "Secondaries")
 		for i := range s.Secondaries {
 			_, _ = out.WriteString(istrings.Indent("  ", s.Secondaries[i].String()))
 		}
@@ -200,12 +200,12 @@ func (s *ReplicationSecondary) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintln("Secondary"))
-	_, _ = out.WriteString(fmt.Sprintf("  API Address: %s\n", s.APIAddress))
-	_, _ = out.WriteString(fmt.Sprintf("  Cluster Address: %s\n", s.ClusterAddress))
-	_, _ = out.WriteString(fmt.Sprintf("  Connection Status: %s\n", s.ConnectionStatus))
-	_, _ = out.WriteString(fmt.Sprintf("  Last Heartbeat: %s\n", s.LastHeartbeat))
-	_, _ = out.WriteString(fmt.Sprintf("  Node ID: %s\n", s.NodeID))
+	_, _ = fmt.Fprintln(out, "Secondary")
+	_, _ = fmt.Fprintf(out, "  API Address: %s\n", s.APIAddress)
+	_, _ = fmt.Fprintf(out, "  Cluster Address: %s\n", s.ClusterAddress)
+	_, _ = fmt.Fprintf(out, "  Connection Status: %s\n", s.ConnectionStatus)
+	_, _ = fmt.Fprintf(out, "  Last Heartbeat: %s\n", s.LastHeartbeat)
+	_, _ = fmt.Fprintf(out, "  Node ID: %s\n", s.NodeID)
 
 	return out.String()
 }

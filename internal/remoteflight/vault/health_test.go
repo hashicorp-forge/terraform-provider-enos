@@ -26,5 +26,5 @@ func TestHealthDeserialize(t *testing.T) {
 	got := NewHealthResponse()
 	body := testReadSupport(t, "health.json")
 	require.NoError(t, json.Unmarshal(body, got))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

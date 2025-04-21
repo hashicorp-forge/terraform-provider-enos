@@ -83,7 +83,7 @@ func WithTargetRequestRetryOpts(opts ...retry.RetrierOpt) TargetRequestOpt {
 
 // TargetArchitecture is a helper that determines the targets architecture.
 func TargetArchitecture(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		arch, stderr, err := tr.Run(ctx, command.New("uname -m"))
 		if err != nil {
 			return "", fmt.Errorf("determining target host architecture: %w, STDERR:%s", err, stderr)
@@ -106,7 +106,7 @@ func TargetArchitecture(ctx context.Context, tr transport.Transport, req *Target
 
 // TargetDistro is a helper that determines the targets distribution.
 func TargetDistro(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		var errs error
 
 		// Try /etc/os-release
@@ -141,7 +141,7 @@ func TargetDistro(ctx context.Context, tr transport.Transport, req *TargetReques
 
 // TargetDistroVersion is a helper that determines the targets distribution version.
 func TargetDistroVersion(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		var errs error
 
 		// Try /etc/os-release
@@ -176,7 +176,7 @@ func TargetDistroVersion(ctx context.Context, tr transport.Transport, req *Targe
 
 // TargetHomeDir is a helper that determines the targets HOME directory.
 func TargetHomeDir(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		var err error
 
 		// Try the env variable
@@ -262,7 +262,7 @@ func TargetHostInfo(ctx context.Context, tr transport.Transport, req *TargetRequ
 
 // TargetHostname is a helper that determines the targets hostname.
 func TargetHostname(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		hostname, stderr, err := tr.Run(ctx, command.New("uname -n"))
 		if err != nil {
 			return "", fmt.Errorf("determining target hostname: %w, STDERR: %s", err, stderr)
@@ -285,7 +285,7 @@ func TargetHostname(ctx context.Context, tr transport.Transport, req *TargetRequ
 
 // TargetPlatform is a helper that determines the targets platform.
 func TargetPlatform(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		platform, stderr, err := tr.Run(ctx, command.New("uname -s"))
 		if err != nil {
 			return "", fmt.Errorf("determining target host platform: %w: STDERR: %s", err, stderr)
@@ -308,7 +308,7 @@ func TargetPlatform(ctx context.Context, tr transport.Transport, req *TargetRequ
 
 // TargetPlatformVersion is a helper that determines the targets platform version.
 func TargetPlatformVersion(ctx context.Context, tr transport.Transport, req *TargetRequest) (string, error) {
-	req.Retrier.Func = func(ctx context.Context) (any, error) {
+	req.Func = func(ctx context.Context) (any, error) {
 		version, stderr, err := tr.Run(ctx, command.New("uname -r"))
 		if err != nil {
 			return "", fmt.Errorf("determining target host platform version: %w: STDERR: %s", err, stderr)
@@ -336,7 +336,7 @@ func TargetProcessManager(ctx context.Context, tp transport.Transport, req *Targ
 		// Assume that were hitting a machine that doesn't have busybox ps and
 		// supports the p flag. We could theoretically use /proc/ps/stat for
 		// linux machines that have unsable ps but this is okay for now.
-		req.Retrier.Func = func(ctx context.Context) (any, error) {
+		req.Func = func(ctx context.Context) (any, error) {
 			pid1, stderr, err := tp.Run(ctx, command.New("ps -p 1 -c -o command="))
 			if err != nil {
 				return "", fmt.Errorf("failed to determine target process manager: %w: STDERR: %s", err, stderr)

@@ -111,7 +111,7 @@ func GetHealthNode(ctx context.Context, tr it.Transport, req *HealthNodeRequest)
 		))
 
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 
 		if stderr != "" {
@@ -156,19 +156,19 @@ func (n *NodeHealth) String() string {
 	out := new(strings.Builder)
 
 	if n.Node != "" {
-		out.WriteString(fmt.Sprintf("Node: %s\n", n.Node))
+		fmt.Fprintf(out, "Node: %s\n", n.Node)
 	}
 
 	if n.Status != "" {
-		out.WriteString(fmt.Sprintf("Status: %s\n", n.Status))
+		fmt.Fprintf(out, "Status: %s\n", n.Status)
 	}
 
 	if n.Output != "" {
-		out.WriteString(fmt.Sprintf("Output: %s\n", n.Output))
+		fmt.Fprintf(out, "Output: %s\n", n.Output)
 	}
 
 	if n.Notes != "" {
-		out.WriteString(fmt.Sprintf("Notes: %s\n", n.Notes))
+		fmt.Fprintf(out, "Notes: %s\n", n.Notes)
 	}
 
 	return out.String()

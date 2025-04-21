@@ -157,12 +157,12 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 
 			transport := newEmbeddedTransport()
 			require.NoError(t, transport.FromTerraform5Value(test.config.toTFValue(t)))
-			assert.Equal(tt, len(expectedValues), len(transport.CopyValues()))
-			assert.Equal(tt, len(expectedAttributeValues), len(transport.Attributes()))
+			assert.Len(tt, transport.CopyValues(), len(expectedValues))
+			assert.Len(tt, transport.Attributes(), len(expectedAttributeValues))
 
 			for transportType, actualValues := range transport.CopyValues() {
 				expectedValues := expectedValues[transportType]
-				assert.Equal(tt, len(expectedValues), len(actualValues))
+				assert.Len(tt, actualValues, len(expectedValues))
 				for name, expectedValue := range expectedValues {
 					actualStringValue := ""
 					actualValue, ok := actualValues[name]
@@ -175,13 +175,13 @@ func TestProviderEmbeddedTransportFromTFValue(t *testing.T) {
 
 			for transportType, actualValues := range transport.Attributes() {
 				expectedTransportValues := expectedAttributeValues[transportType]
-				assert.Equal(tt, len(expectedTransportValues), len(actualValues))
+				assert.Len(tt, actualValues, len(expectedTransportValues))
 				for name, expectedValue := range expectedTransportValues {
 					actualValue, ok := actualValues[name].(*tfString).Get()
 					if ok {
 						assert.Equal(tt, expectedValue, actualValue)
 					} else {
-						assert.Equal(tt, "", actualValue)
+						assert.Empty(tt, actualValue)
 					}
 				}
 			}
@@ -278,7 +278,7 @@ func TestProviderEmbeddedTransportApplyDefaults(t *testing.T) {
 
 				for tType, expectedConfig := range test.expectedValues {
 					actualConfig := transport.Attributes()[tType]
-					assert.Equal(tt, len(actualConfig), len(expectedConfig))
+					assert.Len(tt, actualConfig, len(expectedConfig))
 					for name, expectedValue := range expectedConfig {
 						assert.Equal(tt, expectedValue, actualConfig[name].(*tfString).Val)
 					}

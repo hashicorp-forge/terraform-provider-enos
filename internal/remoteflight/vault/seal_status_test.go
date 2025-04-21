@@ -29,7 +29,7 @@ func TestSealStatusDeserialize(t *testing.T) {
 	got := NewSealStatusResponse()
 	body := testReadSupport(t, "seal-status.json")
 	require.NoError(t, json.Unmarshal(body, got))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }
 
 func TestSealStatusDeserializeOldResponseBody(t *testing.T) {
@@ -47,5 +47,5 @@ func TestSealStatusDeserializeOldResponseBody(t *testing.T) {
 	got := NewSealStatusResponse()
 	body := testReadSupport(t, "seal-status-old.json")
 	require.NoError(t, json.Unmarshal(body, got.Data))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

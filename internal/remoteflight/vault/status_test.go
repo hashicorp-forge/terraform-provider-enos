@@ -21,5 +21,5 @@ func TestStatusDeserialize(t *testing.T) {
 	got := NewStatusResponse()
 	body := testReadSupport(t, "status.json")
 	require.NoError(t, json.Unmarshal(body, got))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

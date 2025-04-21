@@ -36,7 +36,7 @@ var snakeReg = regexp.MustCompile("(^[A-Za-z])|_([A-Za-z])")
 
 func snakeToCamel(str string) string {
 	return snakeReg.ReplaceAllStringFunc(str, func(s string) string {
-		return strings.ToUpper(strings.Replace(s, "_", "", -1))
+		return strings.ToUpper(strings.ReplaceAll(s, "_", ""))
 	})
 }
 

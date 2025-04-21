@@ -42,7 +42,7 @@ func TestRaftConfigurationDeserialize(t *testing.T) {
 	body := testReadSupport(t, "storage-raft-configuration.json")
 	require.NoError(t, json.Unmarshal(body, got))
 
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }
 
 func TestRaftAutopilotConfigurationDeserialize(t *testing.T) {
@@ -58,7 +58,7 @@ func TestRaftAutopilotConfigurationDeserialize(t *testing.T) {
 	body := testReadSupport(t, "storage-raft-autopilot-configuration.json")
 	require.NoError(t, json.Unmarshal(body, got))
 
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }
 
 func TestRaftAutopilotStateDeserialize(t *testing.T) {
@@ -115,5 +115,5 @@ func TestRaftAutopilotStateDeserialize(t *testing.T) {
 	body := testReadSupport(t, "storage-raft-autopilot-state.json")
 	require.NoError(t, json.Unmarshal(body, got))
 
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

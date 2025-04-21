@@ -55,7 +55,7 @@ func CheckStateAllPodsHavePhase(phase v1.PodPhase) CheckStater {
 		for i := range s.PodList.Pods.Items {
 			if s.PodList.Pods.Items[i].Status.Phase != phase {
 				err = errors.Join(err, fmt.Errorf("expected pod %s to have phase %s, got %s, message: %s, reason: %s",
-					s.PodList.Pods.Items[i].ObjectMeta.Name,
+					s.PodList.Pods.Items[i].Name,
 					phase,
 					s.PodList.Pods.Items[i].Status.Phase,
 					s.PodList.Pods.Items[i].Status.Message,

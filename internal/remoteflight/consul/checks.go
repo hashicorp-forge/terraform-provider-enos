@@ -14,7 +14,7 @@ import (
 // has all of the properties and values we expect for a service to be running.
 func CheckStateHasSystemdEnabledAndRunningProperties() CheckStater {
 	return func(s *State) error {
-		props, err := s.UnitProperties.FindProperties(systemd.EnabledAndRunningProperties)
+		props, err := s.FindProperties(systemd.EnabledAndRunningProperties)
 		if err != nil {
 			return fmt.Errorf("expected consul systemd unit to be enabled and running, got: %s", err)
 		}
@@ -49,11 +49,11 @@ func CheckStateNodeIsHealthy() CheckStater {
 // CheckStateClusterHasLeader checks whether or not the consul cluster has a leader.
 func CheckStateClusterHasLeader() CheckStater {
 	return func(s *State) error {
-		if s.RaftConfigurationResponse == nil || s.RaftConfigurationResponse.Servers == nil {
+		if s.RaftConfigurationResponse == nil || s.Servers == nil {
 			return errors.New("no raft servers were found in state")
 		}
 
-		for i := range s.RaftConfigurationResponse.Servers {
+		for i := range s.Servers {
 			if s.RaftConfigurationResponse.Servers[i].Leader {
 				return nil
 			}
@@ -94,12 +94,12 @@ func CheckStateClusterHasMinNHealthyNodes(min uint) CheckStater {
 // N raft voters.
 func CheckStateClusterHasMinNVoters(min uint) CheckStater {
 	return func(s *State) error {
-		if s.RaftConfigurationResponse == nil || s.RaftConfigurationResponse.Servers == nil {
+		if s.RaftConfigurationResponse == nil || s.Servers == nil {
 			return errors.New("no raft servers were found in state")
 		}
 
 		voters := uint(0)
-		for i := range s.RaftConfigurationResponse.Servers {
+		for i := range s.Servers {
 			if s.RaftConfigurationResponse.Servers[i].Voter {
 				voters++
 			}
