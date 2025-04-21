@@ -105,7 +105,7 @@ func GetSealStatus(ctx context.Context, tr it.Transport, req *SealStatusRequest)
 	if err == nil {
 		stdout, stderr, err1 := tr.Run(ctx, command.New(req.String()))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -175,20 +175,20 @@ func (s *SealStatusResponseData) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Build Date: %s\n", s.BuildDate))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster ID: %s\n", s.ClusterID))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster Name: %s\n", s.ClusterName))
-	_, _ = out.WriteString(fmt.Sprintf("Initialized: %t\n", s.Initialized))
-	_, _ = out.WriteString(fmt.Sprintf("Migration: %t\n", s.Migration))
-	_, _ = out.WriteString(fmt.Sprintf("Number: %s\n", s.Number))
-	_, _ = out.WriteString(fmt.Sprintf("Nonce: %s\n", s.Nonce))
-	_, _ = out.WriteString(fmt.Sprintf("Progress: %s\n", s.Progress))
-	_, _ = out.WriteString(fmt.Sprintf("Recovery Seal: %t\n", s.RecoverySeal))
-	_, _ = out.WriteString(fmt.Sprintf("Sealed: %t\n", s.Sealed))
-	_, _ = out.WriteString(fmt.Sprintf("Storage Type: %s\n", s.StorageType))
-	_, _ = out.WriteString(fmt.Sprintf("Threshold: %s\n", s.Threshold))
-	_, _ = out.WriteString(fmt.Sprintf("Type: %s\n", s.Type))
-	_, _ = out.WriteString(fmt.Sprintf("Version: %s\n", s.Version))
+	_, _ = fmt.Fprintf(out, "Build Date: %s\n", s.BuildDate)
+	_, _ = fmt.Fprintf(out, "Cluster ID: %s\n", s.ClusterID)
+	_, _ = fmt.Fprintf(out, "Cluster Name: %s\n", s.ClusterName)
+	_, _ = fmt.Fprintf(out, "Initialized: %t\n", s.Initialized)
+	_, _ = fmt.Fprintf(out, "Migration: %t\n", s.Migration)
+	_, _ = fmt.Fprintf(out, "Number: %s\n", s.Number)
+	_, _ = fmt.Fprintf(out, "Nonce: %s\n", s.Nonce)
+	_, _ = fmt.Fprintf(out, "Progress: %s\n", s.Progress)
+	_, _ = fmt.Fprintf(out, "Recovery Seal: %t\n", s.RecoverySeal)
+	_, _ = fmt.Fprintf(out, "Sealed: %t\n", s.Sealed)
+	_, _ = fmt.Fprintf(out, "Storage Type: %s\n", s.StorageType)
+	_, _ = fmt.Fprintf(out, "Threshold: %s\n", s.Threshold)
+	_, _ = fmt.Fprintf(out, "Type: %s\n", s.Type)
+	_, _ = fmt.Fprintf(out, "Version: %s\n", s.Version)
 
 	return out.String()
 }

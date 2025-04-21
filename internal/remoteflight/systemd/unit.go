@@ -136,9 +136,9 @@ func (s Unit) ToIni() (string, error) {
 			continue
 		}
 
-		unit.WriteString(fmt.Sprintf("[%s]\n", stanza))
+		fmt.Fprintf(unit, "[%s]\n", stanza)
 		for k, v := range fields {
-			unit.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+			fmt.Fprintf(unit, "%s=%s\n", k, v)
 		}
 
 		unit.WriteString("\n")

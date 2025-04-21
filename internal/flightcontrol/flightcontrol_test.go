@@ -89,7 +89,7 @@ func TestSupportedTargets(t *testing.T) {
 	t.Parallel()
 	targets, err := SupportedTargets()
 	require.NoError(t, err)
-	require.EqualValues(t, map[string][]string{
+	require.Equal(t, map[string][]string{
 		"linux": {"amd64", "arm64", "s390x"},
 	}, targets)
 }

@@ -71,7 +71,7 @@ func GetHostInfo(ctx context.Context, tr it.Transport, req *CLIRequest) (*HostIn
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to STDERR: %s", stderr))
@@ -117,22 +117,22 @@ func (s *HostInfoHost) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Boot Time: %s\n", s.BootTime))
-	_, _ = out.WriteString(fmt.Sprintf("Host ID: %s\n", s.HostID))
-	_, _ = out.WriteString(fmt.Sprintf("Hostname: %s\n", s.Hostname))
-	_, _ = out.WriteString(fmt.Sprintf("Kernel Arch: %s\n", s.KernelArch))
-	_, _ = out.WriteString(fmt.Sprintf("Kernel Version: %s\n", s.KernelVersion))
-	_, _ = out.WriteString(fmt.Sprintf("OS: %s\n", s.OS))
-	_, _ = out.WriteString(fmt.Sprintf("Platform: %s\n", s.Platform))
-	_, _ = out.WriteString(fmt.Sprintf("Platform Family: %s\n", s.PlatformFamily))
-	_, _ = out.WriteString(fmt.Sprintf("Procs: %s\n", s.Procs))
-	_, _ = out.WriteString(fmt.Sprintf("Uptime: %s\n", s.Uptime))
+	_, _ = fmt.Fprintf(out, "Boot Time: %s\n", s.BootTime)
+	_, _ = fmt.Fprintf(out, "Host ID: %s\n", s.HostID)
+	_, _ = fmt.Fprintf(out, "Hostname: %s\n", s.Hostname)
+	_, _ = fmt.Fprintf(out, "Kernel Arch: %s\n", s.KernelArch)
+	_, _ = fmt.Fprintf(out, "Kernel Version: %s\n", s.KernelVersion)
+	_, _ = fmt.Fprintf(out, "OS: %s\n", s.OS)
+	_, _ = fmt.Fprintf(out, "Platform: %s\n", s.Platform)
+	_, _ = fmt.Fprintf(out, "Platform Family: %s\n", s.PlatformFamily)
+	_, _ = fmt.Fprintf(out, "Procs: %s\n", s.Procs)
+	_, _ = fmt.Fprintf(out, "Uptime: %s\n", s.Uptime)
 
 	if s.VirtualizationRole != "" {
-		_, _ = out.WriteString(fmt.Sprintf("Virtualization Role: %s\n", s.VirtualizationRole))
+		_, _ = fmt.Fprintf(out, "Virtualization Role: %s\n", s.VirtualizationRole)
 	}
 	if s.VirtualizationSystem != "" {
-		_, _ = out.WriteString(fmt.Sprintf("Virtualization System: %s\n", s.VirtualizationSystem))
+		_, _ = fmt.Fprintf(out, "Virtualization System: %s\n", s.VirtualizationSystem)
 	}
 
 	return out.String()

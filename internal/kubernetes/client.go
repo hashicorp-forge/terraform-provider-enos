@@ -455,7 +455,7 @@ func (c *client) ListPods(ctx context.Context, req *ListPodsRequest) (*ListPodsR
 		listOpts.FieldSelector = strings.Join(req.FieldSelectors, ",")
 	}
 
-	req.Retrier.Func = func(queryCtx context.Context) (any, error) {
+	req.Func = func(queryCtx context.Context) (any, error) {
 		return c.clientset.CoreV1().Pods(namespace).List(ctx, listOpts)
 	}
 
@@ -595,65 +595,65 @@ func (p *Pods) String() string {
 	out := new(strings.Builder)
 
 	for i := range p.Items {
-		out.WriteString(p.Items[i].ObjectMeta.Name + "\n")
-		out.WriteString(fmt.Sprintf("  Name: %s\n", p.Items[i].ObjectMeta.Name))
-		out.WriteString(fmt.Sprintf("  Namespace: %s\n", p.Items[i].ObjectMeta.Namespace))
-		out.WriteString(fmt.Sprintf("  Node Name: %s\n", p.Items[i].Spec.NodeName))
-		out.WriteString(fmt.Sprintf("  Hostname: %s\n", p.Items[i].Spec.Hostname))
-		out.WriteString(fmt.Sprintf("  Subdomain: %s\n", p.Items[i].Spec.Subdomain))
-		out.WriteString(fmt.Sprintf("  Resource Version: %s\n", p.Items[i].ObjectMeta.ResourceVersion))
-		out.WriteString(fmt.Sprintf("  Generation: %d\n", p.Items[i].ObjectMeta.Generation))
-		out.WriteString(fmt.Sprintf("  Creation Timestamp: %q\n", p.Items[i].ObjectMeta.CreationTimestamp))
+		out.WriteString(p.Items[i].Name + "\n")
+		fmt.Fprintf(out, "  Name: %s\n", p.Items[i].Name)
+		fmt.Fprintf(out, "  Namespace: %s\n", p.Items[i].Namespace)
+		fmt.Fprintf(out, "  Node Name: %s\n", p.Items[i].Spec.NodeName)
+		fmt.Fprintf(out, "  Hostname: %s\n", p.Items[i].Spec.Hostname)
+		fmt.Fprintf(out, "  Subdomain: %s\n", p.Items[i].Spec.Subdomain)
+		fmt.Fprintf(out, "  Resource Version: %s\n", p.Items[i].ResourceVersion)
+		fmt.Fprintf(out, "  Generation: %d\n", p.Items[i].Generation)
+		fmt.Fprintf(out, "  Creation Timestamp: %q\n", p.Items[i].CreationTimestamp)
 
 		if p.Items[i].Spec.OS != nil {
-			out.WriteString(fmt.Sprintf("  OS: %s\n", p.Items[i].Spec.OS.Name))
+			fmt.Fprintf(out, "  OS: %s\n", p.Items[i].Spec.OS.Name)
 		}
 
-		out.WriteString(fmt.Sprintf("  Phase: %s\n", p.Items[i].Status.Phase))
-		out.WriteString(fmt.Sprintf("  Message: %s\n", p.Items[i].Status.Message))
-		out.WriteString(fmt.Sprintf("  Reason: %s\n", p.Items[i].Status.Reason))
-		out.WriteString(fmt.Sprintf("  Scheduler Name: %s\n", p.Items[i].Spec.SchedulerName))
-		out.WriteString(fmt.Sprintf("  IP: %s\n", p.Items[i].Status.PodIP))
+		fmt.Fprintf(out, "  Phase: %s\n", p.Items[i].Status.Phase)
+		fmt.Fprintf(out, "  Message: %s\n", p.Items[i].Status.Message)
+		fmt.Fprintf(out, "  Reason: %s\n", p.Items[i].Status.Reason)
+		fmt.Fprintf(out, "  Scheduler Name: %s\n", p.Items[i].Spec.SchedulerName)
+		fmt.Fprintf(out, "  IP: %s\n", p.Items[i].Status.PodIP)
 
-		labels := p.Items[i].ObjectMeta.GetLabels()
+		labels := p.Items[i].GetLabels()
 		if len(labels) > 0 {
-			out.WriteString(fmt.Sprintln("  Labels:"))
+			fmt.Fprintln(out, "  Labels:")
 			for k, v := range labels {
-				out.WriteString(fmt.Sprintf("    %s=%s\n", k, v))
+				fmt.Fprintf(out, "    %s=%s\n", k, v)
 			}
 		}
 
 		for ic := range p.Items[i].Spec.InitContainers {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Init Containers:"))
+				fmt.Fprintln(out, "  Init Containers:")
 			}
 			out.WriteString(istrings.Indent("    ", containerToString(p.Items[i].Spec.InitContainers[ic])))
 		}
 
 		for ic := range p.Items[i].Status.InitContainerStatuses {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Init Container Status:"))
+				fmt.Fprintln(out, "  Init Container Status:")
 			}
 			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.InitContainerStatuses[ic])))
 		}
 
 		for ic := range p.Items[i].Spec.Containers {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Containers:"))
+				fmt.Fprintln(out, "  Containers:")
 			}
 			out.WriteString(istrings.Indent("    ", containerToString(p.Items[i].Spec.Containers[ic])))
 		}
 
 		for ic := range p.Items[i].Status.ContainerStatuses {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Container Status:"))
+				fmt.Fprintln(out, "  Container Status:")
 			}
 			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.ContainerStatuses[ic])))
 		}
 
 		for ic := range p.Items[i].Spec.EphemeralContainers {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Ephemeral Containers:"))
+				fmt.Fprintln(out, "  Ephemeral Containers:")
 			}
 
 			// EphemeralContainerCommon has all the same fields as Container. We'll convert it
@@ -673,7 +673,7 @@ func (p *Pods) String() string {
 
 		for ic := range p.Items[i].Status.EphemeralContainerStatuses {
 			if ic == 0 {
-				out.WriteString(fmt.Sprintln("  Ephemeral Container Status:"))
+				fmt.Fprintln(out, "  Ephemeral Container Status:")
 			}
 			out.WriteString(istrings.Indent("    ", contianerStatusToString(p.Items[i].Status.EphemeralContainerStatuses[ic])))
 		}
@@ -685,23 +685,23 @@ func (p *Pods) String() string {
 func containerToString(container v1.Container) string {
 	out := new(strings.Builder)
 	out.WriteString(container.Name + "\n")
-	out.WriteString(fmt.Sprintf("  Name: %s\n", container.Name))
-	out.WriteString(fmt.Sprintf("  Image: %s\n", container.Image))
-	out.WriteString(fmt.Sprintf("  Command: %s\n", strings.Join(container.Command, " ")))
-	out.WriteString(fmt.Sprintln("  Args:"))
+	fmt.Fprintf(out, "  Name: %s\n", container.Name)
+	fmt.Fprintf(out, "  Image: %s\n", container.Image)
+	fmt.Fprintf(out, "  Command: %s\n", strings.Join(container.Command, " "))
+	fmt.Fprintln(out, "  Args:")
 	for c := range container.Args {
 		out.WriteString(istrings.Indent("    ", container.Args[c]))
 	}
-	out.WriteString(fmt.Sprintln(""))
-	out.WriteString(fmt.Sprintln("  Ports:"))
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "  Ports:")
 	for c := range container.Ports {
-		out.WriteString(fmt.Sprintf("    %s:\n", container.Ports[c].Name))
-		out.WriteString(fmt.Sprintf("      Host Port: %d\n", container.Ports[c].HostPort))
-		out.WriteString(fmt.Sprintf("      Container Port: %d\n", container.Ports[c].ContainerPort))
-		out.WriteString(fmt.Sprintf("      Protocol: %s\n", container.Ports[c].Protocol))
-		out.WriteString(fmt.Sprintf("      Host IP: %s\n", container.Ports[c].HostIP))
+		fmt.Fprintf(out, "    %s:\n", container.Ports[c].Name)
+		fmt.Fprintf(out, "      Host Port: %d\n", container.Ports[c].HostPort)
+		fmt.Fprintf(out, "      Container Port: %d\n", container.Ports[c].ContainerPort)
+		fmt.Fprintf(out, "      Protocol: %s\n", container.Ports[c].Protocol)
+		fmt.Fprintf(out, "      Host IP: %s\n", container.Ports[c].HostIP)
 	}
-	out.WriteString(fmt.Sprintln("  Environment:"))
+	fmt.Fprintln(out, "  Environment:")
 	for c := range container.Env {
 		name := container.Env[c].Name
 		value := container.Env[c].Value
@@ -714,10 +714,10 @@ func containerToString(container v1.Container) string {
 				sourceStr = fmt.Sprintf("%s:%s", source.ResourceFieldRef.ContainerName, source.ResourceFieldRef.Resource)
 			}
 			if source.ConfigMapKeyRef != nil {
-				sourceStr = fmt.Sprintf("%s:%s", source.ConfigMapKeyRef.LocalObjectReference.Name, source.ConfigMapKeyRef.Key)
+				sourceStr = fmt.Sprintf("%s:%s", source.ConfigMapKeyRef.Name, source.ConfigMapKeyRef.Key)
 			}
 			if source.SecretKeyRef != nil {
-				sourceStr = fmt.Sprintf("%s:%s", source.SecretKeyRef.LocalObjectReference.Name, source.SecretKeyRef.Key)
+				sourceStr = fmt.Sprintf("%s:%s", source.SecretKeyRef.Name, source.SecretKeyRef.Key)
 			}
 			if value == "" {
 				value = fmt.Sprintf("(%s)", sourceStr)
@@ -728,7 +728,7 @@ func containerToString(container v1.Container) string {
 		if name == "VAULT_LICENSE" {
 			value = "[redacted]"
 		}
-		out.WriteString(fmt.Sprintf("    %s=%s\n", name, value))
+		fmt.Fprintf(out, "    %s=%s\n", name, value)
 	}
 
 	return out.String()
@@ -737,12 +737,12 @@ func containerToString(container v1.Container) string {
 func contianerStatusToString(status v1.ContainerStatus) string {
 	out := new(strings.Builder)
 	out.WriteString(status.Name + "\n")
-	out.WriteString(fmt.Sprintf("  Name: %s\n", status.Name))
-	out.WriteString(fmt.Sprintf("  Image: %s\n", status.Image))
-	out.WriteString(fmt.Sprintf("  Image ID: %s\n", status.ImageID))
-	out.WriteString(fmt.Sprintf("  Container ID: %s\n", status.ContainerID))
-	out.WriteString(fmt.Sprintf("  Ready: %t\n", status.Ready))
-	out.WriteString(fmt.Sprintf("  Restart Count: %d\n", status.RestartCount))
+	fmt.Fprintf(out, "  Name: %s\n", status.Name)
+	fmt.Fprintf(out, "  Image: %s\n", status.Image)
+	fmt.Fprintf(out, "  Image ID: %s\n", status.ImageID)
+	fmt.Fprintf(out, "  Container ID: %s\n", status.ContainerID)
+	fmt.Fprintf(out, "  Ready: %t\n", status.Ready)
+	fmt.Fprintf(out, "  Restart Count: %d\n", status.RestartCount)
 
 	return out.String()
 }

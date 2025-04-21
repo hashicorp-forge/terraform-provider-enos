@@ -202,34 +202,34 @@ func (r *InitRequest) String() string {
 	cmd := &strings.Builder{}
 	cmd.WriteString(r.BinPath + " operator init -format=json")
 	if r.KeyShares != -1 {
-		cmd.WriteString(fmt.Sprintf(" -key-shares=%d", r.KeyShares))
+		fmt.Fprintf(cmd, " -key-shares=%d", r.KeyShares)
 	}
 	if r.KeyThreshold != -1 {
-		cmd.WriteString(fmt.Sprintf(" -key-threshold=%d", r.KeyThreshold))
+		fmt.Fprintf(cmd, " -key-threshold=%d", r.KeyThreshold)
 	}
 	if len(r.PGPKeys) > 0 {
-		cmd.WriteString(fmt.Sprintf(" -pgp-keys='%s'", strings.Join(r.PGPKeys, ",")))
+		fmt.Fprintf(cmd, " -pgp-keys='%s'", strings.Join(r.PGPKeys, ","))
 	}
 	if r.RecoveryShares != -1 {
-		cmd.WriteString(fmt.Sprintf(" -recovery-shares=%d", r.RecoveryShares))
+		fmt.Fprintf(cmd, " -recovery-shares=%d", r.RecoveryShares)
 	}
 	if r.RecoveryThreshold != -1 {
-		cmd.WriteString(fmt.Sprintf(" -recovery-threshold=%d", r.RecoveryThreshold))
+		fmt.Fprintf(cmd, " -recovery-threshold=%d", r.RecoveryThreshold)
 	}
 	if len(r.RecoveryPGPKeys) > 0 {
-		cmd.WriteString(fmt.Sprintf(" -recovery-pgp-keys='%s'", strings.Join(r.RecoveryPGPKeys, ",")))
+		fmt.Fprintf(cmd, " -recovery-pgp-keys='%s'", strings.Join(r.RecoveryPGPKeys, ","))
 	}
 	if r.RootTokenPGPKey != "" {
-		cmd.WriteString(fmt.Sprintf(" -root-token-pgp-key='%s'", r.RootTokenPGPKey))
+		fmt.Fprintf(cmd, " -root-token-pgp-key='%s'", r.RootTokenPGPKey)
 	}
 	if r.ConsulAuto {
 		cmd.WriteString(" -consul-auto=true")
 	}
 	if r.ConsulService != "" {
-		cmd.WriteString(fmt.Sprintf(" -consul-service='%s'", r.ConsulService))
+		fmt.Fprintf(cmd, " -consul-service='%s'", r.ConsulService)
 	}
 	if r.StoredShares != -1 {
-		cmd.WriteString(fmt.Sprintf(" -stored-shares=%d", r.StoredShares))
+		fmt.Fprintf(cmd, " -stored-shares=%d", r.StoredShares)
 	}
 
 	return cmd.String()

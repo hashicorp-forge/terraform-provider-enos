@@ -35,5 +35,5 @@ func TestReplicationStatusDeserialize(t *testing.T) {
 	got := NewReplicationResponse()
 	body := testReadSupport(t, "replication-status.json")
 	require.NoError(t, json.Unmarshal(body, got))
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

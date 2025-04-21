@@ -155,7 +155,7 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 		ctx, tr, NewHealthNodeRequest(
 			WithHealthNodeRequestFlightControlPath(fcRes.Path),
 			WithHealthNodeRequestConsulAddr(req.ConsulAddr),
-			WithHealthNodeRequestNodeName(state.AgentHostResponse.Hostname()),
+			WithHealthNodeRequestNodeName(state.Hostname()),
 		),
 	)
 	if err != nil {
@@ -242,7 +242,7 @@ func WaitForState(ctx context.Context, tr it.Transport, req *StateRequest, check
 func (s *State) String() string {
 	out := new(strings.Builder)
 
-	_, _ = out.WriteString(fmt.Sprintf("Agent Hostname: %s\n", s.AgentHostResponse.Hostname()))
+	_, _ = fmt.Fprintf(out, "Agent Hostname: %s\n", s.Hostname())
 	s.printStateField(out, s.HealthNodeResponse, "Node Health")
 	s.printStateField(out, s.HealthStatePassingResponse, "Healthy Nodes")
 	s.printStateField(out, s.RaftConfigurationResponse, "Raft Configuration")
@@ -250,7 +250,7 @@ func (s *State) String() string {
 	// Most of the time we don't care about all of the systemd unit properties.
 	// Try and find our meaningful status properties. If we can't then something
 	// strange is afoot and we'll display all of our props.
-	props, err := s.UnitProperties.FindProperties(systemd.EnabledAndRunningProperties)
+	props, err := s.FindProperties(systemd.EnabledAndRunningProperties)
 	if err != nil {
 		props = s.UnitProperties
 	}
@@ -270,5 +270,5 @@ func (s *State) printStateField(w io.Writer, f fmt.Stringer, fn string) {
 	if fs == "" {
 		return
 	}
-	_, _ = w.Write([]byte(fmt.Sprintf("%s: \n%s\n", fn, istrings.Indent("  ", fs))))
+	_, _ = fmt.Fprintf(w, "%s: \n%s\n", fn, istrings.Indent("  ", fs))
 }

@@ -290,7 +290,7 @@ func (s *artifactoryItemStateV1) Validate(ctx context.Context) error {
 			_, err := template.New("query").Parse(templ)
 			if err != nil {
 				return ValidationError(
-					fmt.Sprintf("invalid query template: %s", err.Error()),
+					"invalid query template: "+err.Error(),
 					"query_template",
 				)
 			}

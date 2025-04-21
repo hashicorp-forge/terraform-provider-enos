@@ -192,7 +192,7 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 			// from the exit code. If it isn't valid then return an error.
 			code, err1 := healthStatusFromError(err1)
 			if err1 != nil {
-				err = errors.Join(err, err1)
+				err = err1
 			} else {
 				res.HealthStatus = code
 			}
@@ -285,18 +285,18 @@ func (r *HealthResponse) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Status: %s\n", r.Status()))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster ID: %s\n", r.ClusterID))
-	_, _ = out.WriteString(fmt.Sprintf("Cluster Name: %s\n", r.ClusterID))
-	_, _ = out.WriteString(fmt.Sprintf("Initialized: %t\n", r.Initialized))
-	_, _ = out.WriteString(fmt.Sprintf("Sealed: %t\n", r.Sealed))
-	_, _ = out.WriteString(fmt.Sprintf("Standby: %t\n", r.Standby))
-	_, _ = out.WriteString(fmt.Sprintf("Version: %t\n", r.Standby))
-	_, _ = out.WriteString(fmt.Sprintf("Last WAL: %d\n", r.LastWAL))
-	_, _ = out.WriteString(fmt.Sprintf("Performance Standby: %t\n", r.PerformanceStandby))
-	_, _ = out.WriteString(fmt.Sprintf("Replication DR Mode: %s\n", r.ReplicationDRMode))
-	_, _ = out.WriteString(fmt.Sprintf("Replication Performance Mode: %s\n", r.ReplicationPerformanceMode))
-	_, _ = out.WriteString(fmt.Sprintf("Server Time UTC: %d\n", r.ServerTimeUTC))
+	_, _ = fmt.Fprintf(out, "Status: %s\n", r.Status())
+	_, _ = fmt.Fprintf(out, "Cluster ID: %s\n", r.ClusterID)
+	_, _ = fmt.Fprintf(out, "Cluster Name: %s\n", r.ClusterID)
+	_, _ = fmt.Fprintf(out, "Initialized: %t\n", r.Initialized)
+	_, _ = fmt.Fprintf(out, "Sealed: %t\n", r.Sealed)
+	_, _ = fmt.Fprintf(out, "Standby: %t\n", r.Standby)
+	_, _ = fmt.Fprintf(out, "Version: %t\n", r.Standby)
+	_, _ = fmt.Fprintf(out, "Last WAL: %d\n", r.LastWAL)
+	_, _ = fmt.Fprintf(out, "Performance Standby: %t\n", r.PerformanceStandby)
+	_, _ = fmt.Fprintf(out, "Replication DR Mode: %s\n", r.ReplicationDRMode)
+	_, _ = fmt.Fprintf(out, "Replication Performance Mode: %s\n", r.ReplicationPerformanceMode)
+	_, _ = fmt.Fprintf(out, "Server Time UTC: %d\n", r.ServerTimeUTC)
 	if r.License != nil {
 		_, _ = out.WriteString("License:\n" + istrings.Indent("  ", r.License.String()))
 	}

@@ -155,9 +155,9 @@ func InstallFlightControl(ctx context.Context, tr transport.Transport, ir *Insta
 		WithCopyFileDestination(path),
 		WithCopyFileChmod("+x"),
 		WithCopyFileRetryOptions(
-			retry.WithMaxRetries(ir.Retrier.MaxRetries),
-			retry.WithIntervalFunc(ir.Retrier.RetryInterval),
-			retry.WithOnlyRetryErrors(ir.Retrier.OnlyRetryError...),
+			retry.WithMaxRetries(ir.MaxRetries),
+			retry.WithIntervalFunc(ir.RetryInterval),
+			retry.WithOnlyRetryErrors(ir.OnlyRetryError...),
 		),
 	))
 	if err != nil {

@@ -93,7 +93,7 @@ func NewStateRequest(opts ...StateRequestOpt) *StateRequest {
 // WithStateRequestBinPath sets the vault binary path.
 func WithStateRequestBinPath(path string) StateRequestOpt {
 	return func(u *StateRequest) *StateRequest {
-		u.CLIRequest.BinPath = path
+		u.BinPath = path
 		return u
 	}
 }
@@ -101,7 +101,7 @@ func WithStateRequestBinPath(path string) StateRequestOpt {
 // WithStateRequestVaultAddr sets the vault address.
 func WithStateRequestVaultAddr(addr string) StateRequestOpt {
 	return func(u *StateRequest) *StateRequest {
-		u.CLIRequest.VaultAddr = addr
+		u.VaultAddr = addr
 		return u
 	}
 }
@@ -109,7 +109,7 @@ func WithStateRequestVaultAddr(addr string) StateRequestOpt {
 // WithStateRequestVaultToken sets the vault token.
 func WithStateRequestVaultToken(token string) StateRequestOpt {
 	return func(u *StateRequest) *StateRequest {
-		u.CLIRequest.Token = token
+		u.Token = token
 		return u
 	}
 }
@@ -191,7 +191,7 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 			return state, errors.New("getting the kubernetes pods state: type mismatch between transport")
 		}
 
-		req.ListPodsRequest.Namespace = k.Namespace
+		req.Namespace = k.Namespace
 		state.PodList, err = k.Client.ListPods(ctx, req.ListPodsRequest)
 		if err != nil {
 			return state, fmt.Errorf("getting the kubernetes pod information: %w", err)
@@ -280,7 +280,7 @@ func GetState(ctx context.Context, tr it.Transport, req *StateRequest) (*State, 
 	// The following sub-state endpoints require privileged access, which means
 	// that our cluster must be initialized and unsealed and that we have been
 	// configured with a token.
-	if req.CLIRequest.Token == "" {
+	if req.Token == "" {
 		return state, nil
 	}
 
@@ -423,7 +423,7 @@ func (s *State) printStateField(w io.Writer, f fmt.Stringer, fn string) {
 	if fs == "" {
 		return
 	}
-	_, _ = w.Write([]byte(fmt.Sprintf("%s: \n%s\n", fn, istrings.Indent("  ", fs))))
+	_, _ = fmt.Fprintf(w, "%s: \n%s\n", fn, istrings.Indent("  ", fs))
 }
 
 // IsSealed checks whether or not the state is sealed. If we are unable to

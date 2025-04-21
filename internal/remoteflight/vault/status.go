@@ -158,16 +158,16 @@ func (s *StatusResponse) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintf("Code: %[1]d (%[1]s)\n", s.StatusCode))
+	_, _ = fmt.Fprintf(out, "Code: %[1]d (%[1]s)\n", s.StatusCode)
 	if s.SealType != "" {
-		_, _ = out.WriteString(fmt.Sprintf("Seal Type: %s\n", s.SealType))
+		_, _ = fmt.Fprintf(out, "Seal Type: %s\n", s.SealType)
 	}
-	_, _ = out.WriteString(fmt.Sprintf("Initialized: %t\n", s.Initialized))
-	_, _ = out.WriteString(fmt.Sprintf("Sealed: %t\n", s.Sealed))
+	_, _ = fmt.Fprintf(out, "Initialized: %t\n", s.Initialized)
+	_, _ = fmt.Fprintf(out, "Sealed: %t\n", s.Sealed)
 	if s.Version != "" {
-		_, _ = out.WriteString(fmt.Sprintf("Version: %s\n", s.Version))
+		_, _ = fmt.Fprintf(out, "Version: %s\n", s.Version)
 	}
-	_, _ = out.WriteString(fmt.Sprintf("HA Enabled: %t\n", s.HAEnabled))
+	_, _ = fmt.Fprintf(out, "HA Enabled: %t\n", s.HAEnabled)
 
 	return out.String()
 }

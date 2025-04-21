@@ -117,7 +117,7 @@ func TestPublicIPAddressResolver_add_ips(t *testing.T) {
 	sort.Sort(byIP(gotV6))
 	sort.Sort(byIP(gotAll))
 
-	require.EqualValues(t, expectedV4, gotV4)
-	require.EqualValues(t, expectedV6, gotV6)
-	require.EqualValues(t, expectedAll, gotAll)
+	require.Equal(t, expectedV4, gotV4)
+	require.Equal(t, expectedV6, gotV6)
+	require.Equal(t, expectedAll, gotAll)
 }

@@ -50,5 +50,5 @@ func TestHAStatusDeserialize(t *testing.T) {
 	body := testReadSupport(t, "ha-status.json")
 	require.NoError(t, json.Unmarshal(body, got))
 
-	require.EqualValues(t, expected, got)
+	require.Equal(t, expected, got)
 }

@@ -162,7 +162,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 
 		artUser, okuser := os.LookupEnv("ARTIFACTORY_USER")
 		artToken, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
-		if !(oktoken && okuser) {
+		if !oktoken || !okuser {
 			t.Log(`skipping data bundle install from artifactory test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER aren't set`)
 			t.Skip()
 		} else {

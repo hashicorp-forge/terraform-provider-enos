@@ -67,7 +67,7 @@ func GetHAStatus(ctx context.Context, tr it.Transport, req *CLIRequest) (*HAStat
 			command.WithEnvVar("VAULT_TOKEN", req.Token),
 		))
 		if err1 != nil {
-			err = errors.Join(err, err1)
+			err = err1
 		}
 		if stderr != "" {
 			err = errors.Join(err, fmt.Errorf("unexpected write to stderr: %s", stderr))
@@ -118,20 +118,20 @@ func (s *HAStatusNode) String() string {
 	}
 
 	out := new(strings.Builder)
-	_, _ = out.WriteString(fmt.Sprintln("Node"))
-	_, _ = out.WriteString(fmt.Sprintf("  Active Node: %t\n", s.ActiveNode))
-	_, _ = out.WriteString(fmt.Sprintf("  API Address: %s\n", s.APIAddress))
-	_, _ = out.WriteString(fmt.Sprintf("  Cluster Address: %s\n", s.ClusterAddress))
-	_, _ = out.WriteString(fmt.Sprintf("  Hostname: %s\n", s.Hostname))
+	_, _ = fmt.Fprintln(out, "Node")
+	_, _ = fmt.Fprintf(out, "  Active Node: %t\n", s.ActiveNode)
+	_, _ = fmt.Fprintf(out, "  API Address: %s\n", s.APIAddress)
+	_, _ = fmt.Fprintf(out, "  Cluster Address: %s\n", s.ClusterAddress)
+	_, _ = fmt.Fprintf(out, "  Hostname: %s\n", s.Hostname)
 
 	if s.LastEcho != "" {
-		_, _ = out.WriteString(fmt.Sprintf("  Last Echo: %s\n", s.LastEcho))
+		_, _ = fmt.Fprintf(out, "  Last Echo: %s\n", s.LastEcho)
 	}
 	if s.RedundancyZone != "" {
-		_, _ = out.WriteString(fmt.Sprintf("  Redundancy Zone: %s\n", s.RedundancyZone))
+		_, _ = fmt.Fprintf(out, "  Redundancy Zone: %s\n", s.RedundancyZone)
 	}
 	if s.UpgradeVersion != "" {
-		_, _ = out.WriteString(fmt.Sprintf("  Upgrade Version: %s\n", s.UpgradeVersion))
+		_, _ = fmt.Fprintf(out, "  Upgrade Version: %s\n", s.UpgradeVersion)
 	}
 
 	return out.String()

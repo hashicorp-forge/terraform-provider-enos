@@ -122,7 +122,7 @@ func (c *client) init(ctx context.Context) error {
 		Auth:            []xssh.AuthMethod{},
 	}
 
-	c.clientConfig.Config.SetDefaults() // Use the default ciphers and key exchanges
+	c.clientConfig.SetDefaults() // Use the default ciphers and key exchanges
 
 	if c.transportCfg.password != "" {
 		c.clientConfig.Auth = append(c.clientConfig.Auth, xssh.Password(c.transportCfg.password))
