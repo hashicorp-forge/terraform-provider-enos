@@ -15,19 +15,15 @@ type vaultListenerConfig struct {
 	// Top-level listener attributes
 	Attrs *dynamicPseudoTypeBlock
 
-	// telemetry stanza
+	// Sub-stanzas in 'listener'
 	Telemetry *dynamicPseudoTypeBlock
-
-	// Profiling stanza
 	Profiling *dynamicPseudoTypeBlock
-
 	// inflight_requests_logging stanza
 	IRL *dynamicPseudoTypeBlock
-
-	// customer_response_headers stanza
+	// custom_response_headers stanza
 	CRH *dynamicPseudoTypeBlock
 
-	// keep these around for marshaling the dynamic value
+	// Keep the raw values around for marshaling the dynamic value
 	RawValues map[string]tftypes.Value
 	RawValue  tftypes.Value
 
@@ -75,7 +71,7 @@ func (s *vaultListenerConfig) Set(set *vaultListenerConfigSet) {
 			s.Profiling.Object.Set(values)
 		case "inflight_requests_logging":
 			s.IRL.Object.Set(values)
-		case "customer_response_headers":
+		case "custom_response_headers":
 			s.CRH.Object.Set(values)
 		}
 	}
@@ -139,7 +135,7 @@ func (s *vaultListenerConfig) FromTerraform5Value(val tftypes.Value) error {
 			if err != nil {
 				return err
 			}
-		case "customer_response_headers":
+		case "custom_response_headers":
 			err = s.CRH.FromTFValue(v)
 			if err != nil {
 				return err
@@ -195,7 +191,7 @@ func (s *vaultListenerConfig) Terraform5Value() tftypes.Value {
 			if err != nil {
 				panic(err)
 			}
-		case "customer_response_headers":
+		case "custom_response_headers":
 			val, err = s.CRH.TFValue()
 			if err != nil {
 				panic(err)

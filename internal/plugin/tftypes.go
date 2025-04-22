@@ -1191,11 +1191,9 @@ func newDynamicPseudoTypeBlock() *dynamicPseudoTypeBlock {
 	return &dynamicPseudoTypeBlock{Object: newTfObject()}
 }
 
-// FromTFValue returns unmarshals a tftypes.Value into itself.
+// FromTFValue nmarshals a tftypes.Value into itself and the embedded object.
 func (d *dynamicPseudoTypeBlock) FromTFValue(value tftypes.Value) error {
 	if !value.IsKnown() {
-		// RetryJoin are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
-		// dynamic value that we'll know after apply.
 		d.Object.Unknown = true
 		return nil
 	}
@@ -1204,11 +1202,14 @@ func (d *dynamicPseudoTypeBlock) FromTFValue(value tftypes.Value) error {
 		return nil
 	}
 
+	// Keep this around because we'll need it when we marshal back to the tftypes
 	d.OriginalValue = value
 
+	// Decode the vaule in our embedded tfObject
 	return d.Object.FromTFValue(value)
 }
 
+// TFType returns the terraform 5 type.
 func (d *dynamicPseudoTypeBlock) TFType() tftypes.Type {
 	return tftypes.DynamicPseudoType
 }
@@ -1216,17 +1217,17 @@ func (d *dynamicPseudoTypeBlock) TFType() tftypes.Type {
 // TFValue returns marshals the dynamicPseudoTypeBlock into a tftypes.Value.
 func (d *dynamicPseudoTypeBlock) TFValue() (tftypes.Value, error) {
 	if d == nil || d.Object == nil {
-		return tftypes.NewValue(tftypes.DynamicPseudoType, nil), nil
+		return tftypes.NewValue(d.TFType(), nil), nil
 	}
 
 	if d.OriginalValue.Type() == nil {
 		// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
 		// value.
 		if d.Object.Unknown {
-			return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue), nil
+			return tftypes.NewValue(d.TFType(), tftypes.UnknownValue), nil
 		}
 
-		return tftypes.NewValue(tftypes.DynamicPseudoType, nil), nil
+		return tftypes.NewValue(d.TFType(), nil), nil
 	}
 
 	values := map[string]tftypes.Value{}
