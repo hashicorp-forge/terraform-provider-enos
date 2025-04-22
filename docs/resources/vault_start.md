@@ -32,7 +32,11 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `config.cluster_name` (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
 - `config.listener` (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza
 - `config.listener.type` (String) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener
-- `config.listener.attributes` (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener
+- `config.listener.attributes` (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) top-level parameters for the listener
+- `config.listener.telemetry` (Object) The Vault listener [telemetry](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#telemetry-parameters) stanza
+- `config.listener.profiling` (Object) The Vault listener [profiling](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#profiling-parameters) stanza
+- `config.listener.inflight_requests_logging` (Object) The Vault listener [inflight_requests_logging](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#inflight_requests_logging-parameters) stanza
+- `config.listener.custom_response_headers` (Object) The Vault listener [custom_response_headers](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#custom_response_headers-parameters) stanza
 - `config.log_level` (String) The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)
 - `config.storage` (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - `config.storage.type` (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
@@ -50,7 +54,8 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `config.seals.secondary.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
 - `config.seals.tertiary` (Object) The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3
 - `config.seals.tertiary.type` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
-- `config.seals.tertiary.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type (see [below for nested schema](#nestedatt--config))
+- `config.seals.tertiary.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
+- `config.telemetry` (Object) The Vault [telemetry](https://developer.hashicorp.com/vault/docs/configuration/telemetry#telemetry-parameters) stanza (see [below for nested schema](#nestedatt--config))
 
 ### Optional
 
@@ -88,21 +93,13 @@ Required:
 - `api_addr` (String)
 - `cluster_addr` (String)
 - `cluster_name` (String)
-- `listener` (Object) (see [below for nested schema](#nestedobjatt--config--listener))
+- `listener` (Dynamic)
 - `log_level` (String)
 - `seal` (Object) (see [below for nested schema](#nestedobjatt--config--seal))
 - `seals` (Dynamic)
 - `storage` (Dynamic)
+- `telemetry` (Dynamic)
 - `ui` (Boolean)
-
-<a id="nestedobjatt--config--listener"></a>
-### Nested Schema for `config.listener`
-
-Required:
-
-- `attributes` (Dynamic)
-- `type` (String)
-
 
 <a id="nestedobjatt--config--seal"></a>
 ### Nested Schema for `config.seal`

@@ -1181,3 +1181,64 @@ func (b *tfObjectSlice) String() string {
 		return fmt.Sprintf("%s", b.Val)
 	}
 }
+
+type dynamicPseudoTypeBlock struct {
+	Object        *tfObject
+	OriginalValue tftypes.Value
+}
+
+func newDynamicPseudoTypeBlock() *dynamicPseudoTypeBlock {
+	return &dynamicPseudoTypeBlock{Object: newTfObject()}
+}
+
+// FromTFValue returns unmarshals a tftypes.Value into itself.
+func (d *dynamicPseudoTypeBlock) FromTFValue(value tftypes.Value) error {
+	if !value.IsKnown() {
+		// RetryJoin are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
+		// dynamic value that we'll know after apply.
+		d.Object.Unknown = true
+		return nil
+	}
+	if value.IsNull() {
+		// We can't unmarshal null or unknown things
+		return nil
+	}
+
+	d.OriginalValue = value
+
+	return d.Object.FromTFValue(value)
+}
+
+func (d *dynamicPseudoTypeBlock) TFType() tftypes.Type {
+	return tftypes.DynamicPseudoType
+}
+
+// TFValue returns marshals the dynamicPseudoTypeBlock into a tftypes.Value.
+func (d *dynamicPseudoTypeBlock) TFValue() (tftypes.Value, error) {
+	if d == nil || d.Object == nil {
+		return tftypes.NewValue(tftypes.DynamicPseudoType, nil), nil
+	}
+
+	if d.OriginalValue.Type() == nil {
+		// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
+		// value.
+		if d.Object.Unknown {
+			return tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue), nil
+		}
+
+		return tftypes.NewValue(tftypes.DynamicPseudoType, nil), nil
+	}
+
+	values := map[string]tftypes.Value{}
+	err := d.Object.TFValue().As(&values)
+	if err != nil {
+		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
+	}
+
+	val, err := encodeTfObjectDynamicPseudoType(d.OriginalValue, values)
+	if err != nil {
+		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
+	}
+
+	return val, nil
+}

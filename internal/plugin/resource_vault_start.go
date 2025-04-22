@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -65,11 +66,12 @@ type vaultConfig struct {
 	ClusterName *tfString
 	APIAddr     *tfString
 	ClusterAddr *tfString
-	Listener    *vaultConfigBlock
+	Listener    *vaultListenerConfig
 	LogLevel    *tfString
 	Storage     *vaultStorageConfig
 	Seal        *vaultConfigBlock // Single seal configuration
 	Seals       *vaultSealsConfig // HA Seal configuration
+	Telemetry   *dynamicPseudoTypeBlock
 	UI          *tfBool
 }
 
@@ -112,10 +114,11 @@ func newVaultConfig() *vaultConfig {
 		APIAddr:     newTfString(),
 		ClusterAddr: newTfString(),
 		LogLevel:    newTfString(),
-		Listener:    newVaultConfigBlock("config", "listener"),
+		Listener:    newVaultListenerConfig(),
 		Seal:        newVaultConfigBlock("config", "seal"),
 		Seals:       newVaultSealsConfig(),
 		Storage:     newVaultStorageConfig(),
+		Telemetry:   newDynamicPseudoTypeBlock(),
 		UI:          newTfBool(),
 	}
 }
@@ -298,7 +301,11 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 - ^config.cluster_name^ (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
 - ^config.listener^ (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza
 - ^config.listener.type^ (String) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp) stanza value. Currently 'tcp' is the only supported listener
-- ^config.listener.attributes^ (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) parameters for the tcp listener
+- ^config.listener.attributes^ (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#tcp-listener-parameters) top-level parameters for the listener
+- ^config.listener.telemetry^ (Object) The Vault listener [telemetry](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#telemetry-parameters) stanza
+- ^config.listener.profiling^ (Object) The Vault listener [profiling](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#profiling-parameters) stanza
+- ^config.listener.inflight_requests_logging^ (Object) The Vault listener [inflight_requests_logging](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#inflight_requests_logging-parameters) stanza
+- ^config.listener.custom_response_headers^ (Object) The Vault listener [custom_response_headers](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#custom_response_headers-parameters) stanza
 - ^config.log_level^ (String) The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)
 - ^config.storage^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - ^config.storage.type^ (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
@@ -317,6 +324,7 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 - ^config.seals.tertiary^ (Object) The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3
 - ^config.seals.tertiary.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - ^config.seals.tertiary.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
+- ^config.telemetry^ (Object) The Vault [telemetry](https://developer.hashicorp.com/vault/docs/configuration/telemetry#telemetry-parameters) stanza
 `),
 				},
 				{
@@ -405,7 +413,7 @@ func (s *vaultStartStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *vaultStartStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"bin_path":       s.BinPath,
 		"config_dir":     s.ConfigDir,
 		"config_mode":    s.ConfigMode,
@@ -490,27 +498,34 @@ func (c *vaultConfig) attrs() map[string]tftypes.Type {
 	return map[string]tftypes.Type{
 		"api_addr":     tftypes.String,
 		"cluster_addr": tftypes.String,
+		"cluster_name": c.ClusterName.TFType(),
 		"listener":     c.Listener.Terraform5Type(),
 		"log_level":    tftypes.String,
 		"storage":      c.Storage.Terraform5Type(),
 		"seal":         c.Seal.Terraform5Type(),
 		"seals":        c.Seals.Terraform5Type(),
+		"telemetry":    c.Telemetry.TFType(),
 		"ui":           c.UI.TFType(),
-		"cluster_name": c.ClusterName.TFType(),
 	}
 }
 
 func (c *vaultConfig) optionalAttrs() map[string]struct{} {
 	return map[string]struct{}{
-		"seal":    {},
-		"seals":   {},
-		"storage": {},
+		"seal":      {},
+		"seals":     {},
+		"storage":   {},
+		"telemetry": {},
 	}
 }
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
 	typ := tftypes.Object{
 		AttributeTypes: c.attrs(),
+	}
+
+	telemetry, err := c.Telemetry.TFValue()
+	if err != nil {
+		panic(err)
 	}
 
 	return tftypes.NewValue(typ, map[string]tftypes.Value{
@@ -522,13 +537,14 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 		"seal":         c.Seal.Terraform5Value(),
 		"seals":        c.Seals.Terraform5Value(),
 		"storage":      c.Storage.Terraform5Value(),
+		"telemetry":    telemetry,
 		"ui":           c.UI.TFValue(),
 	})
 }
 
 // FromTerraform5Value unmarshals the value to the struct.
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"api_addr":     c.APIAddr,
 		"cluster_addr": c.ClusterAddr,
 		"cluster_name": c.ClusterName,
@@ -566,6 +582,14 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	storage, ok := vals["storage"]
 	if ok {
 		err = c.Storage.FromTerraform5Value(storage)
+		if err != nil {
+			return err
+		}
+	}
+
+	telemetry, ok := vals["telemetry"]
+	if ok {
+		err = c.Telemetry.FromTFValue(telemetry)
 		if err != nil {
 			return err
 		}
@@ -622,8 +646,21 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 	}
 
 	if label, ok := c.Listener.Type.Get(); ok {
-		if attrs, ok := c.Listener.Attrs.GetObject(); ok {
-			hclBuilder.AppendBlock("listener", []string{label}).AppendAttributes(attrs)
+		listenerBlock := hclBuilder.AppendBlock("listener", []string{label})
+		if attrs, ok := c.Listener.Attrs.Object.GetObject(); ok {
+			listenerBlock.AppendAttributes(attrs)
+		}
+		if telemetry, ok := c.Listener.Telemetry.Object.GetObject(); ok {
+			listenerBlock.AppendBlock("telemetry", nil).AppendAttributes(telemetry)
+		}
+		if profiling, ok := c.Listener.Profiling.Object.GetObject(); ok {
+			listenerBlock.AppendBlock("profiling", nil).AppendAttributes(profiling)
+		}
+		if inflight_requests_logging, ok := c.Listener.IRL.Object.GetObject(); ok {
+			listenerBlock.AppendBlock("inflight_requests_logging", nil).AppendAttributes(inflight_requests_logging)
+		}
+		if custom_response_headers, ok := c.Listener.CRH.Object.GetObject(); ok {
+			listenerBlock.AppendBlock("custom_response_headers", nil).AppendAttributes(custom_response_headers)
 		}
 	}
 
@@ -638,9 +675,7 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 				if err != nil {
 					return nil, nil, err
 				}
-				for k, v := range sealEnvVars {
-					envVars[k] = v
-				}
+				maps.Copy(envVars, sealEnvVars)
 			}
 		}
 	}
@@ -683,9 +718,7 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 					if err != nil {
 						return nil, nil, err
 					}
-					for k, v := range sealEnvVars {
-						envVars[k] = v
-					}
+					maps.Copy(envVars, sealEnvVars)
 				} else {
 					hclBuilder.AppendBlock("seal", []string{label}).AppendAttributes(attrs)
 				}
@@ -696,7 +729,7 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 	if c.Storage != nil && c.Storage.Type != nil {
 		if storageLabel, ok := c.Storage.Type.Get(); ok {
 			storageBlock := hclBuilder.AppendBlock("storage", []string{storageLabel})
-			attrs, ok := c.Storage.Attrs.GetObject()
+			attrs, ok := c.Storage.Attrs.Object.GetObject()
 			if ok { // Add our attributes to the storage block
 				storageBlock.AppendAttributes(attrs)
 
@@ -709,7 +742,7 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 					}
 
 					retryJoinBlock := storageBlock.AppendBlock("retry_join", []string{})
-					retryJoinAttrs, ok := c.Storage.RetryJoin.GetObject()
+					retryJoinAttrs, ok := c.Storage.RetryJoin.Object.GetObject()
 					if ok {
 						// We've been configured with retry_join so we'll set the attrs
 						retryJoinBlock.AppendAttributes(retryJoinAttrs)
@@ -728,6 +761,10 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 				}
 			}
 		}
+	}
+
+	if telemetry, ok := c.Telemetry.Object.GetObject(); ok {
+		hclBuilder.AppendBlock("telemetry", nil).AppendAttributes(telemetry)
 	}
 
 	return hclBuilder, envVars, nil
@@ -803,9 +840,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 		return fmt.Errorf("failed to create the vault HCL configuration, due to: %w", err)
 	}
 
-	for k, v := range configEnv {
-		envVars[k] = v
-	}
+	maps.Copy(envVars, configEnv)
 
 	// Write our config file
 	err = hcl.CreateHCLConfigFile(ctx, transport, hcl.NewCreateHCLConfigFileRequest(

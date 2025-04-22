@@ -112,6 +112,16 @@ resource "enos_vault_start" "leader" {
         address     = "0.0.0.0:8200"
         tls_disable = "true"
       }
+      // Turn on a bunch of unathenticated options that are optional on the leader
+      telemetry = {
+        unauthenticated_metrics_access = true
+      }
+      profiling = {
+        unauthenticated_pprof_access = true
+      }
+      inflight_requests_logging = {
+        unauthenticated_in_flight_request_access = true
+      }
     }
     log_level = var.vault_log_level
     storage = {
@@ -122,6 +132,10 @@ resource "enos_vault_start" "leader" {
     // NOTE: using our seals key here and seal for followers to ensure backwards compat
     seals = {
       "primary" = local.seal[var.unseal_method]
+    }
+    // Turn on some telemetry options on the leader
+    telemetry = {
+      enable_hostname_label = true,
     }
     ui = true
   }
