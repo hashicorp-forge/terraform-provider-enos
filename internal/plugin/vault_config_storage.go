@@ -12,13 +12,8 @@ import (
 type vaultStorageConfig struct {
 	Type *tfString
 
-	Attrs       *tfObject
-	AttrsRaw    tftypes.Value
-	AttrsValues map[string]tftypes.Value
-
-	RetryJoin       *tfObject
-	RetryJoinRaw    tftypes.Value
-	RetryJoinValues map[string]tftypes.Value
+	Attrs     *dynamicPseudoTypeBlock
+	RetryJoin *dynamicPseudoTypeBlock
 
 	// keep these around for marshaling the dynamic value
 	RawValues map[string]tftypes.Value
@@ -37,8 +32,8 @@ type vaultStorageConfigSet struct {
 func newVaultStorageConfig() *vaultStorageConfig {
 	return &vaultStorageConfig{
 		Type:      newTfString(),
-		Attrs:     newTfObject(),
-		RetryJoin: newTfObject(),
+		Attrs:     newDynamicPseudoTypeBlock(),
+		RetryJoin: newDynamicPseudoTypeBlock(),
 		Unknown:   false,
 		Null:      true,
 	}
@@ -59,8 +54,8 @@ func (s *vaultStorageConfig) Set(set *vaultStorageConfigSet) {
 
 	s.Unknown = false
 	s.Type.Set(set.typ)
-	s.Attrs.Set(set.attrs)
-	s.RetryJoin.Set(set.retryJoin)
+	s.Attrs.Object.Set(set.attrs)
+	s.RetryJoin.Object.Set(set.retryJoin)
 }
 
 // FromTerraform5Value unmarshals the value to the struct.
@@ -103,43 +98,11 @@ func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 				return err
 			}
 		case "attributes":
-			if !v.IsKnown() {
-				// Attrs are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
-				// dynamic value that we'll know after apply.
-				s.Attrs.Unknown = true
-				continue
-			}
-			if v.IsNull() {
-				// We can't unmarshal null or unknown things
-				continue
-			}
-
-			s.AttrsRaw = v
-			err = v.As(&s.AttrsValues)
-			if err != nil {
-				return err
-			}
 			err = s.Attrs.FromTFValue(v)
 			if err != nil {
 				return err
 			}
 		case "retry_join":
-			if !v.IsKnown() {
-				// RetryJoin are a DynamicPseudoType but the value is unknown. Terraform expects us to be a
-				// dynamic value that we'll know after apply.
-				s.RetryJoin.Unknown = true
-				continue
-			}
-			if v.IsNull() {
-				// We can't unmarshal null or unknown things
-				continue
-			}
-
-			s.RetryJoinRaw = v
-			err = v.As(&s.RetryJoinValues)
-			if err != nil {
-				return err
-			}
 			err = s.RetryJoin.FromTFValue(v)
 			if err != nil {
 				return err
@@ -172,50 +135,26 @@ func (s *vaultStorageConfig) Terraform5Value() tftypes.Value {
 	attrs := map[string]tftypes.Type{}
 	vals := map[string]tftypes.Value{}
 	for name := range s.RawValues {
+		var val tftypes.Value
+		var err error
 		switch name {
 		case "type":
-			attrs[name] = s.Type.TFType()
-			vals[name] = s.Type.TFValue()
+			val = s.Type.TFValue()
 		case "attributes":
-			var attrsVal tftypes.Value
-			if s.AttrsRaw.Type() == nil {
-				// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
-				// value.
-				if s.Attrs.Unknown {
-					attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
-				} else {
-					attrsVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-				}
-			} else {
-				var err error
-				attrsVal, err = encodeTfObjectDynamicPseudoType(s.AttrsRaw, s.AttrsValues)
-				if err != nil {
-					panic(err)
-				}
+			val, err = s.Attrs.TFValue()
+			if err != nil {
+				panic(err)
 			}
-			attrs[name] = attrsVal.Type()
-			vals[name] = attrsVal
 		case "retry_join":
-			var retryVal tftypes.Value
-			if s.RetryJoinRaw.Type() == nil {
-				// We don't have a type, which means we're a DynamicPseudoType with either a nil or unknown
-				// value.
-				if s.RetryJoin.Unknown {
-					retryVal = tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
-				} else {
-					retryVal = tftypes.NewValue(tftypes.DynamicPseudoType, nil)
-				}
-			} else {
-				var err error
-				retryVal, err = encodeTfObjectDynamicPseudoType(s.RetryJoinRaw, s.RetryJoinValues)
-				if err != nil {
-					panic(err)
-				}
+			val, err = s.RetryJoin.TFValue()
+			if err != nil {
+				panic(err)
 			}
-			attrs[name] = retryVal.Type()
-			vals[name] = retryVal
 		default:
 		}
+
+		attrs[name] = val.Type()
+		vals[name] = val
 	}
 
 	if len(vals) == 0 {

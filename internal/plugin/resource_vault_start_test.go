@@ -5,7 +5,6 @@ package plugin
 
 import (
 	"bytes"
-	"regexp"
 	"testing"
 	"text/template"
 
@@ -24,11 +23,23 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 	vaultCfg.APIAddr.Set("http://127.0.0.1:8200")
 	vaultCfg.ClusterAddr.Set("http://127.0.0.1:8201")
 	vaultCfg.ClusterName.Set("avaultcluster")
-	vaultCfg.Listener.Set(newVaultConfigBlockSet(
-		"tcp", map[string]any{
-			"address":     "0.0.0.0:8200",
-			"tls_disable": "true",
-		}, "config", "listener"))
+	vaultCfg.Listener.Set(newVaultListenerConfigSet(
+		"tcp", map[string]map[string]any{
+			"attributes": {
+				"address":     "0.0.0.0:8200",
+				"tls_disable": "true",
+			},
+			"telemetry": {
+				"unauthenticated_metrics_access": true,
+			},
+			"profiling": {
+				"unauthenticated_pprof_access": true,
+			},
+			"inflight_requests_logging": {
+				"unauthenticated_in_flight_requests_access": true,
+			},
+		},
+	))
 	vaultCfg.LogLevel.Set("debug")
 	vaultCfg.Storage.Set(newVaultStorageConfigSet("raft", map[string]any{
 		"address": "127.0.0.1:8500",
@@ -53,6 +64,10 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 		}, "config", "seal"),
 		"tertiary": newVaultConfigBlockSet("none", nil, "config", "seal"),
 	}))
+	vaultCfg.Telemetry.Object.Set(map[string]any{
+		"usage_gauge_period":        "30m",
+		"maximum_gague_cardinality": 100,
+	})
 
 	// Make sure we can create a dynamic value with optional attrs
 	val := vaultCfg.Terraform5Value()
@@ -69,78 +84,102 @@ func TestAccResourceVaultStart(t *testing.T) {
 	cfg := template.Must(template.New("enos_vault_start").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_vault_start" "{{.ID.Value}}" {
-		{{if .BinPath.Value}}
-		bin_path = "{{.BinPath.Value}}"
-		{{end}}
+    {{if .BinPath.Value -}}
+    bin_path = "{{.BinPath.Value}}"
+    {{end -}}
+		{{if .ConfigDir.Value -}}
+    config_dir = "{{.ConfigDir.Value}}"
+    {{end -}}
+    {{if .License.Value -}}
+    license    = "{{.License.Value}}"
+    {{end -}}
+    {{if .SystemdUnitName.Value -}}
+    unit_name  = "{{.SystemdUnitName.Value}}"
+    {{end -}}
+    {{if .Username.Value -}}
+    username   = "{{.Username.Value}}"
+    {{end -}}
 
-		config = {
-			api_addr = "{{.Config.APIAddr.Value}}"
-			cluster_addr = "{{.Config.ClusterAddr.Value}}"
-			cluster_name = "{{.Config.ClusterName.Value}}"
-			listener = {
-				type = "{{.Config.Listener.Type.Value}}"
-				attributes = {
-					{{range $name, $val := .Config.Listener.Attrs.Value}}
-					{{$name}} = "{{$val}}"
-					{{end}}
-				}
-			}
-			log_level = "${{.Config.LogLevel.Value}}"
-			{{if .Config.Seal.Attrs.Value}}
-			seal = {
-				type = "{{.Config.Seal.Type.Value}}"
-				attributes = {
-					{{range $name, $val := .Config.Seal.Attrs.Value}}
-					{{$name}} = "{{$val}}"
-					{{end}}
-				}
-			}
-			{{end}}
-			{{if .Config.Seals}}
-			seals = {
-			{{range $priority, $seal := .Config.Seals.Value}}
-				{{if $seal.Type.Value }}
-				{{$priority}} = {
-					type = "{{$seal.Type.Value}}"
-					attributes = {
-						{{range $name, $val := $seal.Attrs.Value}}
-						{{$name}} = "{{$val}}"
-						{{end}}
-					}
-				}
-				{{end}}
-			{{end}}
-			}
-			{{end}}
-			storage = {
-				type = "{{.Config.Storage.Type.Value}}"
-				attributes = {
-					{{range $name, $val := .Config.Storage.Attrs.Value}}
-					{{$name}} = "{{$val}}"
-					{{end}}
-				}
-			}
-			ui = true
-		}
+    config = {
+      api_addr     = "{{.Config.APIAddr.Value}}"
+      cluster_addr = "{{.Config.ClusterAddr.Value}}"
+      cluster_name = "{{.Config.ClusterName.Value}}"
+      log_level    = "{{.Config.LogLevel.Value}}"
+      ui           = true
 
-		{{if .ConfigDir.Value}}
-		config_dir = "{{.ConfigDir.Value}}"
-		{{end}}
+      listener = {
+        type = "{{.Config.Listener.Type.Value}}"
 
-		{{if .License.Value}}
-		license = "{{.License.Value}}"
-		{{end}}
+        attributes = { {{range $name, $val := .Config.Listener.Attrs.Object.Value }}
+          {{$name}} = "{{$val}}"
+        {{end -}}
+        }
+        {{if .Config.Listener.Telemetry.Object.Value -}}
+        telemetry = { {{range $name, $val := .Config.Listener.Telemetry.Object.Value }}
+          {{$name}} = "{{$val}}"
+        {{end -}}
+        }
+        {{end}}
+        {{if .Config.Listener.Profiling.Object.Value -}}
+        profiling = { {{range $name, $val := .Config.Listener.Profiling.Object.Value }}
+          {{$name}} = "{{$val}}"
+        {{end -}}
+        }
+        {{end }}
+        {{if .Config.Listener.IRL.Object.Value -}}
+        inflight_requests_logging = { {{range $name, $val := .Config.Listener.IRL.Object.Value }}
+          {{$name}} = "{{$val}}"
+        {{end -}}
+        }
+        {{end}}
+      }
 
-		{{if .SystemdUnitName.Value}}
-		unit_name = "{{.SystemdUnitName.Value}}"
-		{{end}}
 
-		{{if .Username.Value}}
-		username = "{{.Username.Value}}"
-		{{end}}
+      {{if .Config.Seal.Attrs.Value -}}
+      seal = {
+        type = "{{.Config.Seal.Type.Value}}"
+        attributes = { {{range $name, $val := .Config.Seal.Attrs.Value -}}
+          {{$name}} = "{{$val}}"
+          {{end}}
+        }
+      }
+      {{end -}}
 
-		{{ renderTransport .Transport }}
-	}`))
+      {{if .Config.Seals -}}
+      seals = {
+		    {{range $priority, $seal := .Config.Seals.Value -}}
+        {{if $seal.Type.Value }}
+        {{$priority}} = {
+          type = "{{$seal.Type.Value}}"
+          attributes = { {{range $name, $val := $seal.Attrs.Value -}}
+            {{$name}} = "{{$val}}"
+            {{end}}
+          }
+        }
+        {{end }}
+        {{end -}}
+      }
+      {{end -}}
+
+      storage = {
+        type = "{{.Config.Storage.Type.Value}}"
+        attributes = { {{range $name, $val := .Config.Storage.Attrs.Object.Value -}}
+          {{$name}} = "{{$val}}"
+          {{end}}
+        }
+      }
+
+      {{if .Config.Telemetry.Object.Value -}}
+      telemetry = {
+        {{range $name, $val := .Config.Telemetry.Object.Value -}}
+        {{$name}} = "{{$val}}"
+        {{end}}
+      }
+      {{end -}}
+
+    }
+    {{ renderTransport .Transport }}
+  }`))
 
 	cases := []testAccResourceTemplate{}
 
@@ -151,11 +190,23 @@ func TestAccResourceVaultStart(t *testing.T) {
 	vaultStart.Config.APIAddr.Set("http://127.0.0.1:8200")
 	vaultStart.Config.ClusterAddr.Set("http://127.0.0.1:8201")
 	vaultStart.Config.ClusterName.Set("avaultcluster")
-	vaultStart.Config.Listener.Set(newVaultConfigBlockSet(
-		"tcp", map[string]any{
-			"address":     "0.0.0.0:8200",
-			"tls_disable": "true",
-		}, "config", "listener"))
+	vaultStart.Config.Listener.Set(newVaultListenerConfigSet(
+		"tcp", map[string]map[string]any{
+			"attributes": {
+				"address":     "0.0.0.0:8200",
+				"tls_disable": "true",
+			},
+			"telemetry": {
+				"unauthenticated_metrics_access": true,
+			},
+			"profiling": {
+				"unauthenticated_pprof_access": true,
+			},
+			"inflight_requests_logging": {
+				"unauthenticated_in_flight_requests_access": true,
+			},
+		},
+	))
 	vaultStart.Config.LogLevel.Set("debug")
 	vaultStart.Config.Storage.Set(newVaultStorageConfigSet("raft", map[string]any{
 		"path": "vault",
@@ -176,6 +227,10 @@ func TestAccResourceVaultStart(t *testing.T) {
 			"priority":   "2",
 		}, "config", "seal"),
 	}))
+	vaultStart.Config.Telemetry.Object.Set(map[string]any{
+		"usage_gauge_period":        "30m",
+		"maximum_gague_cardinality": 100,
+	})
 	vaultStart.License.Set("some-license-key")
 	vaultStart.SystemdUnitName.Set("vaulter")
 	vaultStart.Username.Set("vault")
@@ -189,34 +244,38 @@ func TestAccResourceVaultStart(t *testing.T) {
 	cases = append(cases, testAccResourceTemplate{
 		"all fields are loaded correctly",
 		vaultStart,
-		resource.ComposeTestCheckFunc(
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "id", regexp.MustCompile(`^foo$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "bin_path", regexp.MustCompile(`^/opt/vault/bin/vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config_dir", regexp.MustCompile(`^/etc/vault.d$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.api_addr", regexp.MustCompile(`^http://127.0.0.1:8200$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.cluster_addr", regexp.MustCompile(`^http://127.0.0.1:8201$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.cluster_name", regexp.MustCompile(`^avaultcluster$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.type", regexp.MustCompile(`^tcp$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.address", regexp.MustCompile(`^0.0.0.0:8200$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.listener.attributes.tls_disable", regexp.MustCompile(`^true$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.log_level", regexp.MustCompile(`^debug$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.type", regexp.MustCompile(`^raft$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", regexp.MustCompile(`^vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join_scheme", regexp.MustCompile(`^https$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join", regexp.MustCompile(`^provider=aws tag_key=join tag_value=vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.type", regexp.MustCompile(`^awskms$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].type", regexp.MustCompile(`^awskms$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.kms_key_id", regexp.MustCompile(`^some-key-id$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.priority", regexp.MustCompile(`^1$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].type", regexp.MustCompile(`^awskms$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.kms_key_id", regexp.MustCompile(`^another-key-id$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.priority", regexp.MustCompile(`^4$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.license", regexp.MustCompile(`^some-license-key$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.unit_name", regexp.MustCompile(`^vault$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "config.username", regexp.MustCompile(`^vaulter$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
-			resource.TestMatchResourceAttr("enos_vault_start.foo", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
+		resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "id", "bar"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "bin_path", "/opt/vault/bin/vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config_dir", "/etc/vault.d"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.api_addr", "http://127.0.0.1:8200"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.cluster_addr", "http://127.0.0.1:8201"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.cluster_name", "avaultcluster"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.type", "tcp"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.attributes.address", "0.0.0.0:8200"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.attributes.tls_disable", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.telemetry.unauthenticated_metrics_access", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.profiling.unauthenticated_pprof_access", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.listener.inflight_requests_logging.unauthenticated_in_flight_requests_access", "false"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_level", "debug"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_level", "debug"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.type", "raft"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", "vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join_scheme", "https"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join", "provider=aws tag_key=join tag_value=vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seal.type", "awskms"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", "some-key-id"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[0].type", "awskms"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.kms_key_id", "some-key-id"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[0].attributes.priority", "1"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[1].type", "awskms"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.kms_key_id", "another-key-id"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[1].attributes.priority", "4"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.license", "some-license-key"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.unit_name", "vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.username", "vaulter"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.user", "ubuntu"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.host", "localhost"),
 		),
 		false,
 	})
@@ -229,6 +288,7 @@ func TestAccResourceVaultStart(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error executing test template: %s", err.Error())
 			}
+			// t.Log(buf.String())
 
 			step := resource.TestStep{
 				Config: buf.String(),
