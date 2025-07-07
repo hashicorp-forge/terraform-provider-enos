@@ -233,11 +233,9 @@ func (s *bundleInstallStateV1) packageGetter() (*remoteflight.PackageInstallGett
 	}
 
 	_, okURL := s.Artifactory.URL.Get()
-	_, okUsername := s.Artifactory.Username.Get()
 	_, okToken := s.Artifactory.Token.Get()
 	_, okSHA := s.Artifactory.SHA256.Get()
-
-	if okURL && okUsername && okToken && okSHA {
+	if okURL && okToken && okSHA {
 		return remoteflight.PackageInstallGetterArtifactory, nil
 	}
 
@@ -382,10 +380,7 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			opts = append(opts, remoteflight.WithPackageInstallDestination(dest))
 		}
 
-		username, ok := s.Artifactory.Username.Get()
-		if !ok {
-			return ValidationError("you must supply an artifactory username", "artifactory", "username")
-		}
+		username, okUsername := s.Artifactory.Username.Get()
 
 		token, ok := s.Artifactory.Token.Get()
 		if !ok {
@@ -397,13 +392,17 @@ func (s *bundleInstallStateV1) Install(ctx context.Context, client it.Transport)
 			return ValidationError("you must supply an artifactory sha256", "artifactory", "sha256")
 		}
 
+		downloadOpts := []remoteflight.DownloadOpt{
+			remoteflight.WithDownloadRequestURL(url),
+			remoteflight.WithDownloadRequestSHA256(sha),
+		}
+		if okUsername {
+			downloadOpts = append(downloadOpts, remoteflight.WithDownloadRequestAuthUser(username), remoteflight.WithDownloadRequestAuthPassword(token))
+		} else { // if no username is provided, we can assume we're using an identity token for auth
+			downloadOpts = append(downloadOpts, remoteflight.WithDownloadRequestAuthToken(token))
+		}
 		opts = append(opts, []remoteflight.PackageInstallRequestOpt{
-			remoteflight.WithPackageInstallDownloadOpts(
-				remoteflight.WithDownloadRequestURL(url),
-				remoteflight.WithDownloadRequestAuthUser(username),
-				remoteflight.WithDownloadRequestAuthPassword(token),
-				remoteflight.WithDownloadRequestSHA256(sha),
-			),
+			remoteflight.WithPackageInstallDownloadOpts(downloadOpts...),
 			remoteflight.WithPackageInstallInstaller(installer),
 		}...)
 	case remoteflight.PackageInstallGetterRepository:
