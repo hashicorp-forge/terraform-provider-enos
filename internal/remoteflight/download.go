@@ -24,6 +24,7 @@ type DownloadRequest struct {
 	Timeout           string
 	AuthUser          string
 	AuthPassword      string
+	AuthToken         string
 	Sudo              bool
 	Replace           bool
 	RetryOpts         []retry.RetrierOpt
@@ -114,6 +115,14 @@ func WithDownloadRequestAuthPassword(password string) DownloadOpt {
 	}
 }
 
+// WithDownloadRequestAuthToken sets auth token.
+func WithDownloadRequestAuthToken(token string) DownloadOpt {
+	return func(dr *DownloadRequest) *DownloadRequest {
+		dr.AuthToken = token
+		return dr
+	}
+}
+
 // WithDownloadRequestSHA256 sets required SHA256 sum.
 func WithDownloadRequestSHA256(sha string) DownloadOpt {
 	return func(dr *DownloadRequest) *DownloadRequest {
@@ -174,6 +183,10 @@ func Download(ctx context.Context, tr transport.Transport, dr *DownloadRequest) 
 	}
 	if dr.AuthUser != "" && dr.AuthPassword != "" {
 		cmd = fmt.Sprintf("%s --auth-user '%s' --auth-password '%s'", cmd, dr.AuthUser, dr.AuthPassword)
+	}
+
+	if dr.AuthToken != "" {
+		cmd = fmt.Sprintf("%s --auth-token '%s'", cmd, dr.AuthToken)
 	}
 
 	runCmd := func(ctx context.Context) (interface{}, error) {
