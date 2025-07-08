@@ -22,31 +22,32 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	cfg := template.Must(template.New("enos_bundle_install").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
-		destination = "{{ .Destination.Value }}"
+		  destination = "{{ .Destination.Value }}"
 
-		{{ if .Path.Value -}}
-		path = "{{ .Path.Value }}"
-		{{ end -}}
+		  {{ if .Path.Value -}}
+		  path = "{{ .Path.Value }}"
+		  {{ end -}}
 
-		{{ if .Release.Product.Value -}}
-		release = {
+		  {{ if .Release.Product.Value -}}
+		  release = {
 			product  = "{{ .Release.Product.Value }}"
 			version  = "{{ .Release.Version.Value }}"
 			edition  = "{{ .Release.Edition.Value }}"
-		}
-		{{ end -}}
+		  }
+		  {{ end -}}
 
-		{{ if .Artifactory.URL.Value -}}
-		artifactory = {
+		  {{ if .Artifactory.URL.Value -}}
+		  artifactory = {
 			{{ if .Artifactory.Username.Value }} username = "{{ .Artifactory.Username.Value }}" {{ end }}
 			token    = "{{ .Artifactory.Token.Value }}"
 			url      = "{{ .Artifactory.URL.Value }}"
 			sha256   = "{{ .Artifactory.SHA256.Value }}"
-		}
-		{{ end -}}
+		  }
+		  {{ end -}}
 
-		{{ renderTransport .Transport }}
-}`))
+		  {{ renderTransport .Transport }}
+		}`),
+	)
 
 	cases := []testAccResourceTemplate{}
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
