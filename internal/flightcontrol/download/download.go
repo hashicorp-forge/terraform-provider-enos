@@ -23,6 +23,7 @@ type Request struct {
 	SHA256       string
 	AuthUser     string
 	AuthPassword string
+	AuthToken    string
 	WriteStdout  bool
 }
 
@@ -90,6 +91,15 @@ func WithRequestAuthPassword(password string) RequestOpt {
 	}
 }
 
+// WithRequestAuthToken sets the auth token.
+func WithRequestAuthToken(token string) RequestOpt {
+	return func(req *Request) (*Request, error) {
+		req.AuthToken = token
+
+		return req, nil
+	}
+}
+
 // WithRequestWriteStdout sets whether or not we should write the body to STDOUT.
 func WithRequestWriteStdout(enabled bool) RequestOpt {
 	return func(req *Request) (*Request, error) {
@@ -132,6 +142,10 @@ func Download(ctx context.Context, req *Request) error {
 
 	if req.AuthUser != "" && req.AuthPassword != "" {
 		dreq.SetBasicAuth(req.AuthUser, req.AuthPassword)
+	}
+
+	if req.AuthToken != "" {
+		dreq.Header.Add("Authorization", "Bearer "+req.AuthToken)
 	}
 
 	res, err := http.DefaultClient.Do(dreq)

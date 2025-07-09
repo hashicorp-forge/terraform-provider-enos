@@ -22,31 +22,32 @@ func TestAccResourceBundleInstall(t *testing.T) {
 	cfg := template.Must(template.New("enos_bundle_install").
 		Funcs(transportRenderFunc).
 		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
-		destination = "{{ .Destination.Value }}"
+		  destination = "{{ .Destination.Value }}"
 
-		{{ if .Path.Value -}}
-		path = "{{ .Path.Value }}"
-		{{ end -}}
+		  {{ if .Path.Value -}}
+		  path = "{{ .Path.Value }}"
+		  {{ end -}}
 
-		{{ if .Release.Product.Value -}}
-		release = {
+		  {{ if .Release.Product.Value -}}
+		  release = {
 			product  = "{{ .Release.Product.Value }}"
 			version  = "{{ .Release.Version.Value }}"
 			edition  = "{{ .Release.Edition.Value }}"
-		}
-		{{ end -}}
+		  }
+		  {{ end -}}
 
-		{{ if .Artifactory.URL.Value -}}
-		artifactory = {
-			username = "{{ .Artifactory.Username.Value }}"
+		  {{ if .Artifactory.URL.Value -}}
+		  artifactory = {
+			{{ if .Artifactory.Username.Value }} username = "{{ .Artifactory.Username.Value }}" {{ end }}
 			token    = "{{ .Artifactory.Token.Value }}"
 			url      = "{{ .Artifactory.URL.Value }}"
 			sha256   = "{{ .Artifactory.SHA256.Value }}"
-		}
-		{{ end -}}
+		  }
+		  {{ end -}}
 
-		{{ renderTransport .Transport }}
-}`))
+		  {{ renderTransport .Transport }}
+		}`),
+	)
 
 	cases := []testAccResourceTemplate{}
 	privateKey, err := readTestFile("../fixtures/ssh.pem")
@@ -162,14 +163,16 @@ func TestAccResourceBundleInstall(t *testing.T) {
 
 		artUser, okuser := os.LookupEnv("ARTIFACTORY_USER")
 		artToken, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
-		if !oktoken || !okuser {
-			t.Log(`skipping data bundle install from artifactory test because TF_ACC, ARTIFACTORY_TOKEN, ARTIFACTORY_USER aren't set`)
+		if !oktoken {
+			t.Log(`skipping data bundle install from artifactory test because ARTIFACTORY_TOKEN isn't set`)
 			t.Skip()
 		} else {
 			bundleInstallArtifactoryInstall := newBundleInstallStateV1()
 			bundleInstallArtifactoryInstall.ID.Set("realart")
 			bundleInstallArtifactoryInstall.Destination.Set("/opt/vault/bin")
-			bundleInstallArtifactoryInstall.Artifactory.Username.Set(artUser)
+			if okuser {
+				bundleInstallArtifactoryInstall.Artifactory.Username.Set(artUser)
+			}
 			bundleInstallArtifactoryInstall.Artifactory.Token.Set(artToken)
 			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-packagespec-buildcache-local/cache-v1/vault-enterprise/7fb88d4d3d0a36ffc78a522d870492e5791bae1b0640232ce4c6d69cc22cf520/store/f45845666b4e552bfc8ca775834a3ef6fc097fe0-1a2809da73e5896b6f766b395ff6e1804f876c45.zip")
 			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("d01a82111133908167a5a140604ab3ec8fd18601758376a5f8e9dd54c7703373")

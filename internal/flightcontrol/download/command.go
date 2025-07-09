@@ -41,6 +41,7 @@ type CommandArgs struct {
 	sha256                    string
 	authUser                  string
 	authPassword              string
+	authToken                 string
 	replace                   bool
 	exitWithRequestStatusCode bool
 }
@@ -110,8 +111,9 @@ func (a *CommandArgs) Parse(args []string) error {
 	a.flags.IntVar(&a.mode, "mode", 0o666, "the file permissions of the downloaded file")
 	a.flags.DurationVar(&a.timeout, "timeout", 5*time.Minute, "the maximum allowable request time")
 	a.flags.StringVar(&a.sha256, "sha256", "", "if given, verifies that the downloaded file matches the given SHA 256 sum")
-	a.flags.StringVar(&a.authUser, "auth-user", "", "if given, sets the basic auth username when making the HTTP request")
-	a.flags.StringVar(&a.authPassword, "auth-password", "", "if given, sets the basic auth password when making the HTTP request")
+	a.flags.StringVar(&a.authUser, "auth-user", "", "if given, sets the basic auth username when making the HTTP request - only username/ password OR token should be used")
+	a.flags.StringVar(&a.authPassword, "auth-password", "", "if given, sets the basic auth password when making the HTTP request - only username/ password OR token should be used")
+	a.flags.StringVar(&a.authToken, "auth-token", "", "if given, sets the auth token when making the HTTP request - only username/ password OR token should be used")
 	a.flags.BoolVar(&a.replace, "replace", false, "overwite the destination if it already exists")
 	a.flags.BoolVar(&a.exitWithRequestStatusCode, "exit-with-status-code", false, "On failure, exit with the HTTP status code returned")
 
@@ -167,6 +169,10 @@ func (c *Command) Download() error {
 
 	if c.args.authPassword != "" {
 		opts = append(opts, WithRequestAuthPassword(c.args.authPassword))
+	}
+
+	if c.args.authToken != "" {
+		opts = append(opts, WithRequestAuthToken(c.args.authToken))
 	}
 
 	req, err := NewRequest(opts...)
