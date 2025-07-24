@@ -73,6 +73,36 @@ type vaultConfig struct {
 	Seals       *vaultSealsConfig // HA Seal configuration
 	Telemetry   *dynamicPseudoTypeBlock
 	UI          *tfBool
+
+	// Added fields from Vault config docs
+	HAStorage                      *vaultStorageConfig
+	UserLockout                    *vaultUserLockoutConfig
+	Reporting                      *vaultReportingConfig
+	CacheSize                      *tfNum
+	DisableCache                   *tfBool
+	DisableMlock                   *tfBool
+	PluginDirectory                *tfString
+	PluginTmpdir                   *tfString
+	PluginFileUID                  *tfNum
+	PluginFilePermissions          *tfNum
+	DefaultLeaseTTL                *tfString
+	MaxLeaseTTL                    *tfString
+	DefaultMaxRequestDuration      *tfString
+	DetectDeadlocks                *tfBool
+	RawStorageEndpoint             *tfString
+	IntrospectionEndpoint          *tfString
+	PidFile                        *tfString
+	EnableResponseHeaderHostname   *tfBool
+	EnableResponseHeaderRaftNodeID *tfBool
+	LogFormat                      *tfString
+	LogFile                        *tfString
+	LogRotateDuration              *tfString
+	LogRotateBytes                 *tfNum
+	LogRotateMaxFiles              *tfNum
+	Experiments                    *vaultExperimentsConfig
+	ImpreciseLeaseRoleTracking     *tfBool
+	EnablePostUnsealTrace          *tfBool
+	PostUnsealTraceDirectory       *tfString
 }
 
 var _ state.State = (*vaultStartStateV1)(nil)
@@ -120,6 +150,35 @@ func newVaultConfig() *vaultConfig {
 		Storage:     newVaultStorageConfig(),
 		Telemetry:   newDynamicPseudoTypeBlock(),
 		UI:          newTfBool(),
+
+		HAStorage:                      newVaultStorageConfig(),
+		UserLockout:                    newVaultUserLockoutConfig(),
+		Reporting:                      newVaultReportingConfig(),
+		CacheSize:                      newTfNum(),
+		DisableCache:                   newTfBool(),
+		DisableMlock:                   newTfBool(),
+		PluginDirectory:                newTfString(),
+		PluginTmpdir:                   newTfString(),
+		PluginFileUID:                  newTfNum(),
+		PluginFilePermissions:          newTfNum(),
+		DefaultLeaseTTL:                newTfString(),
+		MaxLeaseTTL:                    newTfString(),
+		DefaultMaxRequestDuration:      newTfString(),
+		DetectDeadlocks:                newTfBool(),
+		RawStorageEndpoint:             newTfString(),
+		IntrospectionEndpoint:          newTfString(),
+		PidFile:                        newTfString(),
+		EnableResponseHeaderHostname:   newTfBool(),
+		EnableResponseHeaderRaftNodeID: newTfBool(),
+		LogFormat:                      newTfString(),
+		LogFile:                        newTfString(),
+		LogRotateDuration:              newTfString(),
+		LogRotateBytes:                 newTfNum(),
+		LogRotateMaxFiles:              newTfNum(),
+		Experiments:                    newVaultExperimentsConfig(),
+		ImpreciseLeaseRoleTracking:     newTfBool(),
+		EnablePostUnsealTrace:          newTfBool(),
+		PostUnsealTraceDirectory:       newTfString(),
 	}
 }
 
@@ -325,6 +384,34 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 - ^config.seals.tertiary.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - ^config.seals.tertiary.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
 - ^config.telemetry^ (Object) The Vault [telemetry](https://developer.hashicorp.com/vault/docs/configuration/telemetry#telemetry-parameters) stanza
+- ^config.ha_storage^ (Object) The Vault [ha_storage](https://developer.hashicorp.com/vault/docs/internals/high-availability?productSlug=vault&tutorialSlug=raft&tutorialSlug=raft-ha-storage) stanza
+- ^config.user_lockout^ (Object) The Vault [user_lockout](https://developer.hashicorp.com/vault/docs/configuration/user-lockout) stanza
+- ^config.reporting^ (Object) The Vault [reporting](https://developer.hashicorp.com/vault/docs/configuration/reporting) stanza
+- ^config.cache_size^ (Number) The Vault [cache_size](https://developer.hashicorp.com/vault/docs/configuration#cache_size) value
+- ^config.disable_cache^ (Bool) The Vault [disable_cache](https://developer.hashicorp.com/vault/docs/configuration#disable_cache) value
+- ^config.disable_mlock^ (Bool) The Vault [disable_mlock](https://developer.hashicorp.com/vault/docs/configuration#disable_mlock) value
+- ^config.plugin_directory^ (String) The Vault [plugin_directory](https://developer.hashicorp.com/vault/docs/configuration#plugin_directory) value
+- ^config.plugin_tmpdir^ (String) The Vault [plugin_tmpdir](https://developer.hashicorp.com/vault/docs/configuration#plugin_tmpdir) value
+- ^config.plugin_file_uid^ (Number) The Vault [plugin_file_uid](https://developer.hashicorp.com/vault/docs/configuration#plugin_file_uid) value
+- ^config.plugin_file_permissions^ (Number) The Vault [plugin_file_permissions](https://developer.hashicorp.com/vault/docs/configuration#plugin_file_permissions) value
+- ^config.default_lease_ttl^ (String) The Vault [default_lease_ttl](https://developer.hashicorp.com/vault/docs/configuration#default_lease_ttl) value
+- ^config.max_lease_ttl^ (String) The Vault [max_lease_ttl](https://developer.hashicorp.com/vault/docs/configuration#max_lease_ttl) value
+- ^config.default_max_request_duration^ (String) The Vault [default_max_request_duration](https://developer.hashicorp.com/vault/docs/configuration#default_max_request_duration) value
+- ^config.detect_deadlocks^ (Bool) The Vault [detect_deadlocks](https://developer.hashicorp.com/vault/docs/configuration#detect_deadlocks) value
+- ^config.raw_storage_endpoint^ (String) The Vault [raw_storage_endpoint](https://developer.hashicorp.com/vault/docs/configuration#raw_storage_endpoint) value
+- ^config.introspection_endpoint^ (String) The Vault [introspection_endpoint](https://developer.hashicorp.com/vault/docs/configuration#introspection_endpoint) value
+- ^config.pid_file^ (String) The Vault [pid_file](https://developer.hashicorp.com/vault/docs/configuration#pid_file) value
+- ^config.enable_response_header_hostname^ (Bool) The Vault [enable_response_header_hostname](https://developer.hashicorp.com/vault/docs/configuration#enable_response_header_hostname) value
+- ^config.enable_response_header_raft_node_id^ (Bool) The Vault [enable_response_header_raft_node_id](https://developer.hashicorp.com/vault/docs/configuration#enable_response_header_raft_node_id) value
+- ^config.log_format^ (String) The Vault [log_format](https://developer.hashicorp.com/vault/docs/configuration#log_format) value
+- ^config.log_file^ (String) The Vault [log_file](https://developer.hashicorp.com/vault/docs/configuration#log_file) value
+- ^config.log_rotate_duration^ (String) The Vault [log_rotate_duration](https://developer.hashicorp.com/vault/docs/configuration#log_rotate_duration) value
+- ^config.log_rotate_bytes^ (Number) The Vault [log_rotate_bytes](https://developer.hashicorp.com/vault/docs/configuration#log_rotate_bytes) value
+- ^config.log_rotate_max_files^ (Number) The Vault [log_rotate_max_files](https://developer.hashicorp.com/vault/docs/configuration#log_rotate_max_files) value
+- ^config.experiments^ (Object) The Vault [experiments](https://developer.hashicorp.com/vault/docs/configuration#experiments) stanza
+- ^config.imprecise_lease_role_tracking^ (Bool) The Vault [imprecise_lease_role_tracking](https://developer.hashicorp.com/vault/docs/configuration#imprecise_lease_role_tracking) value
+- ^config.enable_post_unseal_trace^ (Bool) The Vault [enable_post_unseal_trace](https://developer.hashicorp.com/vault/docs/configuration#enable_post_unseal_trace) value
+- ^config.post_unseal_trace_directory^ (String) The Vault [post_unseal_trace_directory](https://developer.hashicorp.com/vault/docs/configuration#post_unseal_trace_directory) value
 `),
 				},
 				{
@@ -506,29 +593,83 @@ func (c *vaultConfig) attrs() map[string]tftypes.Type {
 		"seals":        c.Seals.Terraform5Type(),
 		"telemetry":    c.Telemetry.TFType(),
 		"ui":           c.UI.TFType(),
+
+		"ha_storage":                          c.HAStorage.Terraform5Type(),
+		"user_lockout":                        c.UserLockout.Terraform5Type(),
+		"reporting":                           c.Reporting.Terraform5Type(),
+		"cache_size":                          tftypes.Number,
+		"disable_cache":                       tftypes.Bool,
+		"disable_mlock":                       tftypes.Bool,
+		"plugin_directory":                    tftypes.String,
+		"plugin_tmpdir":                       tftypes.String,
+		"plugin_file_uid":                     tftypes.Number,
+		"plugin_file_permissions":             tftypes.Number,
+		"default_lease_ttl":                   tftypes.String,
+		"max_lease_ttl":                       tftypes.String,
+		"default_max_request_duration":        tftypes.String,
+		"detect_deadlocks":                    tftypes.Bool,
+		"raw_storage_endpoint":                tftypes.String,
+		"introspection_endpoint":              tftypes.String,
+		"pid_file":                            tftypes.String,
+		"enable_response_header_hostname":     tftypes.Bool,
+		"enable_response_header_raft_node_id": tftypes.Bool,
+		"log_format":                          tftypes.String,
+		"log_file":                            tftypes.String,
+		"log_rotate_duration":                 tftypes.String,
+		"log_rotate_bytes":                    tftypes.Number,
+		"log_rotate_max_files":                tftypes.Number,
+		"experiments":                         c.Experiments.Terraform5Type(),
+		"imprecise_lease_role_tracking":       tftypes.Bool,
+		"enable_post_unseal_trace":            tftypes.Bool,
+		"post_unseal_trace_directory":         tftypes.String,
 	}
 }
 
 func (c *vaultConfig) optionalAttrs() map[string]struct{} {
 	return map[string]struct{}{
-		"seal":      {},
-		"seals":     {},
-		"storage":   {},
-		"telemetry": {},
+		"seal":                                {},
+		"seals":                               {},
+		"storage":                             {},
+		"telemetry":                           {},
+		"ha_storage":                          {},
+		"user_lockout":                        {},
+		"reporting":                           {},
+		"cache_size":                          {},
+		"disable_cache":                       {},
+		"disable_mlock":                       {},
+		"plugin_directory":                    {},
+		"plugin_tmpdir":                       {},
+		"plugin_file_uid":                     {},
+		"plugin_file_permissions":             {},
+		"default_lease_ttl":                   {},
+		"max_lease_ttl":                       {},
+		"default_max_request_duration":        {},
+		"detect_deadlocks":                    {},
+		"raw_storage_endpoint":                {},
+		"introspection_endpoint":              {},
+		"pid_file":                            {},
+		"enable_response_header_hostname":     {},
+		"enable_response_header_raft_node_id": {},
+		"log_format":                          {},
+		"log_file":                            {},
+		"log_rotate_duration":                 {},
+		"log_rotate_bytes":                    {},
+		"log_rotate_max_files":                {},
+		"experiments":                         {},
+		"imprecise_lease_role_tracking":       {},
+		"enable_post_unseal_trace":            {},
+		"post_unseal_trace_directory":         {},
 	}
 }
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
-	typ := tftypes.Object{
-		AttributeTypes: c.attrs(),
-	}
-
 	telemetry, err := c.Telemetry.TFValue()
 	if err != nil {
 		panic(err)
 	}
-
-	return tftypes.NewValue(typ, map[string]tftypes.Value{
+	return tftypes.NewValue(tftypes.Object{
+		AttributeTypes: c.attrs(),
+	}, map[string]tftypes.Value{
 		"cluster_name": c.ClusterName.TFValue(),
 		"api_addr":     c.APIAddr.TFValue(),
 		"cluster_addr": c.ClusterAddr.TFValue(),
@@ -539,10 +680,38 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 		"storage":      c.Storage.Terraform5Value(),
 		"telemetry":    telemetry,
 		"ui":           c.UI.TFValue(),
+
+		"ha_storage":                          c.HAStorage.Terraform5Value(),
+		"user_lockout":                        c.UserLockout.Terraform5Value(),
+		"reporting":                           c.Reporting.Terraform5Value(),
+		"cache_size":                          c.CacheSize.TFValue(),
+		"disable_cache":                       c.DisableCache.TFValue(),
+		"disable_mlock":                       c.DisableMlock.TFValue(),
+		"plugin_directory":                    c.PluginDirectory.TFValue(),
+		"plugin_tmpdir":                       c.PluginTmpdir.TFValue(),
+		"plugin_file_uid":                     c.PluginFileUID.TFValue(),
+		"plugin_file_permissions":             c.PluginFilePermissions.TFValue(),
+		"default_lease_ttl":                   c.DefaultLeaseTTL.TFValue(),
+		"max_lease_ttl":                       c.MaxLeaseTTL.TFValue(),
+		"default_max_request_duration":        c.DefaultMaxRequestDuration.TFValue(),
+		"detect_deadlocks":                    c.DetectDeadlocks.TFValue(),
+		"raw_storage_endpoint":                c.RawStorageEndpoint.TFValue(),
+		"introspection_endpoint":              c.IntrospectionEndpoint.TFValue(),
+		"pid_file":                            c.PidFile.TFValue(),
+		"enable_response_header_hostname":     c.EnableResponseHeaderHostname.TFValue(),
+		"enable_response_header_raft_node_id": c.EnableResponseHeaderRaftNodeID.TFValue(),
+		"log_format":                          c.LogFormat.TFValue(),
+		"log_file":                            c.LogFile.TFValue(),
+		"log_rotate_duration":                 c.LogRotateDuration.TFValue(),
+		"log_rotate_bytes":                    c.LogRotateBytes.TFValue(),
+		"log_rotate_max_files":                c.LogRotateMaxFiles.TFValue(),
+		"experiments":                         c.Experiments.Terraform5Value(),
+		"imprecise_lease_role_tracking":       c.ImpreciseLeaseRoleTracking.TFValue(),
+		"enable_post_unseal_trace":            c.EnablePostUnsealTrace.TFValue(),
+		"post_unseal_trace_directory":         c.PostUnsealTraceDirectory.TFValue(),
 	})
 }
 
-// FromTerraform5Value unmarshals the value to the struct.
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]any{
 		"api_addr":     c.APIAddr,
@@ -550,6 +719,31 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 		"cluster_name": c.ClusterName,
 		"log_level":    c.LogLevel,
 		"ui":           c.UI,
+
+		"cache_size":                          c.CacheSize,
+		"disable_cache":                       c.DisableCache,
+		"disable_mlock":                       c.DisableMlock,
+		"plugin_directory":                    c.PluginDirectory,
+		"plugin_tmpdir":                       c.PluginTmpdir,
+		"plugin_file_uid":                     c.PluginFileUID,
+		"plugin_file_permissions":             c.PluginFilePermissions,
+		"default_lease_ttl":                   c.DefaultLeaseTTL,
+		"max_lease_ttl":                       c.MaxLeaseTTL,
+		"default_max_request_duration":        c.DefaultMaxRequestDuration,
+		"detect_deadlocks":                    c.DetectDeadlocks,
+		"raw_storage_endpoint":                c.RawStorageEndpoint,
+		"introspection_endpoint":              c.IntrospectionEndpoint,
+		"pid_file":                            c.PidFile,
+		"enable_response_header_hostname":     c.EnableResponseHeaderHostname,
+		"enable_response_header_raft_node_id": c.EnableResponseHeaderRaftNodeID,
+		"log_format":                          c.LogFormat,
+		"log_file":                            c.LogFile,
+		"log_rotate_duration":                 c.LogRotateDuration,
+		"log_rotate_bytes":                    c.LogRotateBytes,
+		"log_rotate_max_files":                c.LogRotateMaxFiles,
+		"imprecise_lease_role_tracking":       c.ImpreciseLeaseRoleTracking,
+		"enable_post_unseal_trace":            c.EnablePostUnsealTrace,
+		"post_unseal_trace_directory":         c.PostUnsealTraceDirectory,
 	})
 	if err != nil {
 		return err
@@ -590,6 +784,36 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	telemetry, ok := vals["telemetry"]
 	if ok {
 		err = c.Telemetry.FromTFValue(telemetry)
+		if err != nil {
+			return err
+		}
+	}
+
+	// New fields
+	haStorage, ok := vals["ha_storage"]
+	if ok {
+		err = c.HAStorage.FromTerraform5Value(haStorage)
+		if err != nil {
+			return err
+		}
+	}
+	userLockout, ok := vals["user_lockout"]
+	if ok {
+		err = c.UserLockout.FromTerraform5Value(userLockout)
+		if err != nil {
+			return err
+		}
+	}
+	reporting, ok := vals["reporting"]
+	if ok {
+		err = c.Reporting.FromTerraform5Value(reporting)
+		if err != nil {
+			return err
+		}
+	}
+	experiments, ok := vals["experiments"]
+	if ok {
+		err = c.Experiments.FromTerraform5Value(experiments)
 		if err != nil {
 			return err
 		}
@@ -767,6 +991,216 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 		hclBuilder.AppendBlock("telemetry", nil).AppendAttributes(telemetry)
 	}
 
+	// HAStorage
+	if c.HAStorage != nil && c.HAStorage.Type != nil {
+		if haStorageLabel, ok := c.HAStorage.Type.Get(); ok {
+			haStorageBlock := hclBuilder.AppendBlock("ha_storage", []string{haStorageLabel})
+			if haAttrs, ok := c.HAStorage.Attrs.Object.GetObject(); ok {
+				haStorageBlock.AppendAttributes(haAttrs)
+			}
+		}
+	}
+
+	// UserLockout
+	if c.UserLockout != nil {
+		userLockoutBlock := hclBuilder.AppendBlock("user_lockout", nil)
+		if val, ok := c.UserLockout.LockoutThreshold.Get(); ok {
+			userLockoutBlock.AppendAttribute("lockout_threshold", val)
+		}
+		if val, ok := c.UserLockout.LockoutDuration.Get(); ok {
+			userLockoutBlock.AppendAttribute("lockout_duration", val)
+		}
+		if val, ok := c.UserLockout.LockoutCounterReset.Get(); ok {
+			userLockoutBlock.AppendAttribute("lockout_counter_reset", val)
+		}
+		if val, ok := c.UserLockout.DisableLockout.Get(); ok {
+			userLockoutBlock.AppendAttribute("disable_lockout", val)
+		}
+	}
+
+	// Reporting
+	if c.Reporting != nil {
+		reportingBlock := hclBuilder.AppendBlock("reporting", nil)
+		if val, ok := c.Reporting.SnapshotRetentionTime.Get(); ok {
+			reportingBlock.AppendAttribute("snapshot_retention_time", val)
+		}
+		if val, ok := c.Reporting.DisableProductUsageReporting.Get(); ok {
+			reportingBlock.AppendAttribute("disable_product_usage_reporting", val)
+		}
+		if c.Reporting.License != nil {
+			licenseBlock := reportingBlock.AppendBlock("license", nil)
+			if val, ok := c.Reporting.License.Enabled.Get(); ok {
+				licenseBlock.AppendAttribute("enabled", val)
+			}
+			if val, ok := c.Reporting.License.BillingStartTimestamp.Get(); ok {
+				licenseBlock.AppendAttribute("billing_start_timestamp", val)
+			}
+			if val, ok := c.Reporting.License.DevelopmentCluster.Get(); ok {
+				licenseBlock.AppendAttribute("development_cluster", val)
+			}
+		}
+	}
+
+	// Experiments
+	if c.Experiments != nil && len(c.Experiments.Experiments) > 0 {
+		exps := []string{}
+		for _, ts := range c.Experiments.Experiments {
+			if val, ok := ts.Get(); ok {
+				exps = append(exps, val)
+			}
+		}
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("experiments", exps)
+		} else {
+			// Vault expects a comma-separated list for VAULT_EXPERIMENTS
+			envVars["VAULT_EXPERIMENTS"] = strings.Join(exps, ",")
+		}
+	}
+
+	// Numbers, bools, strings as top-level attributes
+	if val, ok := c.CacheSize.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("cache_size", val)
+		}
+	}
+	if val, ok := c.DisableCache.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("disable_cache", val)
+		}
+	}
+	if val, ok := c.DisableMlock.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("disable_mlock", val)
+		} else {
+			envVars["VAULT_DISABLE_MLOCK"] = strconv.FormatBool(val)
+		}
+	}
+	if val, ok := c.PluginDirectory.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("plugin_directory", val)
+		} else {
+			envVars["VAULT_PLUGIN_DIRECTORY"] = val
+		}
+	}
+	if val, ok := c.PluginTmpdir.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("plugin_tmpdir", val)
+		} else {
+			envVars["VAULT_PLUGIN_TMPDIR"] = val
+		}
+	}
+	if val, ok := c.PluginFileUID.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("plugin_file_uid", val)
+		}
+	}
+	if val, ok := c.PluginFilePermissions.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("plugin_file_permissions", val)
+		}
+	}
+	if val, ok := c.DefaultLeaseTTL.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("default_lease_ttl", val)
+		} else {
+			envVars["VAULT_DEFAULT_LEASE_TTL"] = val
+		}
+	}
+	if val, ok := c.MaxLeaseTTL.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("max_lease_ttl", val)
+		} else {
+			envVars["VAULT_MAX_LEASE_TTL"] = val
+		}
+	}
+	if val, ok := c.DefaultMaxRequestDuration.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("default_max_request_duration", val)
+		}
+	}
+	if val, ok := c.DetectDeadlocks.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("detect_deadlocks", val)
+		}
+	}
+	if val, ok := c.RawStorageEndpoint.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("raw_storage_endpoint", val)
+		}
+	}
+	if val, ok := c.IntrospectionEndpoint.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("introspection_endpoint", val)
+		}
+	}
+	if val, ok := c.PidFile.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("pid_file", val)
+		} else {
+			envVars["VAULT_PID_FILE"] = val
+		}
+	}
+	if val, ok := c.EnableResponseHeaderHostname.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("enable_response_header_hostname", val)
+		}
+	}
+	if val, ok := c.EnableResponseHeaderRaftNodeID.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("enable_response_header_raft_node_id", val)
+		}
+	}
+	if val, ok := c.LogFormat.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_format", val)
+		} else {
+			envVars["VAULT_LOG_FORMAT"] = val
+		}
+	}
+	if val, ok := c.LogFile.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_file", val)
+		} else {
+			envVars["VAULT_LOG_FILE"] = val
+		}
+	}
+	if val, ok := c.LogRotateDuration.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_rotate_duration", val)
+		} else {
+			envVars["VAULT_LOG_ROTATE_DURATION"] = val
+		}
+	}
+	if val, ok := c.LogRotateBytes.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_rotate_bytes", val)
+		} else {
+			envVars["VAULT_LOG_ROTATE_BYTES"] = fmt.Sprintf("%v", val)
+		}
+	}
+	if val, ok := c.LogRotateMaxFiles.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("log_rotate_max_files", val)
+		} else {
+			envVars["VAULT_LOG_ROTATE_MAX_FILES"] = fmt.Sprintf("%v", val)
+		}
+	}
+	if val, ok := c.ImpreciseLeaseRoleTracking.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("imprecise_lease_role_tracking", val)
+		}
+	}
+	if val, ok := c.EnablePostUnsealTrace.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("enable_post_unseal_trace", val)
+		}
+	}
+	if val, ok := c.PostUnsealTraceDirectory.Get(); ok {
+		if configMode == "file" {
+			hclBuilder.AppendAttribute("post_unseal_trace_directory", val)
+		}
+	}
+
 	return hclBuilder, envVars, nil
 }
 
@@ -877,7 +1311,7 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 
 	// Manage the vault systemd service ourselves unless it has explicitly been
 	// set that we should not.
-	if manage, set := s.ManageService.Get(); !set || (set && manage) {
+	if manage, set := s.ManageService.Get(); !set || manage {
 		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Vault - A tool for managing secrets",
