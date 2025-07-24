@@ -63,18 +63,16 @@ type vaultStartStateV1 struct {
 }
 
 type vaultConfig struct {
-	ClusterName *tfString
-	APIAddr     *tfString
-	ClusterAddr *tfString
-	Listener    *vaultListenerConfig
-	LogLevel    *tfString
-	Storage     *vaultStorageConfig
-	Seal        *vaultConfigBlock // Single seal configuration
-	Seals       *vaultSealsConfig // HA Seal configuration
-	Telemetry   *dynamicPseudoTypeBlock
-	UI          *tfBool
-
-	// Added fields from Vault config docs
+	ClusterName                    *tfString
+	APIAddr                        *tfString
+	ClusterAddr                    *tfString
+	Listener                       *vaultListenerConfig
+	LogLevel                       *tfString
+	Storage                        *vaultStorageConfig
+	Seal                           *vaultConfigBlock // Single seal configuration
+	Seals                          *vaultSealsConfig // HA Seal configuration
+	Telemetry                      *dynamicPseudoTypeBlock
+	UI                             *tfBool
 	HAStorage                      *vaultStorageConfig
 	UserLockout                    *vaultUserLockoutConfig
 	Reporting                      *vaultReportingConfig
@@ -583,17 +581,16 @@ func (c *vaultConfig) Terraform5Type() tftypes.Type {
 
 func (c *vaultConfig) attrs() map[string]tftypes.Type {
 	return map[string]tftypes.Type{
-		"api_addr":     tftypes.String,
-		"cluster_addr": tftypes.String,
-		"cluster_name": c.ClusterName.TFType(),
-		"listener":     c.Listener.Terraform5Type(),
-		"log_level":    tftypes.String,
-		"storage":      c.Storage.Terraform5Type(),
-		"seal":         c.Seal.Terraform5Type(),
-		"seals":        c.Seals.Terraform5Type(),
-		"telemetry":    c.Telemetry.TFType(),
-		"ui":           c.UI.TFType(),
-
+		"api_addr":                            tftypes.String,
+		"cluster_addr":                        tftypes.String,
+		"cluster_name":                        c.ClusterName.TFType(),
+		"listener":                            c.Listener.Terraform5Type(),
+		"log_level":                           tftypes.String,
+		"storage":                             c.Storage.Terraform5Type(),
+		"seal":                                c.Seal.Terraform5Type(),
+		"seals":                               c.Seals.Terraform5Type(),
+		"telemetry":                           c.Telemetry.TFType(),
+		"ui":                                  c.UI.TFType(),
 		"ha_storage":                          c.HAStorage.Terraform5Type(),
 		"user_lockout":                        c.UserLockout.Terraform5Type(),
 		"reporting":                           c.Reporting.Terraform5Type(),
@@ -663,24 +660,25 @@ func (c *vaultConfig) optionalAttrs() map[string]struct{} {
 }
 
 func (c *vaultConfig) Terraform5Value() tftypes.Value {
+	typ := tftypes.Object{
+		AttributeTypes: c.attrs(),
+	}
+
 	telemetry, err := c.Telemetry.TFValue()
 	if err != nil {
 		panic(err)
 	}
-	return tftypes.NewValue(tftypes.Object{
-		AttributeTypes: c.attrs(),
-	}, map[string]tftypes.Value{
-		"cluster_name": c.ClusterName.TFValue(),
-		"api_addr":     c.APIAddr.TFValue(),
-		"cluster_addr": c.ClusterAddr.TFValue(),
-		"listener":     c.Listener.Terraform5Value(),
-		"log_level":    c.LogLevel.TFValue(),
-		"seal":         c.Seal.Terraform5Value(),
-		"seals":        c.Seals.Terraform5Value(),
-		"storage":      c.Storage.Terraform5Value(),
-		"telemetry":    telemetry,
-		"ui":           c.UI.TFValue(),
-
+	return tftypes.NewValue(typ, map[string]tftypes.Value{
+		"cluster_name":                        c.ClusterName.TFValue(),
+		"api_addr":                            c.APIAddr.TFValue(),
+		"cluster_addr":                        c.ClusterAddr.TFValue(),
+		"listener":                            c.Listener.Terraform5Value(),
+		"log_level":                           c.LogLevel.TFValue(),
+		"seal":                                c.Seal.Terraform5Value(),
+		"seals":                               c.Seals.Terraform5Value(),
+		"storage":                             c.Storage.Terraform5Value(),
+		"telemetry":                           telemetry,
+		"ui":                                  c.UI.TFValue(),
 		"ha_storage":                          c.HAStorage.Terraform5Value(),
 		"user_lockout":                        c.UserLockout.Terraform5Value(),
 		"reporting":                           c.Reporting.Terraform5Value(),
@@ -712,14 +710,14 @@ func (c *vaultConfig) Terraform5Value() tftypes.Value {
 	})
 }
 
+// FromTerraform5Value unmarshals the value to the struct.
 func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 	vals, err := mapAttributesTo(val, map[string]any{
-		"api_addr":     c.APIAddr,
-		"cluster_addr": c.ClusterAddr,
-		"cluster_name": c.ClusterName,
-		"log_level":    c.LogLevel,
-		"ui":           c.UI,
-
+		"api_addr":                            c.APIAddr,
+		"cluster_addr":                        c.ClusterAddr,
+		"cluster_name":                        c.ClusterName,
+		"log_level":                           c.LogLevel,
+		"ui":                                  c.UI,
 		"cache_size":                          c.CacheSize,
 		"disable_cache":                       c.DisableCache,
 		"disable_mlock":                       c.DisableMlock,
@@ -789,7 +787,6 @@ func (c *vaultConfig) FromTerraform5Value(val tftypes.Value) error {
 		}
 	}
 
-	// New fields
 	haStorage, ok := vals["ha_storage"]
 	if ok {
 		err = c.HAStorage.FromTerraform5Value(haStorage)
