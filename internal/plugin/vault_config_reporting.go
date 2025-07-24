@@ -13,6 +13,11 @@ type vaultReportingLicenseConfig struct {
 	Enabled               *tfBool
 	BillingStartTimestamp *tfString
 	DevelopmentCluster    *tfBool
+
+	RawValues map[string]tftypes.Value
+	RawValue  tftypes.Value
+	Unknown   bool
+	Null      bool
 }
 
 func newVaultReportingLicenseConfig() *vaultReportingLicenseConfig {
@@ -20,6 +25,8 @@ func newVaultReportingLicenseConfig() *vaultReportingLicenseConfig {
 		Enabled:               newTfBool(),
 		BillingStartTimestamp: newTfString(),
 		DevelopmentCluster:    newTfBool(),
+		Unknown:               false,
+		Null:                  true,
 	}
 }
 
@@ -27,8 +34,11 @@ type vaultReportingConfig struct {
 	SnapshotRetentionTime        *tfString
 	DisableProductUsageReporting *tfBool
 	License                      *vaultReportingLicenseConfig
-	Unknown                      bool
-	Null                         bool
+
+	RawValues map[string]tftypes.Value
+	RawValue  tftypes.Value
+	Unknown   bool
+	Null      bool
 }
 
 func newVaultReportingConfig() *vaultReportingConfig {
@@ -54,42 +64,36 @@ func (s *vaultReportingConfig) FromTerraform5Value(val tftypes.Value) error {
 		s.Unknown = true
 		return nil
 	}
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
+	s.Null = false
+	s.Unknown = false
+	s.RawValue = val
+	s.RawValues = map[string]tftypes.Value{}
+	if err := val.As(&s.RawValues); err != nil {
 		return err
 	}
-	for k, v := range vals {
+	for k, v := range s.RawValues {
 		switch k {
 		case "snapshot_retention_time":
-			err = s.SnapshotRetentionTime.FromTFValue(v)
+			if err := s.SnapshotRetentionTime.FromTFValue(v); err != nil {
+				return err
+			}
 		case "disable_product_usage_reporting":
-			err = s.DisableProductUsageReporting.FromTFValue(v)
+			if err := s.DisableProductUsageReporting.FromTFValue(v); err != nil {
+				return err
+			}
 		case "license":
-			err = s.License.FromTerraform5Value(v)
+			if err := s.License.FromTerraform5Value(v); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown reporting config key: %s", k)
-		}
-		if err != nil {
-			return err
 		}
 	}
 	return nil
 }
 
 func (s *vaultReportingConfig) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"snapshot_retention_time":         tftypes.String,
-			"disable_product_usage_reporting": tftypes.Bool,
-			"license":                         newVaultReportingLicenseConfig().Terraform5Type(),
-		},
-		OptionalAttributes: map[string]struct{}{
-			"snapshot_retention_time":         {},
-			"disable_product_usage_reporting": {},
-			"license":                         {},
-		},
-	}
+	return tftypes.DynamicPseudoType
 }
 
 func (s *vaultReportingConfig) Terraform5Value() tftypes.Value {
@@ -99,11 +103,28 @@ func (s *vaultReportingConfig) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
 	}
-	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"snapshot_retention_time":         s.SnapshotRetentionTime.TFValue(),
-		"disable_product_usage_reporting": s.DisableProductUsageReporting.TFValue(),
-		"license":                         s.License.Terraform5Value(),
-	})
+	attrs := map[string]tftypes.Type{}
+	vals := map[string]tftypes.Value{}
+	for name := range s.RawValues {
+		switch name {
+		case "snapshot_retention_time":
+			vals[name] = s.SnapshotRetentionTime.TFValue()
+		case "disable_product_usage_reporting":
+			vals[name] = s.DisableProductUsageReporting.TFValue()
+		case "license":
+			vals[name] = s.License.Terraform5Value()
+		}
+		attrs[name] = vals[name].Type()
+	}
+	if len(vals) == 0 {
+		return tftypes.NewValue(s.Terraform5Type(), nil)
+	}
+	if s.RawValue.Type().Is(tftypes.Map{}) {
+		for _, v := range vals {
+			return tftypes.NewValue(tftypes.Map{ElementType: v.Type()}, vals)
+		}
+	}
+	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
 }
 
 func (s *vaultReportingLicenseConfig) FromTerraform5Value(val tftypes.Value) error {
@@ -111,53 +132,73 @@ func (s *vaultReportingLicenseConfig) FromTerraform5Value(val tftypes.Value) err
 		return fmt.Errorf("cannot unmarshal %s into nil vaultReportingLicenseConfig", val.String())
 	}
 	if val.IsNull() {
+		s.Null = true
+		s.Unknown = false
 		return nil
 	}
 	if !val.IsKnown() {
+		s.Unknown = true
 		return nil
 	}
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
+	s.Null = false
+	s.Unknown = false
+	s.RawValue = val
+	s.RawValues = map[string]tftypes.Value{}
+	if err := val.As(&s.RawValues); err != nil {
 		return err
 	}
-	for k, v := range vals {
+	for k, v := range s.RawValues {
 		switch k {
 		case "enabled":
-			err = s.Enabled.FromTFValue(v)
+			if err := s.Enabled.FromTFValue(v); err != nil {
+				return err
+			}
 		case "billing_start_timestamp":
-			err = s.BillingStartTimestamp.FromTFValue(v)
+			if err := s.BillingStartTimestamp.FromTFValue(v); err != nil {
+				return err
+			}
 		case "development_cluster":
-			err = s.DevelopmentCluster.FromTFValue(v)
+			if err := s.DevelopmentCluster.FromTFValue(v); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown license config key: %s", k)
-		}
-		if err != nil {
-			return err
 		}
 	}
 	return nil
 }
 
 func (s *vaultReportingLicenseConfig) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"enabled":                 tftypes.Bool,
-			"billing_start_timestamp": tftypes.String,
-			"development_cluster":     tftypes.Bool,
-		},
-		OptionalAttributes: map[string]struct{}{
-			"enabled":                 {},
-			"billing_start_timestamp": {},
-			"development_cluster":     {},
-		},
-	}
+	return tftypes.DynamicPseudoType
 }
 
 func (s *vaultReportingLicenseConfig) Terraform5Value() tftypes.Value {
-	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"enabled":                 s.Enabled.TFValue(),
-		"billing_start_timestamp": s.BillingStartTimestamp.TFValue(),
-		"development_cluster":     s.DevelopmentCluster.TFValue(),
-	})
+	if s.Null {
+		return tftypes.NewValue(s.Terraform5Type(), nil)
+	}
+	if s.Unknown {
+		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
+	}
+	attrs := map[string]tftypes.Type{}
+	vals := map[string]tftypes.Value{}
+	for name := range s.RawValues {
+		switch name {
+		case "enabled":
+			vals[name] = s.Enabled.TFValue()
+		case "billing_start_timestamp":
+			vals[name] = s.BillingStartTimestamp.TFValue()
+		case "development_cluster":
+			vals[name] = s.DevelopmentCluster.TFValue()
+		}
+		attrs[name] = vals[name].Type()
+	}
+	if len(vals) == 0 {
+		return tftypes.NewValue(s.Terraform5Type(), nil)
+	}
+	if s.RawValue.Type().Is(tftypes.Map{}) {
+		for _, v := range vals {
+			return tftypes.NewValue(tftypes.Map{ElementType: v.Type()}, vals)
+		}
+	}
+	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
 }

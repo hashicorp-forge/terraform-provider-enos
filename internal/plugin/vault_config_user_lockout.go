@@ -45,46 +45,41 @@ func (s *vaultUserLockoutConfig) FromTerraform5Value(val tftypes.Value) error {
 		s.Unknown = true
 		return nil
 	}
-	vals := map[string]tftypes.Value{}
-	err := val.As(&vals)
-	if err != nil {
+	s.Null = false
+	s.Unknown = false
+	s.RawValue = val
+	s.RawValues = map[string]tftypes.Value{}
+	if err := val.As(&s.RawValues); err != nil {
 		return err
 	}
-	for k, v := range vals {
+	// Decode known fields
+	for k, v := range s.RawValues {
 		switch k {
 		case "lockout_threshold":
-			err = s.LockoutThreshold.FromTFValue(v)
+			if err := s.LockoutThreshold.FromTFValue(v); err != nil {
+				return err
+			}
 		case "lockout_duration":
-			err = s.LockoutDuration.FromTFValue(v)
+			if err := s.LockoutDuration.FromTFValue(v); err != nil {
+				return err
+			}
 		case "lockout_counter_reset":
-			err = s.LockoutCounterReset.FromTFValue(v)
+			if err := s.LockoutCounterReset.FromTFValue(v); err != nil {
+				return err
+			}
 		case "disable_lockout":
-			err = s.DisableLockout.FromTFValue(v)
+			if err := s.DisableLockout.FromTFValue(v); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown user_lockout config key: %s", k)
-		}
-		if err != nil {
-			return err
 		}
 	}
 	return nil
 }
 
 func (s *vaultUserLockoutConfig) Terraform5Type() tftypes.Type {
-	return tftypes.Object{
-		AttributeTypes: map[string]tftypes.Type{
-			"lockout_threshold":     tftypes.String,
-			"lockout_duration":      tftypes.String,
-			"lockout_counter_reset": tftypes.String,
-			"disable_lockout":       tftypes.Bool,
-		},
-		OptionalAttributes: map[string]struct{}{
-			"lockout_threshold":     {},
-			"lockout_duration":      {},
-			"lockout_counter_reset": {},
-			"disable_lockout":       {},
-		},
-	}
+	return tftypes.DynamicPseudoType
 }
 
 func (s *vaultUserLockoutConfig) Terraform5Value() tftypes.Value {
@@ -94,10 +89,28 @@ func (s *vaultUserLockoutConfig) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
 	}
-	return tftypes.NewValue(s.Terraform5Type(), map[string]tftypes.Value{
-		"lockout_threshold":     s.LockoutThreshold.TFValue(),
-		"lockout_duration":      s.LockoutDuration.TFValue(),
-		"lockout_counter_reset": s.LockoutCounterReset.TFValue(),
-		"disable_lockout":       s.DisableLockout.TFValue(),
-	})
+	attrs := map[string]tftypes.Type{}
+	vals := map[string]tftypes.Value{}
+	for name := range s.RawValues {
+		switch name {
+		case "lockout_threshold":
+			vals[name] = s.LockoutThreshold.TFValue()
+		case "lockout_duration":
+			vals[name] = s.LockoutDuration.TFValue()
+		case "lockout_counter_reset":
+			vals[name] = s.LockoutCounterReset.TFValue()
+		case "disable_lockout":
+			vals[name] = s.DisableLockout.TFValue()
+		}
+		attrs[name] = vals[name].Type()
+	}
+	if len(vals) == 0 {
+		return tftypes.NewValue(s.Terraform5Type(), nil)
+	}
+	if s.RawValue.Type().Is(tftypes.Map{}) {
+		for _, v := range vals {
+			return tftypes.NewValue(tftypes.Map{ElementType: v.Type()}, vals)
+		}
+	}
+	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
 }
