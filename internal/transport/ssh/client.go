@@ -421,7 +421,8 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 func (c *client) connectSSHAgent() (net.Conn, xssh.AuthMethod, bool) {
 	var auth xssh.AuthMethod
 
-	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	dialer := &net.Dialer{}
+	sshAgent, err := dialer.DialContext(context.Background(), "unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		return sshAgent, auth, false
 	}

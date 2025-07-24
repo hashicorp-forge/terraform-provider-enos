@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"math/big"
 	"os"
@@ -118,7 +119,7 @@ func TestClusterBuild(t *testing.T) {
 		t.Skip("Skipping test 'TestClusterBuild', because 'TF_ACC' not set")
 	}
 
-	checkDocker := exec.Command("docker", "ps")
+	checkDocker := exec.CommandContext(context.Background(), "docker", "ps")
 	err := checkDocker.Run()
 	if err != nil {
 		t.Skip("Skipping test 'TestClusterBuild' since docker daemon not available")
