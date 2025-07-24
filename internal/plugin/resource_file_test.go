@@ -398,6 +398,8 @@ EOF
 // TestAccResourceFileLazyCopyMissingSourceFile tests the lazy copy feature
 // of the enos_file  basic resource interface but also the embedded transport interface.
 // As the embedded transport isn't an actual resource we're doing it here.
+//
+//nolint:paralleltest// because we modify the environment
 func TestAccResourceFileLazyCopyMissingSourceFile(t *testing.T) {
 	defer resetEnv(t)
 

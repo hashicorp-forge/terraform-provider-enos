@@ -168,6 +168,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 			} else {
 				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 			}
+
 			return
 		}
 		defer src.Close()
@@ -180,6 +181,7 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 				fmt.Errorf("unable to obtain file SHA256 sum for %s at plan time; file will be required and validated at apply time: %w", srcType, err),
 			))
 			proposedState.Sum.Unknown = true
+
 			return
 		}
 		proposedState.Sum.Set(sum)
@@ -221,6 +223,7 @@ func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResour
 		} else {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
 		}
+
 		return
 	}
 	defer src.Close()
