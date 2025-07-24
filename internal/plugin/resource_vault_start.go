@@ -1172,14 +1172,14 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 		if configMode == "file" {
 			hclBuilder.AppendAttribute("log_rotate_bytes", val)
 		} else {
-			envVars["VAULT_LOG_ROTATE_BYTES"] = fmt.Sprintf("%v", val)
+			envVars["VAULT_LOG_ROTATE_BYTES"] = strconv.Itoa(val)
 		}
 	}
 	if val, ok := c.LogRotateMaxFiles.Get(); ok {
 		if configMode == "file" {
 			hclBuilder.AppendAttribute("log_rotate_max_files", val)
 		} else {
-			envVars["VAULT_LOG_ROTATE_MAX_FILES"] = fmt.Sprintf("%v", val)
+			envVars["VAULT_LOG_ROTATE_MAX_FILES"] = strconv.Itoa(val)
 		}
 	}
 	if val, ok := c.ImpreciseLeaseRoleTracking.Get(); ok {

@@ -32,6 +32,7 @@ func (s *vaultExperimentsConfig) FromTerraform5Value(val tftypes.Value) error {
 	if val.IsNull() {
 		s.Null = true
 		s.Unknown = false
+
 		return nil
 	}
 	if !val.IsKnown() {
@@ -49,6 +50,7 @@ func (s *vaultExperimentsConfig) FromTerraform5Value(val tftypes.Value) error {
 		ts.Set(exp)
 		s.Experiments = append(s.Experiments, ts)
 	}
+
 	return nil
 }
 
