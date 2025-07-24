@@ -152,10 +152,23 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 
 	// If we have unknown attributes we can't generate a valid Sum
 	if !proposedState.hasUnknownAttributes() {
-		// Load the file source
+		// Load the file source, but do not hard error if it does not exist
 		src, srcType, err := proposedState.openSourceOrContent()
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
+			// If the user provided "source", but it does not exist, warn but don't fail plan
+			// Only warn if the source is missing, not if content is missing (which is a config error)
+			srcPath, okSrc := proposedState.Src.Get()
+			if okSrc {
+				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnosticWarn(
+					"Source file not found at plan time",
+					fmt.Errorf("the source file %q does not exist or is unreadable at plan time; it will be required and validated at apply time", srcPath),
+				))
+				// Mark sum as unknown because we can't compute it
+				proposedState.Sum.Unknown = true
+			} else {
+				res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
+			}
+
 			return
 		}
 		defer src.Close()
@@ -163,10 +176,11 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 		// Get the file's SHA256 sum, which we'll use to determine if the resource needs to be updated.
 		sum, err := tfile.SHA256(src)
 		if err != nil {
-			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
-				"Invalid Configuration",
-				fmt.Errorf("unable to obtain file SHA256 sum for %s, due to: %w", srcType, err),
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnosticWarn(
+				"Unable to hash file at plan time",
+				fmt.Errorf("unable to obtain file SHA256 sum for %s at plan time; file will be required and validated at apply time: %w", srcType, err),
 			))
+			proposedState.Sum.Unknown = true
 
 			return
 		}
@@ -200,7 +214,16 @@ func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResour
 
 	src, _, err := plannedState.openSourceOrContent()
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
+		srcPath, okSrc := plannedState.Src.Get()
+		if okSrc {
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
+				"Source file required at apply time",
+				fmt.Errorf("the source file %q does not exist or is unreadable; it must exist at apply time for provisioning", srcPath),
+			))
+		} else {
+			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic("Invalid Configuration", err))
+		}
+
 		return
 	}
 	defer src.Close()

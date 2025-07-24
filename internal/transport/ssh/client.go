@@ -171,7 +171,7 @@ func (c *client) Connect(ctx context.Context) error {
 
 	var err error
 
-	sshAgentConn, sshAgent, ok := c.connectSSHAgent()
+	sshAgentConn, sshAgent, ok := c.connectSSHAgent(ctx)
 	if ok {
 		c.clientConfig.Auth = append(c.clientConfig.Auth, sshAgent)
 		c.agentConn = sshAgentConn
@@ -418,10 +418,11 @@ func (c *client) newSession(ctx context.Context) (*xssh.Session, func() error, e
 	}
 }
 
-func (c *client) connectSSHAgent() (net.Conn, xssh.AuthMethod, bool) {
+func (c *client) connectSSHAgent(ctx context.Context) (net.Conn, xssh.AuthMethod, bool) {
 	var auth xssh.AuthMethod
 
-	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	dialer := &net.Dialer{}
+	sshAgent, err := dialer.DialContext(ctx, "unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		return sshAgent, auth, false
 	}

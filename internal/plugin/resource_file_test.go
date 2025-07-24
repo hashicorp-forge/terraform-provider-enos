@@ -395,6 +395,219 @@ EOF
 	}
 }
 
+// TestAccResourceFileLazyCopyMissingSourceFile tests the lazy copy feature
+// of the enos_file  basic resource interface but also the embedded transport interface.
+// As the embedded transport isn't an actual resource we're doing it here.
+//
+//nolint:paralleltest// because we modify the environment
+func TestAccResourceFileLazyCopyMissingSourceFile(t *testing.T) {
+	defer resetEnv(t)
+
+	const missingFile = "/tmp/enos_file_missing_for_lazy_copy_test"
+
+	providerTransport := template.Must(template.New("enos_file").Parse(`resource "enos_file" "{{.ID.Value}}" {
+		{{if .Src.Value}}
+		source = "{{.Src.Value}}"
+		{{end}}
+
+		{{if .Content.Value}}
+		content = <<EOF
+{{.Content.Value}}
+EOF
+		{{end}}
+
+		destination = "{{.Dst.Value}}"
+	}`))
+
+	resourceTransport := template.Must(template.New("enos_file").
+		Funcs(transportRenderFunc).
+		Parse(`resource "enos_file" "{{.ID.Value}}" {
+			{{if .Src.Value}}
+			source = "{{.Src.Value}}"
+			{{end}}
+
+			{{if .Content.Value}}
+			content = <<EOF
+	{{.Content.Value}}
+EOF
+			{{end}}
+
+			destination = "{{.Dst.Value}}"
+
+			{{ renderTransport .Transport }}
+		}`))
+
+	cases := []testAccResourceTransportTemplate{}
+
+	// SSH
+	sshState := newFileState()
+	sshState.ID.Set("lazycopy_ssh")
+	sshState.Src.Set(missingFile)
+	sshState.Dst.Set("/tmp/dst")
+	ssh := newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKeyPath.Set("../fixtures/ssh.pem")
+	require.NoError(t, sshState.Transport.SetTransportState(ssh))
+	cases = append(cases, testAccResourceTransportTemplate{
+		name:             "[ssh] lazy copy missing source",
+		state:            sshState,
+		check:            resource.ComposeTestCheckFunc(),
+		transport:        sshState.Transport,
+		resourceTemplate: resourceTransport,
+		transportUsed:    SSH,
+	})
+
+	// K8S
+	k8sState := newFileState()
+	k8sState.ID.Set("lazycopy_k8s")
+	k8sState.Src.Set(missingFile)
+	k8sState.Dst.Set("/tmp/dst")
+	k8s := newEmbeddedTransportK8Sv1()
+	k8s.KubeConfigBase64.Set("../fixtures/kubeconfig")
+	k8s.ContextName.Set("kind-kind")
+	k8s.Pod.Set("some-pod")
+	require.NoError(t, k8sState.Transport.SetTransportState(k8s))
+	cases = append(cases, testAccResourceTransportTemplate{
+		name:             "[k8s] lazy copy missing source",
+		state:            k8sState,
+		check:            resource.ComposeTestCheckFunc(),
+		transport:        k8sState.Transport,
+		resourceTemplate: resourceTransport,
+		transportUsed:    K8S,
+	})
+
+	// Nomad
+	nomadState := newFileState()
+	nomadState.ID.Set("lazycopy_nomad")
+	nomadState.Src.Set(missingFile)
+	nomadState.Dst.Set("/tmp/dst")
+	nomad := newEmbeddedTransportNomadv1()
+	nomad.Host.Set("http://127.0.0.1:4646")
+	nomad.SecretID.Set("secret")
+	nomad.AllocationID.Set("d76bc89d")
+	nomad.TaskName.Set("task")
+	require.NoError(t, nomadState.Transport.SetTransportState(nomad))
+	cases = append(cases, testAccResourceTransportTemplate{
+		name:             "[nomad] lazy copy missing source",
+		state:            nomadState,
+		check:            resource.ComposeTestCheckFunc(),
+		transport:        nomadState.Transport,
+		resourceTemplate: resourceTransport,
+		transportUsed:    NOMAD,
+	})
+
+	for _, test := range cases {
+		// Resource-defined transport: PLAN
+		t.Run("resource transport plan "+test.name, func(t *testing.T) {
+			unsetAllEnosEnv(t)
+			defer resetEnv(t)
+
+			buf := bytes.Buffer{}
+			err := test.resourceTemplate.Execute(&buf, test.state)
+			require.NoError(t, err)
+			step := resource.TestStep{
+				Config:             buf.String(),
+				Check:              test.check,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+
+		// Resource-defined transport: APPLY
+		t.Run("resource transport apply "+test.name, func(t *testing.T) {
+			unsetAllEnosEnv(t)
+			defer resetEnv(t)
+
+			buf := bytes.Buffer{}
+			err := test.resourceTemplate.Execute(&buf, test.state)
+			require.NoError(t, err)
+			step := resource.TestStep{
+				Config:      buf.String(),
+				PlanOnly:    false,
+				ExpectError: regexp.MustCompile(`does not exist|unable to open|required at apply`),
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+
+		// Provider/env transport: PLAN
+		t.Run("provider transport plan "+test.name, func(t *testing.T) {
+			unsetAllEnosEnv(t)
+			defer resetEnv(t)
+
+			switch test.transportUsed {
+			case SSH:
+				setEnosSSHEnv(t, test.transport)
+			case K8S:
+				setEnosK8SEnv(t, test.transport)
+			case NOMAD:
+				setENosNomadEnv(t, test.transport)
+			default:
+				t.Errorf("undefined transport type: %s", test.transportUsed)
+			}
+			defer resetEnv(t)
+
+			buf := bytes.Buffer{}
+			err := providerTransport.Execute(&buf, test.state)
+			require.NoError(t, err)
+			step := resource.TestStep{
+				Config:             buf.String(),
+				Check:              test.check,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+
+		// Provider/env transport: APPLY
+		t.Run("provider transport apply "+test.name, func(t *testing.T) {
+			unsetAllEnosEnv(t)
+			switch test.transportUsed {
+			case SSH:
+				setEnosSSHEnv(t, test.transport)
+			case K8S:
+				setEnosK8SEnv(t, test.transport)
+			case NOMAD:
+				host, ok := os.LookupEnv("ENOS_TRANSPORT_HOST")
+				if !ok || host == "" {
+					t.Skip("Skipping Nomad provider transport apply: ENOS_TRANSPORT_HOST env var not set. Please set it to test this scenario.")
+				}
+				setENosNomadEnv(t, test.transport)
+			default:
+				t.Errorf("undefined transport type: %s", test.transportUsed)
+			}
+			defer resetEnv(t)
+
+			buf := bytes.Buffer{}
+			err := providerTransport.Execute(&buf, test.state)
+			require.NoError(t, err)
+			step := resource.TestStep{
+				Config:      buf.String(),
+				PlanOnly:    false,
+				ExpectError: regexp.MustCompile(`does not exist|unable to open|required at apply`),
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviders(t),
+				Steps:                    []resource.TestStep{step},
+			})
+		})
+	}
+}
+
 // TestResourceFileTransportInvalidAttributes ensures that we can gracefully
 // handle invalid attributes in the transport configuration. Since it's a dynamic
 // pseudo type we cannot rely on Terraform's built-in validation.
