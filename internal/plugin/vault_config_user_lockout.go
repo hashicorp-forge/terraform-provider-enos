@@ -114,3 +114,34 @@ func (s *vaultUserLockoutConfig) Terraform5Value() tftypes.Value {
 	}
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
 }
+
+// Add Set method and configSet for user_lockout
+
+type vaultUserLockoutConfigSet struct {
+	LockoutThreshold    string
+	LockoutDuration     string
+	LockoutCounterReset string
+	DisableLockout      bool
+}
+
+func newVaultUserLockoutConfigSet(threshold, duration, counterReset string, disableLockout bool) *vaultUserLockoutConfigSet {
+	return &vaultUserLockoutConfigSet{threshold, duration, counterReset, disableLockout}
+}
+
+func (s *vaultUserLockoutConfig) Set(set *vaultUserLockoutConfigSet) {
+	if s == nil || set == nil {
+		return
+	}
+	s.Null = false
+	s.Unknown = false
+	if set.LockoutThreshold != "" {
+		s.LockoutThreshold.Set(set.LockoutThreshold)
+	}
+	if set.LockoutDuration != "" {
+		s.LockoutDuration.Set(set.LockoutDuration)
+	}
+	if set.LockoutCounterReset != "" {
+		s.LockoutCounterReset.Set(set.LockoutCounterReset)
+	}
+	s.DisableLockout.Set(set.DisableLockout)
+}

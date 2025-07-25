@@ -65,11 +65,36 @@ func (s *vaultExperimentsConfig) Terraform5Value() tftypes.Value {
 	if s.Unknown {
 		return tftypes.NewValue(s.Terraform5Type(), tftypes.UnknownValue)
 	}
-	exps := []string{}
+	// Build slice of tftypes.Value for list
+	vals := []tftypes.Value{}
 	for _, ts := range s.Experiments {
 		if val, ok := ts.Get(); ok {
-			exps = append(exps, val)
+			vals = append(vals, tftypes.NewValue(tftypes.String, val))
 		}
 	}
-	return tftypes.NewValue(s.Terraform5Type(), exps)
+	return tftypes.NewValue(s.Terraform5Type(), vals)
+}
+
+// Add Set method and configSet for experiments
+
+type vaultExperimentsConfigSet struct {
+	Experiments []string
+}
+
+func newVaultExperimentsConfigSet(experiments []string) *vaultExperimentsConfigSet {
+	return &vaultExperimentsConfigSet{experiments}
+}
+
+func (s *vaultExperimentsConfig) Set(set *vaultExperimentsConfigSet) {
+	if s == nil || set == nil {
+		return
+	}
+	s.Null = false
+	s.Unknown = false
+	s.Experiments = []*tfString{}
+	for _, exp := range set.Experiments {
+		ts := newTfString()
+		ts.Set(exp)
+		s.Experiments = append(s.Experiments, ts)
+	}
 }

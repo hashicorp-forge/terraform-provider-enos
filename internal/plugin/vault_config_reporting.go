@@ -202,3 +202,53 @@ func (s *vaultReportingLicenseConfig) Terraform5Value() tftypes.Value {
 	}
 	return tftypes.NewValue(tftypes.Object{AttributeTypes: attrs}, vals)
 }
+
+// Add Set methods and configSet types for reporting
+
+type vaultReportingLicenseConfigSet struct {
+	Enabled               bool
+	BillingStartTimestamp string
+	DevelopmentCluster    bool
+}
+
+func newVaultReportingLicenseConfigSet(enabled bool, billingTimestamp string, developmentCluster bool) *vaultReportingLicenseConfigSet {
+	return &vaultReportingLicenseConfigSet{enabled, billingTimestamp, developmentCluster}
+}
+
+func (s *vaultReportingLicenseConfig) Set(set *vaultReportingLicenseConfigSet) {
+	if s == nil || set == nil {
+		return
+	}
+	s.Null = false
+	s.Unknown = false
+	s.Enabled.Set(set.Enabled)
+	s.BillingStartTimestamp.Set(set.BillingStartTimestamp)
+	s.DevelopmentCluster.Set(set.DevelopmentCluster)
+}
+
+// ConfigSet for vaultReportingConfig
+
+type vaultReportingConfigSet struct {
+	SnapshotRetentionTime        string
+	DisableProductUsageReporting bool
+	License                      *vaultReportingLicenseConfigSet
+}
+
+func newVaultReportingConfigSet(snapshotRetentionTime string, disableReporting bool, license *vaultReportingLicenseConfigSet) *vaultReportingConfigSet {
+	return &vaultReportingConfigSet{snapshotRetentionTime, disableReporting, license}
+}
+
+func (s *vaultReportingConfig) Set(set *vaultReportingConfigSet) {
+	if s == nil || set == nil {
+		return
+	}
+	s.Null = false
+	s.Unknown = false
+	if set.SnapshotRetentionTime != "" {
+		s.SnapshotRetentionTime.Set(set.SnapshotRetentionTime)
+	}
+	s.DisableProductUsageReporting.Set(set.DisableProductUsageReporting)
+	if set.License != nil {
+		s.License.Set(set.License)
+	}
+}
