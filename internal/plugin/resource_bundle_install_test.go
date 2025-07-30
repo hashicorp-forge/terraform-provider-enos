@@ -38,7 +38,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 
 		  {{ if .Artifactory.URL.Value -}}
 		  artifactory = {
-			{{ if .Artifactory.Username.Value }} username = "{{ .Artifactory.Username.Value }}" {{ end }}
+			username = {{ if .Artifactory.Username.Value }} "{{ .Artifactory.Username.Value }}" {{ else }} null {{ end }}
 			token    = "{{ .Artifactory.Token.Value }}"
 			url      = "{{ .Artifactory.URL.Value }}"
 			sha256   = "{{ .Artifactory.SHA256.Value }}"
@@ -161,13 +161,22 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			true,
 		})
 
+		var artToken string
+		var okbearertoken, oktoken bool
 		artUser, okuser := os.LookupEnv("ARTIFACTORY_USER")
-		artToken, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
-		if !oktoken {
-			t.Log(`skipping data bundle install from artifactory test because ARTIFACTORY_TOKEN isn't set`)
+		if !okuser {
+			artToken, okbearertoken = os.LookupEnv("ARTIFACTORY_BEARER_TOKEN")
+		} else {
+			artToken, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+		}
+		if (okuser && !oktoken) || (!okuser && !okbearertoken) {
+			t.Logf(`skipping data bundle install from artifactory test because ARTIFACTORY_BEARER_TOKEN(%t) or ARTIFACTORY_TOKEN(%t) isn't set`,
+				okbearertoken, oktoken,
+			)
 			t.Skip()
 		} else {
 			bundleInstallArtifactoryInstall := newBundleInstallStateV1()
+			bundleInstallArtifactoryInstall.Artifactory.Username.Set("")
 			bundleInstallArtifactoryInstall.ID.Set("realart")
 			bundleInstallArtifactoryInstall.Destination.Set("/opt/vault/bin")
 			if okuser {
