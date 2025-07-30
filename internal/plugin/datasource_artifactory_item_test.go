@@ -15,12 +15,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-// TestAccDataSourceArtifacotoryItemProperties is an integration test that uses the
+// TestAccDataSourceArtifactoryItemProperties is an integration test that uses the
 // actual HashiCorp artifactory service to resolve items based on the search
 // criteria.
 //
 //nolint:paralleltest// because our resource handles it
-func TestAccDataSourceArtifacotoryItemProperties(t *testing.T) {
+func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 	for name, props := range map[string]map[string]string{
 		"vault-1.18.5-1.x86_64.rpm": {
 			"commit":          "06a36557c4904c52f720bafb71866d389385f5ad",
@@ -35,11 +35,20 @@ func TestAccDataSourceArtifacotoryItemProperties(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			state := newArtifactoryItemStateV1()
 			_, okacc := os.LookupEnv("TF_ACC")
-			username, _ := os.LookupEnv("ARTIFACTORY_USER")
-			token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
+			var token string
+			var okbearertoken, oktoken bool
+			username, okuser := os.LookupEnv("ARTIFACTORY_USER")
+			if !okuser {
+				token, okbearertoken = os.LookupEnv("ARTIFACTORY_BEARER_TOKEN")
+			} else {
+				token, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+			}
 
 			if !okacc || !oktoken {
-				t.Log(`skipping data "enos_artifactory_item" test because either TF_ACC or ARTIFACTORY_TOKEN are not set`)
+				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
+					okacc, oktoken, okbearertoken,
+				)
 				t.Skip()
 
 				return
@@ -95,12 +104,12 @@ output "name" {
 	}
 }
 
-// TestAccDataSourceArtifacotoryItemQueryTemplate is an integration test that
+// TestAccDataSourceArtifactoryItemQueryTemplate is an integration test that
 // uses the actual HashiCorp artifactory service to resolve items based on the
 // search criteria.
 //
 //nolint:paralleltest// because our resource handles it
-func TestAccDataSourceArtifacotoryItemQueryTemplate(t *testing.T) {
+func TestAccDataSourceArtifactoryItemQueryTemplate(t *testing.T) {
 	orQueryTemplate := template.Must(template.New("or").Parse(`
 items.find(
 {
@@ -137,11 +146,20 @@ items.find(
 		t.Run(name, func(t *testing.T) {
 			state := newArtifactoryItemStateV1()
 			_, okacc := os.LookupEnv("TF_ACC")
-			username, _ := os.LookupEnv("ARTIFACTORY_USER")
-			token, oktoken := os.LookupEnv("ARTIFACTORY_TOKEN")
+			var token string
+			var okbearertoken, oktoken bool
+			username, okuser := os.LookupEnv("ARTIFACTORY_USER")
+			if !okuser {
+				token, okbearertoken = os.LookupEnv("ARTIFACTORY_BEARER_TOKEN")
+			} else {
+				token, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+			}
 
-			if !okacc || !oktoken {
-				t.Log(`skipping data "enos_artifactory_item" test because either TF_ACC or ARTIFACTORY_TOKEN are not set`)
+			if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
+				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
+					okacc, oktoken, okbearertoken,
+				)
 				t.Skip()
 
 				return
@@ -163,7 +181,9 @@ items.find(
 			state.QueryTemplate.Set(qbuf.String())
 
 			cfg := template.Must(template.New("enos_data_artifactory_item").Parse(`data "enos_artifactory_item" "vault" {
+  {{if .Username.Value -}}
   username = "{{ .Username.Value }}"
+  {{end -}}
   token    = "{{ .Token.Value }}"
   host     = "{{ .Host.Value }}"
   query_template = <<EOT
