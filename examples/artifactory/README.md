@@ -1,8 +1,8 @@
 # artifactory
 
-This example module uses demonstrates the enos utilizing artifactory.
+This example module demonstrates enos utilizing artifactory.
 
-To used this module you'll need to provide the required credentials and
+To use this module you'll need to provide the required credentials and
 search criteria in order to search for a valid binary.
 
 For example, add the follow to a `terraform.tfvars` file:
@@ -11,6 +11,7 @@ For example, add the follow to a `terraform.tfvars` file:
 ```hcl
 artifactory_username   = "<your hashicorp email address>"
 artifactory_token      = "<your artifactory token>"
+artifactory_bearer_token = "<artifactory identity token - instead of username/ token>"
 artifactory_host       = "https://artifactory.hashicorp.engineering/artifactory"
 artifactory_repo       = "hashicorp-packagespec-buildcache-local*"
 artifactory_path       = "cache-v1/vault-enterprise/*"
