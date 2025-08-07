@@ -28,8 +28,8 @@ only one can be configured at a time.
 
 ### Optional
 
-- `artifactory` (Object, Sensitive) - `artifactory.username` (String) The Artifactory API username. This will likely be your hashicorp email address
-- `artifactory.token` (String) The Artifactory API token. You can sign into Artifactory and generate one
+- `artifactory` (Object, Sensitive) - `artifactory.token` (String) The Artifactory identity token. You can get one by joining the 'artifactory-users' Doormat
+    group and using 'doormat artifactory create-token'
 - `artifactory.url` (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
 - `artifactory.sha256` (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed (see [below for nested schema](#nestedatt--artifactory))
 - `destination` (String) The destination directory of the installed binary, eg: /usr/local/bin/. This is required if the artifact is a zip archive and optional when installing RPM or Deb packages
