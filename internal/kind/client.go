@@ -4,6 +4,7 @@
 package kind
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -235,7 +236,7 @@ func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 
 	// saved the docker image to a tar archive
 	commandArgs := append([]string{"save", "-o", imageTar}, image)
-	if err := exec.Command("docker", commandArgs...).Run(); err != nil {
+	if err := exec.CommandContext(context.TODO(), "docker", commandArgs...).Run(); err != nil {
 		return LoadedImageResult{}, fmt.Errorf("failed to export image: [%s] to archive: [%s], due to: %w", imageName, imageTar, err)
 	}
 

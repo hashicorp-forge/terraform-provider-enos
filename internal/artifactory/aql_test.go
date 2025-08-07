@@ -16,16 +16,21 @@ import (
 func EnsureArtifactoryEnvAuth(t *testing.T) (map[string]string, bool) {
 	t.Helper()
 
-	var okacc, oktoken bool
+	var okacc, oktoken, okbearertoken, okuser bool
 	vars := map[string]string{}
 
 	_, okacc = os.LookupEnv("TF_ACC")
-	vars["username"], _ = os.LookupEnv("ARTIFACTORY_USER")
-	vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+	vars["username"], okuser = os.LookupEnv("ARTIFACTORY_USER")
+	if !okuser {
+		vars["token"], okbearertoken = os.LookupEnv("ARTIFACTORY_BEARER_TOKEN")
+	} else {
+		vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+	}
 
-	if !okacc || !oktoken {
-		t.Logf(`skipping data "enos_artifactory_item" test because TF_ACC(%t), ARTIFACTORY_TOKEN(%t) aren't set`,
-			okacc, oktoken,
+	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
+		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
+			okacc, oktoken, okbearertoken,
 		)
 		t.Skip()
 
@@ -38,18 +43,23 @@ func EnsureArtifactoryEnvAuth(t *testing.T) (map[string]string, bool) {
 func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 	t.Helper()
 
-	var okacc, oktoken, okver, okrev bool
+	var okacc, oktoken, okbearertoken, okver, okrev, okuser bool
 	vars := map[string]string{}
 
 	_, okacc = os.LookupEnv("TF_ACC")
-	vars["username"], _ = os.LookupEnv("ARTIFACTORY_USER")
-	vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+	vars["username"], okuser = os.LookupEnv("ARTIFACTORY_USER")
+	if !okuser {
+		vars["token"], okbearertoken = os.LookupEnv("ARTIFACTORY_BEARER_TOKEN")
+	} else {
+		vars["token"], oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
+	}
 	vars["version"], okver = os.LookupEnv("ARTIFACTORY_PRODUCT_VERSION")
 	vars["revision"], okrev = os.LookupEnv("ARTIFACTORY_REVISION")
 
-	if !okacc || !oktoken || !okver || !okrev {
-		t.Logf(`skipping data "enos_artifactory_item" test because TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_PRODUCT_VERSION(%t), ARTIFACTORY_REVISION(%t) aren't set`,
-			okacc, oktoken, okver, okrev,
+	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) || !okver || !okrev {
+		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t), ARTIFACTORY_PRODUCT_VERSION(%t), ARTIFACTORY_REVISION(%t)`,
+			okacc, oktoken, okbearertoken, okver, okrev,
 		)
 		t.Skip()
 
@@ -64,11 +74,14 @@ func TestAccSearchAQL(t *testing.T) {
 
 	vars, _ := EnsureArtifactoryEnvVars(t)
 
-	client := NewClient(
+	opts := []Opt{
 		WithHost("https://artifactory.hashicorp.engineering/artifactory"),
-		WithUsername(vars["username"]),
 		WithToken(vars["token"]),
-	)
+	}
+	if vars["username"] != "" {
+		opts = append(opts, WithUsername(vars["username"]))
+	}
+	client := NewClient(opts...)
 
 	for _, test := range []struct {
 		Name string
@@ -172,11 +185,14 @@ func TestAccSearchRawQuery(t *testing.T) {
 
 	vars, _ := EnsureArtifactoryEnvAuth(t)
 
-	client := NewClient(
+	opts := []Opt{
 		WithHost("https://artifactory.hashicorp.engineering/artifactory"),
-		WithUsername(vars["username"]),
 		WithToken(vars["token"]),
-	)
+	}
+	if vars["username"] != "" {
+		opts = append(opts, WithUsername(vars["username"]))
+	}
+	client := NewClient(opts...)
 
 	orQueryTemplate := template.Must(template.New("or").Parse(`
 items.find(
