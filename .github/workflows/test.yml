@@ -104,8 +104,6 @@ jobs:
           } | tee -a "$GITHUB_OUTPUT"
       - run: make test-acc
         env:
-          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
-          ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
           ARTIFACTORY_BEARER_TOKEN: ${{ secrets.ARTIFACTORY_BEARER_TOKEN }}
           ENOS_TRANSPORT_USER: ubuntu
           ENOS_TRANSPORT_PRIVATE_KEY_PATH: ./enos-ci-ssh-key.pem
