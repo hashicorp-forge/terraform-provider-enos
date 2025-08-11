@@ -89,7 +89,7 @@ for every criteria. This means that you can use wildcards `*` for any field. See
 - `properties` (Map of String) A map of properties to match on
 - `query_template` (String) An AQL query to run. When a 'query' is provided all search properties are ignored so you must write the a complete and valid items.find() query
 - `repo` (String) The Artifactory repository you want to search in
-- `username` (String) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
+- `username` (String, Deprecated) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
 
 ### Read-Only
 

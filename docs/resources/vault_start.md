@@ -27,7 +27,8 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 ### Required
 
 - `bin_path` (String) The fully qualified path to the vault binary
-- `config` (Object) - `config.api_addr` (String) The Vault [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) value
+- `config` (Object) The vault configuration
+- `config.api_addr` (String) The Vault [api_addr](https://developer.hashicorp.com/vault/docs/configuration#api_addr) value
 - `config.cluster_addr` (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
 - `config.cluster_name` (String) The Vault [cluster_addr](https://developer.hashicorp.com/vault/docs/configuration#cluster_addr) value
 - `config.listener` (Object) The Vault [listener](https://developer.hashicorp.com/vault/docs/configuration/listener) stanza
@@ -38,14 +39,14 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `config.listener.inflight_requests_logging` (Object) The Vault listener [inflight_requests_logging](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#inflight_requests_logging-parameters) stanza
 - `config.listener.custom_response_headers` (Object) The Vault listener [custom_response_headers](https://developer.hashicorp.com/vault/docs/configuration/listener/tcp#custom_response_headers-parameters) stanza
 - `config.log_level` (String) The Vault [log_level](https://developer.hashicorp.com/vault/docs/configuration#log_level)
-- `config.storage` (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
+- `config.storage` (Object, Optional) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - `config.storage.type` (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
 - `config.storage.attributes` (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type
 - `config.storage.retry_join` (Object) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza
-- `config.seal` (Object) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
+- `config.seal` (Object, Optional) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
 - `config.seal.type` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - `config.seal.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
-- `config.seals` (Object) Vault Enterprise [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) configuration. Cannot be used in conjunction with `config.seal`. Up to three seals can be defined but only one is required.
+- `config.seals` (Object, Optional) Vault Enterprise [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) configuration. Cannot be used in conjunction with `config.seal`. Up to three seals can be defined but only one is required.
 - `config.seals.primary` (Object) The primary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Primary has priority 1
 - `config.seals.primary.type` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - `config.seals.primary.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
@@ -55,7 +56,7 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `config.seals.tertiary` (Object) The tertiary [HA seal](https://developer.hashicorp.com/vault/docs/configuration/seal/seal-ha) stanza. Tertiary has priority 3
 - `config.seals.tertiary.type` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - `config.seals.tertiary.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
-- `config.telemetry` (Object) The Vault [telemetry](https://developer.hashicorp.com/vault/docs/configuration/telemetry#telemetry-parameters) stanza (see [below for nested schema](#nestedatt--config))
+- `config.telemetry` (Object, Optional) The Vault [telemetry](https://developer.hashicorp.com/vault/docs/configuration/telemetry#telemetry-parameters) stanza (see [below for nested schema](#nestedatt--config))
 
 ### Optional
 

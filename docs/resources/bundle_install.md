@@ -28,8 +28,9 @@ only one can be configured at a time.
 
 ### Optional
 
-- `artifactory` (Object, Sensitive) - `artifactory.username` (String) The Artifactory API username. This will likely be your hashicorp email address
-- `artifactory.token` (String) The Artifactory API token. You can sign into Artifactory and generate one
+- `artifactory` (Object, Sensitive) Configuration for installing artifacts from Artifactory
+- `artifactory.username` (String, Deprecated) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
+- `artifactory.token` (String) The Artifactory API Key token or identity token. API keys are deprecated so it is best to use an identity token
 - `artifactory.url` (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
 - `artifactory.sha256` (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed (see [below for nested schema](#nestedatt--artifactory))
 - `destination` (String) The destination directory of the installed binary, eg: /usr/local/bin/. This is required if the artifact is a zip archive and optional when installing RPM or Deb packages
@@ -37,7 +38,8 @@ only one can be configured at a time.
 - `installer` (String) The method used to install the package
 - `name` (String) The name of the artifact that was installed
 - `path` (String) The local path to a zip archive install bundle.
-- `release` (Object) - `release.product` (String) The product name that you wish to install, eg: 'vault' or 'consul'
+- `release` (Object) Configuration for installing artifacts from https://releases.hashicorpl.com
+- `release.product` (String) The product name that you wish to install, eg: 'vault' or 'consul'
 - `release.version` (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
 - `release.edition` (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips1403', etc. (see [below for nested schema](#nestedatt--release))
 - `transport` (Dynamic) - `transport.ssh` (Object) the ssh transport configuration

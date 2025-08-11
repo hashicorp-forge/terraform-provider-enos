@@ -38,7 +38,7 @@ func TestAccResourceBundleInstall(t *testing.T) {
 
 		  {{ if .Artifactory.URL.Value -}}
 		  artifactory = {
-			username = {{ if .Artifactory.Username.Value }} "{{ .Artifactory.Username.Value }}" {{ else }} null {{ end }}
+			{{ if .Artifactory.Username.Value }} username = "{{ .Artifactory.Username.Value }}" {{ end }}
 			token    = "{{ .Artifactory.Token.Value }}"
 			url      = "{{ .Artifactory.URL.Value }}"
 			sha256   = "{{ .Artifactory.SHA256.Value }}"
@@ -101,25 +101,51 @@ func TestAccResourceBundleInstall(t *testing.T) {
 		false,
 	})
 
-	installBundleArtifactory := newBundleInstallStateV1()
-	installBundleArtifactory.ID.Set("art")
-	installBundleArtifactory.Destination.Set("/opt/vault/bin")
-	installBundleArtifactory.Artifactory.Token.Set("1234abcd")
-	installBundleArtifactory.Artifactory.Username.Set("some@user.com")
-	installBundleArtifactory.Artifactory.URL.Set("https://artifactory.com")
-	installBundleArtifactory.Artifactory.SHA256.Set("abcd1234")
+	installBundleArtifactAPIAuth := newBundleInstallStateV1()
+	installBundleArtifactAPIAuth.ID.Set("art")
+	installBundleArtifactAPIAuth.Destination.Set("/opt/vault/bin")
+	installBundleArtifactAPIAuth.Artifactory.Token.Set("1234abcd")
+	installBundleArtifactAPIAuth.Artifactory.Username.Set("some@user.com")
+	installBundleArtifactAPIAuth.Artifactory.URL.Set("https://artifactory.com")
+	installBundleArtifactAPIAuth.Artifactory.SHA256.Set("abcd1234")
 	ssh = newEmbeddedTransportSSH()
 	ssh.User.Set("ubuntu")
 	ssh.Host.Set("localhost")
 	ssh.PrivateKey.Set(privateKey)
-	require.NoError(t, installBundleArtifactory.Transport.SetTransportState(ssh))
+	require.NoError(t, installBundleArtifactAPIAuth.Transport.SetTransportState(ssh))
 	cases = append(cases, testAccResourceTemplate{
 		"artifactory",
-		installBundleArtifactory,
+		installBundleArtifactAPIAuth,
 		resource.ComposeTestCheckFunc(
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "id", regexp.MustCompile(`^path$`)),
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "destination", regexp.MustCompile(`^/usr/local/bin/vault$`)),
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.username", regexp.MustCompile(`^some@user.com$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.token", regexp.MustCompile(`^1234abcd$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.url", regexp.MustCompile(`^https://artifactory.com$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.sha256", regexp.MustCompile(`^abcd1234$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "transport.ssh.user", regexp.MustCompile(`^ubuntu$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "transport.ssh.host", regexp.MustCompile(`^localhost$`)),
+		),
+		false,
+	})
+
+	installBundleArtifactTokenAuth := newBundleInstallStateV1()
+	installBundleArtifactTokenAuth.ID.Set("art")
+	installBundleArtifactTokenAuth.Destination.Set("/opt/vault/bin")
+	installBundleArtifactTokenAuth.Artifactory.Token.Set("1234abcd")
+	installBundleArtifactTokenAuth.Artifactory.URL.Set("https://artifactory.com")
+	installBundleArtifactTokenAuth.Artifactory.SHA256.Set("abcd1234")
+	ssh = newEmbeddedTransportSSH()
+	ssh.User.Set("ubuntu")
+	ssh.Host.Set("localhost")
+	ssh.PrivateKey.Set(privateKey)
+	require.NoError(t, installBundleArtifactTokenAuth.Transport.SetTransportState(ssh))
+	cases = append(cases, testAccResourceTemplate{
+		"artifactory",
+		installBundleArtifactTokenAuth,
+		resource.ComposeTestCheckFunc(
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "id", regexp.MustCompile(`^path$`)),
+			resource.TestMatchResourceAttr("enos_bundle_install.art", "destination", regexp.MustCompile(`^/usr/local/bin/vault$`)),
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.token", regexp.MustCompile(`^1234abcd$`)),
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.url", regexp.MustCompile(`^https://artifactory.com$`)),
 			resource.TestMatchResourceAttr("enos_bundle_install.art", "artifactory.sha256", regexp.MustCompile(`^abcd1234$`)),
@@ -183,8 +209,8 @@ func TestAccResourceBundleInstall(t *testing.T) {
 				bundleInstallArtifactoryInstall.Artifactory.Username.Set(artUser)
 			}
 			bundleInstallArtifactoryInstall.Artifactory.Token.Set(artToken)
-			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-packagespec-buildcache-local/cache-v1/vault-enterprise/7fb88d4d3d0a36ffc78a522d870492e5791bae1b0640232ce4c6d69cc22cf520/store/f45845666b4e552bfc8ca775834a3ef6fc097fe0-1a2809da73e5896b6f766b395ff6e1804f876c45.zip")
-			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("d01a82111133908167a5a140604ab3ec8fd18601758376a5f8e9dd54c7703373")
+			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-crt-prod-local/vault-enterprise/1.20.2%2Bent/8e95c64a526fa9f8aa0b822fcf5080eb0f6226be/vault_1.20.2%2Bent_linux_amd64.zip")
+			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("081e592c87d9209e0e77b8e7092ba71d9be64ba6eee0fafc935d9044d9c2afb3")
 			ssh := newEmbeddedTransportSSH()
 			ssh.Host.Set(enosVars["host"])
 			require.NoError(t, bundleInstallArtifactoryInstall.Transport.SetTransportState(ssh))
