@@ -22,14 +22,14 @@ import (
 //nolint:paralleltest// because our resource handles it
 func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 	for name, props := range map[string]map[string]string{
-		"vault-1.18.5-1.x86_64.rpm": {
-			"commit":          "06a36557c4904c52f720bafb71866d389385f5ad",
-			"product-name":    "vault",
-			"product-version": "1.18.5",
-		},
 		"vault-1.19.1-1.x86_64.rpm": {
-			"build.number": "69bb3e9e943962d8fc2aa8a12031d35d2aac9a68",
+			"build.number": "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
 			"build.name":   "vault-1.19.1",
+		},
+		"vault-1.19.2-1.x86_64.rpm": {
+			"commit":          "2ee4ea013b31a770a2fc421bb1e4bc74a9669185",
+			"product-name":    "vault",
+			"product-version": "1.19.2",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -45,7 +45,7 @@ func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 			}
 
 			if !okacc || !oktoken {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)
@@ -57,7 +57,7 @@ func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 			state.Username.Set(username)
 			state.Token.Set(token)
 			state.Host.Set("https://artifactory.hashicorp.engineering/artifactory")
-			state.Repo.Set("hashicorp-crt-stable-local*")
+			state.Repo.Set("hashicorp-crt-staging-local*")
 			state.Path.Set("vault/*")
 			state.Name.Set(name)
 			state.Properties.SetStrings(props)
@@ -119,7 +119,7 @@ items.find(
       [
         {"@commit": { "$match": "{{ .SHA }}" }},
         {"@product-name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -129,7 +129,7 @@ items.find(
       [
         {"@build.number": { "$match": "{{ .SHA }}" }},
         {"@build.name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -141,7 +141,7 @@ items.find(
 		// New CRT fields
 		"vault_1.19.1-1_amd64.deb": "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
 		// Old CRT fields
-		"vault_1.19.0-1_amd64.deb": "ea8260c5893f2f38c3daa7aed07e89d85613844f",
+		"vault_1.19.0-1_amd64.deb": "7eeafb6160d60ede73c1d95566b0c8ea54f3cb5a",
 	} {
 		t.Run(name, func(t *testing.T) {
 			state := newArtifactoryItemStateV1()
@@ -156,7 +156,7 @@ items.find(
 			}
 
 			if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)

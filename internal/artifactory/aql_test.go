@@ -28,7 +28,7 @@ func EnsureArtifactoryEnvAuth(t *testing.T) (map[string]string, bool) {
 	}
 
 	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
-		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 			okacc, oktoken, okbearertoken,
 		)
@@ -57,7 +57,7 @@ func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 	vars["revision"], okrev = os.LookupEnv("ARTIFACTORY_REVISION")
 
 	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) || !okver || !okrev {
-		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set: 
+		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t), ARTIFACTORY_PRODUCT_VERSION(%t), ARTIFACTORY_REVISION(%t)`,
 			okacc, oktoken, okbearertoken, okver, okrev,
 		)
@@ -90,7 +90,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "all search fields",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-stable-local*"),
+				WithRepo("hashicorp-crt-staging-local*"),
 				WithPath("vault/*"),
 				WithName("*.zip"),
 				WithProperties(map[string]string{
@@ -115,7 +115,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no path",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-stable-local*"),
+				WithRepo("hashicorp-crt-staging-local*"),
 				WithName("*.zip"),
 				WithProperties(map[string]string{
 					"product-name":    "vault",
@@ -127,7 +127,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no name",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-stable-local*"),
+				WithRepo("hashicorp-crt-staging-local*"),
 				WithPath("vault/*"),
 				WithProperties(map[string]string{
 					"product-name":    "vault",
@@ -139,7 +139,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no properties",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-stable-local*"),
+				WithRepo("hashicorp-crt-staging-local*"),
 				WithPath("vault/*"),
 				WithName("*.zip"),
 			},
@@ -203,7 +203,7 @@ items.find(
       [
         {"@commit": { "$match": "{{ .SHA }}" }},
         {"@product-name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -213,7 +213,7 @@ items.find(
       [
         {"@build.number": { "$match": "{{ .SHA }}" }},
         {"@build.name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-stable-local*" }},
+        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -237,7 +237,7 @@ items.find(
 		{
 			Name:         "old crt fields",
 			ArtifactName: "vault_1.19.0-1_amd64.deb",
-			SHA:          "ea8260c5893f2f38c3daa7aed07e89d85613844f",
+			SHA:          "7eeafb6160d60ede73c1d95566b0c8ea54f3cb5a",
 		},
 	} {
 		t.Run(test.Name, func(t *testing.T) {
