@@ -206,6 +206,7 @@ for every criteria. This means that you can use wildcards ^*^ for any field. See
 					Name:        "username",
 					Type:        tftypes.String,
 					Optional:    true,
+					Deprecated:  true,
 					Description: "The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth",
 				},
 				{

@@ -466,8 +466,9 @@ only one can be configured at a time.
 					Optional:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: docCaretToBacktick(`
-- ^artifactory.username^ (String) The Artifactory API username. This will likely be your hashicorp email address
-- ^artifactory.token^ (String) The Artifactory API token. You can sign into Artifactory and generate one
+Configuration for installing artifacts from Artifactory
+- ^artifactory.username^ (String, Deprecated) The Artifactory API Key user name. Depending on your login scheme this is likely an email address. If no username is provided we'll assume you wish to use an identity token for Auth
+- ^artifactory.token^ (String) The Artifactory API Key token or identity token. API keys are deprecated so it is best to use an identity token
 - ^artifactory.url^ (String) The fully qualified Artifactory item URL. You can use enos_artifactory_item to search for this URL
 - ^artifactory.sha256^ (String) The Artifactory item SHA 256 sum. If present this will be verified on the remote target before the package is installed
 `),
@@ -479,6 +480,7 @@ only one can be configured at a time.
 
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: docCaretToBacktick(`
+Configuration for installing artifacts from https://releases.hashicorpl.com
 - ^release.product^ (String) The product name that you wish to install, eg: 'vault' or 'consul'
 - ^release.version^ (String) The version of the product that you wish to install. Use the full semver version ('2.1.3' or 'latest')
 - ^release.edition^ (String) The edition of the product that you wish to install. Eg: 'ce', 'ent', 'ent.hsm', 'ent.hsm.fips1403', etc.
@@ -689,12 +691,25 @@ func (s *bundleInstallStateV1) Terraform5Value() tftypes.Value {
 }
 
 func (s *bundleInstallStateV1) ArtifactoryTerraform5Type() tftypes.Type {
-	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+	return tftypes.Object{
+		AttributeTypes:     s.artifactoryAttrs(),
+		OptionalAttributes: s.artifactoryOptionalAttrs(),
+	}
+}
+
+func (s *bundleInstallStateV1) artifactoryAttrs() map[string]tftypes.Type {
+	return map[string]tftypes.Type{
 		"username": s.Artifactory.Username.TFType(),
 		"token":    s.Artifactory.Token.TFType(),
 		"url":      s.Artifactory.URL.TFType(),
 		"sha256":   s.Artifactory.SHA256.TFType(),
-	}}
+	}
+}
+
+func (s *bundleInstallStateV1) artifactoryOptionalAttrs() map[string]struct{} {
+	return map[string]struct{}{
+		"username": {},
+	}
 }
 
 func (s *bundleInstallStateV1) ReleaseTerraform5Type() tftypes.Type {
@@ -708,7 +723,11 @@ func (s *bundleInstallStateV1) ReleaseTerraform5Type() tftypes.Type {
 func (s *bundleInstallStateV1) ArtifactoryTerraform5Value() tftypes.Value {
 	// As this is an optional value, return a nil object instead of nil values
 	if tfStringsSetOrUnknown(s.Artifactory.Username, s.Artifactory.Token, s.Artifactory.URL) {
-		return tftypes.NewValue(s.ArtifactoryTerraform5Type(), map[string]tftypes.Value{
+		typ := tftypes.Object{
+			AttributeTypes: s.artifactoryAttrs(),
+		}
+
+		return tftypes.NewValue(typ, map[string]tftypes.Value{
 			"username": s.Artifactory.Username.TFValue(),
 			"token":    s.Artifactory.Token.TFValue(),
 			"url":      s.Artifactory.URL.TFValue(),

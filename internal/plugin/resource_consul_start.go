@@ -262,7 +262,8 @@ The ^enos_consul_start^ resource is capable of configuring a Consul service on a
 					Optional:        true,
 					DescriptionKind: tfprotov6.StringKindMarkdown,
 					Description: docCaretToBacktick(`
-- ^config.bind_addr^ (String) The Consul [bind_addr](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr) value
+The consul configuration
+- ^config.bind_addr^ (String, Optional) The Consul [bind_addr](https://developer.hashicorp.com/consul/docs/agent/config/config-files#bind_addr) value
 - ^config.datacenter^ (String) The Consul [datacenter](https://developer.hashicorp.com/consul/docs/agent/config/config-files#datacenter) value
 - ^config.data_dir^ (String) The Consul [data_dir](https://developer.hashicorp.com/consul/docs/agent/config/config-files#data_dir) value
 - ^config.retry_join^ (List of String) The Consul [retry_join](https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join) value
