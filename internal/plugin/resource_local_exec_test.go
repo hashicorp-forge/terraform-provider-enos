@@ -161,7 +161,7 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
         }
     }`))
 
-	data1 := map[string]interface{}{
+	data1 := map[string]any{
 		"File": f.Name(),
 		"Env": map[string]string{
 			"one": "one",
@@ -179,7 +179,7 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 		PlanOnly: false,
 	}
 
-	data2 := map[string]interface{}{
+	data2 := map[string]any{
 		"File": f.Name(),
 		"Env": map[string]string{
 			"one": "one",

@@ -3,6 +3,8 @@
 
 package artifactory
 
+import "slices"
+
 // supportedVaultTargets is our currently supported Vault build targets.
 var supportedVaultTargets = map[string][]string{
 	"darwin":  {"amd64"},
@@ -29,13 +31,7 @@ func SupportedVaultArch(platform, arch string) bool {
 		return false
 	}
 
-	for _, a := range archs {
-		if arch == a {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(archs, arch)
 }
 
 // SupportedVaultPlatform validates that the given platform is supported.
@@ -46,11 +42,5 @@ func SupportedVaultPlatform(platform string) bool {
 
 // SupportedVaultEdition validates that the given edition is a valid for Vault.
 func SupportedVaultEdition(ed string) bool {
-	for _, edition := range supportedVaultEditions {
-		if ed == edition {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(supportedVaultEditions, ed)
 }

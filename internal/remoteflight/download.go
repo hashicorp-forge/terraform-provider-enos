@@ -189,8 +189,8 @@ func Download(ctx context.Context, tr transport.Transport, dr *DownloadRequest) 
 		cmd = fmt.Sprintf("%s --auth-token '%s'", cmd, dr.AuthToken)
 	}
 
-	runCmd := func(ctx context.Context) (interface{}, error) {
-		var resp interface{}
+	runCmd := func(ctx context.Context) (any, error) {
+		var resp any
 		stdout, stderr, err := tr.Run(ctx, command.New(cmd))
 		if err != nil {
 			return resp, WrapErrorWith(err, stdout, stderr)

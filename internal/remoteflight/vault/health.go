@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
@@ -248,13 +249,8 @@ func (r *HealthResponse) StatusIsOneOf(statuses ...HealthStatus) bool {
 	}
 
 	s := r.Status()
-	for _, status := range statuses {
-		if status == s {
-			return true
-		}
-	}
 
-	return false
+	return slices.Contains(statuses, s)
 }
 
 // IsSealed returns whether or not the node is sealed.

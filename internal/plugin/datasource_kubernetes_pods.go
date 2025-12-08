@@ -199,7 +199,7 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 		containers := newTfStringSlice()
 		containers.SetStrings(pods[i].Containers)
 
-		pod.Set(map[string]interface{}{
+		pod.Set(map[string]any{
 			"name":       podName,
 			"namespace":  podNamespace,
 			"containers": containers,
@@ -215,7 +215,7 @@ func (d *kubernetesPods) ReadDataSource(ctx context.Context, req tfprotov6.ReadD
 			container := newTfString()
 			container.Set(c)
 
-			transport.Set(map[string]interface{}{
+			transport.Set(map[string]any{
 				"kubeconfig_base64": kubeConfigBase64,
 				"context_name":      contextName,
 				"namespace":         podNamespace,
@@ -379,7 +379,7 @@ func (s *kubernetesPodsStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
-	_, err := mapAttributesTo(val, map[string]interface{}{
+	_, err := mapAttributesTo(val, map[string]any{
 		"id":                 s.ID,
 		"kubeconfig_base64":  s.KubeConfigBase64,
 		"context_name":       s.ContextName,

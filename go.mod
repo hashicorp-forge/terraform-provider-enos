@@ -1,6 +1,6 @@
 module github.com/hashicorp-forge/terraform-provider-enos
 
-go 1.24.0
+go 1.25
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
@@ -8,6 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.83
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.83.0
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cpuguy83/tar2go v0.3.1
+	github.com/distribution/reference v0.6.0
 	github.com/google/go-github/v60 v60.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/hcl/v2 v2.24.0
@@ -17,6 +19,7 @@ require (
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.33.0
 	github.com/miekg/dns v1.1.66
 	github.com/mitchellh/cli v1.1.5
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
@@ -108,6 +111,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/oklog/run v1.2.0 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/posener/complete v1.2.3 // indirect

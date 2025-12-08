@@ -32,7 +32,7 @@ func NewBuilder() *Builder {
 // attribute is a key/value HCL entry.
 type attribute struct {
 	typeName string
-	value    interface{}
+	value    any
 }
 
 // block is an HCL block entry.
@@ -70,7 +70,7 @@ func (b *block) appendTo(body *hclwrite.Body) error {
 }
 
 // AppendAttribute appends a new attribute to the current block, returning the Builder for that block.
-func (h *Builder) AppendAttribute(key string, value interface{}) *Builder {
+func (h *Builder) AppendAttribute(key string, value any) *Builder {
 	h.entries = append(h.entries, attribute{key, value})
 	return h
 }
@@ -86,7 +86,7 @@ func (h *Builder) AppendBlock(name string, labels []string) *Builder {
 
 // AppendAttributes appends the provided attributes to the current block and returns the Builder for
 // the current block.
-func (h *Builder) AppendAttributes(attributes map[string]interface{}) *Builder {
+func (h *Builder) AppendAttributes(attributes map[string]any) *Builder {
 	for k, v := range attributes {
 		h.AppendAttribute(k, v)
 	}
@@ -109,7 +109,7 @@ func (h *Builder) BuildHCL() (string, error) {
 }
 
 // toCtyValue takes a Go type and attempts to convert it to a cty type.
-func toCtyValue(value interface{}) (cty.Value, error) {
+func toCtyValue(value any) (cty.Value, error) {
 	ctyType, err := gocty.ImpliedType(value)
 	if err != nil {
 		return cty.NilVal, err

@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/kind/pkg/cmd"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
+	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/docker"
 
@@ -124,7 +125,7 @@ func (c *localClient) CreateCluster(request CreateKindClusterRequest) (ClusterIn
 		return EmptyClusterInfo, errors.New("cannot create a cluster with an empty cluster 'name'")
 	}
 
-	logFields := map[string]interface{}{"name": request.Name}
+	logFields := map[string]any{"name": request.Name}
 
 	var copts []cluster.CreateOption
 
@@ -194,7 +195,7 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
 	}
 
-	c.logger.Info("Destroying Local Kind Cluster", map[string]interface{}{
+	c.logger.Info("Destroying Local Kind Cluster", map[string]any{
 		"name":            request.Name,
 		"kubeconfig_path": kubeConfigPath,
 	})
@@ -205,7 +206,7 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
 	}
 
-	c.logger.Info("Local Kind Cluster Destroyed", map[string]interface{}{
+	c.logger.Info("Local Kind Cluster Destroyed", map[string]any{
 		"name":            request.Name,
 		"kubeconfig_path": kubeConfigPath,
 	})
@@ -270,10 +271,29 @@ func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImage
 	defer tarFile.Close()
 
 	for _, node := range nodes {
-		if err := nodeutils.LoadImageArchive(node, tarFile); err != nil {
+		// Very occasionally our image will fail to load on our all our nodes. I
+		// suspect a race but for now we'll simply retry it in these cases.
+		// TODO(ryan): Why aren't we using "kind load docker-image <ref> --name <controller-cluster>"
+		req, err := retry.NewRetrier(
+			retry.WithMaxRetries(2),
+			retry.WithIntervalFunc(retry.IntervalDuration(2*time.Second)),
+			retry.WithRetrierFunc(func(context.Context) (any, error) {
+				err := nodeutils.LoadImageArchive(node, tarFile)
+				if err == nil {
+					result.Nodes = append(result.Nodes, node.String())
+					return node.String(), nil
+				}
+
+				return result, err
+			}),
+		)
+		if err != nil {
 			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
 		}
-		result.Nodes = append(result.Nodes, node.String())
+		_, err = retry.Retry(context.Background(), req)
+		if err != nil {
+			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
+		}
 	}
 
 	return result, nil

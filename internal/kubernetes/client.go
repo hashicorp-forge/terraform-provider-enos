@@ -291,7 +291,7 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 		namespace = defaultNamespace
 	}
 
-	queryFunc := func(queryCtx context.Context) (interface{}, error) {
+	queryFunc := func(queryCtx context.Context) (any, error) {
 		podList, err := c.clientset.
 			CoreV1().
 			Pods(namespace).
@@ -323,7 +323,7 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 	}
 
 	var err error
-	var result interface{}
+	var result any
 	if req.WaitTimeout > 0 {
 		var retrier *retry.Retrier
 		retrier, err = retry.NewRetrier(

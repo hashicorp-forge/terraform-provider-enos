@@ -23,7 +23,7 @@ var serviceInfoRegex = regexp.MustCompile(`^(?P<unit>\S+)\.service\s+(?P<load>\S
 // parseServiceInfos parses the systemctl services output into a slice of ServiceInfos.
 func parseServiceInfos(services string) []ServiceInfo {
 	serviceInfos := []ServiceInfo{}
-	for _, line := range strings.Split(services, "\n") {
+	for line := range strings.SplitSeq(services, "\n") {
 		if line == "" {
 			continue
 		}

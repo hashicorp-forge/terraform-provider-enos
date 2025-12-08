@@ -81,12 +81,9 @@ func TestPublicIPAddressResolver_add_ips(t *testing.T) {
 			net.ParseIP("3.4.5.6"),
 		},
 	} {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			pubip.addIPs(ips)
-		}()
+		})
 	}
 
 	expectedV4 := []net.IP{

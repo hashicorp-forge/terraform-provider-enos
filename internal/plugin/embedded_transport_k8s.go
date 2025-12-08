@@ -120,7 +120,7 @@ func (em *embeddedTransportK8Sv1) IsConfigured() bool {
 }
 
 func (em *embeddedTransportK8Sv1) FromTerraform5Value(val tftypes.Value) (err error) {
-	em.Values, err = mapAttributesTo(val, map[string]interface{}{
+	em.Values, err = mapAttributesTo(val, map[string]any{
 		"kubeconfig_base64": em.KubeConfigBase64,
 		"context_name":      em.ContextName,
 		"namespace":         em.Namespace,

@@ -610,7 +610,7 @@ func (s *bundleInstallStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Value with As().
 func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"id":          s.ID,
 		"destination": s.Destination,
 		"path":        s.Path,
@@ -625,7 +625,7 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 	release, ok := vals["release"]
 	if ok {
 		if release.IsKnown() && !release.IsNull() {
-			_, err = mapAttributesTo(release, map[string]interface{}{
+			_, err = mapAttributesTo(release, map[string]any{
 				"product": s.Release.Product,
 				"version": s.Release.Version,
 				"edition": s.Release.Edition,
@@ -639,7 +639,7 @@ func (s *bundleInstallStateV1) FromTerraform5Value(val tftypes.Value) error {
 	atf, ok := vals["artifactory"]
 	if ok {
 		if atf.IsKnown() && !atf.IsNull() {
-			_, err = mapAttributesTo(atf, map[string]interface{}{
+			_, err = mapAttributesTo(atf, map[string]any{
 				"username": s.Artifactory.Username,
 				"token":    s.Artifactory.Token,
 				"url":      s.Artifactory.URL,

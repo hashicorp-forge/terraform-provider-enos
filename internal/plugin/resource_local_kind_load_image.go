@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/distribution/reference"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -199,7 +201,7 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 	}
 
 	// sets up a logger that will include the state in every log message
-	logger := log.NewLogger(ctx).WithValues(map[string]interface{}{
+	logger := log.NewLogger(ctx).WithValues(map[string]any{
 		"id":      plannedState.ID.Value(),
 		"cluster": plannedState.ClusterName.Value(),
 		"image":   plannedState.Image.Value(),
@@ -250,31 +252,41 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 		}
 
 		var loadedImage *docker.ImageRef
-		for _, info := range result.Images {
-			if info.Repository == plannedState.Image.Value() {
-				for _, tagInfo := range info.Tags {
-					if tagInfo.Tag == plannedState.Tag.Value() {
-						loadedImage = &docker.ImageRef{
-							Repository: info.Repository,
-							Tag:        tagInfo.Tag,
-						}
-
-						break
-					}
+		ref := plannedState.Image.Value()
+		tag := plannedState.Tag.Value()
+		loadedImage = getImageRef(result.Images, ref, tag)
+		if loadedImage == nil {
+			// We couldn't find the image. We'll try again accounting for the mismatch
+			// in behavior between container images that include Docker v1.1 metadata
+			// and domainless references. Check if we're searching for a domainless
+			// reference and if so, try using the default domain (docker.io). We'll
+			// ignore the error case of parsing because it'll result in no image found
+			// and we'll bubble up all the necessary diagnostics in the next block.
+			normalized, err := reference.ParseDockerRef(ref + ":" + tag)
+			if err == nil {
+				domain := reference.Domain(normalized)
+				if reference.Path(normalized) == ref && domain != "" {
+					ref = domain + "/" + ref
+					loadedImage = getImageRef(result.Images, ref, tag)
 				}
 			}
 		}
 
 		if loadedImage == nil {
+			detail := strings.Builder{}
+			detail.WriteString("None of the loaded images match the configured image")
+			detail.WriteString(fmt.Sprintf("Image %s\nTag %s\nImages %#v\n",
+				plannedState.Image.Value(),
+				plannedState.Tag.Value(),
+				result,
+			))
+			if err != nil {
+				detail.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
+			}
 			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
 				Summary:  "Image Load Failed",
-				Detail:   "None of the loaded images match the configured image",
-			})
-			tflog.Error(ctx, "None of the loaded images match the configured image", map[string]interface{}{
-				"image":         plannedState.Image.Value(),
-				"tag":           plannedState.Tag.Value(),
-				"loaded_images": fmt.Sprintf("%#v", result),
+				Detail:   detail.String(),
 			})
 
 			return
@@ -305,6 +317,23 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 		})
 	}
 	// if you put anything here, it must be applicable for any of the create, update or delete cases
+}
+
+func getImageRef(images []docker.ImageInfo, repo, tag string) *docker.ImageRef {
+	for _, info := range images {
+		if info.Repository == repo {
+			for _, tagInfo := range info.Tags {
+				if tagInfo.Tag == tag {
+					return &docker.ImageRef{
+						Repository: info.Repository,
+						Tag:        tagInfo.Tag,
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (k *localKindLoadImageStateV1) Schema() *tfprotov6.Schema {
@@ -413,7 +442,7 @@ func (k *localKindLoadImageStateV1) Validate(ctx context.Context) error {
 }
 
 func (k *localKindLoadImageStateV1) FromTerraform5Value(val tftypes.Value) error {
-	_, err := mapAttributesTo(val, map[string]interface{}{
+	_, err := mapAttributesTo(val, map[string]any{
 		"id":            k.ID,
 		"cluster_name":  k.ClusterName,
 		"image":         k.Image,
@@ -467,7 +496,7 @@ func (l *loadedImagesStateV1) Terraform5Value() tftypes.Value {
 }
 
 func (l *loadedImagesStateV1) FromTerraform5Value(val tftypes.Value) error {
-	_, err := mapAttributesTo(val, map[string]interface{}{
+	_, err := mapAttributesTo(val, map[string]any{
 		"repository": l.Repository,
 		"tag":        l.Tag,
 		"nodes":      l.Nodes,

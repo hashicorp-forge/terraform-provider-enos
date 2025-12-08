@@ -152,11 +152,11 @@ func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error
 		random.ID(),
 	))
 
-	fileOperations := func(ctx context.Context) (interface{}, error) {
+	fileOperations := func(ctx context.Context) (any, error) {
 		var err error
 		var stdout string
 		var stderr string
-		var res interface{}
+		var res any
 
 		err = tr.Copy(ctx, file.Content, tmpPath)
 		if err != nil {
@@ -236,8 +236,8 @@ func DeleteFile(ctx context.Context, tr it.Transport, req *DeleteFileRequest) er
 		return errors.New("no file delete request provided")
 	}
 
-	rmFile := func(ctx context.Context) (interface{}, error) {
-		var res interface{}
+	rmFile := func(ctx context.Context) (any, error) {
+		var res any
 		stdout, stderr, err := tr.Run(ctx, command.New("rm -r "+req.Path+" || sudo rm -r "+req.Path))
 		if err != nil {
 			return res, WrapErrorWith(err, stdout, stderr, "deleting file")
