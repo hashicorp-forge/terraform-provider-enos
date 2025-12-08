@@ -271,10 +271,10 @@ func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImage
 	defer tarFile.Close()
 
 	for _, node := range nodes {
-		// Sometimes our image load can fail. This could be race but for now we'll
-		// simply retry it.
+		// Very occasionally our image will fail to load on our all our nodes. I
+		// suspect a race but for now we'll simply retry it in these cases.
 		// TODO(ryan): Why aren't we using "kind load docker-image <ref> --name <controller-cluster>"
-		req, _ := retry.NewRetrier(
+		req, err := retry.NewRetrier(
 			retry.WithMaxRetries(2),
 			retry.WithIntervalFunc(retry.IntervalDuration(2*time.Second)),
 			retry.WithRetrierFunc(func(context.Context) (any, error) {
@@ -284,11 +284,15 @@ func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImage
 					return node.String(), nil
 				}
 
-				return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
-			}))
-		_, err := retry.Retry(context.Background(), req)
+				return result, err
+			}),
+		)
 		if err != nil {
-			return result, err
+			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
+		}
+		_, err = retry.Retry(context.Background(), req)
+		if err != nil {
+			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
 		}
 	}
 

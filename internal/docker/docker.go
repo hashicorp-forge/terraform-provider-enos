@@ -66,7 +66,9 @@ func GetImageInfos(archivePath string) ([]ImageInfo, error) {
 	tfs := tar2go.NewIndex(f).FS()
 
 	// Try Docker repositories metadata as it has historically been what we've
-	// done for determining our image information.
+	// done for determining our image information. If the file isn't there (and
+	// going forward it likely won't be), we'll fall back to our more complicated
+	// OCI metadata path.
 	rf, err := tfs.Open("repositories")
 	if err == nil {
 		return getImageInfoDockerMetadata(rf)

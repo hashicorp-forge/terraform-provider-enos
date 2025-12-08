@@ -259,7 +259,9 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 			// We couldn't find the image. We'll try again accounting for the mismatch
 			// in behavior between container images that include Docker v1.1 metadata
 			// and domainless references. Check if we're searching for a domainless
-			// reference and if so, try using the default domain (docker.io).
+			// reference and if so, try using the default domain (docker.io). We'll
+			// ignore the error case of parsing because it'll result in no image found
+			// and we'll bubble up all the necessary diagnostics in the next block.
 			normalized, err := reference.ParseDockerRef(ref + ":" + tag)
 			if err == nil {
 				domain := reference.Domain(normalized)
