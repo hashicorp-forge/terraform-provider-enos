@@ -27,9 +27,9 @@ func TestRetry_SuccessfulFirstAttempt(t *testing.T) {
 	defer cancel()
 
 	var attempt int
-	var res interface{}
+	var res any
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
+	funcToRun := func(ctx context.Context) (any, error) {
 		attempt++
 
 		var err error
@@ -60,9 +60,9 @@ func TestRetry_RetryAfterFailedFirstAttempt(t *testing.T) {
 
 	var attempt int
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
+	funcToRun := func(ctx context.Context) (any, error) {
 		attempt++
-		var res interface{}
+		var res any
 		var err error
 
 		// We want to fail on first try and succeed on second try
@@ -95,9 +95,9 @@ func TestRetry_DoesntExceedMaxRetries(t *testing.T) {
 	var attempt int
 	maxRetries := 2
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
+	funcToRun := func(ctx context.Context) (any, error) {
 		attempt++
-		var res interface{}
+		var res any
 
 		// We want to fail on all attempts
 		return res, errors.New("purposefully failing on all attempts")
@@ -122,9 +122,9 @@ func TestRetry_OnlyRetryOnSpecifiedErrors(t *testing.T) {
 
 	var attempt int
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
+	funcToRun := func(ctx context.Context) (any, error) {
 		attempt++
-		var res interface{}
+		var res any
 
 		switch attempt {
 		case 1:
@@ -156,9 +156,9 @@ func TestRetry_Timeout(t *testing.T) {
 	defer cancel()
 
 	var attempt int
-	var res interface{}
+	var res any
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
+	funcToRun := func(ctx context.Context) (any, error) {
 		attempt++
 
 		return res, error1
@@ -180,8 +180,8 @@ func TestRetry_CorrectValueReturned(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
 	defer cancel()
 
-	funcToRun := func(ctx context.Context) (interface{}, error) {
-		var valueToReturn interface{}
+	funcToRun := func(ctx context.Context) (any, error) {
+		var valueToReturn any
 		var err error
 
 		valueToReturn = 1

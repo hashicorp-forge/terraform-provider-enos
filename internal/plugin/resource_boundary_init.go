@@ -522,7 +522,7 @@ func (s *boundaryInitStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Boundary with As().
 func (s *boundaryInitStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"id":          s.ID,
 		"bin_name":    s.BinName,
 		"bin_path":    s.BinPath,

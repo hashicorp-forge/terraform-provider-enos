@@ -28,7 +28,7 @@ type ImageInfo struct {
 // TagInfo information about an image tag.
 type TagInfo struct {
 	Tag string
-	// ID is the docker image ID (final layer hash of the image).
+	// ID is the docker image ID (the hash of the config layer in the image)
 	ID string
 }
 
@@ -65,15 +65,15 @@ func GetImageInfos(archivePath string) ([]ImageInfo, error) {
 
 	tfs := tar2go.NewIndex(f).FS()
 
-	// Try Docker v1.1 as it has historically been what we've done for determining
-	// our image information.
+	// Try Docker repositories metadata as it has historically been what we've
+	// done for determining our image information.
 	rf, err := tfs.Open("repositories")
 	if err == nil {
 		return getImageInfoDockerMetadata(rf)
 	}
 
-	// Docker v1.1 didn't work. The container was probably built with Docker
-	// >=29.0.0 so it's no longer there. Try OCI v1.
+	// Docker repositories didn't work. The container was probably built with
+	// Docker >=29.0.0 so it's no longer there. Try OCI v1.
 	return getImageInfoOCIMetadata(tfs)
 }
 

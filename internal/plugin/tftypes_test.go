@@ -275,14 +275,14 @@ func TestTFObjectGetAndValue(t *testing.T) {
 		desc  string
 		in    func() *tfObject
 		value tftypes.Value
-		val   map[string]interface{}
+		val   map[string]any
 		ok    bool
 	}{
 		{
 			"unknown",
 			func() *tfObject {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				obj.Unknown = true
 
 				return obj
@@ -293,14 +293,14 @@ func TestTFObjectGetAndValue(t *testing.T) {
 					"bar": tftypes.Bool,
 				},
 			}, tftypes.UnknownValue),
-			map[string]interface{}{},
+			map[string]any{},
 			false,
 		},
 		{
 			"null",
 			func() *tfObject {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				obj.Null = true
 
 				return obj
@@ -311,14 +311,14 @@ func TestTFObjectGetAndValue(t *testing.T) {
 					"bar": tftypes.Bool,
 				},
 			}, nil),
-			map[string]interface{}{},
+			map[string]any{},
 			false,
 		},
 		{
 			"fully known",
 			func() *tfObject {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 
 				return obj
 			},
@@ -331,14 +331,14 @@ func TestTFObjectGetAndValue(t *testing.T) {
 				"foo": tftypes.NewValue(tftypes.String, "foo"),
 				"bar": tftypes.NewValue(tftypes.Bool, false),
 			}),
-			map[string]interface{}{"foo": "foo", "bar": false},
+			map[string]any{"foo": "foo", "bar": false},
 			true,
 		},
 		{
 			"known with unknown child",
 			func() *tfObject {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Unknown: true}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Unknown: true}, "bar": &tfBool{Val: false}})
 
 				return obj
 			},
@@ -351,7 +351,7 @@ func TestTFObjectGetAndValue(t *testing.T) {
 				"foo": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
 				"bar": tftypes.NewValue(tftypes.Bool, false),
 			}),
-			map[string]interface{}{},
+			map[string]any{},
 			false,
 		},
 	} {
@@ -373,14 +373,14 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 		desc  string
 		in    func() *tfObjectSlice
 		value tftypes.Value
-		val   []map[string]interface{}
+		val   []map[string]any
 		ok    bool
 	}{
 		{
 			"unknown",
 			func() *tfObjectSlice {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
@@ -394,14 +394,14 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 					"bar": tftypes.Bool,
 				},
 			}}, tftypes.UnknownValue),
-			[]map[string]interface{}{},
+			[]map[string]any{},
 			false,
 		},
 		{
 			"null",
 			func() *tfObjectSlice {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
@@ -415,14 +415,14 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 					"bar": tftypes.Bool,
 				},
 			}}, nil),
-			[]map[string]interface{}{},
+			[]map[string]any{},
 			false,
 		},
 		{
 			"fully known",
 			func() *tfObjectSlice {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Val: "foo"}, "bar": &tfBool{Val: false}})
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
@@ -443,14 +443,14 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				"foo": tftypes.NewValue(tftypes.String, "foo"),
 				"bar": tftypes.NewValue(tftypes.Bool, false),
 			})}),
-			[]map[string]interface{}{{"foo": "foo", "bar": false}},
+			[]map[string]any{{"foo": "foo", "bar": false}},
 			true,
 		},
 		{
 			"known with unknown child",
 			func() *tfObjectSlice {
 				obj := newTfObject()
-				obj.Set(map[string]interface{}{"foo": &tfString{Unknown: true}, "bar": &tfBool{Val: false}})
+				obj.Set(map[string]any{"foo": &tfString{Unknown: true}, "bar": &tfBool{Val: false}})
 				objs := newTfObjectSlice()
 				objs.AttrTypes = map[string]tftypes.Type{"foo": tftypes.String, "bar": tftypes.Bool}
 				objs.Set([]*tfObject{obj})
@@ -471,7 +471,7 @@ func TestTFObjectSliceGetAndValue(t *testing.T) {
 				"foo": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
 				"bar": tftypes.NewValue(tftypes.Bool, false),
 			})}),
-			[]map[string]interface{}{},
+			[]map[string]any{},
 			false,
 		},
 	} {
@@ -625,7 +625,7 @@ func TestDebugTfObject(t *testing.T) {
 	t.Parallel()
 
 	object := newTfObject()
-	object.Set(map[string]interface{}{
+	object.Set(map[string]any{
 		"one":    1,
 		"true":   true,
 		"string": "string",
@@ -656,21 +656,21 @@ func TestDebugTfObjectSlice(t *testing.T) {
 	t.Parallel()
 
 	o1 := newTfObject()
-	o1.Set(map[string]interface{}{
+	o1.Set(map[string]any{
 		"one":    1,
 		"true":   true,
 		"string": "string",
 	})
 
 	o2 := newTfObject()
-	o2.Set(map[string]interface{}{
+	o2.Set(map[string]any{
 		"two":   1,
 		"false": false,
 		"slice": []string{"bananas", "mangos"},
 	})
 
 	o3 := newTfObject()
-	o3.Set(map[string]interface{}{
+	o3.Set(map[string]any{
 		"one": map[string]string{"a": "a", "b": "b"},
 	})
 

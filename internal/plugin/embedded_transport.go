@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"text/template"
@@ -556,10 +558,8 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 	// Because the transport type is a dynamic pseudo type we have to manually ensure
 	// that the user hasn't set any unknown attributes.
 	isKnownAttribute := func(attr string) error {
-		for _, known := range knownAttributes {
-			if attr == known {
-				return nil
-			}
+		if slices.Contains(knownAttributes, attr) {
+			return nil
 		}
 
 		return AttributePathError(
@@ -579,9 +579,7 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 
 func copyValues(values map[string]tftypes.Value) map[string]tftypes.Value {
 	newVals := map[string]tftypes.Value{}
-	for key, value := range values {
-		newVals[key] = value
-	}
+	maps.Copy(newVals, values)
 
 	return newVals
 }

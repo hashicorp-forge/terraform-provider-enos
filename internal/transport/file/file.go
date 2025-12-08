@@ -52,7 +52,7 @@ func (f *copyableFile) IsDir() bool {
 	return f.info.IsDir()
 }
 
-func (f *copyableFile) Sys() interface{} {
+func (f *copyableFile) Sys() any {
 	return f.info.Sys()
 }
 

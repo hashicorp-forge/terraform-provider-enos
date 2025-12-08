@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -501,7 +502,7 @@ func (tc transportconfig) k8s(config configmap) transportconfig {
 	return tc
 }
 
-func (tc transportconfig) k8sValue(key string, value interface{}) transportconfig {
+func (tc transportconfig) k8sValue(key string, value any) transportconfig {
 	if _, ok := tc[K8S]; !ok {
 		tc[K8S] = configmap{}
 	}
@@ -515,7 +516,7 @@ func (tc transportconfig) ssh(config configmap) transportconfig {
 	return tc
 }
 
-func (tc transportconfig) sshValue(key string, value interface{}) transportconfig {
+func (tc transportconfig) sshValue(key string, value any) transportconfig {
 	if _, ok := tc[SSH]; !ok {
 		tc[SSH] = configmap{}
 	}
@@ -529,7 +530,7 @@ func (tc transportconfig) nomad(config configmap) transportconfig {
 	return tc
 }
 
-func (tc transportconfig) nomadValue(key string, value interface{}) transportconfig {
+func (tc transportconfig) nomadValue(key string, value any) transportconfig {
 	if _, ok := tc[NOMAD]; !ok {
 		tc[NOMAD] = configmap{}
 	}
@@ -546,13 +547,11 @@ func (tc transportconfig) build(t *testing.T) *embeddedTransportV1 {
 	return transport
 }
 
-type configmap map[string]interface{}
+type configmap map[string]any
 
 func (c configmap) copy() configmap {
 	newConfigmap := configmap{}
-	for k, v := range c {
-		newConfigmap[k] = v
-	}
+	maps.Copy(newConfigmap, c)
 
 	return newConfigmap
 }

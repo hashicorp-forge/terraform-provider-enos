@@ -49,13 +49,13 @@ func TransportDebugFailureHandler(et *embeddedTransportV1) FailureHandler {
 func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string) FailureHandler {
 	return func(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
 		logger := log.NewLogger(ctx)
-		logger = logger.WithValues(map[string]interface{}{
+		logger = logger.WithValues(map[string]any{
 			"app_names": appNames,
 		})
 
 		cfg := newProviderConfig()
 		if err := cfg.FromTerraform5Value(providerConfig); err != nil {
-			logger.Error("failed to get data dir", map[string]interface{}{
+			logger.Error("failed to get data dir", map[string]any{
 				"error": err,
 			})
 
@@ -72,14 +72,14 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 		var err error
 		switch transport := et.resolvedTransport.(type) {
 		case *embeddedTransportSSHv1:
-			logger = logger.WithValues(map[string]interface{}{
+			logger = logger.WithValues(map[string]any{
 				"user": transport.User.Val,
 				"host": transport.Host.Val,
 			})
 			logger.Info("Attempting to gather systemd logs")
 			responses, err = getSystemdLogs(ctx, logger, transport, appNames)
 		case *embeddedTransportNomadv1:
-			logger = logger.WithValues(map[string]interface{}{
+			logger = logger.WithValues(map[string]any{
 				"allocation_id": transport.AllocationID.Val,
 				"task":          transport.TaskName.Val,
 				"host":          transport.Host.Val,
@@ -87,7 +87,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			logger.Info("Attempting to gather Nomad task logs")
 			responses, err = getNomadLogs(ctx, transport)
 		case *embeddedTransportK8Sv1:
-			logger = logger.WithValues(map[string]interface{}{
+			logger = logger.WithValues(map[string]any{
 				"context_name": transport.ContextName.Val,
 				"namespace":    transport.Namespace.Val,
 				"pod":          transport.Pod.Val,
@@ -96,7 +96,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			logger.Info("Attempting to gather Kubernetes pod logs")
 			responses, err = getK8sLogs(ctx, transport)
 		default:
-			logger.Error("failed to get logs, unknown transport type", map[string]interface{}{
+			logger.Error("failed to get logs, unknown transport type", map[string]any{
 				"transport_type": string(transport.Type()),
 			})
 
@@ -104,7 +104,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 		}
 
 		if err != nil {
-			logger.Error("failed to get logs", map[string]interface{}{
+			logger.Error("failed to get logs", map[string]any{
 				"error": err,
 			})
 		}
@@ -117,7 +117,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 		for _, resp := range responses {
 			appName := resp.GetAppName()
 			logFile := filepath.Join(dataDir, resp.GetLogFileName())
-			logger = logger.WithValues(map[string]interface{}{
+			logger = logger.WithValues(map[string]any{
 				"app_name": appName,
 				"log_file": logFile,
 			})
@@ -125,7 +125,7 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 			logger.Info("Got logs, writing to a file")
 
 			if err := saveLogsToFile(logFile, resp.GetLogs()); err != nil {
-				logger.Error("failed to save logs to file", map[string]interface{}{
+				logger.Error("failed to save logs to file", map[string]any{
 					"error": err,
 				})
 
