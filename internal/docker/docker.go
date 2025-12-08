@@ -4,12 +4,19 @@
 package docker
 
 import (
-	"archive/tar"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/cpuguy83/tar2go"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ImageInfo information about a docker image.
@@ -21,7 +28,7 @@ type ImageInfo struct {
 // TagInfo information about an image tag.
 type TagInfo struct {
 	Tag string
-	// ID docker image ID
+	// ID is the docker image ID (final layer hash of the image).
 	ID string
 }
 
@@ -39,8 +46,6 @@ func (i *ImageInfo) String() string {
 	return fmt.Sprintf("%#v", i)
 }
 
-var repositoriesFile = "repositories"
-
 // TODO: do we need this function
 // GetImageRefs creates a slice of all the image refs, where an image ref is Repository:Tag.
 func (i *ImageInfo) GetImageRefs() []string {
@@ -53,53 +58,135 @@ func (i *ImageInfo) GetImageRefs() []string {
 }
 
 func GetImageInfos(archivePath string) ([]ImageInfo, error) {
-	archiveFile, err := os.Open(archivePath)
+	f, err := os.Open(archivePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open image archive: %s", archivePath)
+		return nil, err
 	}
-	defer archiveFile.Close()
 
-	archiveReader := tar.NewReader(archiveFile)
+	tfs := tar2go.NewIndex(f).FS()
 
-	for {
-		header, err := archiveReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				return nil, errors.New("failed to find docker file manifest")
-			}
+	// Try Docker v1.1 as it has historically been what we've done for determining
+	// our image information.
+	rf, err := tfs.Open("repositories")
+	if err == nil {
+		return getImageInfoDockerMetadata(rf)
+	}
 
-			return nil, fmt.Errorf("failed to read archive contents due to: %w", err)
+	// Docker v1.1 didn't work. The container was probably built with Docker
+	// >=29.0.0 so it's no longer there. Try OCI v1.
+	return getImageInfoOCIMetadata(tfs)
+}
+
+func getImageInfoDockerMetadata(repoFile fs.File) ([]ImageInfo, error) {
+	repositories, err := io.ReadAll(repoFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read container image 'repositories' file: %w", err)
+	}
+
+	// repository --> tag --> id
+	var imageInfo map[string]map[string]string
+	err = json.Unmarshal(repositories, &imageInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container image 'repositories' file: %w", err)
+	}
+
+	infos := []ImageInfo{}
+	for repo, info := range imageInfo {
+		var tags []TagInfo
+		for tag, id := range info {
+			tags = append(tags, TagInfo{
+				Tag: tag,
+				ID:  id,
+			})
 		}
-		fileInfo := header.FileInfo()
-		if fileInfo.Name() == repositoriesFile {
-			repositories, err := io.ReadAll(archiveReader)
+		infos = append(infos, ImageInfo{
+			Repository: repo,
+			Tags:       tags,
+		})
+	}
+
+	return sortImageInfos(infos), nil
+}
+
+func getImageInfoOCIMetadata(tfs fs.FS) ([]ImageInfo, error) {
+	idxb, err := fs.ReadFile(tfs, "index.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read container image OCI 'index.json' file: %w", err)
+	}
+
+	var idx ocispec.Index
+	err = json.Unmarshal(idxb, &idx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container image OCI 'index.json' file: %w", err)
+	}
+
+	// Iterate through the manifests and create our information.
+	if len(idx.Manifests) < 1 {
+		return nil, errors.New("container 'index.json' file does not contain any manifests")
+	}
+	var infos []ImageInfo
+	resolvedIDS := map[string]string{}
+
+	for _, manifest := range idx.Manifests {
+		manifestDigest := manifest.Digest.Encoded()
+
+		// Get the container ID. First, find the manifest blob and then get the config
+		// layer SHA from it.
+		id, ok := resolvedIDS[manifestDigest]
+		if !ok {
+			manb, err := fs.ReadFile(tfs, filepath.Join("blobs", "sha256", manifestDigest))
 			if err != nil {
-				return nil, fmt.Errorf("failed to read %s file due to: %w", repositoriesFile, err)
+				return nil, fmt.Errorf("failed to read container manifest blob '%s': %w", manifestDigest, err)
 			}
 
-			// repository --> tag --> id
-			var imageInfo map[string]map[string]string
-			err = json.Unmarshal(repositories, &imageInfo)
+			var man ocispec.Manifest
+			err = json.Unmarshal(manb, &man)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal %s file, due to: %w", repositoriesFile, err)
+				return nil, fmt.Errorf("failed to unmarshal container manifest blob '%s': %w", manifestDigest, err)
 			}
 
-			var infos []ImageInfo
-			for repo, info := range imageInfo {
-				var tags []TagInfo
-				for tag, id := range info {
-					tags = append(tags, TagInfo{
-						Tag: tag,
+			// The identifier of the image is the SHA256 of the "config" layer.
+			id = man.Config.Digest.Encoded()
+			resolvedIDS[manifestDigest] = id
+		}
+
+		for name, value := range manifest.Annotations {
+			if name != "io.containerd.image.name" {
+				continue
+			}
+
+			// Split the image name into the repository and the tag
+			// e.g: docker.io/hashicorp/vault-enterprise:1.22.0-beta1-ent
+			parts := strings.SplitN(value, ":", 2)
+
+			// Add our ImageInfo to infos
+			infos = append(infos, ImageInfo{
+				Repository: parts[0],
+				Tags: []TagInfo{
+					{
 						ID:  id,
-					})
-				}
-				infos = append(infos, ImageInfo{
-					Repository: repo,
-					Tags:       tags,
-				})
-			}
-
-			return infos, nil
+						Tag: parts[1],
+					},
+				},
+			})
 		}
 	}
+
+	return sortImageInfos(infos), nil
+}
+
+// sortImageInfos sorts ImageInfo by repository name.
+func sortImageInfos(in []ImageInfo) []ImageInfo {
+	if len(in) < 2 {
+		return in
+	}
+
+	slices.SortStableFunc(in, func(a ImageInfo, b ImageInfo) int {
+		return cmp.Or(
+			strings.Compare(a.Repository, b.Repository),
+			cmp.Compare(len(a.Tags), len(b.Tags)),
+		)
+	})
+
+	return in
 }
