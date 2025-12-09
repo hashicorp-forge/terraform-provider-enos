@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"sigs.k8s.io/kind/pkg/cmd"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
-	"github.com/hashicorp-forge/terraform-provider-enos/internal/retry"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/docker"
 
@@ -263,37 +263,26 @@ func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImage
 	if len(nodes) == 0 {
 		return result, fmt.Errorf("no nodes found for cluster: [%s]", clusterName)
 	}
-
 	tarFile, err := os.Open(archive)
 	if err != nil {
 		return result, fmt.Errorf("failed to open image archive: [%s], due to: %w", archive, err)
 	}
 	defer tarFile.Close()
 
-	for _, node := range nodes {
-		// Very occasionally our image will fail to load on our all our nodes. I
-		// suspect a race but for now we'll simply retry it in these cases.
-		// TODO(ryan): Why aren't we using "kind load docker-image <ref> --name <controller-cluster>"
-		req, err := retry.NewRetrier(
-			retry.WithMaxRetries(2),
-			retry.WithIntervalFunc(retry.IntervalDuration(2*time.Second)),
-			retry.WithRetrierFunc(func(context.Context) (any, error) {
-				err := nodeutils.LoadImageArchive(node, tarFile)
-				if err == nil {
-					result.Nodes = append(result.Nodes, node.String())
-					return node.String(), nil
-				}
+	for i, node := range nodes {
+		if i != 0 {
+			_, err := tarFile.Seek(0, io.SeekStart)
+			if err != nil {
+				return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
+			}
+		}
 
-				return result, err
-			}),
-		)
+		err = nodeutils.LoadImageArchive(node, tarFile)
 		if err != nil {
 			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
 		}
-		_, err = retry.Retry(context.Background(), req)
-		if err != nil {
-			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
-		}
+
+		result.Nodes = append(result.Nodes, node.String())
 	}
 
 	return result, nil
