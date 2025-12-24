@@ -62,6 +62,19 @@ resource "aws_instance" "this" {
   }
 
   tags = var.tags
+
+  # Ensure the root EBS volume is encrypted
+  root_block_device {
+    encrypted               = true
+    delete_on_termination   = true
+  }
+
+  # Require IMDSv2
+  metadata_options {
+    http_tokens               = "required"
+    http_endpoint             = "enabled"
+    http_put_response_hop_limit = 1
+  }
 }
 
 data "enos_environment" "this" {}
