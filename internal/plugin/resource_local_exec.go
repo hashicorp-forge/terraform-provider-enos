@@ -455,7 +455,8 @@ func (s *localExecStateV1) Validate(ctx context.Context) error {
 	for _, path := range scripts {
 		f, err = tfile.Open(path)
 		if err != nil {
-			return AttributePathError(fmt.Errorf("validation error, unable to open script file: [%s], due to: %w", path, err),
+			return AttributePathError(
+				fmt.Errorf("validation error, unable to open script file: [%s], due to: %w", path, err),
 				"scripts",
 			)
 		}

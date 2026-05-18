@@ -45,7 +45,8 @@ func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 			}
 
 			if !okacc || !oktoken {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+				t.Logf(
+					`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)
@@ -156,7 +157,8 @@ items.find(
 			}
 
 			if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+				t.Logf(
+					`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)

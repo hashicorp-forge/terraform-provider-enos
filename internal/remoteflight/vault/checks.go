@@ -54,7 +54,8 @@ func CheckStateAllPodsHavePhase(phase v1.PodPhase) CheckStater {
 		var err error
 		for i := range s.PodList.Pods.Items {
 			if s.PodList.Pods.Items[i].Status.Phase != phase {
-				err = errors.Join(err, fmt.Errorf("expected pod %s to have phase %s, got %s, message: %s, reason: %s",
+				err = errors.Join(err, fmt.Errorf(
+					"expected pod %s to have phase %s, got %s, message: %s, reason: %s",
 					s.PodList.Pods.Items[i].Name,
 					phase,
 					s.PodList.Pods.Items[i].Status.Phase,
@@ -90,7 +91,8 @@ func CheckStatePodHasPhase(name string, phase v1.PodPhase) CheckStater {
 			}
 
 			if s.PodList.Pods.Items[i].Status.Phase != phase {
-				return fmt.Errorf("expected pod %s to have phase %s, got %s, message: %s, reason: %s",
+				return fmt.Errorf(
+					"expected pod %s to have phase %s, got %s, message: %s, reason: %s",
 					name,
 					phase,
 					s.PodList.Pods.Items[i].Status.Phase,
@@ -121,7 +123,8 @@ func CheckStateAllContainersAreReady() CheckStater {
 		for i := range s.PodList.Pods.Items {
 			for ic := range s.PodList.Pods.Items[i].Status.ContainerStatuses {
 				if !s.PodList.Pods.Items[i].Status.ContainerStatuses[ic].Ready {
-					err = errors.Join(fmt.Errorf("container %s is not ready",
+					err = errors.Join(fmt.Errorf(
+						"container %s is not ready",
 						s.PodList.Pods.Items[i].Status.ContainerStatuses[ic].Name,
 					))
 				}
@@ -158,7 +161,8 @@ func CheckStateAllPodContainersAreReady(podName string) CheckStater {
 			var err error
 			for ic := range s.PodList.Pods.Items[i].Status.ContainerStatuses {
 				if !s.PodList.Pods.Items[i].Status.ContainerStatuses[ic].Ready {
-					err = errors.Join(fmt.Errorf("container %s is not ready",
+					err = errors.Join(fmt.Errorf(
+						"container %s is not ready",
 						s.PodList.Pods.Items[i].Status.ContainerStatuses[ic].Name,
 					))
 				}
@@ -322,7 +326,8 @@ func CheckStateHasHealthStatusOf(statuses ...HealthStatus) CheckStater {
 			return nil
 		}
 
-		return fmt.Errorf("checking vault health status: expected one of /v1/sys/health statuses: %v, got /v1/sys/health status: %s",
+		return fmt.Errorf(
+			"checking vault health status: expected one of /v1/sys/health statuses: %v, got /v1/sys/health status: %s",
 			statuses,
 			s.Health.Status(),
 		)
@@ -551,7 +556,8 @@ func CheckStateAutopilotHasLeader() CheckStater {
 		for i := range s.AutopilotState.Data.Servers {
 			if s.AutopilotState.Data.Servers[i].Status == "leader" {
 				if s.AutopilotState.Data.Servers[i].Name != s.AutopilotState.Data.Leader {
-					return fmt.Errorf("checking if vault has an autopilot leader: mismatch on leader, servers data has %s, data has %s",
+					return fmt.Errorf(
+						"checking if vault has an autopilot leader: mismatch on leader, servers data has %s, data has %s",
 						s.AutopilotState.Data.Servers[i].Name, s.AutopilotState.Data.Leader,
 					)
 				}

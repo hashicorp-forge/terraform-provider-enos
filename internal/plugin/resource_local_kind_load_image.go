@@ -275,7 +275,8 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 		if loadedImage == nil {
 			detail := strings.Builder{}
 			detail.WriteString("None of the loaded images match the configured image")
-			detail.WriteString(fmt.Sprintf("Image %s\nTag %s\nImages %#v\n",
+			detail.WriteString(fmt.Sprintf(
+				"Image %s\nTag %s\nImages %#v\n",
 				plannedState.Image.Value(),
 				plannedState.Tag.Value(),
 				result,

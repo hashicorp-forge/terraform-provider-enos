@@ -126,7 +126,8 @@ func Unzip(ctx context.Context, tr transport.Transport, ur *UnzipRequest) (*Unzi
 	default:
 	}
 
-	cmd := fmt.Sprintf("%s unzip --source '%s' --destination '%s' --mode '%s' --destination-mode '%s' --create-destination=%t --replace=%t",
+	cmd := fmt.Sprintf(
+		"%s unzip --source '%s' --destination '%s' --mode '%s' --destination-mode '%s' --create-destination=%t --replace=%t",
 		ur.FlightControlPath,
 		ur.SourcePath,
 		ur.DestinationDirectory,

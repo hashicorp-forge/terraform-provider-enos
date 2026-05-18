@@ -564,7 +564,8 @@ func verifyConfiguration(knownAttributes []string, values map[string]tftypes.Val
 
 		return AttributePathError(
 			fmt.Errorf("unsupported argument, an argument named \"%s\" is not expected here", attr),
-			"transport", transportType, attr)
+			"transport", transportType, attr,
+		)
 	}
 
 	for attribute := range values {

@@ -61,7 +61,8 @@ func (s *vaultStorageConfig) Set(set *vaultStorageConfigSet) {
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vault storage config", val.String()),
+		return AttributePathError(
+			fmt.Errorf("cannot unmarshal %s into nil vault storage config", val.String()),
 			"config", "storage",
 		)
 	}
@@ -108,7 +109,8 @@ func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 				return err
 			}
 		default:
-			return AttributePathError(fmt.Errorf("unknown configuration '%s', known values are 'type', 'attributes', or 'retry_join'", k),
+			return AttributePathError(
+				fmt.Errorf("unknown configuration '%s', known values are 'type', 'attributes', or 'retry_join'", k),
 				"config", "storage",
 			)
 		}

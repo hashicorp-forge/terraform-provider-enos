@@ -147,7 +147,8 @@ func CopyFile(ctx context.Context, tr it.Transport, file *CopyFileRequest) error
 		return errors.New("you must supply a destination path")
 	}
 
-	tmpPath := filepath.Join(file.TmpDir, fmt.Sprintf("%s-%s",
+	tmpPath := filepath.Join(file.TmpDir, fmt.Sprintf(
+		"%s-%s",
 		filepath.Base(file.Destination),
 		random.ID(),
 	))

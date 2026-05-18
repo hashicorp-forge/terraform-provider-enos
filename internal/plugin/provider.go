@@ -115,7 +115,8 @@ func (p *Provider) Validate(ctx context.Context, req *tfprotov6.ValidateProvider
 		}
 		if !info.IsDir() {
 			res.Diagnostics = append(res.Diagnostics,
-				diags.ErrToDiagnostic("Validation Error",
+				diags.ErrToDiagnostic(
+					"Validation Error",
 					ValidationError("configured diagnostics dir is not a directory", "debug_data_root_dir"),
 				))
 

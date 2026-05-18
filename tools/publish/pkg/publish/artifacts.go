@@ -65,7 +65,8 @@ type TFCRelease struct {
 // CreateZipArchive takes a source binary and a destination path and creates
 // a zip archive of the binary.
 func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error {
-	a.log.Infow("creating zip archive",
+	a.log.Infow(
+		"creating zip archive",
 		"source", sourceBinaryPath,
 		"destination", zipFilePath,
 	)
@@ -95,7 +96,8 @@ func (a *Artifacts) CreateZipArchive(sourceBinaryPath, zipFilePath string) error
 	zipHeader.Method = zip.Deflate
 	zipHeader.Modified = sourceInfo.ModTime()
 	zipHeader.SetMode(sourceInfo.Mode())
-	a.log.Infow("setting header mode for file",
+	a.log.Infow(
+		"setting header mode for file",
 		"source", sourceBinaryPath,
 		"destination", zipFilePath,
 		"mode", sourceInfo.Mode(),
@@ -662,7 +664,8 @@ func (a *Artifacts) HasVersion(ctx context.Context, version string) (bool, error
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.log.Debugw("checking if version exists",
+	a.log.Debugw(
+		"checking if version exists",
 		"version", version,
 	)
 
@@ -693,7 +696,8 @@ func (a *Artifacts) CopyReleaseArtifactsBetweenRemoteBucketsForVersion(ctx conte
 	}
 
 	for srcFile, destKey := range filesToCopy {
-		a.log.Debugw("copying file",
+		a.log.Debugw(
+			"copying file",
 			"bucket", destBucketName,
 			"source", srcFile,
 			"destination", destKey,
@@ -766,7 +770,8 @@ func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Clie
 			input.ContentType = aws.String("application/json")
 		}
 
-		a.log.Debugw("uploading file to bucket",
+		a.log.Debugw(
+			"uploading file to bucket",
 			"bucket", bucket,
 			"file", key,
 		)

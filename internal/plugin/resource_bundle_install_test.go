@@ -19,9 +19,10 @@ import (
 func TestAccResourceBundleInstall(t *testing.T) {
 	t.Parallel()
 
-	cfg := template.Must(template.New("enos_bundle_install").
-		Funcs(transportRenderFunc).
-		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
+	cfg := template.Must(
+		template.New("enos_bundle_install").
+			Funcs(transportRenderFunc).
+			Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
 		  destination = "{{ .Destination.Value }}"
 
 		  {{ if .Path.Value -}}
@@ -170,7 +171,8 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			artToken, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
 		}
 		if (okuser && !oktoken) || (!okuser && !okbearertoken) {
-			t.Logf(`skipping data bundle install from artifactory test because ARTIFACTORY_BEARER_TOKEN(%t) or ARTIFACTORY_TOKEN(%t) isn't set`,
+			t.Logf(
+				`skipping data bundle install from artifactory test because ARTIFACTORY_BEARER_TOKEN(%t) or ARTIFACTORY_TOKEN(%t) isn't set`,
 				okbearertoken, oktoken,
 			)
 			t.Skip()

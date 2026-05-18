@@ -43,7 +43,8 @@ func (t *transportResourceUtil) ValidateResourceConfig(
 		if pan := recover(); pan != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Serialization Error", fmt.Errorf(
-					"%v state: %+v, config:%+v ", pan, state, req.Config),
+					"%v state: %+v, config:%+v ", pan, state, req.Config,
+				),
 			))
 		}
 	}()
@@ -131,7 +132,8 @@ func (t *transportResourceUtil) ReadResource(
 		if pan := recover(); pan != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Serialization Error", fmt.Errorf(
-					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState),
+					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState,
+				),
 			))
 		}
 	}()
@@ -173,7 +175,8 @@ func (t *transportResourceUtil) ReadUnmarshalAndBuildTransport(
 		if pan := recover(); pan != nil {
 			res.Diagnostics = append(res.Diagnostics, diags.ErrToDiagnostic(
 				"Serialization Error", fmt.Errorf(
-					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState),
+					"%v new state: %+v, current state:%+v ", pan, res.NewState, req.CurrentState,
+				),
 			))
 		}
 	}()

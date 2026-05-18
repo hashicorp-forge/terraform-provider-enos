@@ -28,7 +28,8 @@ func EnsureArtifactoryEnvAuth(t *testing.T) (map[string]string, bool) {
 	}
 
 	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
-		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+		t.Logf(
+			`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 			okacc, oktoken, okbearertoken,
 		)
@@ -57,7 +58,8 @@ func EnsureArtifactoryEnvVars(t *testing.T) (map[string]string, bool) {
 	vars["revision"], okrev = os.LookupEnv("ARTIFACTORY_REVISION")
 
 	if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) || !okver || !okrev {
-		t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+		t.Logf(
+			`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 			TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t), ARTIFACTORY_PRODUCT_VERSION(%t), ARTIFACTORY_REVISION(%t)`,
 			okacc, oktoken, okbearertoken, okver, okrev,
 		)
