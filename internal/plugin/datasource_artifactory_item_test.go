@@ -22,14 +22,14 @@ import (
 //nolint:paralleltest// because our resource handles it
 func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 	for name, props := range map[string]map[string]string{
-		"vault-1.19.1-1.x86_64.rpm": {
-			"build.number": "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
-			"build.name":   "vault-1.19.1",
+		"vault-enterprise-2.0.0+ent-1.x86_64.rpm": {
+			"build.number": "f71c0251abe59d87152bb89e726a025f53a45ddc",
+			"build.name":   "vault-enterprise-2.0.0+ent",
 		},
-		"vault-1.19.2-1.x86_64.rpm": {
-			"commit":          "2ee4ea013b31a770a2fc421bb1e4bc74a9669185",
-			"product-name":    "vault",
-			"product-version": "1.19.2",
+		"vault-enterprise-2.0.0+ent-1.aarch64.rpm": {
+			"commit":          "f71c0251abe59d87152bb89e726a025f53a45ddc",
+			"product-name":    "vault-enterprise",
+			"product-version": "2.0.0+ent",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -44,8 +44,9 @@ func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 				token, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
 			}
 
-			if !okacc || !oktoken {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+			if !okacc || (!oktoken && !okbearertoken) {
+				t.Logf(
+					`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)
@@ -57,8 +58,8 @@ func TestAccDataSourceArtifactoryItemProperties(t *testing.T) {
 			state.Username.Set(username)
 			state.Token.Set(token)
 			state.Host.Set("https://artifactory.hashicorp.engineering/artifactory")
-			state.Repo.Set("hashicorp-crt-staging-local*")
-			state.Path.Set("vault/*")
+			state.Repo.Set("hashicorp-crt-prod-local*")
+			state.Path.Set("vault-enterprise/*")
 			state.Name.Set(name)
 			state.Properties.SetStrings(props)
 
@@ -95,7 +96,7 @@ output "name" {
 					{
 						Config: buf.String(),
 						Check: resource.ComposeTestCheckFunc(
-							resource.TestMatchOutput("name", regexp.MustCompile(name)),
+							resource.TestMatchOutput("name", regexp.MustCompile(`vault\-enterprise`)),
 						),
 					},
 				},
@@ -118,9 +119,9 @@ items.find(
       "$and":
       [
         {"@commit": { "$match": "{{ .SHA }}" }},
-        {"@product-name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
-        {"path": { "$match": "vault/*" }},
+        {"@product-name": { "$match": "vault-enterprise" }},
+        {"repo": { "$match": "hashicorp-crt-prod-local*" }},
+        {"path": { "$match": "vault-enterprise/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
     },
@@ -128,9 +129,9 @@ items.find(
       "$and":
       [
         {"@build.number": { "$match": "{{ .SHA }}" }},
-        {"@build.name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
-        {"path": { "$match": "vault/*" }},
+        {"@build.name": { "$match": "vault-enterprise-2.0.0+ent" }},
+        {"repo": { "$match": "hashicorp-crt-prod-local*" }},
+        {"path": { "$match": "vault-enterprise/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
     }
@@ -138,10 +139,8 @@ items.find(
 }).include("*", "property.*") .sort({"$desc": ["modified"]})`))
 
 	for name, sha := range map[string]string{
-		// New CRT fields
-		"vault_1.19.1-1_amd64.deb": "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
-		// Old CRT fields
-		"vault_1.19.0-1_amd64.deb": "7eeafb6160d60ede73c1d95566b0c8ea54f3cb5a",
+		"vault-enterprise-2.0.0+ent-1.x86_64.rpm":  "f71c0251abe59d87152bb89e726a025f53a45ddc",
+		"vault-enterprise-2.0.0+ent-1.aarch64.rpm": "f71c0251abe59d87152bb89e726a025f53a45ddc",
 	} {
 		t.Run(name, func(t *testing.T) {
 			state := newArtifactoryItemStateV1()
@@ -156,7 +155,8 @@ items.find(
 			}
 
 			if !okacc || (okuser && !oktoken) || (!okuser && !okbearertoken) {
-				t.Logf(`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
+				t.Logf(
+					`skipping data "enos_artifactory_item" test because one or more of the following isn't set:
 					TF_ACC(%t), ARTIFACTORY_TOKEN(%t), ARTIFACTORY_BEARER_TOKEN(%t)`,
 					okacc, oktoken, okbearertoken,
 				)
@@ -204,7 +204,7 @@ output "name" {
 					{
 						Config: buf.String(),
 						Check: resource.ComposeTestCheckFunc(
-							resource.TestMatchOutput("name", regexp.MustCompile(name)),
+							resource.TestMatchOutput("name", regexp.MustCompile(`vault\-enterprise`)),
 						),
 					},
 				},

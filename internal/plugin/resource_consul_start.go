@@ -710,7 +710,8 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 	}
 
 	if minNodes, ok := s.Config.BootstrapExpect.Get(); ok {
-		checks = append(checks,
+		checks = append(
+			checks,
 			consul.CheckStateClusterHasMinNVoters(uint(minNodes)),
 			consul.CheckStateClusterHasMinNHealthyNodes(uint(minNodes)),
 		)

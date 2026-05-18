@@ -167,7 +167,8 @@ func Download(ctx context.Context, tr transport.Transport, dr *DownloadRequest) 
 	default:
 	}
 
-	cmd := fmt.Sprintf("%s download --url '%s' --destination '%s' --mode '%s' --timeout '%s' --replace=%t",
+	cmd := fmt.Sprintf(
+		"%s download --url '%s' --destination '%s' --mode '%s' --timeout '%s' --replace=%t",
 		dr.FlightControlPath,
 		dr.URL,
 		dr.Destination,

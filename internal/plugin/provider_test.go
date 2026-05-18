@@ -22,6 +22,7 @@ func TestProviderSchemaMarshalRoundtrip(t *testing.T) {
 	provider := newProvider()
 	diagnosticsDir := newTfString()
 	diagnosticsDir.Set("/this/is/where/the/diagnostics/be/at")
+	//nolint:gosec // These are hardcoded for tests
 	provider.config.Transport = transportconfig{}.ssh(map[string]any{
 		"user":             "ubuntu",
 		"host":             "localhost",

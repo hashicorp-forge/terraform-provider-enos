@@ -247,7 +247,8 @@ func PackageInstall(ctx context.Context, tr it.Transport, req *PackageInstallReq
 	}
 
 	if !req.Installer.Compatible(req.Getter) {
-		return nil, fmt.Errorf("package installer %s is not compatible with package getter %s",
+		return nil, fmt.Errorf(
+			"package installer %s is not compatible with package getter %s",
 			req.Installer.Type,
 			req.Getter.Type,
 		)

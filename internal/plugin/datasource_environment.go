@@ -108,7 +108,8 @@ func (d *environment) ReadDataSource(ctx context.Context, req tfprotov6.ReadData
 		err = errors.Join(err, errors.New("unable to resolve public ip address"))
 	}
 	if err != nil {
-		res.Diagnostics = append(res.Diagnostics,
+		res.Diagnostics = append(
+			res.Diagnostics,
 			diags.ErrToDiagnostic("Resolve IP Error", fmt.Errorf("failed to resolve public IP addresses, due to: %w", err)),
 		)
 

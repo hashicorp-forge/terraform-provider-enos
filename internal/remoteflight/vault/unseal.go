@@ -186,9 +186,11 @@ func Unseal(ctx context.Context, tr it.Transport, req *UnsealRequest) (*UnsealRe
 				default:
 				}
 
-				_, stderr, err := tr.Run(ctx, command.New(
-					fmt.Sprintf("%s operator unseal %s;", binPath, key),
-					command.WithEnvVar("VAULT_ADDR", vaultAddr)),
+				_, stderr, err := tr.Run(
+					ctx, command.New(
+						fmt.Sprintf("%s operator unseal %s;", binPath, key),
+						command.WithEnvVar("VAULT_ADDR", vaultAddr),
+					),
 				)
 				if err != nil {
 					err = errors.Join(

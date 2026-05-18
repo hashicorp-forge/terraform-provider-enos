@@ -116,7 +116,8 @@ func GetAgentHost(ctx context.Context, tr it.Transport, req *AgentHostRequest) (
 
 // String returns the request as a string.
 func (r *AgentHostRequest) String() string {
-	return fmt.Sprintf("%s download --url '%s/v1/agent/host' --stdout",
+	return fmt.Sprintf(
+		"%s download --url '%s/v1/agent/host' --stdout",
 		r.FlightControlPath,
 		r.ConsulAddr,
 	)

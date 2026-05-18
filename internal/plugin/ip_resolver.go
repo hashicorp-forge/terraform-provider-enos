@@ -114,7 +114,8 @@ func withDNSResolver(
 			}},
 		}
 
-		baseErr := fmt.Sprintf("%s@%s (%s/%s)",
+		baseErr := fmt.Sprintf(
+			"%s@%s (%s/%s)",
 			host, nameserver, qType.String(), qClass.String(),
 		)
 

@@ -80,7 +80,8 @@ func (s *vaultListenerConfig) Set(set *vaultListenerConfigSet) {
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultListenerConfig) FromTerraform5Value(val tftypes.Value) error {
 	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vault listener config", val.String()),
+		return AttributePathError(
+			fmt.Errorf("cannot unmarshal %s into nil vault listener config", val.String()),
 			"config", "listener",
 		)
 	}

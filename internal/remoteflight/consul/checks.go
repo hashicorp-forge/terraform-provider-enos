@@ -59,7 +59,8 @@ func CheckStateClusterHasLeader() CheckStater {
 			}
 		}
 
-		return fmt.Errorf("no raft servers are leader, got response: %v",
+		return fmt.Errorf(
+			"no raft servers are leader, got response: %v",
 			s.RaftConfigurationResponse.String(),
 		)
 	}
@@ -84,7 +85,8 @@ func CheckStateClusterHasMinNHealthyNodes(min uint) CheckStater {
 			return nil
 		}
 
-		return fmt.Errorf("expected minimum of %d healthy nodes, got %d, response: %s",
+		return fmt.Errorf(
+			"expected minimum of %d healthy nodes, got %d, response: %s",
 			min, healthy, s.HealthStatePassingResponse.String(),
 		)
 	}
@@ -109,7 +111,8 @@ func CheckStateClusterHasMinNVoters(min uint) CheckStater {
 			return nil
 		}
 
-		return fmt.Errorf("expected minimum of %d raft voters, got %d, response: %s",
+		return fmt.Errorf(
+			"expected minimum of %d raft voters, got %d, response: %s",
 			min, voters, s.RaftConfigurationResponse.String(),
 		)
 	}

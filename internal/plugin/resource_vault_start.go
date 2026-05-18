@@ -955,12 +955,13 @@ func (s *vaultStartStateV1) startVault(ctx context.Context, transport it.Transpo
 		return fmt.Errorf("failed to start the vault service, due to: %w", err)
 	}
 
-	state, err := vault.WaitForState(timeoutCtx, transport, vault.NewStateRequest(
-		vault.WithStateRequestFlightControlUseHomeDir(),
-		vault.WithStateRequestBinPath(s.BinPath.Value()),
-		vault.WithStateRequestVaultAddr(s.Config.APIAddr.Value()),
-		vault.WithStateRequestSystemdUnitName(unitName),
-	), vault.CheckStateHasSystemdEnabledAndRunningProperties(),
+	state, err := vault.WaitForState(
+		timeoutCtx, transport, vault.NewStateRequest(
+			vault.WithStateRequestFlightControlUseHomeDir(),
+			vault.WithStateRequestBinPath(s.BinPath.Value()),
+			vault.WithStateRequestVaultAddr(s.Config.APIAddr.Value()),
+			vault.WithStateRequestSystemdUnitName(unitName),
+		), vault.CheckStateHasSystemdEnabledAndRunningProperties(),
 		vault.CheckStateSealStateIsKnown(),
 	)
 

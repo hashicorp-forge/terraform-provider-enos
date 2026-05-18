@@ -220,7 +220,8 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 
 // String returns the health status request as an enos-flight-control command string.
 func (r *HealthRequest) String() string {
-	return fmt.Sprintf("%s download --exit-with-status-code --stdout --url '%s/v1/sys/health?standbyok=%t&perfstandbyok=%t&activecode=%d&standbycode=%d&drsecondarycode=%d&performancestandbycode=%d&sealedcode=%d&uninitcode=%d'",
+	return fmt.Sprintf(
+		"%s download --exit-with-status-code --stdout --url '%s/v1/sys/health?standbyok=%t&perfstandbyok=%t&activecode=%d&standbycode=%d&drsecondarycode=%d&performancestandbycode=%d&sealedcode=%d&uninitcode=%d'",
 		r.FlightControlPath,
 		r.VaultAddr,
 		r.StandbyOk,
@@ -306,7 +307,8 @@ func (l *HealthResponseDataLicense) String() string {
 		return ""
 	}
 
-	return fmt.Sprintf("State: %s\nExpiry Time: %s\nTerminated: %t\n",
+	return fmt.Sprintf(
+		"State: %s\nExpiry Time: %s\nTerminated: %t\n",
 		l.State, l.ExpiryTime, l.Terminated,
 	)
 }

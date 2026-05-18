@@ -38,7 +38,7 @@ type Iniable interface {
 }
 
 // Assert that our unit implements the Iniable interface.
-var _ Iniable = (Unit)(nil)
+var _ Iniable = Unit(nil)
 
 // CreateUnitFileRequest is a systemd unit file creator.
 type CreateUnitFileRequest struct {
