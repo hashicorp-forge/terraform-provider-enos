@@ -53,7 +53,7 @@ func (c *cmd) Cmd() string {
 	cmd := strings.Builder{}
 
 	for key, val := range c.env {
-		cmd.WriteString(fmt.Sprintf("%s='%s' ", key, val))
+		fmt.Fprintf(&cmd, "%s='%s' ", key, val)
 	}
 
 	cmd.WriteString(c.cmd)

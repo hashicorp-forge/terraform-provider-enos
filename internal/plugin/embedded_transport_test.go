@@ -19,6 +19,7 @@ import (
 )
 
 var (
+	//nolint:gosec // These are hardcoded for tests
 	sshConfig = configmap{
 		"host":             "localhost",
 		"user":             "ubuntu",
@@ -302,6 +303,7 @@ func TestProviderEmbeddedTransportValidate(t *testing.T) {
 
 	none := transportconfig{}
 
+	//nolint:gosec // These are hardcoded for tests
 	validSSH := transportconfig{}.ssh(configmap{
 		"user":             "ubuntu",
 		"host":             "localhost",

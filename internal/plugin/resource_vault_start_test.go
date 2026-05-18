@@ -309,6 +309,8 @@ func TestAccResourceVaultStart(t *testing.T) {
 }
 
 // Test_sealAttrsToEnvVars tests converting our seal attributes into their respective values.
+//
+//nolint:gosec // G101: these hardcoded secrets are for tests only
 func Test_sealAttrsToEnvVars(t *testing.T) {
 	t.Parallel()
 

@@ -383,6 +383,7 @@ func (a *Artifacts) WriteDetachedSignature(ctx context.Context, source, out, nam
 		"ident_name", name,
 	)
 
+	//nolint:gosec
 	return exec.CommandContext(ctx, "gpg", "--detach-sign", "--local-user", name, source).Run()
 }
 

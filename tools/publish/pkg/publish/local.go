@@ -287,6 +287,7 @@ func (l *Local) AddGoBinariesFrom(binPath string) error {
 				return err
 			}
 
+			//nolint:gosec
 			sourceFile, err := os.Open(releasePath)
 			if err != nil {
 				return err

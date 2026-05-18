@@ -168,13 +168,13 @@ type errTFCAPI struct {
 // Returns the TFCAPI's error title and status.
 func (e *errTFCAPI) String() string {
 	msg := strings.Builder{}
-	msg.WriteString(fmt.Sprintln(e.msg))
+	fmt.Fprintln(&msg, e.msg)
 	if e.status != 0 {
-		msg.WriteString(fmt.Sprintf("HTTP: %d", e.status))
+		fmt.Fprintf(&msg, "HTTP: %d", e.status)
 	}
 	if e.Errors != nil {
 		for _, err := range e.Errors {
-			msg.WriteString(fmt.Sprintf("%s: %s\n", err.Title, err.Status))
+			fmt.Fprintf(&msg, "%s: %s\n", err.Title, err.Status)
 		}
 	}
 

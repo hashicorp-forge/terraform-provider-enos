@@ -275,14 +275,12 @@ func (k *localKindLoadImage) ApplyResourceChange(ctx context.Context, req resour
 		if loadedImage == nil {
 			detail := strings.Builder{}
 			detail.WriteString("None of the loaded images match the configured image")
-			detail.WriteString(fmt.Sprintf(
-				"Image %s\nTag %s\nImages %#v\n",
+			fmt.Fprintf(&detail, "Image %s\nTag %s\nImages %#v\n",
 				plannedState.Image.Value(),
 				plannedState.Tag.Value(),
-				result,
-			))
+				result)
 			if err != nil {
-				detail.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
+				fmt.Fprintf(&detail, "Error: %s\n", err.Error())
 			}
 			res.Diagnostics = append(res.Diagnostics, &tfprotov6.Diagnostic{
 				Severity: tfprotov6.DiagnosticSeverityError,
