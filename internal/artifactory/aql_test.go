@@ -92,7 +92,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "all search fields",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-staging-local*"),
+				WithRepo("hashicorp-crt-prod-local*"),
 				WithPath("vault/*"),
 				WithName("*.zip"),
 				WithProperties(map[string]string{
@@ -117,7 +117,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no path",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-staging-local*"),
+				WithRepo("hashicorp-crt-prod-local*"),
 				WithName("*.zip"),
 				WithProperties(map[string]string{
 					"product-name":    "vault",
@@ -129,7 +129,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no name",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-staging-local*"),
+				WithRepo("hashicorp-crt-prod-local*"),
 				WithPath("vault/*"),
 				WithProperties(map[string]string{
 					"product-name":    "vault",
@@ -141,7 +141,7 @@ func TestAccSearchAQL(t *testing.T) {
 		{
 			Name: "no properties",
 			Args: []SearchAQLOpt{
-				WithRepo("hashicorp-crt-staging-local*"),
+				WithRepo("hashicorp-crt-prod-local*"),
 				WithPath("vault/*"),
 				WithName("*.zip"),
 			},
@@ -205,7 +205,7 @@ items.find(
       [
         {"@commit": { "$match": "{{ .SHA }}" }},
         {"@product-name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
+        {"repo": { "$match": "hashicorp-crt-prod-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -215,7 +215,7 @@ items.find(
       [
         {"@build.number": { "$match": "{{ .SHA }}" }},
         {"@build.name": { "$match": "vault" }},
-        {"repo": { "$match": "hashicorp-crt-staging-local*" }},
+        {"repo": { "$match": "hashicorp-crt-prod-local*" }},
         {"path": { "$match": "vault/*" }},
         {"name": { "$match": "{{ .Name }}"}}
       ]
@@ -236,11 +236,14 @@ items.find(
 			ArtifactName: "vault_1.19.1-1_amd64.deb",
 			SHA:          "aa75903ec499b2236da9e7bbbfeb7fd16fa4fd9d",
 		},
-		{
-			Name:         "old crt fields",
-			ArtifactName: "vault_1.19.0-1_amd64.deb",
-			SHA:          "7eeafb6160d60ede73c1d95566b0c8ea54f3cb5a",
-		},
+		/*
+			All builds still cached in Artifactory are using new builds now.
+			{
+				Name:         "old crt fields",
+				ArtifactName: "vault_1.19.0-1_amd64.deb",
+				SHA:          "7eeafb6160d60ede73c1d95566b0c8ea54f3cb5a",
+			},
+		*/
 	} {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Parallel()
