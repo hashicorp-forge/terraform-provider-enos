@@ -24,6 +24,7 @@ description: |-
 
 - `bin_name` (String) The name of boundary binary we're going to use when starting the cluster
 - `config_name` (String) The name of a Boundary configuration to use when starting the cluster
+- `debug` (Boolean) When true, start Boundary with the `-debug` flag
 - `license` (String, Sensitive) The path to a license for Boundary Enterprise
 - `manage_service` (Boolean) Whether or not Enos should supply a systemd unit for the service
 - `recording_storage_path` (String) The path to use for storage when recording
