@@ -43,6 +43,7 @@ type boundaryStartStateV1 struct {
 	SystemdUnitName      *tfString
 	Username             *tfString
 	RecordingStoragePath *tfString
+	Debug                *tfBool
 	Transport            *embeddedTransportV1
 	failureHandlers
 }
@@ -75,6 +76,7 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 		SystemdUnitName:      newTfString(),
 		Username:             newTfString(),
 		RecordingStoragePath: newTfString(),
+		Debug:                newTfBool(),
 		Transport:            transport,
 		failureHandlers:      fh,
 	}
@@ -278,6 +280,12 @@ func (s *boundaryStartStateV1) Schema() *tfprotov6.Schema {
 					Optional:    true,
 					Description: "The path to use for storage when recording",
 				},
+				{
+					Name:        "debug",
+					Type:        tftypes.Bool,
+					Optional:    true,
+					Description: "When true, start Boundary with the `-debug` flag",
+				},
 				s.Transport.SchemaAttributeTransport(supportsSSH),
 			},
 		},
@@ -318,6 +326,7 @@ func (s *boundaryStartStateV1) FromTerraform5Value(val tftypes.Value) error {
 		"unit_name":              s.SystemdUnitName,
 		"username":               s.Username,
 		"recording_storage_path": s.RecordingStoragePath,
+		"debug":                  s.Debug,
 	})
 	if err != nil {
 		return err
@@ -344,8 +353,8 @@ func (s *boundaryStartStateV1) Terraform5Type() tftypes.Type {
 		"unit_name":              s.SystemdUnitName.TFType(),
 		"username":               s.Username.TFType(),
 		"recording_storage_path": s.RecordingStoragePath.TFType(),
-
-		"transport": s.Transport.Terraform5Type(),
+		"debug":                  s.Debug.TFType(),
+		"transport":              s.Transport.Terraform5Type(),
 	}}
 }
 
@@ -363,6 +372,7 @@ func (s *boundaryStartStateV1) Terraform5Value() tftypes.Value {
 		"unit_name":              s.SystemdUnitName.TFValue(),
 		"username":               s.Username.TFValue(),
 		"recording_storage_path": s.RecordingStoragePath.TFValue(),
+		"debug":                  s.Debug.TFValue(),
 		"transport":              s.Transport.Terraform5Value(),
 	})
 }
@@ -460,6 +470,11 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 			unitName = unit
 		}
 
+		execStart := fmt.Sprintf("%s/%s server -config %s", s.BinPath.Value(), binName, configFilePath)
+		if debug, ok := s.Debug.Get(); ok && debug {
+			execStart += " -debug"
+		}
+
 		unit := systemd.Unit{
 			"Unit": {
 				"Description":           "HashiCorp Boundary",
@@ -483,7 +498,7 @@ func (s *boundaryStartStateV1) startBoundary(ctx context.Context, transport it.T
 				"Capabilities":          "CAP_IPC_LOCK+ep",
 				"CapabilityBoundingSet": "CAP_SYSLOG CAP_IPC_LOCK",
 				"NoNewPrivileges":       "yes",
-				"ExecStart":             fmt.Sprintf("%s/%s server -config %s", s.BinPath.Value(), binName, configFilePath),
+				"ExecStart":             execStart,
 				"ExecReload":            "/bin/kill --signal HUP $MAINPID",
 				"KillMode":              "process",
 				"KillSignal":            "SIGINT",
