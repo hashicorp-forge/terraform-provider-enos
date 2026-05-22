@@ -68,6 +68,48 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 		"usage_gauge_period":        "30m",
 		"maximum_gague_cardinality": 100,
 	})
+	vaultCfg.UI.Set(true)
+	vaultCfg.CacheSize.Set(42)
+	vaultCfg.DisableCache.Set(true)
+	vaultCfg.DisableMlock.Set(true)
+	vaultCfg.PluginDirectory.Set("/opt/plugins")
+	vaultCfg.PluginTmpdir.Set("/tmp/plugins")
+	vaultCfg.PluginFileUID.Set(1001)
+	vaultCfg.PluginFilePermissions.Set(0644)
+	vaultCfg.DefaultLeaseTTL.Set("30s")
+	vaultCfg.MaxLeaseTTL.Set("1h")
+	vaultCfg.DefaultMaxRequestDuration.Set("2m")
+	vaultCfg.DetectDeadlocks.Set(true)
+	vaultCfg.RawStorageEndpoint.Set("/metrics")
+	vaultCfg.IntrospectionEndpoint.Set("/introspect")
+	vaultCfg.PidFile.Set("/var/run/vault.pid")
+	vaultCfg.EnableResponseHeaderHostname.Set(true)
+	vaultCfg.EnableResponseHeaderRaftNodeID.Set(true)
+	vaultCfg.LogFormat.Set("json")
+	vaultCfg.LogFile.Set("/var/log/vault.log")
+	vaultCfg.LogRotateDuration.Set("5m")
+	vaultCfg.LogRotateBytes.Set(1048576)
+	vaultCfg.LogRotateMaxFiles.Set(7)
+	vaultCfg.ImpreciseLeaseRoleTracking.Set(true)
+	vaultCfg.EnablePostUnsealTrace.Set(true)
+	vaultCfg.PostUnsealTraceDirectory.Set("/var/lib/vault/traces")
+	// Set user_lockout block using constructor
+	vaultCfg.UserLockout.Set(newVaultUserLockoutConfigSet(
+		"3",
+		"5m",
+		"10m",
+		true))
+	// Set reporting block using constructor
+	vaultCfg.Reporting.Set(newVaultReportingConfigSet(
+		"1h",
+		false,
+		newVaultReportingLicenseConfigSet(
+			true,
+			"2025-07-24T00:00:00Z",
+			false),
+	))
+	// Set experiments list
+	vaultCfg.Experiments.Set(newVaultExperimentsConfigSet([]string{"expA", "expB"}))
 
 	// Make sure we can create a dynamic value with optional attrs
 	val := vaultCfg.Terraform5Value()
@@ -106,6 +148,30 @@ func TestAccResourceVaultStart(t *testing.T) {
       cluster_name = "{{.Config.ClusterName.Value}}"
       log_level    = "{{.Config.LogLevel.Value}}"
       ui           = true
+      cache_size                     = {{.Config.CacheSize.Value}}
+      disable_cache                  = {{.Config.DisableCache.Value}}
+      disable_mlock                  = {{.Config.DisableMlock.Value}}
+      plugin_directory               = "{{.Config.PluginDirectory.Value}}"
+      plugin_tmpdir                  = "{{.Config.PluginTmpdir.Value}}"
+      plugin_file_uid                = {{.Config.PluginFileUID.Value}}
+      plugin_file_permissions        = {{.Config.PluginFilePermissions.Value}}
+      default_lease_ttl              = "{{.Config.DefaultLeaseTTL.Value}}"
+      max_lease_ttl                  = "{{.Config.MaxLeaseTTL.Value}}"
+      default_max_request_duration   = "{{.Config.DefaultMaxRequestDuration.Value}}"
+      detect_deadlocks               = {{.Config.DetectDeadlocks.Value}}
+      raw_storage_endpoint           = "{{.Config.RawStorageEndpoint.Value}}"
+      introspection_endpoint         = "{{.Config.IntrospectionEndpoint.Value}}"
+      pid_file                       = "{{.Config.PidFile.Value}}"
+      enable_response_header_hostname = {{.Config.EnableResponseHeaderHostname.Value}}
+      enable_response_header_raft_node_id = {{.Config.EnableResponseHeaderRaftNodeID.Value}}
+      log_format                     = "{{.Config.LogFormat.Value}}"
+      log_file                       = "{{.Config.LogFile.Value}}"
+      log_rotate_duration            = "{{.Config.LogRotateDuration.Value}}"
+      log_rotate_bytes               = {{.Config.LogRotateBytes.Value}}
+      log_rotate_max_files           = {{.Config.LogRotateMaxFiles.Value}}
+      imprecise_lease_role_tracking = {{.Config.ImpreciseLeaseRoleTracking.Value}}
+      enable_post_unseal_trace       = {{.Config.EnablePostUnsealTrace.Value}}
+      post_unseal_trace_directory    = "{{.Config.PostUnsealTraceDirectory.Value}}"
 
       listener = {
         type = "{{.Config.Listener.Type.Value}}"
@@ -169,6 +235,16 @@ func TestAccResourceVaultStart(t *testing.T) {
         }
       }
 
+      {{if .Config.HAStorage.Type.Value -}}
+      ha_storage = {
+        type       = "{{.Config.HAStorage.Type.Value}}"
+        attributes = { {{range $name, $val := .Config.HAStorage.Attrs.Object.Value -}}
+          {{$name}} = "{{$val}}"
+        {{end -}}
+        }
+      }
+      {{end -}}
+
       {{if .Config.Telemetry.Object.Value -}}
       telemetry = {
         {{range $name, $val := .Config.Telemetry.Object.Value -}}
@@ -176,6 +252,27 @@ func TestAccResourceVaultStart(t *testing.T) {
         {{end}}
       }
       {{end -}}
+      {{if or .Config.UserLockout.LockoutThreshold.Value .Config.UserLockout.LockoutDuration.Value .Config.UserLockout.LockoutCounterReset.Value .Config.UserLockout.DisableLockout.Value -}}
+      user_lockout = {
+        {{if .Config.UserLockout.LockoutThreshold.Value}}lockout_threshold        = "{{.Config.UserLockout.LockoutThreshold.Value}}"{{end}}
+        {{if .Config.UserLockout.LockoutDuration.Value}}lockout_duration         = "{{.Config.UserLockout.LockoutDuration.Value}}"{{end}}
+        {{if .Config.UserLockout.LockoutCounterReset.Value}}lockout_counter_reset = "{{.Config.UserLockout.LockoutCounterReset.Value}}"{{end}}
+        {{if .Config.UserLockout.DisableLockout.Value}}disable_lockout           = {{.Config.UserLockout.DisableLockout.Value}}{{end}}
+      }
+      {{end}}
+      {{if or .Config.Reporting.SnapshotRetentionTime.Value .Config.Reporting.DisableProductUsageReporting.Value .Config.Reporting.License.Enabled.Value .Config.Reporting.License.BillingStartTimestamp.Value .Config.Reporting.License.DevelopmentCluster.Value -}}
+      reporting = {
+        {{if .Config.Reporting.SnapshotRetentionTime.Value}}snapshot_retention_time          = "{{.Config.Reporting.SnapshotRetentionTime.Value}}"{{end}}
+        {{if .Config.Reporting.DisableProductUsageReporting.Value}}disable_product_usage_reporting = {{.Config.Reporting.DisableProductUsageReporting.Value}}{{end}}
+        {{if or .Config.Reporting.License.Enabled.Value .Config.Reporting.License.BillingStartTimestamp.Value .Config.Reporting.License.DevelopmentCluster.Value -}}
+        license = {
+          {{if .Config.Reporting.License.Enabled.Value}}enabled             = {{.Config.Reporting.License.Enabled.Value}}{{end}}
+          {{if .Config.Reporting.License.BillingStartTimestamp.Value}}billing_start_timestamp = "{{.Config.Reporting.License.BillingStartTimestamp.Value}}"{{end}}
+          {{if .Config.Reporting.License.DevelopmentCluster.Value}}development_cluster      = {{.Config.Reporting.License.DevelopmentCluster.Value}}{{end}}
+        }
+        {{end}}
+      }
+      {{end}}
 
     }
     {{ renderTransport .Transport }}
@@ -231,6 +328,52 @@ func TestAccResourceVaultStart(t *testing.T) {
 		"usage_gauge_period":        "30m",
 		"maximum_gague_cardinality": 100,
 	})
+	// Set experiments list
+	vaultStart.Config.Experiments.Set(newVaultExperimentsConfigSet([]string{"expA", "expB"}))
+	// Set top level simple config fields
+	vaultStart.Config.CacheSize.Set(42)
+	vaultStart.Config.DisableCache.Set(true)
+	vaultStart.Config.DisableMlock.Set(true)
+	vaultStart.Config.PluginDirectory.Set("/opt/plugins")
+	vaultStart.Config.PluginTmpdir.Set("/tmp/plugins")
+	vaultStart.Config.PluginFileUID.Set(1001)
+	vaultStart.Config.PluginFilePermissions.Set(0644)
+	vaultStart.Config.DefaultLeaseTTL.Set("30s")
+	vaultStart.Config.MaxLeaseTTL.Set("1h")
+	vaultStart.Config.DefaultMaxRequestDuration.Set("2m")
+	vaultStart.Config.DetectDeadlocks.Set(true)
+	vaultStart.Config.RawStorageEndpoint.Set("/metrics")
+	vaultStart.Config.IntrospectionEndpoint.Set("/introspect")
+	vaultStart.Config.PidFile.Set("/var/run/vault.pid")
+	vaultStart.Config.EnableResponseHeaderHostname.Set(true)
+	vaultStart.Config.EnableResponseHeaderRaftNodeID.Set(true)
+	vaultStart.Config.LogFormat.Set("json")
+	vaultStart.Config.LogFile.Set("/var/log/vault.log")
+	vaultStart.Config.LogRotateDuration.Set("5m")
+	vaultStart.Config.LogRotateBytes.Set(1048576)
+	vaultStart.Config.LogRotateMaxFiles.Set(7)
+	vaultStart.Config.ImpreciseLeaseRoleTracking.Set(true)
+	vaultStart.Config.EnablePostUnsealTrace.Set(true)
+	vaultStart.Config.PostUnsealTraceDirectory.Set("/var/lib/vault/traces")
+	// Set HA storage block
+	vaultStart.Config.HAStorage.Set(newVaultStorageConfigSet("raft", map[string]any{"path": "ha_path"}, nil))
+	// Set user_lockout block
+	vaultStart.Config.UserLockout.Set(newVaultUserLockoutConfigSet(
+		"3",
+		"5m",
+		"10m",
+		true))
+	// Set reporting block
+	vaultStart.Config.Reporting.Set(newVaultReportingConfigSet(
+		"1h",
+		false,
+		newVaultReportingLicenseConfigSet(
+			true,
+			"2025-07-24T00:00:00Z",
+			false),
+	))
+	// Set experiments list
+	vaultStart.Config.Experiments.Set(newVaultExperimentsConfigSet([]string{"expA", "expB"}))
 	vaultStart.License.Set("some-license-key")
 	vaultStart.SystemdUnitName.Set("vaulter")
 	vaultStart.Username.Set("vault")
@@ -263,6 +406,8 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.attributes.path", "vault"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join_scheme", "https"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.storage.retry_join.auto_join", "provider=aws tag_key=join tag_value=vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.ha_storage.type", "raft"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.ha_storage.attributes.path", "ha_path"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seal.type", "awskms"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seal.attributes.kms_key_id", "some-key-id"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.seals[0].type", "awskms"),
@@ -276,6 +421,34 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.username", "vaulter"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.user", "ubuntu"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.host", "localhost"),
+			// experiments
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.experiments.0", "expA"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.experiments.1", "expB"),
+			// top-level simple config fields
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.cache_size", "42"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.disable_cache", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.disable_mlock", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.plugin_directory", "/opt/plugins"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.plugin_tmpdir", "/tmp/plugins"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.plugin_file_uid", "1001"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.plugin_file_permissions", "420"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.default_lease_ttl", "30s"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.max_lease_ttl", "1h"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.default_max_request_duration", "2m"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.detect_deadlocks", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.raw_storage_endpoint", "/metrics"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.introspection_endpoint", "/introspect"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.pid_file", "/var/run/vault.pid"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.enable_response_header_hostname", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.enable_response_header_raft_node_id", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_format", "json"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_file", "/var/log/vault.log"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_rotate_duration", "5m"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_rotate_bytes", "1048576"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.log_rotate_max_files", "7"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.imprecise_lease_role_tracking", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.enable_post_unseal_trace", "true"),
+			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.post_unseal_trace_directory", "/var/lib/vault/traces"),
 		),
 		false,
 	})
