@@ -20,13 +20,33 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"go.uber.org/zap"
 	"golang.org/x/mod/sumdb/dirhash"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/transport/file"
 )
+
+// writeAtBuffer implements io.WriterAt for a byte slice.
+type writeAtBuffer struct {
+	buf []byte
+}
+
+func newWriteAtBuffer(buf []byte) *writeAtBuffer {
+	return &writeAtBuffer{buf: buf}
+}
+
+func (w *writeAtBuffer) WriteAt(p []byte, off int64) (n int, err error) {
+	if off < 0 {
+		return 0, errors.New("writeAtBuffer.WriteAt: negative offset")
+	}
+	if off+int64(len(p)) > int64(len(w.buf)) {
+		return 0, errors.New("writeAtBuffer.WriteAt: offset out of range")
+	}
+
+	return copy(w.buf[off:], p), nil
+}
 
 // NewArtifacts takes the name of the terraform provider and returns a new
 // Artifacts.
@@ -604,11 +624,11 @@ func (a *Artifacts) LoadRemoteIndex(ctx context.Context, s3Client *s3.Client, bu
 	}
 
 	buf := make([]byte, int(*head.ContentLength))
-	writer := manager.NewWriteAtBuffer(buf)
-	downloader := manager.NewDownloader(s3Client)
-	_, err = downloader.Download(ctx, writer, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    idxKey,
+	tmClient := transfermanager.New(s3Client)
+	_, err = tmClient.DownloadObject(ctx, &transfermanager.DownloadObjectInput{
+		Bucket:   aws.String(bucket),
+		Key:      idxKey,
+		WriterAt: newWriteAtBuffer(buf),
 	})
 	if err != nil {
 		return err
@@ -644,11 +664,11 @@ func (a *Artifacts) LoadRemoteReleaseMetedataForVersion(ctx context.Context, s3C
 	}
 
 	buf := make([]byte, int(*head.ContentLength))
-	bufwriter := manager.NewWriteAtBuffer(buf)
-	downloader := manager.NewDownloader(s3Client)
-	_, err = downloader.Download(ctx, bufwriter, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    key,
+	tmClient := transfermanager.New(s3Client)
+	_, err = tmClient.DownloadObject(ctx, &transfermanager.DownloadObjectInput{
+		Bucket:   aws.String(bucket),
+		Key:      key,
+		WriterAt: newWriteAtBuffer(buf),
 	})
 	if err != nil {
 		return err
@@ -734,7 +754,7 @@ func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Clie
 
 	a.log.Infow("publishing local mirror to remote bucket", "bucket", bucket)
 
-	uploader := manager.NewUploader(s3Client)
+	tmClient := transfermanager.New(s3Client)
 
 	entries, err := os.ReadDir(a.dir)
 	if err != nil {
@@ -777,7 +797,12 @@ func (a *Artifacts) PublishToRemoteBucket(ctx context.Context, s3Client *s3.Clie
 			"file", key,
 		)
 
-		_, err = uploader.Upload(ctx, input)
+		_, err = tmClient.UploadObject(ctx, &transfermanager.UploadObjectInput{
+			Bucket:      input.Bucket,
+			Key:         input.Key,
+			Body:        input.Body,
+			ContentType: input.ContentType,
+		})
 		if err != nil {
 			return err
 		}
