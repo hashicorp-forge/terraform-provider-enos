@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2016, 2025
 # SPDX-License-Identifier: MPL-2.0
 
 terraform {
@@ -11,30 +11,40 @@ terraform {
 
     helm = {
       source  = "hashicorp/helm"
-      version = "2.6.0"
+      version = "3.1.1"
     }
   }
 }
 
 locals {
-  helm_chart_settings = {
-    "server.ha.enabled"             = "true"
-    "server.ha.replicas"            = var.vault_instance_count
-    "server.ha.raft.enabled"        = "true"
-    "server.affinity"               = ""
-    "server.image.repository"       = var.image_repository
-    "server.image.tag"              = var.image_tag
-    "server.image.pullPolicy"       = "Always"
-    "server.resources.requests.cpu" = "50m"
-    "server.limits.memory"          = "200m"
-    "server.limits.cpu"             = "200m"
-    "server.ha.raft.config"         = file("${abspath(path.module)}/raft-config.hcl")
-    "server.dataStorage.size"       = "100m"
-    "server.logLevel"               = var.vault_log_level
+  chart_settings = {
+    "server.affinity"                                                       = ""
+    "server.dataStorage.size"                                               = "100m"
+    "server.ha.enabled"                                                     = "true"
+    "server.ha.raft.config"                                                 = file("${abspath(path.module)}/raft-config.hcl")
+    "server.ha.raft.enabled"                                                = "true"
+    "server.ha.replicas"                                                    = var.vault_instance_count
+    "server.image.pullPolicy"                                               = "Never" # Forces local image use
+    "server.image.repository"                                               = var.image_repository
+    "server.image.tag"                                                      = var.image_tag
+    "server.limits.cpu"                                                     = "200m"
+    "server.limits.memory"                                                  = "200m"
+    "server.logLevel"                                                       = var.vault_log_level
+    "server.resources.requests.cpu"                                         = "50m"
+    "server.statefulSet.securityContext.container.allowPrivilegeEscalation" = "false"
+    "server.statefulSet.securityContext.pod.runAsNonRoot"                   = "true"
+    "server.statefulSet.securityContext.pod.runAsGroup"                     = "1000"
+    "server.statefulSet.securityContext.pod.runAsUser"                      = "100"
+    "server.statefulSet.securityContext.pod.fsGroup"                        = "1000"
   }
-  all_helm_chart_settings = var.ent_license == null ? local.helm_chart_settings : merge(local.helm_chart_settings, {
+  all_chart_settings = var.ent_license == null ? local.chart_settings : merge(local.chart_settings, {
     "server.extraEnvironmentVars.VAULT_LICENSE" = var.ent_license
   })
+  chart_list_settings = {
+    "server.statefulSet.securityContext.container.capabilities.add" = [
+      "IPC_LOCK",
+    ],
+  }
 
   vault_address = "http://127.0.0.1:8200"
 
@@ -50,21 +60,11 @@ resource "helm_release" "vault" {
   repository = "https://helm.releases.hashicorp.com"
   chart      = "vault"
 
-  dynamic "set" {
-    for_each = local.all_helm_chart_settings
-
-    content {
-      name  = set.key
-      value = set.value
-    }
-  }
+  set      = [for k, v in local.all_chart_settings : { name : k, value : v }]
+  set_list = [for k, v in local.chart_list_settings : { name : k, value : v }]
 }
 
 data "enos_kubernetes_pods" "vault_pods" {
-  depends_on = [
-    helm_release.vault,
-  ]
-
   kubeconfig_base64 = var.kubeconfig_base64
   context_name      = var.context_name
   namespace         = helm_release.vault.namespace
@@ -72,14 +72,11 @@ data "enos_kubernetes_pods" "vault_pods" {
     "app.kubernetes.io/name=vault",
     "component=server"
   ]
-  wait_timeout = "30s"
+
+  depends_on = [helm_release.vault]
 }
 
 resource "enos_vault_init" "leader" {
-  depends_on = [
-    data.enos_kubernetes_pods.vault_pods,
-  ]
-
   bin_path   = "/bin/vault"
   vault_addr = local.vault_address
 
@@ -97,10 +94,6 @@ resource "enos_vault_init" "leader" {
 }
 
 resource "enos_vault_unseal" "leader" {
-  depends_on = [
-    enos_vault_init.leader,
-  ]
-
   bin_path    = "/bin/vault"
   vault_addr  = local.vault_address
   seal_type   = "shamir"
@@ -114,6 +107,8 @@ resource "enos_vault_unseal" "leader" {
       namespace         = data.enos_kubernetes_pods.vault_pods.pods[local.leader_idx].namespace
     }
   }
+
+  depends_on = [enos_vault_init.leader]
 }
 
 // We need to manually join the followers since the join request must only happen after the leader
@@ -124,9 +119,6 @@ resource "enos_vault_unseal" "leader" {
 // clusters that are configured with auto-unseal as eventually the nodes would join and unseal.
 resource "enos_remote_exec" "raft_join" {
   for_each = local.followers_idx
-  depends_on = [
-    enos_vault_unseal.leader,
-  ]
 
   inline = [
     // asserts that vault is ready
@@ -143,13 +135,13 @@ resource "enos_remote_exec" "raft_join" {
       namespace         = data.enos_kubernetes_pods.vault_pods.pods[each.key].namespace
     }
   }
+
+  depends_on = [enos_vault_unseal.leader]
 }
+
 
 resource "enos_vault_unseal" "followers" {
   for_each = local.followers_idx
-  depends_on = [
-    enos_remote_exec.raft_join,
-  ]
 
   bin_path    = "/bin/vault"
   vault_addr  = local.vault_address
@@ -164,6 +156,8 @@ resource "enos_vault_unseal" "followers" {
       namespace         = data.enos_kubernetes_pods.vault_pods.pods[each.key].namespace
     }
   }
+
+  depends_on = [enos_remote_exec.raft_join]
 }
 
 output "vault_root_token" {
