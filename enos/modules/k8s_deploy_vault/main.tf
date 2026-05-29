@@ -24,7 +24,6 @@ locals {
     "server.ha.raft.config"                                                 = file("${abspath(path.module)}/raft-config.hcl")
     "server.ha.raft.enabled"                                                = "true"
     "server.ha.replicas"                                                    = var.vault_instance_count
-    "server.image.pullPolicy"                                               = "Never" # Forces local image use
     "server.image.repository"                                               = var.image_repository
     "server.image.tag"                                                      = var.image_tag
     "server.limits.cpu"                                                     = "200m"
