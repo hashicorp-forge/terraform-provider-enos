@@ -7,7 +7,7 @@ terraform {
   required_providers {
     helm = {
       source  = "hashicorp/helm"
-      version = "2.6.0"
+      version = "3.1.1"
     }
   }
 }
@@ -19,18 +19,11 @@ resource "helm_release" "ci-test" {
   namespace        = "ci-test"
   create_namespace = true
 
-  set {
-    name  = "replicaCount"
-    value = var.replica_count
-  }
-  set {
-    name  = "image.repository"
-    value = var.repository
-  }
-  set {
-    name  = "image.tag"
-    value = var.tag
-  }
+  set = [
+    { name : "replicaCount", value : var.replica_count },
+    { name : "image.repository", value : var.repository },
+    { name : "image.tag", value : var.tag },
+  ]
 
   wait = true
 }
