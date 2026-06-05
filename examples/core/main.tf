@@ -52,7 +52,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
   }
 
   filter {
@@ -69,7 +69,7 @@ data "aws_ami" "rhel" {
   # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-8.2*HVM-20*"]
+    values = ["RHEL-10.1*HVM_GA-20*"]
   }
 
   filter {
@@ -90,7 +90,9 @@ module "target_sg" {
   description = "Enos provider core example security group"
   vpc_id      = data.aws_vpc.default.id
 
-  ingress_cidr_blocks = ["${data.enos_environment.localhost.public_ip_address}/32"]
+  ingress_cidr_ipv4 = {
+    runner = "${data.enos_environment.localhost.public_ip_address}/32",
+  }
 }
 
 resource "aws_instance" "ubuntu" {
@@ -98,7 +100,7 @@ resource "aws_instance" "ubuntu" {
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   associate_public_ip_address = true
-  security_groups             = [module.target_sg.security_group_name]
+  security_groups             = [module.target_sg.name]
 }
 
 resource "aws_instance" "rhel" {
@@ -106,7 +108,7 @@ resource "aws_instance" "rhel" {
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   associate_public_ip_address = true
-  security_groups             = [module.target_sg.security_group_name]
+  security_groups             = [module.target_sg.name]
 }
 
 resource "enos_file" "from_source" {
