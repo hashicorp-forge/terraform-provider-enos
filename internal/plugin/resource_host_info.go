@@ -201,28 +201,24 @@ func (f *hostInfo) PlanResourceChange(ctx context.Context, req resource.PlanReso
 	}
 
 	// Plan for all unknown computed attributes to be Unknown until after apply.
+	// Mark as unknown during create OR when transport changes (requires re-reading host info)
+	requiresRead := false
 	if _, ok := priorState.ID.Get(); !ok {
+		// This is a create
+		requiresRead = true
 		proposedState.ID.Unknown = true
+	} else if len(res.RequiresReplace) > 0 {
+		// Transport changed, we need to re-read host info
+		requiresRead = true
 	}
-	if _, ok := proposedState.Arch.Get(); !ok {
+
+	if requiresRead {
 		proposedState.Arch.Unknown = true
-	}
-	if _, ok := proposedState.Distro.Get(); !ok {
 		proposedState.Distro.Unknown = true
-	}
-	if _, ok := proposedState.DistroVersion.Get(); !ok {
 		proposedState.DistroVersion.Unknown = true
-	}
-	if _, ok := proposedState.Hostname.Get(); !ok {
 		proposedState.Hostname.Unknown = true
-	}
-	if _, ok := proposedState.Pid1.Get(); !ok {
 		proposedState.Pid1.Unknown = true
-	}
-	if _, ok := proposedState.Platform.Get(); !ok {
 		proposedState.Platform.Unknown = true
-	}
-	if _, ok := proposedState.PlatformVersion.Get(); !ok {
 		proposedState.PlatformVersion.Unknown = true
 	}
 }
