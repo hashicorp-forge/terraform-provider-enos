@@ -295,6 +295,44 @@ func TestAccResourceVaultStart(t *testing.T) {
 		false,
 	})
 
+	// Test case for no retry_join (should use AWS auto-join fallback)
+	vaultStartNoRetry := newVaultStartStateV1()
+	vaultStartNoRetry.ID.Set("no_retry")
+	vaultStartNoRetry.BinPath.Set("/opt/vault/bin/vault")
+	vaultStartNoRetry.ConfigDir.Set("/etc/vault.d")
+	vaultStartNoRetry.Config.APIAddr.Set("http://127.0.0.1:8200")
+	vaultStartNoRetry.Config.ClusterAddr.Set("http://127.0.0.1:8201")
+	vaultStartNoRetry.Config.ClusterName.Set("noretry")
+	vaultStartNoRetry.Config.Listener.Set(newVaultListenerConfigSet(
+		"tcp", map[string]map[string]any{
+			"attributes": {
+				"address":     "0.0.0.0:8200",
+				"tls_disable": "true",
+			},
+		},
+	))
+	vaultStartNoRetry.Config.LogLevel.Set("info")
+	vaultStartNoRetry.Config.Storage.Type.Set("raft")
+	vaultStartNoRetry.Config.Storage.Attrs.Object.Set(map[string]any{"path": "/opt/raft"})
+	// No retry_join configured - should use AWS auto-join fallback
+	sshNoRetry := newEmbeddedTransportSSH()
+	sshNoRetry.User.Set("ubuntu")
+	sshNoRetry.Host.Set("localhost")
+	privateKeyNoRetry, err := readTestFile("../fixtures/ssh.pem")
+	require.NoError(t, err)
+	sshNoRetry.PrivateKey.Set(privateKeyNoRetry)
+	require.NoError(t, vaultStartNoRetry.Transport.SetTransportState(sshNoRetry))
+	cases = append(cases, testAccResourceTemplate{
+		"no retry_join uses AWS auto-join fallback",
+		vaultStartNoRetry,
+		resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("enos_vault_start.no_retry", "id", "static"),
+			resource.TestCheckResourceAttr("enos_vault_start.no_retry", "config.storage.type", "raft"),
+			resource.TestCheckResourceAttr("enos_vault_start.no_retry", "config.cluster_name", "noretry"),
+		),
+		false,
+	})
+
 	// Test case for multiple retry_join blocks
 	vaultStartMultiRetry := newVaultStartStateV1()
 	vaultStartMultiRetry.ID.Set("multi_retry")

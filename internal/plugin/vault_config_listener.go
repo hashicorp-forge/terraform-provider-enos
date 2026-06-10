@@ -49,6 +49,7 @@ func newVaultListenerConfig() *vaultListenerConfig {
 	}
 }
 
+//nolint:unparam // typ is only "tcp" right now but could be more
 func newVaultListenerConfigSet(typ string, attrs map[string]map[string]any) *vaultListenerConfigSet {
 	return &vaultListenerConfigSet{typ: typ, attrs: attrs}
 }
