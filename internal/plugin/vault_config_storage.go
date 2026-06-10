@@ -12,8 +12,12 @@ import (
 type vaultStorageConfig struct {
 	Type *tfString
 
-	Attrs     *dynamicPseudoTypeBlock
-	RetryJoin *dynamicPseudoTypeBlock
+	Attrs *dynamicPseudoTypeBlock
+
+	// We use a different backing type depending on whether or not retry_join
+	// has been configured with a single or multiple retry_join blocks.
+	RetryJoin  *dynamicPseudoTypeBlock
+	RetryJoins *tfObjectSlice
 
 	// keep these around for marshaling the dynamic value
 	RawValues map[string]tftypes.Value
@@ -31,11 +35,12 @@ type vaultStorageConfigSet struct {
 
 func newVaultStorageConfig() *vaultStorageConfig {
 	return &vaultStorageConfig{
-		Type:      newTfString(),
-		Attrs:     newDynamicPseudoTypeBlock(),
-		RetryJoin: newDynamicPseudoTypeBlock(),
-		Unknown:   false,
-		Null:      true,
+		Type:       newTfString(),
+		Attrs:      newDynamicPseudoTypeBlock(),
+		RetryJoin:  newDynamicPseudoTypeBlock(),
+		RetryJoins: newTfObjectSlice(),
+		Unknown:    false,
+		Null:       true,
 	}
 }
 
@@ -104,7 +109,16 @@ func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 				return err
 			}
 		case "retry_join":
-			err = s.RetryJoin.FromTFValue(v)
+			// Terraform can send lists as either tftypes.List or tftypes.Tuple
+			// depending on the number of elements.
+			_, isList := v.Type().(tftypes.List)
+			_, isTuple := v.Type().(tftypes.Tuple)
+			if isList || isTuple {
+				err = s.RetryJoins.FromTFValue(v)
+			} else {
+				// Assume it's a singular retry_join block
+				err = s.RetryJoin.FromTFValue(v)
+			}
 			if err != nil {
 				return err
 			}
@@ -148,6 +162,17 @@ func (s *vaultStorageConfig) Terraform5Value() tftypes.Value {
 				panic(err)
 			}
 		case "retry_join":
+			// If we're given multiple blocks, preserve the original retry_join during
+			// plan so we can appropriately marshal it.
+			if rawVal, ok := s.RawValues[name]; ok {
+				_, isList := rawVal.Type().(tftypes.List)
+				_, isTuple := rawVal.Type().(tftypes.Tuple)
+				if (isList || isTuple) && s.RetryJoins != nil && len(s.RetryJoins.Val) > 0 {
+					val = rawVal
+					break
+				}
+			}
+
 			val, err = s.RetryJoin.TFValue()
 			if err != nil {
 				panic(err)
