@@ -41,7 +41,7 @@ As such, you will need to provide _all_ values except for `seals` until we make 
 - `config.storage` (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - `config.storage.type` (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
 - `config.storage.attributes` (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type
-- `config.storage.retry_join` (Object) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza
+- `config.storage.retry_join` (Object or List of Objects) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza. Can be a single object for one retry_join block, or a list of objects for multiple retry_join blocks for redundancy.
 - `config.seal` (Object) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
 - `config.seal.type` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - `config.seal.attributes` (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
