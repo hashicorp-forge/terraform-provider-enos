@@ -110,15 +110,22 @@ func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 			}
 		case "retry_join":
 			// Terraform can send lists as either tftypes.List or tftypes.Tuple
-			// depending on the number of elements.
+			// depending on the number of elements. Preserve the raw collection
+			// shape so we can round-trip heterogeneous retry_join objects during
+			// plan/apply without forcing a single object schema.
 			_, isList := v.Type().(tftypes.List)
 			_, isTuple := v.Type().(tftypes.Tuple)
 			if isList || isTuple {
 				err = s.RetryJoins.FromTFValue(v)
-			} else {
-				// Assume it's a singular retry_join block
-				err = s.RetryJoin.FromTFValue(v)
+				if err != nil {
+					return err
+				}
+
+				continue
 			}
+
+			// Assume it's a singular retry_join block
+			err = s.RetryJoin.FromTFValue(v)
 			if err != nil {
 				return err
 			}
@@ -162,12 +169,10 @@ func (s *vaultStorageConfig) Terraform5Value() tftypes.Value {
 				panic(err)
 			}
 		case "retry_join":
-			// If we're given multiple blocks, preserve the original retry_join during
-			// plan so we can appropriately marshal it.
 			if rawVal, ok := s.RawValues[name]; ok {
 				_, isList := rawVal.Type().(tftypes.List)
 				_, isTuple := rawVal.Type().(tftypes.Tuple)
-				if (isList || isTuple) && s.RetryJoins != nil && len(s.RetryJoins.Val) > 0 {
+				if isList || isTuple {
 					val = rawVal
 					break
 				}
