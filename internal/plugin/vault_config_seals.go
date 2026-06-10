@@ -141,6 +141,10 @@ func (s *vaultSealsConfig) Terraform5Type() tftypes.Type {
 // Terraform5Value is the tftypes.Value.
 func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
 	if s.Null {
+		if s.RawValue.Type() != nil {
+			return tftypes.NewValue(s.RawValue.Type(), map[string]tftypes.Value{})
+		}
+
 		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
 	}
 
@@ -166,6 +170,10 @@ func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
 	}
 
 	if len(vals) == 0 {
+		if s.RawValue.Type() != nil {
+			return tftypes.NewValue(s.RawValue.Type(), map[string]tftypes.Value{})
+		}
+
 		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
 	}
 

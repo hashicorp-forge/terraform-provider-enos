@@ -167,6 +167,21 @@ func TestAccResourceVaultStart(t *testing.T) {
           {{$name}} = "{{$val}}"
           {{end}}
         }
+        {{if .Config.Storage.RetryJoin.Object.Value -}}
+        retry_join = { {{range $name, $val := .Config.Storage.RetryJoin.Object.Value -}}
+          {{$name}} = "{{$val}}"
+          {{end}}
+        }
+        {{else if .Config.Storage.RetryJoins.Val -}}
+        retry_join = [
+          {{range $idx, $rj := .Config.Storage.RetryJoins.Val -}}
+          { {{range $name, $val := $rj.Value -}}
+            {{$name}} = "{{$val}}"
+            {{end}}
+          },
+          {{end -}}
+        ]
+        {{end -}}
       }
 
       {{if .Config.Telemetry.Object.Value -}}
@@ -276,6 +291,59 @@ func TestAccResourceVaultStart(t *testing.T) {
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "config.username", "vaulter"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.user", "ubuntu"),
 			resource.TestCheckResourceAttr("enos_vault_start.foo", "transport.ssh.host", "localhost"),
+		),
+		false,
+	})
+
+	// Test case for multiple retry_join blocks
+	vaultStartMultiRetry := newVaultStartStateV1()
+	vaultStartMultiRetry.ID.Set("multi_retry")
+	vaultStartMultiRetry.BinPath.Set("/opt/vault/bin/vault")
+	vaultStartMultiRetry.ConfigDir.Set("/etc/vault.d")
+	vaultStartMultiRetry.Config.APIAddr.Set("http://127.0.0.1:8200")
+	vaultStartMultiRetry.Config.ClusterAddr.Set("http://127.0.0.1:8201")
+	vaultStartMultiRetry.Config.ClusterName.Set("multiretry")
+	vaultStartMultiRetry.Config.Listener.Set(newVaultListenerConfigSet(
+		"tcp", map[string]map[string]any{
+			"attributes": {
+				"address":     "0.0.0.0:8200",
+				"tls_disable": "true",
+			},
+		},
+	))
+	vaultStartMultiRetry.Config.LogLevel.Set("info")
+	vaultStartMultiRetry.Config.Storage.Type.Set("raft")
+	vaultStartMultiRetry.Config.Storage.Attrs.Object.Set(map[string]any{"path": "/opt/raft"})
+	// Set multiple retry_join blocks using the new RetryJoins field
+	vaultStartMultiRetry.Config.Storage.RetryJoins.SetObjects([]map[string]any{
+		{
+			"auto_join":        "provider=aws tag_key=Type tag_value=vault",
+			"auto_join_scheme": "https",
+		},
+		{
+			"leader_api_addr": "http://vault-1:8200",
+		},
+		{
+			"leader_api_addr": "http://vault-2:8200",
+		},
+	})
+	sshMulti := newEmbeddedTransportSSH()
+	sshMulti.User.Set("ubuntu")
+	sshMulti.Host.Set("localhost")
+	privateKeyMulti, err := readTestFile("../fixtures/ssh.pem")
+	require.NoError(t, err)
+	sshMulti.PrivateKey.Set(privateKeyMulti)
+	require.NoError(t, vaultStartMultiRetry.Transport.SetTransportState(sshMulti))
+	cases = append(cases, testAccResourceTemplate{
+		"multiple retry_join blocks",
+		vaultStartMultiRetry,
+		resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "id", "static"),
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "config.storage.type", "raft"),
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "config.storage.retry_join.0.auto_join", "provider=aws tag_key=Type tag_value=vault"),
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "config.storage.retry_join.0.auto_join_scheme", "https"),
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "config.storage.retry_join.1.leader_api_addr", "http://vault-1:8200"),
+			resource.TestCheckResourceAttr("enos_vault_start.multi_retry", "config.storage.retry_join.2.leader_api_addr", "http://vault-2:8200"),
 		),
 		false,
 	})

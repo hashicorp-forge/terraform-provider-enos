@@ -310,7 +310,7 @@ As such, you will need to provide _all_ values except for ^seals^ until we make 
 - ^config.storage^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) stanza
 - ^config.storage.type^ (String) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) type
 - ^config.storage.attributes^ (Object) The Vault [storage](https://developer.hashicorp.com/vault/docs/configuration/storage) parameters for the given storage type
-- ^config.storage.retry_join^ (Object) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza
+- ^config.storage.retry_join^ (Object or List of Objects) The Vault integrated storage [retry_join](https://developer.hashicorp.com/vault/docs/configuration/storage/raft#retry_join-stanza) stanza. Can be a single object for one retry_join block, or a list of objects for multiple retry_join blocks for redundancy.
 - ^config.seal^ (Object) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) stanza
 - ^config.seal.type^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) type
 - ^config.seal.attributes^ (String) The Vault [seal](https://developer.hashicorp.com/vault/docs/configuration/seal) parameters for the given seal type
@@ -734,29 +734,46 @@ func (c *vaultConfig) Render(configMode string) (*hcl.Builder, map[string]string
 				storageBlock.AppendAttributes(attrs)
 
 				if storageLabel == raftStorageType {
-					// Handle integrated storage defaults. We do this for backwards compatibility with older
-					// provider versions. Make sure to only set defaults if the user has not passed in the
-					// keys.
+					// Our integrated storage support is complicated because we support
+					// lots of implicit legacy behavior:
+					// - If no path is set we need to set it to a default path.
+					// - If no retry_join has been set then we set up an AWS auto_join
+					// - retry_join can be set to a singular object with attributes
+					// - retry_join can be set to a list of objects with attributes
+
 					if _, ok := attrs["path"]; !ok {
 						storageBlock.AppendAttribute("path", defaultRaftDataDir)
 					}
 
-					retryJoinBlock := storageBlock.AppendBlock("retry_join", []string{})
-					retryJoinAttrs, ok := c.Storage.RetryJoin.Object.GetObject()
-					if ok {
-						// We've been configured with retry_join so we'll set the attrs
-						retryJoinBlock.AppendAttributes(retryJoinAttrs)
-					} else {
-						// The user has not configured retry_join set so we'll use the old defaults for
-						// backwards compat.
-						clusterName, ok := c.ClusterName.Get()
-						if !ok {
-							// This shouldn't ever happen...
-							return nil, nil, errors.New("enos_vault_start.cluster_name must be set")
+					// If we've got multiple retry_joins write them out!
+					if retryJoins, ok := c.Storage.RetryJoins.Get(); ok && len(retryJoins) > 0 {
+						// Render multiple retry_join blocks
+						for _, retryJoin := range retryJoins {
+							if attrs, ok := retryJoin.GetObject(); ok {
+								storageBlock.AppendBlock("retry_join", []string{}).AppendAttributes(attrs)
+							}
 						}
+					} else {
+						// Single retry_join block. Write it out if we've been configured
+						// with one, otherwise add the aws discovery backwards compat
+						// auto_join.
+						retryJoinBlock := storageBlock.AppendBlock("retry_join", []string{})
+						retryJoinAttrs, ok := c.Storage.RetryJoin.Object.GetObject()
+						if ok {
+							// We've been configured with retry_join so we'll set the attrs
+							retryJoinBlock.AppendAttributes(retryJoinAttrs)
+						} else {
+							// The user has not configured retry_join set so we'll use the old
+							// defaults for backwards compat.
+							clusterName, ok := c.ClusterName.Get()
+							if !ok {
+								// This shouldn't ever happen...
+								return nil, nil, errors.New("enos_vault_start.cluster_name must be set")
+							}
 
-						retryJoinBlock.AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
-							AppendAttribute("auto_join_scheme", "http")
+							retryJoinBlock.AppendAttribute("auto_join", "provider=aws tag_key=Type tag_value="+clusterName).
+								AppendAttribute("auto_join_scheme", "http")
+						}
 					}
 				}
 			}
