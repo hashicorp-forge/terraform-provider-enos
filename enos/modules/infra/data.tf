@@ -27,9 +27,8 @@ locals {
 
 data "aws_ami" "ubuntu" {
   most_recent = true
-  count       = length(local.architecture_filters)
+  for_each    = local.architecture_filters
 
-  # Currently latest LTS-1
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
@@ -42,7 +41,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "architecture"
-    values = [local.architecture_filters[count.index]]
+    values = [each.value]
   }
 
   owners = ["099720109477"] # Canonical
@@ -50,7 +49,7 @@ data "aws_ami" "ubuntu" {
 
 data "aws_ami" "rhel" {
   most_recent = true
-  count       = length(local.architecture_filters)
+  for_each    = local.architecture_filters
 
   filter {
     name   = "name"
@@ -64,7 +63,7 @@ data "aws_ami" "rhel" {
 
   filter {
     name   = "architecture"
-    values = [local.architecture_filters[count.index]]
+    values = [each.value]
   }
 
   owners = ["309956199498"] # Redhat

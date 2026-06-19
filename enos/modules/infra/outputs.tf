@@ -3,7 +3,7 @@
 
 output "aws_region" {
   description = "AWS Region for resources"
-  value       = data.aws_region.current.name
+  value       = data.aws_region.current.region
 }
 
 output "vpc_id" {
