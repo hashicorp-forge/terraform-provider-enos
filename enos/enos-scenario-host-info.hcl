@@ -6,19 +6,13 @@ scenario "host_info" {
     include {
       arch    = ["arm64", "amd64"]
       distro  = ["rhel"]
-      version = ["7.9", "8.8", "9.1"]
+      version = ["9.8", "9.1", "10.2"]
     }
 
     include {
       arch    = ["arm64", "amd64"]
       distro  = ["ubuntu"]
-      version = ["18.04", "20.04", "22.04"]
-    }
-
-    exclude {
-      arch    = ["arm64"]
-      distro  = ["rhel"]
-      version = ["7.9"]
+      version = ["22.04", "24.04", "26.04"]
     }
   }
 

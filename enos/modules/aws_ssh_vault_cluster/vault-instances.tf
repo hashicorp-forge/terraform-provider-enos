@@ -19,22 +19,28 @@ resource "aws_instance" "vault_instance" {
   )
 }
 
-resource "enos_remote_exec" "install_dependencies" {
-  depends_on = [aws_instance.vault_instance]
-  for_each = toset([
-    for idx in local.vault_instances : idx
-    if length(var.dependencies_to_install) > 0
-  ])
-
-  content = templatefile("${path.module}/templates/install-dependencies.sh", {
-    dependencies = join(" ", var.dependencies_to_install)
-  })
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance[each.value].public_ip
+locals {
+  hosts = { for idx in range(var.instance_count) : idx => {
+    ipv6       = try(aws_instance.vault_instance[idx].ipv6_addresses[0], "")
+    public_ip  = aws_instance.vault_instance[idx].public_ip
+    private_ip = aws_instance.vault_instance[idx].private_ip
     }
   }
+}
+
+module "install_packages" {
+  depends_on = [aws_instance.vault_instance]
+  source     = "../install_packages"
+
+  hosts    = local.hosts
+  packages = var.dependencies_to_install
+}
+
+module "maybe_disable_selinux" {
+  depends_on = [aws_instance.vault_instance]
+  source     = "../disable_selinux"
+
+  hosts = local.hosts
 }
 
 resource "enos_bundle_install" "consul" {
@@ -71,6 +77,10 @@ resource "enos_bundle_install" "vault" {
 resource "enos_consul_start" "consul" {
   for_each = enos_bundle_install.consul
 
+  depends_on = [
+    module.maybe_disable_selinux,
+  ]
+
   bin_path = local.consul_bin_path
   data_dir = var.consul_data_dir
   config = {
@@ -95,11 +105,13 @@ resource "enos_consul_start" "consul" {
 }
 
 resource "enos_vault_start" "leader" {
+  for_each = local.leader
+
   depends_on = [
     enos_consul_start.consul,
     enos_bundle_install.vault,
+    module.maybe_disable_selinux,
   ]
-  for_each = local.leader
 
   bin_path = local.vault_bin_path
   config = {
@@ -139,9 +151,11 @@ resource "enos_vault_start" "leader" {
     }
     ui = true
   }
-  config_dir     = var.vault_config_dir
-  config_mode    = var.config_mode
-  environment    = var.vault_environment
+  config_dir  = var.vault_config_dir
+  config_mode = var.config_mode
+  environment = merge(var.vault_environment, {
+    VAULT_DISABLE_MLOCK = false,
+  })
   license        = var.vault_license
   manage_service = var.manage_service
   username       = local.vault_service_user
@@ -181,9 +195,11 @@ resource "enos_vault_start" "followers" {
     seal = local.seal[var.unseal_method]
     ui   = true
   }
-  config_dir     = var.vault_config_dir
-  config_mode    = var.config_mode
-  environment    = var.vault_environment
+  config_dir  = var.vault_config_dir
+  config_mode = var.config_mode
+  environment = merge(var.vault_environment, {
+    VAULT_DISABLE_MLOCK = true,
+  })
   license        = var.vault_license
   manage_service = var.manage_service
   username       = local.vault_service_user
@@ -267,7 +283,7 @@ resource "enos_vault_unseal" "followers" {
 resource "enos_vault_unseal" "when_vault_unseal_when_no_init_is_set" {
   depends_on = [
     enos_vault_start.followers,
-    enos_remote_exec.install_dependencies,
+    module.install_packages,
   ]
   for_each = toset([
     for idx in local.instances : idx
@@ -297,7 +313,7 @@ resource "enos_remote_exec" "wait_for_leader_in_vault_hosts" {
   depends_on = [
     enos_vault_unseal.leader,
     enos_vault_unseal.followers,
-    enos_remote_exec.install_dependencies,
+    module.install_packages,
   ]
   for_each = local.vault_instances
 

@@ -19,6 +19,22 @@ resource "aws_instance" "consul_instance" {
   )
 }
 
+locals {
+  hosts = { for idx in range(var.instance_count) : idx => {
+    ipv6       = try(aws_instance.consul_instance[idx].ipv6_addresses[0], "")
+    public_ip  = aws_instance.consul_instance[idx].public_ip
+    private_ip = aws_instance.consul_instance[idx].private_ip
+    }
+  }
+}
+
+module "maybe_disable_selinux" {
+  depends_on = [aws_instance.consul_instance]
+  source     = "../disable_selinux"
+
+  hosts = local.hosts
+}
+
 resource "enos_bundle_install" "consul" {
   depends_on = [aws_instance.consul_instance]
   for_each   = toset([for idx in range(var.instance_count) : tostring(idx)])
@@ -37,6 +53,7 @@ resource "enos_consul_start" "consul" {
   depends_on = [
     aws_instance.consul_instance,
     enos_bundle_install.consul,
+    module.maybe_disable_selinux,
   ]
 
   for_each = toset([for idx in range(var.instance_count) : tostring(idx)])

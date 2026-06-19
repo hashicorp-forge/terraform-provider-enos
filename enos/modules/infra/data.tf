@@ -15,7 +15,7 @@ data "aws_availability_zones" "available" {
 
 locals {
   // AWS AMIs standardized on the x86_64 label for 64bit x86 architectures, therefore amd64 should be rather x86_64.
-  architecture_filters = [for arch in var.ami_architectures : (arch == "amd64" ? "x86_64" : arch)]
+  architecture_filters = toset([for arch in var.ami_architectures : (arch == "amd64" ? "x86_64" : arch)])
   common_tags = merge(
     var.common_tags,
     {
@@ -27,12 +27,11 @@ locals {
 
 data "aws_ami" "ubuntu" {
   most_recent = true
-  count       = length(local.architecture_filters)
+  for_each    = local.architecture_filters
 
-  # Currently latest LTS-1
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-*-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
   }
 
   filter {
@@ -42,7 +41,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "architecture"
-    values = [local.architecture_filters[count.index]]
+    values = [each.value]
   }
 
   owners = ["099720109477"] # Canonical
@@ -50,11 +49,11 @@ data "aws_ami" "ubuntu" {
 
 data "aws_ami" "rhel" {
   most_recent = true
-  count       = length(local.architecture_filters)
+  for_each    = local.architecture_filters
 
   filter {
     name   = "name"
-    values = ["RHEL-8.8*HVM-20*"]
+    values = ["RHEL-10.2*HVM_GA-20*"]
   }
 
   filter {
@@ -64,7 +63,7 @@ data "aws_ami" "rhel" {
 
   filter {
     name   = "architecture"
-    values = [local.architecture_filters[count.index]]
+    values = [each.value]
   }
 
   owners = ["309956199498"] # Redhat

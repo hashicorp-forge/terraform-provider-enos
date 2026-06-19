@@ -102,7 +102,7 @@ variable "instance_count" {
 variable "instance_type" {
   description = "EC2 Instance"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.small"
 }
 
 variable "kms_key_arn" {
