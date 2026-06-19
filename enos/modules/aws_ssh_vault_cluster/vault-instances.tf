@@ -36,6 +36,13 @@ module "install_packages" {
   packages = var.dependencies_to_install
 }
 
+module "maybe_disable_selinux" {
+  depends_on = [aws_instance.vault_instance]
+  source     = "../disable_selinux"
+
+  hosts = local.hosts
+}
+
 resource "enos_bundle_install" "consul" {
   for_each = {
     for idx, instance in aws_instance.vault_instance : idx => instance
@@ -70,6 +77,10 @@ resource "enos_bundle_install" "vault" {
 resource "enos_consul_start" "consul" {
   for_each = enos_bundle_install.consul
 
+  depends_on = [
+    module.maybe_disable_selinux,
+  ]
+
   bin_path = local.consul_bin_path
   data_dir = var.consul_data_dir
   config = {
@@ -94,11 +105,13 @@ resource "enos_consul_start" "consul" {
 }
 
 resource "enos_vault_start" "leader" {
+  for_each = local.leader
+
   depends_on = [
     enos_consul_start.consul,
     enos_bundle_install.vault,
+    module.maybe_disable_selinux,
   ]
-  for_each = local.leader
 
   bin_path = local.vault_bin_path
   config = {
