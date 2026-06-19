@@ -100,6 +100,15 @@ resource "aws_instance" "ubuntu" {
   key_name                    = var.key_name
   associate_public_ip_address = true
   security_groups             = [module.target_sg.name]
+
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
 }
 
 resource "aws_instance" "rhel" {
@@ -108,6 +117,15 @@ resource "aws_instance" "rhel" {
   key_name                    = var.key_name
   associate_public_ip_address = true
   security_groups             = [module.target_sg.name]
+
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
 }
 
 resource "enos_file" "from_source" {

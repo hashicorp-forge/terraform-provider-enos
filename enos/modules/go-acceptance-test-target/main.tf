@@ -92,6 +92,15 @@ resource "aws_instance" "remotehost" {
 
   vpc_security_group_ids = [aws_security_group.this.id]
 
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   tags = {
     Name = "enos_provider_remote_host"
   }

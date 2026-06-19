@@ -52,6 +52,15 @@ resource "aws_instance" "this" {
 
   vpc_security_group_ids = [aws_security_group.this.id]
 
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   tags = var.tags
 }
 
