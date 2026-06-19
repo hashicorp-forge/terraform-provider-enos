@@ -29,7 +29,7 @@ locals {
 }
 
 module "maybe_disable_selinux" {
-  depends_on = [aws_instance.vault_instance]
+  depends_on = [aws_instance.consul_instance]
   source     = "../disable_selinux"
 
   hosts = local.hosts
