@@ -151,9 +151,11 @@ resource "enos_vault_start" "leader" {
     }
     ui = true
   }
-  config_dir     = var.vault_config_dir
-  config_mode    = var.config_mode
-  environment    = var.vault_environment
+  config_dir  = var.vault_config_dir
+  config_mode = var.config_mode
+  environment = merge(var.vault_environment, {
+    VAULT_DISABLE_MLOCK = false,
+  })
   license        = var.vault_license
   manage_service = var.manage_service
   username       = local.vault_service_user
@@ -193,9 +195,11 @@ resource "enos_vault_start" "followers" {
     seal = local.seal[var.unseal_method]
     ui   = true
   }
-  config_dir     = var.vault_config_dir
-  config_mode    = var.config_mode
-  environment    = var.vault_environment
+  config_dir  = var.vault_config_dir
+  config_mode = var.config_mode
+  environment = merge(var.vault_environment, {
+    VAULT_DISABLE_MLOCK = true,
+  })
   license        = var.vault_license
   manage_service = var.manage_service
   username       = local.vault_service_user
