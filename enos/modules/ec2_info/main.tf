@@ -104,7 +104,7 @@ data "aws_ami" "rhel_98" {
   # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-9.8*HVM-20*"]
+    values = ["RHEL-9.8*HVM_GA-20*"]
   }
 
   filter {
@@ -124,10 +124,9 @@ data "aws_ami" "rhel_102" {
   most_recent = true
   for_each    = local.architectures
 
-  # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-10.2*HVM-20*"]
+    values = ["RHEL-10.2*HVM_GA-20*"]
   }
 
   filter {
@@ -142,7 +141,6 @@ data "aws_ami" "rhel_102" {
 
   owners = [local.rhel_owner_id]
 }
-
 
 data "aws_region" "current" {}
 
