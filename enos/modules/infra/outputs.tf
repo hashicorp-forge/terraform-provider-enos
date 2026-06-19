@@ -24,8 +24,8 @@ output "vpc_subnets" {
 output "ami_ids" {
   description = "The AWS AMI IDs for to use for ubuntu and rhel based instance for the amd64 and arm64 architectures."
   value = {
-    ubuntu = { for arch in local.architecture_filters : arch => data.aws_ami.ubuntu[arch].id }
-    rhel   = { for arch in local.architecture_filters : arch => data.aws_ami.rhel[arch].id }
+    ubuntu = { for arch in local.architecture_filters : (arch == "x86_64" ? "amd64" : arch) => data.aws_ami.ubuntu[arch].id }
+    rhel   = { for arch in local.architecture_filters : (arch == "x86_64" ? "amd64" : arch) => data.aws_ami.rhel[arch].id }
   }
 }
 
