@@ -19,22 +19,21 @@ resource "aws_instance" "vault_instance" {
   )
 }
 
-resource "enos_remote_exec" "install_dependencies" {
-  depends_on = [aws_instance.vault_instance]
-  for_each = toset([
-    for idx in local.vault_instances : idx
-    if length(var.dependencies_to_install) > 0
-  ])
-
-  content = templatefile("${path.module}/templates/install-dependencies.sh", {
-    dependencies = join(" ", var.dependencies_to_install)
-  })
-
-  transport = {
-    ssh = {
-      host = aws_instance.vault_instance[each.value].public_ip
+locals {
+  hosts = { for idx in range(var.instance_count) : idx => {
+    ipv6       = try(aws_instance.targets[idx].ipv6_addresses[0], "")
+    public_ip  = aws_instance.targets[idx].public_ip
+    private_ip = aws_instance.targets[idx].private_ip
     }
   }
+}
+
+module "install_packages" {
+  depends_on = [aws_instance.vault_instance]
+  source     = "../install_packages"
+
+  hosts    = local.hosts
+  packages = var.dependencies_to_install
 }
 
 resource "enos_bundle_install" "consul" {
@@ -267,7 +266,7 @@ resource "enos_vault_unseal" "followers" {
 resource "enos_vault_unseal" "when_vault_unseal_when_no_init_is_set" {
   depends_on = [
     enos_vault_start.followers,
-    enos_remote_exec.install_dependencies,
+    module.install_packages,
   ]
   for_each = toset([
     for idx in local.instances : idx
@@ -297,7 +296,7 @@ resource "enos_remote_exec" "wait_for_leader_in_vault_hosts" {
   depends_on = [
     enos_vault_unseal.leader,
     enos_vault_unseal.followers,
-    enos_remote_exec.install_dependencies,
+    module.install_packages,
   ]
   for_each = local.vault_instances
 
