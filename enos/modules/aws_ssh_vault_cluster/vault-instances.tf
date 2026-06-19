@@ -9,6 +9,16 @@ resource "aws_instance" "vault_instance" {
   subnet_id              = tolist(data.aws_subnets.infra.ids)[each.key % length(data.aws_subnets.infra.ids)]
   key_name               = var.ssh_aws_keypair
   iam_instance_profile   = aws_iam_instance_profile.vault_profile.name
+
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   tags = merge(
     var.common_tags,
     {
