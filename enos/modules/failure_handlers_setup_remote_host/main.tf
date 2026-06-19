@@ -17,10 +17,9 @@ terraform {
 data "aws_ami" "ubuntu" {
   most_recent = true
 
-  # Currently latest LTS-1
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-*-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
   }
 
   filter {

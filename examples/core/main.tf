@@ -66,10 +66,9 @@ data "aws_ami" "ubuntu" {
 data "aws_ami" "rhel" {
   most_recent = true
 
-  # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-10.1*HVM_GA-20*"]
+    values = ["RHEL-10.2*HVM-20*"]
   }
 
   filter {

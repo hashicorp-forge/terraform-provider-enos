@@ -32,7 +32,7 @@ data "aws_ami" "ubuntu" {
   # Currently latest LTS-1
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-*-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
   }
 
   filter {
@@ -54,7 +54,7 @@ data "aws_ami" "rhel" {
 
   filter {
     name   = "name"
-    values = ["RHEL-8.8*HVM-20*"]
+    values = ["RHEL-10.2*HVM-20*"]
   }
 
   filter {
