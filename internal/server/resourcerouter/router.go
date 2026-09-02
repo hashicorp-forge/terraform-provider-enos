@@ -50,19 +50,6 @@ type Resource interface {
 	SetProviderConfig(val tftypes.Value) error
 }
 
-// TransportRegistrar is an optional interface that resources may implement to receive a
-// reference to the provider-level transport target registry. The router checks for this
-// interface via type assertion and, when present, calls SetTransportRegistry before every
-// ApplyResourceChange so that the resource can register its resolved transport after a
-// successful apply.
-//
-// The registry is typed as any to avoid an import cycle between the server and plugin
-// packages. Resources that implement this interface are expected to perform the type
-// assertion themselves.
-type TransportRegistrar interface {
-	SetTransportRegistry(registry any)
-}
-
 // RouterOpt is a functional option for the router constructor.
 type RouterOpt func(Router) Router
 
@@ -94,18 +81,17 @@ func newRouter() Router {
 
 // Router routes the requests the resource servers.
 type Router struct {
-	resources map[string]Resource
-	// registry is an opaque reference to the provider-level transport target registry.
-	// It is set via WithRegistry and forwarded to resources that implement TransportRegistrar.
-	registry any
+	resources      map[string]Resource
+	injectRegistry func(context.Context) context.Context
 }
 
-// WithRegistry is a functional option that stores the provider-level transport target registry on
-// the Router. The registry is forwarded to every resource that implements TransportRegistrar before
-// ApplyResourceChange is called.
-func WithRegistry(registry any) RouterOpt {
+// WithRegistryInjector is a functional option that stores a context-injection function on the
+// Router. The function is called before every ApplyResourceChange to make the provider-level
+// transport target registry available via context. Using a function avoids an import cycle
+// between the server/resourcerouter and plugin packages.
+func WithRegistryInjector(inject func(context.Context) context.Context) RouterOpt {
 	return func(router Router) Router {
-		router.registry = registry
+		router.injectRegistry = inject
 		return router
 	}
 }

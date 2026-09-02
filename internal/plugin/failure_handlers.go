@@ -145,14 +145,11 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 // Log collection is best-effort: errors from individual targets are logged as warnings and do not
 // prevent collection from the remaining targets or suppress the primary failure diagnostic.
 //
-// registryGetter is called at failure time (not at construction time), which allows the registry
-// to be set on the resource after the state is constructed.
-func GatherLogsFromAllKnownTargetsFailureHandler(registryGetter func() *transportTargetRegistry, appNames []string) FailureHandler {
+// The registry is read from ctx at failure time (not at construction time), so it reflects all
+// targets registered up to the point of failure.
+func GatherLogsFromAllKnownTargetsFailureHandler(appNames []string) FailureHandler {
 	return func(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
-		var registry *transportTargetRegistry
-		if registryGetter != nil {
-			registry = registryGetter()
-		}
+		registry := transportTargetRegistryFromContext(ctx)
 		if registry == nil {
 			return
 		}

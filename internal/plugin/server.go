@@ -4,6 +4,8 @@
 package plugin
 
 import (
+	"context"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
@@ -18,17 +20,20 @@ func Server() tfprotov6.ProviderServer {
 	return server.New(
 		server.RegisterProvider(p),
 		WithDefaultDataRouter(),
-		WithDefaultResourceRouter(p.Registry()),
+		withResourceRouter(p.registry),
 	)
 }
 
 // WithDefaultResourceRouter creates a server opt that registers all the default resources and
 // optionally any provided overrides (or additional, non-default resources). The optional overrides
 // argument is useful if you need to override a resource in a test.
-//
-// registry is the provider-level transport target registry; it may be nil (e.g. in tests that do
-// not need log collection from non-failing resources).
-func WithDefaultResourceRouter(registry any, overrides ...rr.Resource) func(server.Server) server.Server {
+func WithDefaultResourceRouter(overrides ...rr.Resource) func(server.Server) server.Server {
+	return server.RegisterResourceRouter(buildResourceRouter(nil, overrides...))
+}
+
+// withResourceRouter is the internal counterpart used by Server() that wires in the provider-level
+// transport target registry.
+func withResourceRouter(registry *transportTargetRegistry, overrides ...rr.Resource) func(server.Server) server.Server {
 	return server.RegisterResourceRouter(buildResourceRouter(registry, overrides...))
 }
 
@@ -70,9 +75,8 @@ func defaultResources() []rr.Resource {
 	}
 }
 
-func buildResourceRouter(registry any, resourceOverrides ...rr.Resource) rr.Router {
+func buildResourceRouter(registry *transportTargetRegistry, resourceOverrides ...rr.Resource) rr.Router {
 	defaultResources := defaultResources()
-	// +1 for WithRegistry opt
 	opts := make([]rr.RouterOpt, 0, len(defaultResources)+len(resourceOverrides)+1)
 
 	for i := range defaultResources {
@@ -82,7 +86,9 @@ func buildResourceRouter(registry any, resourceOverrides ...rr.Resource) rr.Rout
 		opts = append(opts, rr.RegisterResource(resourceOverrides[i]))
 	}
 	if registry != nil {
-		opts = append(opts, rr.WithRegistry(registry))
+		opts = append(opts, rr.WithRegistryInjector(func(ctx context.Context) context.Context {
+			return withTransportTargetRegistry(ctx, registry)
+		}))
 	}
 
 	return rr.New(opts...)

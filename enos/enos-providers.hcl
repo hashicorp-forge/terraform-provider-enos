@@ -16,6 +16,20 @@ provider "enos" "ubuntu" {
   }
 }
 
+# ubuntu_with_debug is identical to ubuntu but also sets debug_data_root_dir so that
+# failure handlers write log files to disk. Used by the gather-logs-all-targets scenario
+# step to verify VAULT-42080: logs are collected from non-failing registered targets.
+provider "enos" "ubuntu_with_debug" {
+  debug_data_root_dir = abspath(joinpath(path.root, "../.enos-debug-logs"))
+
+  transport = {
+    ssh = {
+      user             = "ubuntu"
+      private_key_path = abspath(joinpath(path.root, "./support/enos-ci-ssh-key.pem"))
+    }
+  }
+}
+
 provider "enos" "rhel" {
   transport = {
     ssh = {

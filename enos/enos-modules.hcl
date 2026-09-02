@@ -105,6 +105,10 @@ module "test_failure_handlers" {
   source = "./modules/test_failure_handlers"
 }
 
+module "test_gather_logs_all_targets" {
+  source = "./modules/test_gather_logs_all_targets"
+}
+
 module "test_host_info" {
   source = "./modules/test_host_info"
 }

@@ -28,9 +28,3 @@ type ResourceWithProviderConfig interface {
 	GetProviderConfig() (*config, error)
 }
 
-// ResourceWithTransportRegistry is implemented by resources that wish to register their
-// resolved transport with the provider-level transportTargetRegistry after a successful apply.
-type ResourceWithTransportRegistry interface {
-	SetTransportRegistry(registry any)
-	GetTransportRegistry() *transportTargetRegistry
-}

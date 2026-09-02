@@ -30,7 +30,6 @@ import (
 type consulStart struct {
 	providerConfig *config
 	mu             sync.Mutex
-	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*consulStart)(nil)
@@ -70,19 +69,11 @@ func newConsulStart() *consulStart {
 }
 
 func newConsulStartStateV1() *consulStartStateV1 {
-	return newConsulStartStateV1WithRegistry(nil)
-}
-
-func newConsulStartStateV1WithRegistry(r *consulStart) *consulStartStateV1 {
 	transport := newEmbeddedTransport()
-	var registryGetter func() *transportTargetRegistry
-	if r != nil {
-		registryGetter = r.GetTransportRegistry
-	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"consul"}),
-		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"consul"}),
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"consul"}),
 	}
 
 	return &consulStartStateV1{
@@ -128,22 +119,6 @@ func (r *consulStart) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
-}
-
-func (r *consulStart) SetTransportRegistry(registry any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if reg, ok := registry.(*transportTargetRegistry); ok {
-		r.registry = reg
-	}
-}
-
-func (r *consulStart) GetTransportRegistry() *transportTargetRegistry {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -214,8 +189,8 @@ func (r *consulStart) PlanResourceChange(ctx context.Context, req resource.PlanR
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *consulStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newConsulStartStateV1WithRegistry(r)
-	plannedState := newConsulStartStateV1WithRegistry(r)
+	priorState := newConsulStartStateV1()
+	plannedState := newConsulStartStateV1()
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

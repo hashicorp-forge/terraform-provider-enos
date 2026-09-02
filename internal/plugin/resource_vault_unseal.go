@@ -24,7 +24,6 @@ import (
 type vaultUnseal struct {
 	providerConfig *config
 	mu             sync.Mutex
-	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*vaultUnseal)(nil)
@@ -52,19 +51,11 @@ func newVaultUnseal() *vaultUnseal {
 }
 
 func newVaultUnsealStateV1() *vaultUnsealStateV1 {
-	return newVaultUnsealStateV1WithRegistry(nil)
-}
-
-func newVaultUnsealStateV1WithRegistry(r *vaultUnseal) *vaultUnsealStateV1 {
 	transport := newEmbeddedTransport()
-	var registryGetter func() *transportTargetRegistry
-	if r != nil {
-		registryGetter = r.GetTransportRegistry
-	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
-		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"vault"}),
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"}),
 	}
 
 	return &vaultUnsealStateV1{
@@ -99,22 +90,6 @@ func (r *vaultUnseal) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
-}
-
-func (r *vaultUnseal) SetTransportRegistry(registry any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if reg, ok := registry.(*transportTargetRegistry); ok {
-		r.registry = reg
-	}
-}
-
-func (r *vaultUnseal) GetTransportRegistry() *transportTargetRegistry {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -184,8 +159,8 @@ func (r *vaultUnseal) PlanResourceChange(ctx context.Context, req resource.PlanR
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *vaultUnseal) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newVaultUnsealStateV1WithRegistry(r)
-	plannedState := newVaultUnsealStateV1WithRegistry(r)
+	priorState := newVaultUnsealStateV1()
+	plannedState := newVaultUnsealStateV1()
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

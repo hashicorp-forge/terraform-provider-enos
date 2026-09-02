@@ -41,7 +41,6 @@ const (
 type vaultStart struct {
 	providerConfig *config
 	mu             sync.Mutex
-	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*vaultStart)(nil)
@@ -86,19 +85,11 @@ func newVaultStart() *vaultStart {
 }
 
 func newVaultStartStateV1() *vaultStartStateV1 {
-	return newVaultStartStateV1WithRegistry(nil)
-}
-
-func newVaultStartStateV1WithRegistry(r *vaultStart) *vaultStartStateV1 {
 	transport := newEmbeddedTransport()
-	var registryGetter func() *transportTargetRegistry
-	if r != nil {
-		registryGetter = r.GetTransportRegistry
-	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
-		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"vault"}),
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"}),
 	}
 
 	return &vaultStartStateV1{
@@ -153,22 +144,6 @@ func (r *vaultStart) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
-}
-
-func (r *vaultStart) SetTransportRegistry(registry any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if reg, ok := registry.(*transportTargetRegistry); ok {
-		r.registry = reg
-	}
-}
-
-func (r *vaultStart) GetTransportRegistry() *transportTargetRegistry {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -245,8 +220,8 @@ func (r *vaultStart) PlanResourceChange(ctx context.Context, req resource.PlanRe
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *vaultStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newVaultStartStateV1WithRegistry(r)
-	plannedState := newVaultStartStateV1WithRegistry(r)
+	priorState := newVaultStartStateV1()
+	plannedState := newVaultStartStateV1()
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

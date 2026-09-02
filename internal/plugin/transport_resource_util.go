@@ -320,8 +320,8 @@ func (t *transportResourceUtil) ApplyUnmarshalState(
 
 // ApplyValidatePlannedAndBuildTransport takes the planned state and provider transport,
 // validates them, and returns a new embedded transport that can be used to create a transport client.
-// If the resource implements ResourceWithTransportRegistry, the resolved transport is registered
-// with the provider-level registry so that failure handlers can collect logs from all known targets.
+// If a transportTargetRegistry is stored in ctx (injected by the resource router), the resolved
+// transport is registered with it so that failure handlers can collect logs from all known targets.
 func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(
 	ctx context.Context,
 	planned StateWithTransport,
@@ -391,12 +391,10 @@ func (t *transportResourceUtil) ApplyValidatePlannedAndBuildTransport(
 		return nil
 	}
 
-	// Register this resolved transport with the provider-level registry so that failure
-	// handlers triggered by any resource can gather logs from all known targets.
-	if registryResource, ok := resource.(ResourceWithTransportRegistry); ok {
-		if registry := registryResource.GetTransportRegistry(); registry != nil {
-			registry.register(configuredTransport)
-		}
+	// Register this resolved transport with the provider-level registry (if one was injected
+	// into ctx by the router) so that failure handlers can gather logs from all known targets.
+	if registry := transportTargetRegistryFromContext(ctx); registry != nil {
+		registry.register(configuredTransport)
 	}
 
 	return et

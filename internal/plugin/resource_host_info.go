@@ -22,7 +22,6 @@ import (
 type hostInfo struct {
 	providerConfig *config
 	mu             sync.Mutex
-	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*hostInfo)(nil)
@@ -53,18 +52,10 @@ func newHostInfo() *hostInfo {
 }
 
 func newHostInfoStateV1() *hostInfoStateV1 {
-	return newHostInfoStateV1WithRegistry(nil)
-}
-
-func newHostInfoStateV1WithRegistry(f *hostInfo) *hostInfoStateV1 {
 	transport := newEmbeddedTransport()
-	var registryGetter func() *transportTargetRegistry
-	if f != nil {
-		registryGetter = f.GetTransportRegistry
-	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{}),
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{}),
 	}
 
 	return &hostInfoStateV1{
@@ -105,22 +96,6 @@ func (f *hostInfo) GetProviderConfig() (*config, error) {
 	defer f.mu.Unlock()
 
 	return f.providerConfig.Copy()
-}
-
-func (f *hostInfo) SetTransportRegistry(registry any) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if reg, ok := registry.(*transportTargetRegistry); ok {
-		f.registry = reg
-	}
-}
-
-func (f *hostInfo) GetTransportRegistry() *transportTargetRegistry {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	return f.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -254,8 +229,8 @@ func (f *hostInfo) PlanResourceChange(ctx context.Context, req resource.PlanReso
 // ApplyResourceChange is the request Terraform sends when it needs to apply a planned set of
 // changes to the resource.
 func (f *hostInfo) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newHostInfoStateV1WithRegistry(f)
-	plannedState := newHostInfoStateV1WithRegistry(f)
+	priorState := newHostInfoStateV1()
+	plannedState := newHostInfoStateV1()
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

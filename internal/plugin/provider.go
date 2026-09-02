@@ -185,11 +185,6 @@ func (p *Provider) Config() tftypes.Value {
 	return p.config.Terraform5Value()
 }
 
-// Registry returns the provider-level transport target registry.
-func (p *Provider) Registry() *transportTargetRegistry {
-	return p.registry
-}
-
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (c *config) FromTerraform5Value(val tftypes.Value) error {
 	c.mu.Lock()

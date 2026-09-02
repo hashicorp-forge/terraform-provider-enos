@@ -3,7 +3,29 @@
 
 package plugin
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
+
+// transportTargetRegistryKey is the context key used to store and retrieve the
+// provider-level transportTargetRegistry from a context.Context.
+type transportTargetRegistryKey struct{}
+
+// withTransportTargetRegistry returns a new context with the given registry stored under
+// transportTargetRegistryKey. The registry is injected by the resource router before
+// ApplyResourceChange so that transport_resource_util and failure handlers can access it
+// without any per-resource boilerplate.
+func withTransportTargetRegistry(ctx context.Context, r *transportTargetRegistry) context.Context {
+	return context.WithValue(ctx, transportTargetRegistryKey{}, r)
+}
+
+// transportTargetRegistryFromContext retrieves the registry from ctx, returning nil if none
+// was stored.
+func transportTargetRegistryFromContext(ctx context.Context) *transportTargetRegistry {
+	r, _ := ctx.Value(transportTargetRegistryKey{}).(*transportTargetRegistry)
+	return r
+}
 
 // transportTargetRegistry is a thread-safe store of resolved transport targets that have been
 // configured by resources during apply. It is held on the Provider so that failure handlers

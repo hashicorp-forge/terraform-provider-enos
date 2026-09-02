@@ -468,10 +468,10 @@ Taco Failed`)
 	assert.Equal(t, "Failed to make taco since there was no chicken.", diag.Detail)
 }
 
-func TestGatherLogsFromAllKnownTargetsFailureHandler_NilRegistry(t *testing.T) {
+func TestGatherLogsFromAllKnownTargetsFailureHandler_NoRegistryInContext(t *testing.T) {
 	t.Parallel()
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(nil, []string{"vault"})
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -479,25 +479,7 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_NilRegistry(t *testing.T) {
 		Detail:   "something went wrong",
 	}
 
-	// Should be a no-op — no panic, no changes to the diagnostic.
-	handler(t.Context(), diag, tftypes.NewValue(tftypes.String, ""))
-
-	assert.Equal(t, "something went wrong", diag.Detail)
-}
-
-func TestGatherLogsFromAllKnownTargetsFailureHandler_NilGetterFunc(t *testing.T) {
-	t.Parallel()
-
-	var getter func() *transportTargetRegistry
-
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(getter, []string{"vault"})
-
-	diag := &tfprotov6.Diagnostic{
-		Severity: tfprotov6.DiagnosticSeverityError,
-		Summary:  "Failure",
-		Detail:   "something went wrong",
-	}
-
+	// No registry in context — should be a no-op.
 	handler(t.Context(), diag, tftypes.NewValue(tftypes.String, ""))
 
 	assert.Equal(t, "something went wrong", diag.Detail)
@@ -511,9 +493,7 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_NoDebugDir(t *testing.T) {
 	sshTransport.Host.Set("10.0.0.1")
 	registry.register(sshTransport)
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
-		return registry
-	}, []string{"vault"})
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -523,7 +503,8 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_NoDebugDir(t *testing.T) {
 
 	// Provider config without debug_data_root_dir configured: handler should be a no-op.
 	providerConfig := newProviderConfig()
-	handler(t.Context(), diag, providerConfig.Terraform5Value())
+	ctx := withTransportTargetRegistry(t.Context(), registry)
+	handler(ctx, diag, providerConfig.Terraform5Value())
 
 	assert.Equal(t, "something went wrong", diag.Detail)
 }
@@ -533,9 +514,7 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_EmptyRegistry(t *testing.T)
 
 	registry := newTransportTargetRegistry()
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
-		return registry
-	}, []string{"vault"})
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -545,7 +524,8 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_EmptyRegistry(t *testing.T)
 
 	providerConfig := newProviderConfig()
 	providerConfig.DebugDataRootDir.Set(t.TempDir())
-	handler(t.Context(), diag, providerConfig.Terraform5Value())
+	ctx := withTransportTargetRegistry(t.Context(), registry)
+	handler(ctx, diag, providerConfig.Terraform5Value())
 
 	// No transports registered — detail unchanged.
 	assert.Equal(t, "something went wrong", diag.Detail)
@@ -589,9 +569,7 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_CollectsFromAllTargets(t *t
 	registry.register(sshTransport1)
 	registry.register(sshTransport2)
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
-		return registry
-	}, []string{"chicken", "consul"})
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"chicken", "consul"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -601,7 +579,8 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_CollectsFromAllTargets(t *t
 
 	providerConfig := newProviderConfig()
 	providerConfig.DebugDataRootDir.Set(existDir)
-	handler(t.Context(), diag, providerConfig.Terraform5Value())
+	ctx := withTransportTargetRegistry(t.Context(), registry)
+	handler(ctx, diag, providerConfig.Terraform5Value())
 
 	// The diagnostic detail should be updated with log file locations.
 	assert.Contains(t, diag.Detail, "Application Logs (all known targets):")
@@ -610,16 +589,14 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_CollectsFromAllTargets(t *t
 	assert.Contains(t, diag.Detail, "consul")
 }
 
-func TestGatherLogsFromAllKnownTargetsFailureHandler_GetterCalledAtFailureTime(t *testing.T) {
+func TestGatherLogsFromAllKnownTargetsFailureHandler_RegistryReadFromContextAtFireTime(t *testing.T) {
 	t.Parallel()
 
-	// Verify that the getter is called at failure time (not at construction time),
-	// allowing the registry to be populated after the handler is constructed.
+	// Verify that the registry is read from ctx at failure time (not at construction time),
+	// so a registry populated after handler construction is still visible.
 	registry := newTransportTargetRegistry()
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
-		return registry
-	}, []string{"vault"})
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"})
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -630,7 +607,8 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_GetterCalledAtFailureTime(t
 	providerConfig := newProviderConfig()
 	providerConfig.DebugDataRootDir.Set(t.TempDir())
 
-	// Empty registry at handler fire time — no log sections appended.
-	handler(t.Context(), diag, providerConfig.Terraform5Value())
+	// Registry is empty at fire time — no log sections appended.
+	ctx := withTransportTargetRegistry(t.Context(), registry)
+	handler(ctx, diag, providerConfig.Terraform5Value())
 	assert.Equal(t, "something went wrong", diag.Detail)
 }

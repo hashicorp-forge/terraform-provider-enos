@@ -11,6 +11,10 @@ scenario "failure_handlers" {
       Name        = "enos-provider"
       Environment = var.environment
     }
+
+    # Local directory where the ubuntu_with_debug provider writes failure-handler log files.
+    # This must match the debug_data_root_dir configured on provider.enos.ubuntu_with_debug.
+    debug_data_root_dir = abspath(joinpath(path.root, "../.enos-debug-logs"))
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
@@ -18,6 +22,7 @@ scenario "failure_handlers" {
   providers = [
     provider.aws.default,
     provider.enos.ubuntu,
+    provider.enos.ubuntu_with_debug,
   ]
 
   step "find_azs" {
@@ -91,6 +96,30 @@ scenario "failure_handlers" {
 
     variables {
       host_public_ip = step.setup_remote_host.public_ip
+    }
+  }
+
+  # test_gather_logs_all_targets verifies VAULT-42080.
+  # It installs Vault + Consul, then intentionally fails a different resource and asserts
+  # that log files for *both* vault and consul were written to disk by the
+  # GatherLogsFromAllKnownTargetsFailureHandler — even though those resources succeeded.
+  #
+  # The step uses provider.enos.ubuntu_with_debug so that debug_data_root_dir is set and
+  # log files are actually persisted. skip_step mirrors run_failure_handler_tests so the
+  # end-to-end test is opt-in (same behaviour as the existing test_failure_handlers step).
+  step "test_gather_logs_all_targets" {
+    skip_step  = !var.run_failure_handler_tests
+    module     = module.test_gather_logs_all_targets
+    depends_on = [step.setup_remote_host]
+
+    providers = {
+      enos = provider.enos.ubuntu_with_debug
+    }
+
+    variables {
+      host_public_ip      = step.setup_remote_host.public_ip
+      host_private_ip     = step.setup_remote_host.private_ip
+      debug_data_root_dir = local.debug_data_root_dir
     }
   }
 
