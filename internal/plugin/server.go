@@ -13,18 +13,23 @@ import (
 
 // Server returns a default instance of our ProviderServer.
 func Server() tfprotov6.ProviderServer {
+	p := newProvider()
+
 	return server.New(
-		server.RegisterProvider(newProvider()),
+		server.RegisterProvider(p),
 		WithDefaultDataRouter(),
-		WithDefaultResourceRouter(),
+		WithDefaultResourceRouter(p.Registry()),
 	)
 }
 
 // WithDefaultResourceRouter creates a server opt that registers all the default resources and
 // optionally any provided overrides (or additional, non-default resources). The optional overrides
 // argument is useful if you need to override a resource in a test.
-func WithDefaultResourceRouter(overrides ...rr.Resource) func(server.Server) server.Server {
-	return server.RegisterResourceRouter(buildResourceRouter(overrides...))
+//
+// registry is the provider-level transport target registry; it may be nil (e.g. in tests that do
+// not need log collection from non-failing resources).
+func WithDefaultResourceRouter(registry any, overrides ...rr.Resource) func(server.Server) server.Server {
+	return server.RegisterResourceRouter(buildResourceRouter(registry, overrides...))
 }
 
 // WithDefaultDataRouter creates a server opt that registers all the default datasources and
@@ -65,18 +70,19 @@ func defaultResources() []rr.Resource {
 	}
 }
 
-func buildResourceRouter(resourceOverrides ...rr.Resource) rr.Router {
+func buildResourceRouter(registry any, resourceOverrides ...rr.Resource) rr.Router {
 	defaultResources := defaultResources()
-	opts := make([]rr.RouterOpt, len(defaultResources)+len(resourceOverrides))
-	count := 0
+	// +1 for WithRegistry opt
+	opts := make([]rr.RouterOpt, 0, len(defaultResources)+len(resourceOverrides)+1)
 
 	for i := range defaultResources {
-		opts[count] = rr.RegisterResource(defaultResources[i])
-		count++
+		opts = append(opts, rr.RegisterResource(defaultResources[i]))
 	}
 	for i := range resourceOverrides {
-		opts[count] = rr.RegisterResource(resourceOverrides[i])
-		count++
+		opts = append(opts, rr.RegisterResource(resourceOverrides[i]))
+	}
+	if registry != nil {
+		opts = append(opts, rr.WithRegistry(registry))
 	}
 
 	return rr.New(opts...)

@@ -137,6 +137,119 @@ func GetApplicationLogsFailureHandler(et *embeddedTransportV1, appNames []string
 	}
 }
 
+// GatherLogsFromAllKnownTargetsFailureHandler returns a FailureHandler that, when any resource
+// fails, attempts to gather logs from every transport target registered in the provider-level
+// registry — including targets that did not fail. This is useful when diagnosing a failure that
+// may be caused by or correlated with activity on a different (healthy) machine.
+//
+// Log collection is best-effort: errors from individual targets are logged as warnings and do not
+// prevent collection from the remaining targets or suppress the primary failure diagnostic.
+//
+// registryGetter is called at failure time (not at construction time), which allows the registry
+// to be set on the resource after the state is constructed.
+func GatherLogsFromAllKnownTargetsFailureHandler(registryGetter func() *transportTargetRegistry, appNames []string) FailureHandler {
+	return func(ctx context.Context, errDiag *tfprotov6.Diagnostic, providerConfig tftypes.Value) {
+		var registry *transportTargetRegistry
+		if registryGetter != nil {
+			registry = registryGetter()
+		}
+		if registry == nil {
+			return
+		}
+
+		logger := log.NewLogger(ctx)
+
+		cfg := newProviderConfig()
+		if err := cfg.FromTerraform5Value(providerConfig); err != nil {
+			logger.Error("GatherAllTargets: failed to decode provider config", map[string]any{
+				"error": err,
+			})
+
+			return
+		}
+
+		dataDir, ok := cfg.DebugDataRootDir.Get()
+		if !ok {
+			logger.Debug("GatherAllTargets: skipped, debug_data_root_dir not configured")
+			return
+		}
+
+		targets := registry.all()
+		if len(targets) == 0 {
+			return
+		}
+
+		var collectedAny bool
+
+		for _, transport := range targets {
+			var responses []remoteflight.GetLogsResponse
+			var err error
+
+			switch t := transport.(type) {
+			case *embeddedTransportSSHv1:
+				tLogger := logger.WithValues(map[string]any{
+					"host": t.Host.Val,
+					"user": t.User.Val,
+				})
+				tLogger.Info("GatherAllTargets: gathering systemd logs")
+				responses, err = getSystemdLogs(ctx, tLogger, t, appNames)
+			case *embeddedTransportNomadv1:
+				tLogger := logger.WithValues(map[string]any{
+					"allocation_id": t.AllocationID.Val,
+					"task":          t.TaskName.Val,
+					"host":          t.Host.Val,
+				})
+				tLogger.Info("GatherAllTargets: gathering Nomad task logs")
+				responses, err = getNomadLogs(ctx, t)
+			case *embeddedTransportK8Sv1:
+				tLogger := logger.WithValues(map[string]any{
+					"context_name": t.ContextName.Val,
+					"namespace":    t.Namespace.Val,
+					"pod":          t.Pod.Val,
+					"container":    t.Container.Val,
+				})
+				tLogger.Info("GatherAllTargets: gathering Kubernetes pod logs")
+				responses, err = getK8sLogs(ctx, t)
+			default:
+				logger.Error("GatherAllTargets: unknown transport type", map[string]any{
+					"transport_type": string(transport.Type()),
+				})
+
+				continue
+			}
+
+			if err != nil {
+				logger.Error("GatherAllTargets: failed to get logs from target", map[string]any{
+					"error": err,
+				})
+			}
+
+			for _, resp := range responses {
+				appName := resp.GetAppName()
+				logFile := filepath.Join(dataDir, resp.GetLogFileName())
+				logger.Info("GatherAllTargets: writing log file", map[string]any{
+					"app_name": appName,
+					"log_file": logFile,
+				})
+
+				if err := saveLogsToFile(logFile, resp.GetLogs()); err != nil {
+					logger.Error("GatherAllTargets: failed to save log file", map[string]any{
+						"error": err,
+					})
+
+					continue
+				}
+
+				if !collectedAny {
+					errDiag.Detail = errDiag.Detail + "\n\nApplication Logs (all known targets):"
+					collectedAny = true
+				}
+				errDiag.Detail = fmt.Sprintf("%s\n  %s: %s", errDiag.Detail, appName, logFile)
+			}
+		}
+	}
+}
+
 func saveLogsToFile(logFile string, logs []byte) error {
 	err := os.MkdirAll(filepath.Dir(logFile), 0o750)
 	if err != nil {

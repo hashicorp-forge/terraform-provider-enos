@@ -23,6 +23,7 @@ import (
 type file struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*file)(nil)
@@ -51,8 +52,19 @@ func newFile() *file {
 }
 
 func newFileState() *fileStateV1 {
+	return newFileStateWithRegistry(nil)
+}
+
+func newFileStateWithRegistry(f *file) *fileStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	var registryGetter func() *transportTargetRegistry
+	if f != nil {
+		registryGetter = f.GetTransportRegistry
+	}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{}),
+	}
 
 	return &fileStateV1{
 		ID:              newTfString(),
@@ -88,6 +100,22 @@ func (f *file) GetProviderConfig() (*config, error) {
 	defer f.mu.Unlock()
 
 	return f.providerConfig.Copy()
+}
+
+func (f *file) SetTransportRegistry(registry any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		f.registry = reg
+	}
+}
+
+func (f *file) GetTransportRegistry() *transportTargetRegistry {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -177,8 +205,8 @@ func (f *file) PlanResourceChange(ctx context.Context, req resource.PlanResource
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (f *file) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newFileState()
-	plannedState := newFileState()
+	priorState := newFileStateWithRegistry(f)
+	plannedState := newFileStateWithRegistry(f)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

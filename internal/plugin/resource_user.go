@@ -20,6 +20,7 @@ import (
 type user struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*user)(nil)
@@ -47,8 +48,19 @@ func newUser() *user {
 }
 
 func newUserStateV1() *userStateV1 {
+	return newUserStateV1WithRegistry(nil)
+}
+
+func newUserStateV1WithRegistry(f *user) *userStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	var registryGetter func() *transportTargetRegistry
+	if f != nil {
+		registryGetter = f.GetTransportRegistry
+	}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{}),
+	}
 
 	return &userStateV1{
 		ID:              newTfString(),
@@ -82,6 +94,22 @@ func (f *user) GetProviderConfig() (*config, error) {
 	defer f.mu.Unlock()
 
 	return f.providerConfig.Copy()
+}
+
+func (f *user) SetTransportRegistry(registry any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		f.registry = reg
+	}
+}
+
+func (f *user) GetTransportRegistry() *transportTargetRegistry {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -218,8 +246,8 @@ func (f *user) PlanResourceChange(ctx context.Context, req resource.PlanResource
 // ApplyResourceChange is the request Terraform sends when it needs to apply a planned set of
 // changes to the resource.
 func (f *user) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newUserStateV1()
-	plannedState := newUserStateV1()
+	priorState := newUserStateV1WithRegistry(f)
+	plannedState := newUserStateV1WithRegistry(f)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

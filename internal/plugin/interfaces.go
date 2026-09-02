@@ -27,3 +27,10 @@ type ResourceWithProviderConfig interface {
 	SetProviderConfig(val tftypes.Value) error
 	GetProviderConfig() (*config, error)
 }
+
+// ResourceWithTransportRegistry is implemented by resources that wish to register their
+// resolved transport with the provider-level transportTargetRegistry after a successful apply.
+type ResourceWithTransportRegistry interface {
+	SetTransportRegistry(registry any)
+	GetTransportRegistry() *transportTargetRegistry
+}

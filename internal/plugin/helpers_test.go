@@ -334,7 +334,7 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 			return server.New(
 				server.RegisterProvider(provider),
 				WithDefaultDataRouter(datasourceOverrides...),
-				WithDefaultResourceRouter(resourceOverrides...),
+				WithDefaultResourceRouter(provider.Registry(), resourceOverrides...),
 			), nil
 		},
 	}

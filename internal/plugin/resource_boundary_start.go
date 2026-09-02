@@ -27,6 +27,7 @@ import (
 type boundaryStart struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*boundaryStart)(nil)
@@ -58,10 +59,19 @@ func newBoundaryStart() *boundaryStart {
 }
 
 func newBoundaryStartStateV1() *boundaryStartStateV1 {
+	return newBoundaryStartStateV1WithRegistry(nil)
+}
+
+func newBoundaryStartStateV1WithRegistry(r *boundaryStart) *boundaryStartStateV1 {
 	transport := newEmbeddedTransport()
+	var registryGetter func() *transportTargetRegistry
+	if r != nil {
+		registryGetter = r.GetTransportRegistry
+	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"boundary"}),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"boundary"}),
 	}
 
 	return &boundaryStartStateV1{
@@ -102,6 +112,22 @@ func (r *boundaryStart) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
+}
+
+func (r *boundaryStart) SetTransportRegistry(registry any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		r.registry = reg
+	}
+}
+
+func (r *boundaryStart) GetTransportRegistry() *transportTargetRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -157,8 +183,8 @@ func (r *boundaryStart) PlanResourceChange(ctx context.Context, req resource.Pla
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *boundaryStart) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newBoundaryStartStateV1()
-	plannedState := newBoundaryStartStateV1()
+	priorState := newBoundaryStartStateV1WithRegistry(r)
+	plannedState := newBoundaryStartStateV1WithRegistry(r)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

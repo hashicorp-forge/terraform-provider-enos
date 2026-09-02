@@ -21,6 +21,7 @@ import (
 type boundaryInit struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*boundaryInit)(nil)
@@ -77,8 +78,19 @@ func newBoundaryInit() *boundaryInit {
 }
 
 func newBoundaryInitStateV1() *boundaryInitStateV1 {
+	return newBoundaryInitStateV1WithRegistry(nil)
+}
+
+func newBoundaryInitStateV1WithRegistry(r *boundaryInit) *boundaryInitStateV1 {
 	transport := newEmbeddedTransport()
-	handlers := failureHandlers{TransportDebugFailureHandler(transport)}
+	var registryGetter func() *transportTargetRegistry
+	if r != nil {
+		registryGetter = r.GetTransportRegistry
+	}
+	handlers := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"boundary"}),
+	}
 
 	return &boundaryInitStateV1{
 		ID:         newTfString(),
@@ -142,6 +154,22 @@ func (r *boundaryInit) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
+}
+
+func (r *boundaryInit) SetTransportRegistry(registry any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		r.registry = reg
+	}
+}
+
+func (r *boundaryInit) GetTransportRegistry() *transportTargetRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -226,8 +254,8 @@ func (r *boundaryInit) PlanResourceChange(ctx context.Context, req resource.Plan
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *boundaryInit) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newBoundaryInitStateV1()
-	plannedState := newBoundaryInitStateV1()
+	priorState := newBoundaryInitStateV1WithRegistry(r)
+	plannedState := newBoundaryInitStateV1WithRegistry(r)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

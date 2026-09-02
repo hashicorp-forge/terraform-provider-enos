@@ -29,15 +29,17 @@ var (
 // newProvider returns a new instance of the plugin provider server.
 func newProvider() *Provider {
 	return &Provider{
-		mu:     sync.Mutex{},
-		config: newProviderConfig(),
+		mu:       sync.Mutex{},
+		config:   newProviderConfig(),
+		registry: newTransportTargetRegistry(),
 	}
 }
 
 // Provider implements the internal server.Provider interface.
 type Provider struct {
-	mu     sync.Mutex
-	config *config
+	mu       sync.Mutex
+	config   *config
+	registry *transportTargetRegistry
 }
 
 type config struct {
@@ -181,6 +183,11 @@ func (p *Provider) Stop(ctx context.Context, req *tfprotov6.StopProviderRequest)
 // Config returns the providers configuration as a Terraform5Value.
 func (p *Provider) Config() tftypes.Value {
 	return p.config.Terraform5Value()
+}
+
+// Registry returns the provider-level transport target registry.
+func (p *Provider) Registry() *transportTargetRegistry {
+	return p.registry
 }
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().

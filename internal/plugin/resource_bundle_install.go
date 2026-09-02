@@ -30,6 +30,7 @@ import (
 type bundleInstall struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*bundleInstall)(nil)
@@ -71,8 +72,19 @@ func newBundleInstall() *bundleInstall {
 }
 
 func newBundleInstallStateV1() *bundleInstallStateV1 {
+	return newBundleInstallStateV1WithRegistry(nil)
+}
+
+func newBundleInstallStateV1WithRegistry(r *bundleInstall) *bundleInstallStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	var registryGetter func() *transportTargetRegistry
+	if r != nil {
+		registryGetter = r.GetTransportRegistry
+	}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{}),
+	}
 
 	return &bundleInstallStateV1{
 		ID:          newTfString(),
@@ -117,6 +129,22 @@ func (r *bundleInstall) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
+}
+
+func (r *bundleInstall) SetTransportRegistry(registry any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		r.registry = reg
+	}
+}
+
+func (r *bundleInstall) GetTransportRegistry() *transportTargetRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -181,8 +209,8 @@ func (r *bundleInstall) PlanResourceChange(ctx context.Context, req resource.Pla
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *bundleInstall) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newBundleInstallStateV1()
-	plannedState := newBundleInstallStateV1()
+	priorState := newBundleInstallStateV1WithRegistry(r)
+	plannedState := newBundleInstallStateV1WithRegistry(r)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)

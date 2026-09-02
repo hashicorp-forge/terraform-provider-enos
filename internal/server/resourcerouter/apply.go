@@ -106,6 +106,12 @@ func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyRes
 		return nil, newErrSetProviderConfig(err)
 	}
 
+	// If the resource supports transport registration, forward the provider-level registry so
+	// that after a successful apply the resource can register its resolved transport target.
+	if registrar, ok := resource.(TransportRegistrar); ok && r.registry != nil {
+		registrar.SetTransportRegistry(r.registry)
+	}
+
 	res := &ApplyResourceChangeResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
 	}

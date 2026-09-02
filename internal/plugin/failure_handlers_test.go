@@ -467,3 +467,170 @@ Taco Failed`)
 
 	assert.Equal(t, "Failed to make taco since there was no chicken.", diag.Detail)
 }
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_NilRegistry(t *testing.T) {
+	t.Parallel()
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(nil, []string{"vault"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Failure",
+		Detail:   "something went wrong",
+	}
+
+	// Should be a no-op — no panic, no changes to the diagnostic.
+	handler(t.Context(), diag, tftypes.NewValue(tftypes.String, ""))
+
+	assert.Equal(t, "something went wrong", diag.Detail)
+}
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_NilGetterFunc(t *testing.T) {
+	t.Parallel()
+
+	var getter func() *transportTargetRegistry
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(getter, []string{"vault"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Failure",
+		Detail:   "something went wrong",
+	}
+
+	handler(t.Context(), diag, tftypes.NewValue(tftypes.String, ""))
+
+	assert.Equal(t, "something went wrong", diag.Detail)
+}
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_NoDebugDir(t *testing.T) {
+	t.Parallel()
+
+	registry := newTransportTargetRegistry()
+	sshTransport := newEmbeddedTransportSSH()
+	sshTransport.Host.Set("10.0.0.1")
+	registry.register(sshTransport)
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
+		return registry
+	}, []string{"vault"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Failure",
+		Detail:   "something went wrong",
+	}
+
+	// Provider config without debug_data_root_dir configured: handler should be a no-op.
+	providerConfig := newProviderConfig()
+	handler(t.Context(), diag, providerConfig.Terraform5Value())
+
+	assert.Equal(t, "something went wrong", diag.Detail)
+}
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_EmptyRegistry(t *testing.T) {
+	t.Parallel()
+
+	registry := newTransportTargetRegistry()
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
+		return registry
+	}, []string{"vault"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Failure",
+		Detail:   "something went wrong",
+	}
+
+	providerConfig := newProviderConfig()
+	providerConfig.DebugDataRootDir.Set(t.TempDir())
+	handler(t.Context(), diag, providerConfig.Terraform5Value())
+
+	// No transports registered — detail unchanged.
+	assert.Equal(t, "something went wrong", diag.Detail)
+}
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_CollectsFromAllTargets(t *testing.T) {
+	t.Parallel()
+
+	existDir := t.TempDir()
+
+	chickenLogs := []byte("chicken log data")
+	consulLogs := []byte("consul log data")
+
+	sshTransport1 := newEmbeddedTransportSSH()
+	sshTransport1.Host.Set("10.0.0.1")
+	sshTransport1.User.Set("ubuntu")
+	sshTransport1.PrivateKeyPath.Set("/some/private/key/path/key.pem")
+	sshTransport1.sshTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error) {
+		return mock.New(), nil
+	}
+	serviceMap := map[string][]byte{
+		"chicken": chickenLogs,
+		"consul":  consulLogs,
+	}
+	sshTransport1.systemdClientFactory = func(transport it.Transport, logger log.Logger) systemd.Client {
+		return &mockSystemdClient{logs: serviceMap}
+	}
+
+	sshTransport2 := newEmbeddedTransportSSH()
+	sshTransport2.Host.Set("10.0.0.2")
+	sshTransport2.User.Set("ubuntu")
+	sshTransport2.PrivateKeyPath.Set("/some/private/key/path/key.pem")
+	sshTransport2.sshTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error) {
+		return mock.New(), nil
+	}
+	sshTransport2.systemdClientFactory = func(transport it.Transport, logger log.Logger) systemd.Client {
+		return &mockSystemdClient{logs: serviceMap}
+	}
+
+	registry := newTransportTargetRegistry()
+	registry.register(sshTransport1)
+	registry.register(sshTransport2)
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
+		return registry
+	}, []string{"chicken", "consul"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Remote resource failed",
+		Detail:   "the vault_start resource failed",
+	}
+
+	providerConfig := newProviderConfig()
+	providerConfig.DebugDataRootDir.Set(existDir)
+	handler(t.Context(), diag, providerConfig.Terraform5Value())
+
+	// The diagnostic detail should be updated with log file locations.
+	assert.Contains(t, diag.Detail, "Application Logs (all known targets):")
+	// Each transport target produces logs for chicken and consul.
+	assert.Contains(t, diag.Detail, "chicken")
+	assert.Contains(t, diag.Detail, "consul")
+}
+
+func TestGatherLogsFromAllKnownTargetsFailureHandler_GetterCalledAtFailureTime(t *testing.T) {
+	t.Parallel()
+
+	// Verify that the getter is called at failure time (not at construction time),
+	// allowing the registry to be populated after the handler is constructed.
+	registry := newTransportTargetRegistry()
+
+	handler := GatherLogsFromAllKnownTargetsFailureHandler(func() *transportTargetRegistry {
+		return registry
+	}, []string{"vault"})
+
+	diag := &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityError,
+		Summary:  "Failure",
+		Detail:   "something went wrong",
+	}
+
+	providerConfig := newProviderConfig()
+	providerConfig.DebugDataRootDir.Set(t.TempDir())
+
+	// Empty registry at handler fire time — no log sections appended.
+	handler(t.Context(), diag, providerConfig.Terraform5Value())
+	assert.Equal(t, "something went wrong", diag.Detail)
+}

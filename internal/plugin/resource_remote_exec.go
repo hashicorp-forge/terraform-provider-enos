@@ -26,6 +26,7 @@ import (
 type remoteExec struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 
 	stateFactory remoteExecStateFactory
 }
@@ -52,18 +53,31 @@ var _ state.State = (*remoteExecStateV1)(nil)
 type remoteExecStateFactory = func() *remoteExecStateV1
 
 func newRemoteExec() *remoteExec {
-	return &remoteExec{
+	r := &remoteExec{
 		providerConfig: newProviderConfig(),
 		mu:             sync.Mutex{},
-		stateFactory:   newRemoteExecStateV1,
 	}
+	r.stateFactory = func() *remoteExecStateV1 {
+		return newRemoteExecStateV1WithRegistry(r)
+	}
+
+	return r
 }
 
 func newRemoteExecStateV1() *remoteExecStateV1 {
+	return newRemoteExecStateV1WithRegistry(nil)
+}
+
+func newRemoteExecStateV1WithRegistry(r *remoteExec) *remoteExecStateV1 {
 	transport := newEmbeddedTransport()
+	var registryGetter func() *transportTargetRegistry
+	if r != nil {
+		registryGetter = r.GetTransportRegistry
+	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{}),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{}),
 	}
 
 	return &remoteExecStateV1{
@@ -100,6 +114,22 @@ func (r *remoteExec) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
+}
+
+func (r *remoteExec) SetTransportRegistry(registry any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		r.registry = reg
+	}
+}
+
+func (r *remoteExec) GetTransportRegistry() *transportTargetRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to

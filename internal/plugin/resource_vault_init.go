@@ -24,6 +24,7 @@ import (
 type vaultInit struct {
 	providerConfig *config
 	mu             sync.Mutex
+	registry       *transportTargetRegistry
 }
 
 var _ resource.Resource = (*vaultInit)(nil)
@@ -69,10 +70,19 @@ func newVaultInit() *vaultInit {
 }
 
 func newVaultInitStateV1() *vaultInitStateV1 {
+	return newVaultInitStateV1WithRegistry(nil)
+}
+
+func newVaultInitStateV1WithRegistry(r *vaultInit) *vaultInitStateV1 {
 	transport := newEmbeddedTransport()
+	var registryGetter func() *transportTargetRegistry
+	if r != nil {
+		registryGetter = r.GetTransportRegistry
+	}
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
 		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
+		GatherLogsFromAllKnownTargetsFailureHandler(registryGetter, []string{"vault"}),
 	}
 
 	return &vaultInitStateV1{
@@ -126,6 +136,22 @@ func (r *vaultInit) GetProviderConfig() (*config, error) {
 	defer r.mu.Unlock()
 
 	return r.providerConfig.Copy()
+}
+
+func (r *vaultInit) SetTransportRegistry(registry any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reg, ok := registry.(*transportTargetRegistry); ok {
+		r.registry = reg
+	}
+}
+
+func (r *vaultInit) GetTransportRegistry() *transportTargetRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.registry
 }
 
 // ValidateResourceConfig is the request Terraform sends when it wants to
@@ -210,8 +236,8 @@ func (r *vaultInit) PlanResourceChange(ctx context.Context, req resource.PlanRes
 // ApplyResourceChange is the request Terraform sends when it needs to apply a
 // planned set of changes to the resource.
 func (r *vaultInit) ApplyResourceChange(ctx context.Context, req resource.ApplyResourceChangeRequest, res *resource.ApplyResourceChangeResponse) {
-	priorState := newVaultInitStateV1()
-	plannedState := newVaultInitStateV1()
+	priorState := newVaultInitStateV1WithRegistry(r)
+	plannedState := newVaultInitStateV1WithRegistry(r)
 	res.NewState = plannedState
 
 	transportUtil.ApplyUnmarshalState(ctx, priorState, plannedState, req, res)
