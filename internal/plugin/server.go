@@ -4,6 +4,8 @@
 package plugin
 
 import (
+	"context"
+
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/server"
@@ -13,18 +15,31 @@ import (
 
 // Server returns a default instance of our ProviderServer.
 func Server() tfprotov6.ProviderServer {
+	p := newProvider()
+
 	return server.New(
-		server.RegisterProvider(newProvider()),
+		server.RegisterProvider(p),
 		WithDefaultDataRouter(),
-		WithDefaultResourceRouter(),
+		withResourceRouter(p.registry),
 	)
 }
 
 // WithDefaultResourceRouter creates a server opt that registers all the default resources and
 // optionally any provided overrides (or additional, non-default resources). The optional overrides
 // argument is useful if you need to override a resource in a test.
+//
+// Note: this passes a nil registry to buildResourceRouter, so the transport target registry is NOT
+// injected into the context. As a result, GatherLogsFromAllKnownTargetsFailureHandler will be a
+// no-op in any server wired with this function. Use the internal withResourceRouter (called by
+// Server()) when you need the full registry-backed failure-handler behaviour.
 func WithDefaultResourceRouter(overrides ...rr.Resource) func(server.Server) server.Server {
-	return server.RegisterResourceRouter(buildResourceRouter(overrides...))
+	return server.RegisterResourceRouter(buildResourceRouter(nil, overrides...))
+}
+
+// withResourceRouter is the internal counterpart used by Server() that wires in the provider-level
+// transport target registry.
+func withResourceRouter(registry *transportTargetRegistry, overrides ...rr.Resource) func(server.Server) server.Server {
+	return server.RegisterResourceRouter(buildResourceRouter(registry, overrides...))
 }
 
 // WithDefaultDataRouter creates a server opt that registers all the default datasources and
@@ -65,18 +80,20 @@ func defaultResources() []rr.Resource {
 	}
 }
 
-func buildResourceRouter(resourceOverrides ...rr.Resource) rr.Router {
+func buildResourceRouter(registry *transportTargetRegistry, resourceOverrides ...rr.Resource) rr.Router {
 	defaultResources := defaultResources()
-	opts := make([]rr.RouterOpt, len(defaultResources)+len(resourceOverrides))
-	count := 0
+	opts := make([]rr.RouterOpt, 0, len(defaultResources)+len(resourceOverrides)+1)
 
 	for i := range defaultResources {
-		opts[count] = rr.RegisterResource(defaultResources[i])
-		count++
+		opts = append(opts, rr.RegisterResource(defaultResources[i]))
 	}
 	for i := range resourceOverrides {
-		opts[count] = rr.RegisterResource(resourceOverrides[i])
-		count++
+		opts = append(opts, rr.RegisterResource(resourceOverrides[i]))
+	}
+	if registry != nil {
+		opts = append(opts, rr.WithRegistryInjector(func(ctx context.Context) context.Context {
+			return withTransportTargetRegistry(ctx, registry)
+		}))
 	}
 
 	return rr.New(opts...)

@@ -52,7 +52,11 @@ func newFile() *file {
 
 func newFileState() *fileStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		// nil appNames: only systemd.KnownServices are collected when this handler fires.
+		GatherLogsFromAllKnownTargetsFailureHandler(nil),
+	}
 
 	return &fileStateV1{
 		ID:              newTfString(),

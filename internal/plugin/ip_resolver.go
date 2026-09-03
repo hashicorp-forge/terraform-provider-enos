@@ -241,7 +241,7 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 	}
 
 	wg := sync.WaitGroup{}
-	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Second*1))
+	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
 
 	defer ipCancel()
 	errC := make(chan error)

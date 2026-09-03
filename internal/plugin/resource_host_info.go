@@ -53,7 +53,11 @@ func newHostInfo() *hostInfo {
 
 func newHostInfoStateV1() *hostInfoStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		// nil appNames: only systemd.KnownServices are collected when this handler fires.
+		GatherLogsFromAllKnownTargetsFailureHandler(nil),
+	}
 
 	return &hostInfoStateV1{
 		ID: newTfString(),

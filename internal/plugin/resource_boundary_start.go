@@ -61,7 +61,9 @@ func newBoundaryStartStateV1() *boundaryStartStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, []string{"boundary"}),
+		// GatherLogsFromAllKnownTargetsFailureHandler collects boundary logs from every registered
+		// target (including this one), so GetApplicationLogsFailureHandler is redundant here.
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"boundary"}),
 	}
 
 	return &boundaryStartStateV1{
