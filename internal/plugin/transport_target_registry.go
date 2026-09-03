@@ -40,8 +40,12 @@ func newTransportTargetRegistry() *transportTargetRegistry {
 	return &transportTargetRegistry{}
 }
 
-// register adds a resolved transport state. Registrations are append-only; re-applying the
-// same resource simply adds another entry, which is fine because log collection is best-effort.
+// register adds a resolved transport state. Registrations are append-only; re-applying the same
+// resource simply adds another entry. This means the registry grows without bound across repeated
+// applies within the same provider process. That is acceptable for enos scenarios, which are
+// short-lived (one terraform apply per process), but would be a memory leak in a long-running
+// provider. If this ever needs to support long-running processes, consider keying on resource
+// address and evicting on PlanResourceChange.
 func (r *transportTargetRegistry) register(transport transportState) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

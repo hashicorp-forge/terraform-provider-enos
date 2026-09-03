@@ -592,11 +592,30 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_CollectsFromAllTargets(t *t
 func TestGatherLogsFromAllKnownTargetsFailureHandler_RegistryReadFromContextAtFireTime(t *testing.T) {
 	t.Parallel()
 
-	// Verify that the registry is read from ctx at failure time (not at construction time),
-	// so a registry populated after handler construction is still visible.
-	registry := newTransportTargetRegistry()
+	// Verify that the registry is read from ctx at failure time (not at construction time).
+	// The handler is constructed with an empty registry; transports are registered only
+	// afterwards. The handler must still see them when it fires.
+	existDir := t.TempDir()
 
-	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"})
+	sshTransport := newEmbeddedTransportSSH()
+	sshTransport.Host.Set("10.0.0.1")
+	sshTransport.User.Set("ubuntu")
+	sshTransport.PrivateKeyPath.Set("/some/private/key/path/key.pem")
+	sshTransport.sshTransportBuilder = func(state *embeddedTransportSSHv1, ctx context.Context) (it.Transport, error) {
+		return mock.New(), nil
+	}
+	sshTransport.systemdClientFactory = func(transport it.Transport, logger log.Logger) systemd.Client {
+		return &mockSystemdClient{logs: map[string][]byte{
+			"consul": []byte("consul log data"),
+		}}
+	}
+
+	// Construct the handler BEFORE registering any transport.
+	registry := newTransportTargetRegistry()
+	handler := GatherLogsFromAllKnownTargetsFailureHandler([]string{"consul"})
+
+	// Register the transport AFTER handler construction — this is the late-binding case.
+	registry.register(sshTransport)
 
 	diag := &tfprotov6.Diagnostic{
 		Severity: tfprotov6.DiagnosticSeverityError,
@@ -605,10 +624,11 @@ func TestGatherLogsFromAllKnownTargetsFailureHandler_RegistryReadFromContextAtFi
 	}
 
 	providerConfig := newProviderConfig()
-	providerConfig.DebugDataRootDir.Set(t.TempDir())
-
-	// Registry is empty at fire time — no log sections appended.
+	providerConfig.DebugDataRootDir.Set(existDir)
 	ctx := withTransportTargetRegistry(t.Context(), registry)
 	handler(ctx, diag, providerConfig.Terraform5Value())
-	assert.Equal(t, "something went wrong", diag.Detail)
+
+	// Handler must have seen the transport that was registered after construction.
+	assert.Contains(t, diag.Detail, "Application Logs (all known targets):")
+	assert.Contains(t, diag.Detail, "consul")
 }

@@ -181,17 +181,20 @@ func GatherLogsFromAllKnownTargetsFailureHandler(appNames []string) FailureHandl
 		for _, transport := range targets {
 			var responses []remoteflight.GetLogsResponse
 			var err error
+			// tLogger is enriched with transport-specific fields inside the switch so that
+			// error messages after the switch carry the right context.
+			tLogger := logger
 
 			switch t := transport.(type) {
 			case *embeddedTransportSSHv1:
-				tLogger := logger.WithValues(map[string]any{
+				tLogger = logger.WithValues(map[string]any{
 					"host": t.Host.Val,
 					"user": t.User.Val,
 				})
 				tLogger.Info("GatherAllTargets: gathering systemd logs")
 				responses, err = getSystemdLogs(ctx, tLogger, t, appNames)
 			case *embeddedTransportNomadv1:
-				tLogger := logger.WithValues(map[string]any{
+				tLogger = logger.WithValues(map[string]any{
 					"allocation_id": t.AllocationID.Val,
 					"task":          t.TaskName.Val,
 					"host":          t.Host.Val,
@@ -199,7 +202,7 @@ func GatherLogsFromAllKnownTargetsFailureHandler(appNames []string) FailureHandl
 				tLogger.Info("GatherAllTargets: gathering Nomad task logs")
 				responses, err = getNomadLogs(ctx, t)
 			case *embeddedTransportK8Sv1:
-				tLogger := logger.WithValues(map[string]any{
+				tLogger = logger.WithValues(map[string]any{
 					"context_name": t.ContextName.Val,
 					"namespace":    t.Namespace.Val,
 					"pod":          t.Pod.Val,
@@ -216,7 +219,7 @@ func GatherLogsFromAllKnownTargetsFailureHandler(appNames []string) FailureHandl
 			}
 
 			if err != nil {
-				logger.Error("GatherAllTargets: failed to get logs from target", map[string]any{
+				tLogger.Error("GatherAllTargets: failed to get logs from target", map[string]any{
 					"error": err,
 				})
 			}

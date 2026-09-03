@@ -27,6 +27,11 @@ func Server() tfprotov6.ProviderServer {
 // WithDefaultResourceRouter creates a server opt that registers all the default resources and
 // optionally any provided overrides (or additional, non-default resources). The optional overrides
 // argument is useful if you need to override a resource in a test.
+//
+// Note: this passes a nil registry to buildResourceRouter, so the transport target registry is NOT
+// injected into the context. As a result, GatherLogsFromAllKnownTargetsFailureHandler will be a
+// no-op in any server wired with this function. Use the internal withResourceRouter (called by
+// Server()) when you need the full registry-backed failure-handler behaviour.
 func WithDefaultResourceRouter(overrides ...rr.Resource) func(server.Server) server.Server {
 	return server.RegisterResourceRouter(buildResourceRouter(nil, overrides...))
 }

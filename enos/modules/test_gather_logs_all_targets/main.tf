@@ -1,23 +1,17 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-# test_gather_logs_all_targets verifies VAULT-42080: when any resource fails, the provider's
-# failure handlers gather logs from *all* registered transport targets — not only the one that
-# failed.
+# test_gather_logs_all_targets is the first half of the VAULT-42080 end-to-end test.
 #
-# How it works:
-#   1. enos_bundle_install + enos_vault_start + enos_consul_start all apply successfully, each
-#      registering their SSH transport with the provider-level transportTargetRegistry.
-#   2. enos_remote_exec.trigger_failure intentionally runs a command that will never exist,
-#      causing the apply to fail and firing every registered failure handler.
-#   3. Because debug_data_root_dir is set on the provider, GatherLogsFromAllKnownTargetsFailureHandler
-#      writes log files for vault and consul to disk — even though those resources succeeded.
-#   4. enos_remote_exec.verify_log_files then SSHes into the host and checks that the expected
-#      log files exist locally (via a path passed as an env var), proving that logs were gathered
-#      from non-failing targets.
+# It installs Vault and Consul, registers both SSH transports with the provider-level
+# transportTargetRegistry, then intentionally fails a different resource (enos_remote_exec)
+# to fire the failure handlers. Because debug_data_root_dir is configured on the provider,
+# GatherLogsFromAllKnownTargetsFailureHandler writes log files for vault and consul to
+# debug_data_root_dir on the local machine — even though those resources succeeded.
 #
-# NOTE: step 2 is intentionally expected to fail. The verification in step 4 is what confirms
-# the gather-all-targets behaviour worked correctly.
+# This module is expected to fail (terraform apply exits non-zero). The verification that the
+# log files were actually written is done in the separate test_gather_logs_all_targets_verify
+# module, which runs in a subsequent enos step after this step's failure is handled by enos.
 
 terraform {
   required_version = ">= 1.2.0"
@@ -171,39 +165,3 @@ resource "enos_remote_exec" "trigger_failure" {
   }
 }
 
-# ── Verify log files were written by the gather-all-targets handler ──────────
-# After the failure above, the provider should have written log files for vault
-# and consul to debug_data_root_dir on the local machine running terraform.
-# We verify those files exist using a local-exec so we stay in the same apply.
-
-resource "enos_local_exec" "verify_vault_log_written" {
-  depends_on = [enos_remote_exec.trigger_failure]
-
-  # The vault systemd journal log file follows the naming convention:
-  # <host>_vault.log — verify it exists and is non-empty.
-  inline = [
-    "set -e",
-    "log_dir=${var.debug_data_root_dir}",
-    "echo 'Checking for vault log file in: '\"$log_dir\"",
-    "vault_log=$(ls \"$log_dir\"/*vault* 2>/dev/null | head -1)",
-    "if [ -z \"$vault_log\" ]; then echo 'ERROR: no vault log file found in '\"$log_dir\"; exit 1; fi",
-    "echo 'Found vault log: '\"$vault_log\"",
-    "if [ ! -s \"$vault_log\" ]; then echo 'ERROR: vault log file is empty'; exit 1; fi",
-    "echo 'vault log file verified OK'",
-  ]
-}
-
-resource "enos_local_exec" "verify_consul_log_written" {
-  depends_on = [enos_remote_exec.trigger_failure]
-
-  inline = [
-    "set -e",
-    "log_dir=${var.debug_data_root_dir}",
-    "echo 'Checking for consul log file in: '\"$log_dir\"",
-    "consul_log=$(ls \"$log_dir\"/*consul* 2>/dev/null | head -1)",
-    "if [ -z \"$consul_log\" ]; then echo 'ERROR: no consul log file found in '\"$log_dir\"; exit 1; fi",
-    "echo 'Found consul log: '\"$consul_log\"",
-    "if [ ! -s \"$consul_log\" ]; then echo 'ERROR: consul log file is empty'; exit 1; fi",
-    "echo 'consul log file verified OK'",
-  ]
-}

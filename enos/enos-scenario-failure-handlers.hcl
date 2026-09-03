@@ -99,14 +99,14 @@ scenario "failure_handlers" {
     }
   }
 
-  # test_gather_logs_all_targets verifies VAULT-42080.
-  # It installs Vault + Consul, then intentionally fails a different resource and asserts
-  # that log files for *both* vault and consul were written to disk by the
-  # GatherLogsFromAllKnownTargetsFailureHandler — even though those resources succeeded.
+  # test_gather_logs_all_targets verifies VAULT-42080 (first half).
+  # Installs Vault + Consul, registers their SSH transports, then intentionally fails a
+  # separate resource to fire GatherLogsFromAllKnownTargetsFailureHandler. Because
+  # provider.enos.ubuntu_with_debug has debug_data_root_dir set, the handler writes vault
+  # and consul log files to disk — even though those resources succeeded.
   #
-  # The step uses provider.enos.ubuntu_with_debug so that debug_data_root_dir is set and
-  # log files are actually persisted. skip_step mirrors run_failure_handler_tests so the
-  # end-to-end test is opt-in (same behaviour as the existing test_failure_handlers step).
+  # This step is expected to fail (the trigger resource always errors). Enos handles the
+  # expected failure and continues to the verify step below.
   step "test_gather_logs_all_targets" {
     skip_step  = !var.run_failure_handler_tests
     module     = module.test_gather_logs_all_targets
@@ -117,8 +117,20 @@ scenario "failure_handlers" {
     }
 
     variables {
-      host_public_ip      = step.setup_remote_host.public_ip
-      host_private_ip     = step.setup_remote_host.private_ip
+      host_public_ip  = step.setup_remote_host.public_ip
+      host_private_ip = step.setup_remote_host.private_ip
+    }
+  }
+
+  # test_gather_logs_all_targets_verify verifies VAULT-42080 (second half).
+  # Runs after the expected failure above. Checks that the vault and consul log files
+  # were written to debug_data_root_dir by GatherLogsFromAllKnownTargetsFailureHandler.
+  step "test_gather_logs_all_targets_verify" {
+    skip_step  = !var.run_failure_handler_tests
+    module     = module.test_gather_logs_all_targets_verify
+    depends_on = [step.test_gather_logs_all_targets]
+
+    variables {
       debug_data_root_dir = local.debug_data_root_dir
     }
   }

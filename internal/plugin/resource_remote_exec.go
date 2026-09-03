@@ -63,8 +63,9 @@ func newRemoteExecStateV1() *remoteExecStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, []string{}),
-		GatherLogsFromAllKnownTargetsFailureHandler([]string{}),
+		// GatherLogsFromAllKnownTargetsFailureHandler is a superset of GetApplicationLogsFailureHandler:
+		// it collects systemd.KnownServices from every registered target (nil = no extra app names).
+		GatherLogsFromAllKnownTargetsFailureHandler(nil),
 	}
 
 	return &remoteExecStateV1{

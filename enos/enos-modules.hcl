@@ -109,6 +109,10 @@ module "test_gather_logs_all_targets" {
   source = "./modules/test_gather_logs_all_targets"
 }
 
+module "test_gather_logs_all_targets_verify" {
+  source = "./modules/test_gather_logs_all_targets_verify"
+}
+
 module "test_host_info" {
   source = "./modules/test_host_info"
 }
