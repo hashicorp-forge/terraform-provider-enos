@@ -27,4 +27,3 @@ type ResourceWithProviderConfig interface {
 	SetProviderConfig(val tftypes.Value) error
 	GetProviderConfig() (*config, error)
 }
-
