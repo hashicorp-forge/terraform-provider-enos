@@ -181,9 +181,7 @@ func GatherLogsFromAllKnownTargetsFailureHandler(appNames []string) FailureHandl
 		for _, transport := range targets {
 			var responses []remoteflight.GetLogsResponse
 			var err error
-			// tLogger is enriched with transport-specific fields inside the switch so that
-			// error messages after the switch carry the right context.
-			tLogger := logger
+			var tLogger log.Logger
 
 			switch t := transport.(type) {
 			case *embeddedTransportSSHv1:

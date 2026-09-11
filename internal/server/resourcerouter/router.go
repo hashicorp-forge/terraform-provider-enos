@@ -75,7 +75,8 @@ func RegisterResource(resource Resource) func(Router) Router {
 
 func newRouter() Router {
 	return Router{
-		resources: map[string]Resource{},
+		resources:      map[string]Resource{},
+		injectRegistry: nil,
 	}
 }
 
