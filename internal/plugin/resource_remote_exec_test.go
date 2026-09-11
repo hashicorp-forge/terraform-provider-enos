@@ -155,7 +155,31 @@ EOF
 				}
 
 				steps = append(steps, resource.TestStep{
-					Config: buf.String(),
+					ResourceName:              "",
+					PreConfig:                 nil,
+					Taint:                     nil,
+					Config:                    buf.String(),
+					Check:                     nil,
+					Destroy:                   false,
+					ExpectNonEmptyPlan:        false,
+					ExpectError:               nil,
+					PlanOnly:                  false,
+					PreventDiskCleanup:        false,
+					PreventPostDestroyRefresh: false,
+					SkipFunc:                  nil,
+					ImportState:               false,
+					ImportStateId:             "",
+					ImportStateIdPrefix:       "",
+					ImportStateIdFunc:         nil,
+					ImportStateCheck:          nil,
+					ImportStateVerify:         false,
+					ImportStateVerifyIgnore:   nil,
+					ImportStatePersist:        false,
+					RefreshState:              false,
+					ProviderFactories:         nil,
+					ProtoV5ProviderFactories:  nil,
+					ProtoV6ProviderFactories:  nil,
+					ExternalProviders:         nil,
 				})
 			}
 
@@ -265,9 +289,31 @@ func TestBadTransportConfig(t *testing.T) {
 			}
 
 			step := resource.TestStep{
-				Config:      buf.String(),
-				PlanOnly:    false,
-				ExpectError: test.expectedErrorRegEx,
+				ResourceName:              "",
+				PreConfig:                 nil,
+				Taint:                     nil,
+				Config:                    buf.String(),
+				Check:                     nil,
+				Destroy:                   false,
+				ExpectNonEmptyPlan:        false,
+				ExpectError:               test.expectedErrorRegEx,
+				PlanOnly:                  false,
+				PreventDiskCleanup:        false,
+				PreventPostDestroyRefresh: false,
+				SkipFunc:                  nil,
+				ImportState:               false,
+				ImportStateId:             "",
+				ImportStateIdPrefix:       "",
+				ImportStateIdFunc:         nil,
+				ImportStateCheck:          nil,
+				ImportStateVerify:         false,
+				ImportStateVerifyIgnore:   nil,
+				ImportStatePersist:        false,
+				RefreshState:              false,
+				ProviderFactories:         nil,
+				ProtoV5ProviderFactories:  nil,
+				ProtoV6ProviderFactories:  nil,
+				ExternalProviders:         nil,
 			}
 
 			resource.Test(t, resource.TestCase{
@@ -337,7 +383,7 @@ func TestChangedEnvVars(t *testing.T) {
 		return state
 	}
 
-	providers := testProviders(t, providerOverrides{resources: []resourcerouter.Resource{remoteExecResource}})
+	providers := testProviders(t, providerOverrides{datasources: nil, resources: []resourcerouter.Resource{remoteExecResource}})
 
 	s1 := bytes.Buffer{}
 	err := cfg1.Execute(&s1, remoteExecState)
@@ -346,8 +392,31 @@ func TestChangedEnvVars(t *testing.T) {
 	}
 
 	apply1 := resource.TestStep{
-		Config:   s1.String(),
-		PlanOnly: false,
+		ResourceName:              "",
+		PreConfig:                 nil,
+		Taint:                     nil,
+		Config:                    s1.String(),
+		Check:                     nil,
+		Destroy:                   false,
+		ExpectNonEmptyPlan:        false,
+		ExpectError:               nil,
+		PlanOnly:                  false,
+		PreventDiskCleanup:        false,
+		PreventPostDestroyRefresh: false,
+		SkipFunc:                  nil,
+		ImportState:               false,
+		ImportStateId:             "",
+		ImportStateIdPrefix:       "",
+		ImportStateIdFunc:         nil,
+		ImportStateCheck:          nil,
+		ImportStateVerify:         false,
+		ImportStateVerifyIgnore:   nil,
+		ImportStatePersist:        false,
+		RefreshState:              false,
+		ProviderFactories:         nil,
+		ProtoV5ProviderFactories:  nil,
+		ProtoV6ProviderFactories:  nil,
+		ExternalProviders:         nil,
 	}
 
 	s2 := bytes.Buffer{}
@@ -425,9 +494,31 @@ wrapping_token_creation_path:    sys/replication/performance/primary/secondary-t
 	require.NoError(t, cfg.Execute(&s, data))
 
 	apply := resource.TestStep{
-		Config:   s.String(),
-		PlanOnly: false,
-		Check:    resource.TestCheckResourceAttr("enos_remote_exec.inline_with_piped_command_and_env_vars", "stdout", token),
+		ResourceName:              "",
+		PreConfig:                 nil,
+		Taint:                     nil,
+		Config:                    s.String(),
+		Check:                     resource.TestCheckResourceAttr("enos_remote_exec.inline_with_piped_command_and_env_vars", "stdout", token),
+		Destroy:                   false,
+		ExpectNonEmptyPlan:        false,
+		ExpectError:               nil,
+		PlanOnly:                  false,
+		PreventDiskCleanup:        false,
+		PreventPostDestroyRefresh: false,
+		SkipFunc:                  nil,
+		ImportState:               false,
+		ImportStateId:             "",
+		ImportStateIdPrefix:       "",
+		ImportStateIdFunc:         nil,
+		ImportStateCheck:          nil,
+		ImportStateVerify:         false,
+		ImportStateVerifyIgnore:   nil,
+		ImportStatePersist:        false,
+		RefreshState:              false,
+		ProviderFactories:         nil,
+		ProtoV5ProviderFactories:  nil,
+		ProtoV6ProviderFactories:  nil,
+		ExternalProviders:         nil,
 	}
 
 	resource.Test(t, resource.TestCase{

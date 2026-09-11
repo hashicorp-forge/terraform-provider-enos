@@ -143,18 +143,38 @@ func TestAccResourceKindLoadImage(t *testing.T) {
 			tmpl := test.tmpl
 
 			step := resource.TestStep{
-				Config:             buf.String(),
-				Check:              tmpl.check,
-				ExpectNonEmptyPlan: !tmpl.apply,
-				PlanOnly:           !tmpl.apply,
-				ExpectError:        test.expectedErr,
+				ResourceName:              "",
+				PreConfig:                 nil,
+				Taint:                     nil,
+				Config:                    buf.String(),
+				Check:                     tmpl.check,
+				Destroy:                   false,
+				ExpectNonEmptyPlan:        !tmpl.apply,
+				ExpectError:               test.expectedErr,
+				PlanOnly:                  !tmpl.apply,
+				PreventDiskCleanup:        false,
+				PreventPostDestroyRefresh: false,
+				SkipFunc:                  nil,
+				ImportState:               false,
+				ImportStateId:             "",
+				ImportStateIdPrefix:       "",
+				ImportStateIdFunc:         nil,
+				ImportStateCheck:          nil,
+				ImportStateVerify:         false,
+				ImportStateVerifyIgnore:   nil,
+				ImportStatePersist:        false,
+				RefreshState:              false,
+				ProviderFactories:         nil,
+				ProtoV5ProviderFactories:  nil,
+				ProtoV6ProviderFactories:  nil,
+				ExternalProviders:         nil,
 			}
 
 			kindLoadImage := newLocalKindLoadImage()
 			mockKindClient := NewMockKindClient()
 			kindLoadImage.clientFactory = func(logger log.Logger) kind.Client { return mockKindClient }
 
-			providers := testProviders(t, providerOverrides{resources: []resourcerouter.Resource{kindLoadImage}})
+			providers := testProviders(t, providerOverrides{datasources: nil, resources: []resourcerouter.Resource{kindLoadImage}})
 
 			resource.ParallelTest(tt, resource.TestCase{
 				ProtoV6ProviderFactories: providers,
@@ -228,6 +248,7 @@ func (m *MockKindClient) LoadImageArchive(req kind.LoadImageArchiveRequest) (kin
 				},
 			},
 		}},
+		Nodes: nil,
 	}
 
 	return loadImageArchiveResponse, nil
@@ -241,9 +262,10 @@ func (m *MockKindClient) LoadImage(req kind.LoadImageRequest) (kind.LoadedImageR
 			Tags: []docker.TagInfo{
 				{
 					Tag: req.Tag,
-					ID:  "123456", // not a valid id
+					ID:  "123456", //nolint:mnd // not a valid id
 				},
 			},
 		}},
+		Nodes: nil,
 	}, nil
 }

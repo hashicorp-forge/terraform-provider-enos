@@ -136,17 +136,16 @@ func withDNSResolver(
 		)
 
 		client := dns.Client{
-			Net:            "",
-			UDPSize:        0,
-			TLSConfig:      nil,
-			Dialer:         nil,
-			Timeout:        0,
-			DialTimeout:    0,
-			ReadTimeout:    0,
-			WriteTimeout:   0,
-			TsigSecret:     nil,
-			TsigProvider:   nil,
-			SingleInflight: false,
+			Net:          "",
+			UDPSize:      0,
+			TLSConfig:    nil,
+			Dialer:       nil,
+			Timeout:      0,
+			DialTimeout:  0,
+			ReadTimeout:  0,
+			WriteTimeout: 0,
+			TsigSecret:   nil,
+			TsigProvider: nil,
 		}
 		res, _, err := client.ExchangeContext(ctx, msg, nameserver)
 		if err != nil {

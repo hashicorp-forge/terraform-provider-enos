@@ -323,7 +323,11 @@ Error: Failed to find consul`)
 	k8sTransport.ContextName.Set("taco_cluster")
 	k8sTransport.k8sClientFactory = func(cfg kubernetes.ClientCfg) (kubernetes.Client, error) {
 		return &kubernetes.MockClient{
-			GetLogsFunc: kubernetes.NewMockGetLogsFunc(chickenLogs),
+			NewExecRequestFunc: nil,
+			QueryPodInfosFunc:  nil,
+			GetPodInfoFunc:     nil,
+			GetLogsFunc:        kubernetes.NewMockGetLogsFunc(chickenLogs),
+			ListPodsFunc:       nil,
 		}, nil
 	}
 
@@ -444,7 +448,11 @@ Taco Failed`)
 	k8sTransport.ContextName.Set("taco_cluster")
 	k8sTransport.k8sClientFactory = func(cfg kubernetes.ClientCfg) (kubernetes.Client, error) {
 		return &kubernetes.MockClient{
-			GetLogsFunc: kubernetes.NewMockGetLogsFunc(logs),
+			NewExecRequestFunc: nil,
+			QueryPodInfosFunc:  nil,
+			GetPodInfoFunc:     nil,
+			GetLogsFunc:        kubernetes.NewMockGetLogsFunc(logs),
+			ListPodsFunc:       nil,
 		}, nil
 	}
 	embeddedTransport := newEmbeddedTransport()

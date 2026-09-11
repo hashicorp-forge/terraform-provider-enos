@@ -24,28 +24,28 @@ func TestTFBoolGetAndValue(t *testing.T) {
 	}{
 		{
 			"unknown",
-			&tfBool{Unknown: true},
+			&tfBool{Unknown: true, Null: false, Val: false},
 			tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue),
 			false,
 			false,
 		},
 		{
 			"null",
-			&tfBool{Null: true},
+			&tfBool{Unknown: false, Null: true, Val: false},
 			tftypes.NewValue(tftypes.Bool, nil),
 			false,
 			false,
 		},
 		{
 			"true",
-			&tfBool{Val: true},
+			&tfBool{Unknown: false, Null: false, Val: true},
 			tftypes.NewValue(tftypes.Bool, true),
 			true,
 			true,
 		},
 		{
 			"false",
-			&tfBool{Val: false},
+			&tfBool{Unknown: false, Null: false, Val: false},
 			tftypes.NewValue(tftypes.Bool, false),
 			false,
 			true,
@@ -65,7 +65,7 @@ func TestTFBoolGetAndValue(t *testing.T) {
 func TestTFBoolSet(t *testing.T) {
 	t.Parallel()
 	for _, b := range []bool{true, false} {
-		tb := &tfBool{}
+		tb := &tfBool{Unknown: false, Null: false, Val: false}
 		tb.Set(b)
 
 		val, ok := tb.Get()
@@ -87,7 +87,7 @@ func TestTFNumGetAndValue(t *testing.T) {
 	}{
 		{
 			"unknown",
-			&tfNum{Unknown: true, Val: 3},
+			&tfNum{Unknown: true, Null: false, Val: 3},
 			tftypes.NewValue(tftypes.Number, tftypes.UnknownValue),
 			3,
 			false,

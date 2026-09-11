@@ -88,7 +88,7 @@ func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
 	// all must be the same. We'll tell them to redeclare the value as an object and not use
 	// strings as the keys to ensure we get an object whose attribute values don't all have to be
 	// the same.
-	if s.RawValue.Type().Is(tftypes.Map{}) && len(s.RawValues) > 1 {
+	if s.RawValue.Type().Is(tftypes.Map{ElementType: nil}) && len(s.RawValues) > 1 {
 		var lastType tftypes.Type
 		for key, val := range s.RawValues {
 			if lastType == nil {
@@ -181,7 +181,7 @@ func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
 
 	// Depending on how many are set, Terraform might pass the configuration over
 	// as a map or object, so we need to handle both.
-	if s.RawValue.Type().Is(tftypes.Map{}) {
+	if s.RawValue.Type().Is(tftypes.Map{ElementType: nil}) {
 		for _, val := range vals {
 			return tftypes.NewValue(tftypes.Map{ElementType: val.Type()}, vals)
 		}

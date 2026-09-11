@@ -44,7 +44,7 @@ func TestVaultStartConfigOptionalAttrs(t *testing.T) {
 	vaultCfg.Storage.Set(newVaultStorageConfigSet("raft", map[string]any{
 		"address": "127.0.0.1:8500",
 		"path":    "vault",
-	}, map[string]any{"autojoin": &tfString{Val: "provider=aws tag=thing value=foo"}}))
+	}, map[string]any{"autojoin": &tfString{Unknown: false, Null: false, Val: "provider=aws tag=thing value=foo"}}))
 	vaultCfg.Seal.Set(newVaultConfigBlockSet("awskms", map[string]any{
 		"kms_key_id": "some-key-id",
 	}, "config", "seal"))
@@ -426,6 +426,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 		shouldFail bool
 	}{
 		"alicloudkms": {
+			shouldFail: false,
 			in: map[string]any{
 				"region":     "us-east-1",
 				"access_key": "AKIAIOSFODNN7EXAMPLE",
@@ -441,6 +442,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"awskms": {
+			shouldFail: false,
 			in: map[string]any{
 				"region":     "us-east-1",
 				"access_key": "0wNEpMMlzy7szvai",
@@ -460,6 +462,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"azurekeyvault": {
+			shouldFail: false,
 			in: map[string]any{
 				"tenant_id":     "46646709-b63e-4747-be42-516edeaf1e14",
 				"client_id":     "03dc33fc-16d9-4b77-8152-3ec568f8af6e",
