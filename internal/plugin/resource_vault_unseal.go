@@ -66,6 +66,7 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 		SystemdUnitName: newTfString(),
 		SealType:        newTfString(),
 		UnsealKeys:      newTfStringSlice(),
+		Status:          newTfNum(),
 		Transport:       transport,
 		failureHandlers: fh,
 	}

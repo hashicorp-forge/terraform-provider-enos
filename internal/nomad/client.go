@@ -194,7 +194,21 @@ func (c *client) Exec(ctx context.Context, opts ExecRequestOpts, streams *it.Exe
 			streams.StdoutWriter(),
 			streams.StderrWriter(),
 			nil,
-			&api.QueryOptions{},
+			&api.QueryOptions{
+				Region:        "",
+				Namespace:     "",
+				AllowStale:    false,
+				WaitIndex:     0,
+				WaitTime:      0,
+				Prefix:        "",
+				Params:        nil,
+				Headers:       nil,
+				AuthToken:     "",
+				Filter:        "",
+				PerPage:       0,
+				NextToken:     "",
+				Reverse:       false,
+			},
 		)
 		execErr := err
 		if exitCode != 0 {
@@ -268,7 +282,15 @@ func (c *client) Close() {
 // createClient creates the Nomad API client.
 func createClient(opts ClientCfg) (*api.Client, error) {
 	config := &api.Config{
-		Address: opts.Host,
+		Region:     "",
+		Namespace:  "",
+		Address:    opts.Host,
+		SecretID:   "",
+		HttpClient: nil,
+		HttpAuth:   nil,
+		WaitTime:   0,
+		TLSConfig:  nil,
+		Headers:    nil,
 	}
 
 	if len(opts.SecretID) > 0 {

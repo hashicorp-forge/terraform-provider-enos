@@ -310,7 +310,13 @@ func (u *userStateV1) User() *remoteflight.User {
 		return nil
 	}
 
-	user := &remoteflight.User{}
+	user := &remoteflight.User{
+		Name:    nil,
+		HomeDir: nil,
+		Shell:   nil,
+		GID:     nil,
+		UID:     nil,
+	}
 	if u.Name != nil {
 		if n, ok := u.Name.Get(); ok {
 			user.Name = &n

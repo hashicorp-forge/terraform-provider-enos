@@ -173,9 +173,10 @@ type transportState interface {
 
 func newEmbeddedTransport() *embeddedTransportV1 {
 	return &embeddedTransportV1{
-		mu:            sync.Mutex{},
-		transports:    map[it.TransportType]transportState{},
-		clientFactory: defaultTransportClientFactory,
+		mu:                sync.Mutex{},
+		transports:        map[it.TransportType]transportState{},
+		clientFactory:     defaultTransportClientFactory,
+		resolvedTransport: nil,
 	}
 }
 

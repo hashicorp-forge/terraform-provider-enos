@@ -157,8 +157,12 @@ type ListPodsRequestOpt func(*ListPodsRequest)
 // NewListPodsRequest takes NewListPodsRequestOpt's and returns a new instance of ListPodsRequest.
 func NewListPodsRequest(opts ...ListPodsRequestOpt) *ListPodsRequest {
 	req := &ListPodsRequest{
-		Namespace: defaultNamespace,
+		Namespace:      defaultNamespace,
+		LabelSelectors: nil,
+		FieldSelectors: nil,
+		RetryOpts:      nil,
 		Retrier: &retry.Retrier{
+			Func:           nil,
 			MaxRetries:     retry.MaxRetriesUnlimited,
 			RetryInterval:  retry.IntervalExponential(2 * time.Second),
 			OnlyRetryError: []error{},
@@ -252,9 +256,11 @@ func (e *execRequest) Exec(ctx context.Context) *it.ExecResponse {
 	stream := func(stdout, stderr io.Writer) {
 		defer streams.Close()
 		execErr := executor.StreamWithContext(ctx, remotecommand.StreamOptions{
-			Stdout: stdout,
-			Stderr: stderr,
-			Stdin:  streams.Stdin(),
+			Stdin:             streams.Stdin(),
+			Stdout:            stdout,
+			Stderr:            stderr,
+			Tty:               false,
+			TerminalSizeQueue: nil,
 		})
 		if execErr != nil {
 			var e exec.CodeExitError
@@ -296,9 +302,19 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 			CoreV1().
 			Pods(namespace).
 			List(ctx, metav1.ListOptions{
-				LabelSelector: req.LabelSelector,
-				FieldSelector: req.FieldSelector,
-			})
+					TypeMeta:             metav1.TypeMeta{},
+					LabelSelector:        req.LabelSelector,
+					FieldSelector:        req.FieldSelector,
+					Watch:                false,
+					AllowWatchBookmarks:  false,
+					ResourceVersion:      "",
+					ResourceVersionMatch: "",
+					TimeoutSeconds:       nil,
+					Limit:                0,
+					Continue:             "",
+					SendInitialEvents:    nil,
+					ShardSelector:        "",
+				})
 		if err != nil {
 			return nil, fmt.Errorf("failed to query pods for request: %#v, due to: %w", req, err)
 		}
@@ -380,7 +396,7 @@ func (c *client) GetPodInfo(ctx context.Context, req GetPodInfoRequest) (*PodInf
 	pod, err := c.clientset.
 		CoreV1().
 		Pods(namespace).
-		Get(ctx, req.Name, metav1.GetOptions{})
+		Get(ctx, req.Name, metav1.GetOptions{TypeMeta: metav1.TypeMeta{}, ResourceVersion: ""})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get a pod for name: %s and namespace: %s, due to: %w", req.Name, req.Namespace, err)
 	}
@@ -413,7 +429,17 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 	getLogsReq := c.clientset.CoreV1().
 		Pods(namespace).
 		GetLogs(req.Pod, &v1.PodLogOptions{
-			Container: req.Container,
+			TypeMeta:                    metav1.TypeMeta{},
+			Container:                   req.Container,
+			Follow:                      false,
+			Previous:                    false,
+			SinceSeconds:                nil,
+			SinceTime:                   nil,
+			Timestamps:                  false,
+			TailLines:                   nil,
+			LimitBytes:                  nil,
+			InsecureSkipTLSVerifyBackend: false,
+			Stream:                      nil,
 		})
 
 	podLogs, err := getLogsReq.Stream(ctx)
@@ -440,14 +466,27 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 // ListPods queries Kubernetes using search criteria for the given ListPodsRequest and returns a
 // list of pods.
 func (c *client) ListPods(ctx context.Context, req *ListPodsRequest) (*ListPodsResponse, error) {
-	res := &ListPodsResponse{}
+	res := &ListPodsResponse{Pods: nil}
 
 	namespace := req.Namespace
 	if strings.TrimSpace(namespace) == "" {
 		namespace = defaultNamespace
 	}
 
-	listOpts := metav1.ListOptions{}
+	listOpts := metav1.ListOptions{
+		TypeMeta:             metav1.TypeMeta{},
+		LabelSelector:        "",
+		FieldSelector:        "",
+		Watch:                false,
+		AllowWatchBookmarks:  false,
+		ResourceVersion:      "",
+		ResourceVersionMatch: "",
+		TimeoutSeconds:       nil,
+		Limit:                0,
+		Continue:             "",
+		SendInitialEvents:    nil,
+		ShardSelector:        "",
+	}
 	if len(req.LabelSelectors) > 0 {
 		listOpts.LabelSelector = strings.Join(req.LabelSelectors, ",")
 	}
@@ -524,12 +563,13 @@ func (c *client) createExecutor(execRequest execRequest) (remotecommand.Executor
 		Name(execRequest.opts.Pod).
 		SubResource("exec").
 		VersionedParams(&v1.PodExecOptions{
-			Command:   []string{"/bin/sh", "-c", execRequest.opts.Command},
+			TypeMeta:  metav1.TypeMeta{},
 			Stdin:     execRequest.Streams().Stdin() != nil,
 			Stdout:    true,
 			Stderr:    true,
 			TTY:       false,
 			Container: execRequest.opts.Container,
+			Command:   []string{"/bin/sh", "-c", execRequest.opts.Command},
 		}, scheme.ParameterCodec)
 
 	return remotecommand.NewSPDYExecutor(c.restConfig, "POST", request.URL())
@@ -662,7 +702,33 @@ func (p *Pods) String() string {
 			if err != nil {
 				continue
 			}
-			container := &v1.Container{}
+			container := &v1.Container{
+				Name:                     "",
+				Image:                    "",
+				Command:                  nil,
+				Args:                     nil,
+				WorkingDir:               "",
+				Ports:                    nil,
+				EnvFrom:                  nil,
+				Env:                      nil,
+				Resources:                v1.ResourceRequirements{},
+				ResizePolicy:             nil,
+				RestartPolicy:            nil,
+				RestartPolicyRules:       nil,
+				VolumeMounts:             nil,
+				VolumeDevices:            nil,
+				LivenessProbe:            nil,
+				ReadinessProbe:           nil,
+				StartupProbe:             nil,
+				Lifecycle:                nil,
+				TerminationMessagePath:   "",
+				TerminationMessagePolicy: "",
+				ImagePullPolicy:          "",
+				SecurityContext:          nil,
+				Stdin:                    false,
+				StdinOnce:                false,
+				TTY:                      false,
+			}
 			err = container.Unmarshal(bytes)
 			if err != nil {
 				continue

@@ -207,13 +207,16 @@ func (s *environmentStateV1) FromTerraform5Value(val tftypes.Value) error {
 
 // Terraform5Type is the file state tftypes.Type.
 func (s *environmentStateV1) Terraform5Type() tftypes.Type {
-	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                    s.ID.TFType(),
-		"public_ip_address":     s.PublicIPAddress.TFType(),
-		"public_ip_addresses":   s.PublicIPAddresses.TFType(),
-		"public_ipv4_addresses": s.PublicIPV4Addresses.TFType(),
-		"public_ipv6_addresses": s.PublicIPV6Addresses.TFType(),
-	}}
+	return tftypes.Object{
+		AttributeTypes: map[string]tftypes.Type{
+			"id":                    s.ID.TFType(),
+			"public_ip_address":     s.PublicIPAddress.TFType(),
+			"public_ip_addresses":   s.PublicIPAddresses.TFType(),
+			"public_ipv4_addresses": s.PublicIPV4Addresses.TFType(),
+			"public_ipv6_addresses": s.PublicIPV6Addresses.TFType(),
+		},
+		OptionalAttributes: nil,
+	}
 }
 
 // Terraform5Value is the file state tftypes.Value.

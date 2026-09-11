@@ -320,18 +320,21 @@ func (s *artifactoryItemStateV1) FromTerraform5Value(val tftypes.Value) error {
 
 // Terraform5Type is the file state tftypes.Type.
 func (s *artifactoryItemStateV1) Terraform5Type() tftypes.Type {
-	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":             s.ID.TFType(),
-		"username":       s.Username.TFType(),
-		"token":          s.Token.TFType(),
-		"host":           s.Host.TFType(),
-		"repo":           s.Repo.TFType(),
-		"path":           s.Path.TFType(),
-		"name":           s.Name.TFType(),
-		"properties":     s.Properties.TFType(),
-		"query_template": s.QueryTemplate.TFType(),
-		"results":        s.Results.TFType(),
-	}}
+	return tftypes.Object{
+		AttributeTypes: map[string]tftypes.Type{
+			"id":             s.ID.TFType(),
+			"username":       s.Username.TFType(),
+			"token":          s.Token.TFType(),
+			"host":           s.Host.TFType(),
+			"repo":           s.Repo.TFType(),
+			"path":           s.Path.TFType(),
+			"name":           s.Name.TFType(),
+			"properties":     s.Properties.TFType(),
+			"query_template": s.QueryTemplate.TFType(),
+			"results":        s.Results.TFType(),
+		},
+		OptionalAttributes: nil,
+	}
 }
 
 // Terraform5Value is the file state tftypes.Value.

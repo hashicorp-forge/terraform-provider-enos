@@ -26,11 +26,13 @@ type vaultSealsConfig struct {
 
 func newVaultSealsConfig() *vaultSealsConfig {
 	return &vaultSealsConfig{
-		Unknown:   false,
-		Null:      true,
 		Primary:   newVaultConfigBlock("config", "seals", "primary"),
 		Secondary: newVaultConfigBlock("config", "seals", "secondary"),
 		Tertiary:  newVaultConfigBlock("config", "seals", "tertiary"),
+		RawValues: nil,
+		RawValue:  tftypes.Value{},
+		Unknown:   false,
+		Null:      true,
 	}
 }
 

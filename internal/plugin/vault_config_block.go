@@ -29,9 +29,10 @@ type vaultConfigBlockSet struct {
 func newVaultConfigBlock(attributePaths ...string) *vaultConfigBlock {
 	return &vaultConfigBlock{
 		AttributePaths: attributePaths,
+		Type:           newTfString(),
 		Attrs:          newTfObject(),
 		AttrsValues:    map[string]tftypes.Value{},
-		Type:           newTfString(),
+		AttrsRaw:       tftypes.Value{},
 		Unknown:        false,
 		Null:           true,
 	}

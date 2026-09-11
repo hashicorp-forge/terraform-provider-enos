@@ -44,6 +44,8 @@ func newVaultListenerConfig() *vaultListenerConfig {
 		Profiling: newDynamicPseudoTypeBlock(),
 		IRL:       newDynamicPseudoTypeBlock(),
 		CRH:       newDynamicPseudoTypeBlock(),
+		RawValues: nil,
+		RawValue:  tftypes.Value{},
 		Unknown:   false,
 		Null:      true,
 	}
@@ -211,7 +213,7 @@ func (s *vaultListenerConfig) Terraform5Value() tftypes.Value {
 
 	// Depending on how many are set, Terraform might pass the configuration over
 	// as a map or object, so we need to handle both.
-	if s.RawValue.Type().Is(tftypes.Map{}) {
+	if s.RawValue.Type().Is(tftypes.Map{ElementType: nil}) {
 		for _, val := range vals {
 			return tftypes.NewValue(tftypes.Map{ElementType: val.Type()}, vals)
 		}

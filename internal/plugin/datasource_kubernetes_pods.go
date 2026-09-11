@@ -32,9 +32,11 @@ var defaultPodInfoGetter podInfoGetter = func(ctx context.Context, state kuberne
 	}
 
 	request := kubernetes.QueryPodInfosRequest{
-		Namespace:     state.Namespace.Value(),
-		LabelSelector: strings.Join(state.LabelSelectors.StringValue(), ","),
-		FieldSelector: strings.Join(state.FieldSelectors.StringValue(), ","),
+		Namespace:        state.Namespace.Value(),
+		LabelSelector:    strings.Join(state.LabelSelectors.StringValue(), ","),
+		FieldSelector:    strings.Join(state.FieldSelectors.StringValue(), ","),
+		ExpectedPodCount: 0,
+		WaitTimeout:      0,
 	}
 
 	if count, ok := state.ExpectedPodCount.Get(); ok {
@@ -398,18 +400,21 @@ func (s *kubernetesPodsStateV1) FromTerraform5Value(val tftypes.Value) error {
 // Terraform5Type is the file state tftypes.Type.
 func (s *kubernetesPodsStateV1) Terraform5Type() tftypes.Type {
 	// TODO: Add each state attribute
-	return tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-		"id":                 s.ID.TFType(),
-		"kubeconfig_base64":  s.KubeConfigBase64.TFType(),
-		"context_name":       s.ContextName.TFType(),
-		"namespace":          s.Namespace.TFType(),
-		"label_selectors":    s.LabelSelectors.TFType(),
-		"field_selectors":    s.FieldSelectors.TFType(),
-		"expected_pod_count": s.ExpectedPodCount.TFType(),
-		"wait_timeout":       s.WaitTimeout.TFType(),
-		"pods":               s.Pods.TFType(),
-		"transports":         s.Transports.TFType(),
-	}}
+	return tftypes.Object{
+		AttributeTypes: map[string]tftypes.Type{
+			"id":                 s.ID.TFType(),
+			"kubeconfig_base64":  s.KubeConfigBase64.TFType(),
+			"context_name":       s.ContextName.TFType(),
+			"namespace":          s.Namespace.TFType(),
+			"label_selectors":    s.LabelSelectors.TFType(),
+			"field_selectors":    s.FieldSelectors.TFType(),
+			"expected_pod_count": s.ExpectedPodCount.TFType(),
+			"wait_timeout":       s.WaitTimeout.TFType(),
+			"pods":               s.Pods.TFType(),
+			"transports":         s.Transports.TFType(),
+		},
+		OptionalAttributes: nil,
+	}
 }
 
 // Terraform5Value is the file state tftypes.Value.

@@ -22,7 +22,12 @@ type nomadClientFactory func(cfg nomadapi.ClientCfg) (nomadapi.Client, error)
 type nomadTransportBuilder func(state *embeddedTransportNomadv1, ctx context.Context) (transport.Transport, error)
 
 var defaultNomadTransportBuilder = func(state *embeddedTransportNomadv1, ctx context.Context) (transport.Transport, error) {
-	opts := nomad.TransportOpts{}
+	opts := nomad.TransportOpts{
+		Host:         "",
+		SecretID:     "",
+		AllocationID: "",
+		TaskName:     "",
+	}
 
 	if host, ok := state.Host.Get(); ok {
 		opts.Host = host

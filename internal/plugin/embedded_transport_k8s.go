@@ -21,7 +21,13 @@ import (
 type k8sTransportBuilder func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error)
 
 var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error) {
-	opts := k8s.TransportOpts{}
+	opts := k8s.TransportOpts{
+		KubeConfigBase64: "",
+		ContextName:      "",
+		Namespace:        "",
+		Pod:              "",
+		Container:        "",
+	}
 
 	if err := state.Validate(ctx); err != nil {
 		return nil, err
@@ -221,7 +227,10 @@ func (em *embeddedTransportK8Sv1) debug() string {
 }
 
 func (em *embeddedTransportK8Sv1) k8sClient() (kubernetes.Client, error) {
-	cfg := kubernetes.ClientCfg{}
+	cfg := kubernetes.ClientCfg{
+		KubeConfigBase64: "",
+		ContextName:      "",
+	}
 
 	kubeconfig, ok := em.KubeConfigBase64.Get()
 	if !ok {

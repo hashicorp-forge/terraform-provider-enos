@@ -26,7 +26,7 @@ type Builder struct {
 
 // NewBuilder creates a new Builder.
 func NewBuilder() *Builder {
-	return &Builder{}
+	return &Builder{entries: nil}
 }
 
 // attribute is a key/value HCL entry.
@@ -78,7 +78,7 @@ func (h *Builder) AppendAttribute(key string, value any) *Builder {
 // AppendBlock constructs a new block given the provided name and labels, appends it to current
 // block and returns the Builder for the new block.
 func (h *Builder) AppendBlock(name string, labels []string) *Builder {
-	builder := &Builder{}
+	builder := &Builder{entries: nil}
 	h.entries = append(h.entries, &block{name, labels, builder})
 
 	return builder

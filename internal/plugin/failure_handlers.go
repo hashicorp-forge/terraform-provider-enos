@@ -279,6 +279,7 @@ func getK8sLogs(ctx context.Context, transport *embeddedTransportK8Sv1) ([]remot
 		ContextName: transport.ContextName.Val,
 		Namespace:   namespace,
 		Pod:         pod,
+		Container:   "",
 	}
 
 	// it's possible to have a transport where the container is not specified. In this case, we want

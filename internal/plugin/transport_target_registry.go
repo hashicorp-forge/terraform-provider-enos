@@ -37,7 +37,10 @@ type transportTargetRegistry struct {
 }
 
 func newTransportTargetRegistry() *transportTargetRegistry {
-	return &transportTargetRegistry{}
+	return &transportTargetRegistry{
+		mu:      sync.Mutex{},
+		targets: nil,
+	}
 }
 
 // register adds a resolved transport state. Registrations are append-only; re-applying the same

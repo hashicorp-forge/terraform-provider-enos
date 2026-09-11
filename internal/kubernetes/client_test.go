@@ -27,6 +27,7 @@ func TestGetPodLogsResponse_GetLogFileName(t *testing.T) {
 				Namespace:   "food",
 				Pod:         "mexican",
 				Container:   "tacos",
+				Logs:        nil,
 			},
 			want: "taco-truck_food_mexican_tacos.log",
 		},
@@ -40,6 +41,7 @@ func TestGetPodLogsResponse_GetLogFileName(t *testing.T) {
 				Namespace:   tt.fields.Namespace,
 				Pod:         tt.fields.Pod,
 				Container:   tt.fields.Container,
+				Logs:        nil,
 			}
 			if got := p.GetLogFileName(); got != tt.want {
 				t.Errorf("GetLogFileName() = %v, want %v", got, tt.want)
