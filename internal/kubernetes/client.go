@@ -302,19 +302,19 @@ func (c *client) QueryPodInfos(ctx context.Context, req QueryPodInfosRequest) ([
 			CoreV1().
 			Pods(namespace).
 			List(ctx, metav1.ListOptions{
-					TypeMeta:             metav1.TypeMeta{},
-					LabelSelector:        req.LabelSelector,
-					FieldSelector:        req.FieldSelector,
-					Watch:                false,
-					AllowWatchBookmarks:  false,
-					ResourceVersion:      "",
-					ResourceVersionMatch: "",
-					TimeoutSeconds:       nil,
-					Limit:                0,
-					Continue:             "",
-					SendInitialEvents:    nil,
-					ShardSelector:        "",
-				})
+				TypeMeta:             metav1.TypeMeta{},
+				LabelSelector:        req.LabelSelector,
+				FieldSelector:        req.FieldSelector,
+				Watch:                false,
+				AllowWatchBookmarks:  false,
+				ResourceVersion:      "",
+				ResourceVersionMatch: "",
+				TimeoutSeconds:       nil,
+				Limit:                0,
+				Continue:             "",
+				SendInitialEvents:    nil,
+				ShardSelector:        "",
+			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to query pods for request: %#v, due to: %w", req, err)
 		}
@@ -429,17 +429,17 @@ func (c *client) GetLogs(ctx context.Context, req GetPodLogsRequest) (*GetPodLog
 	getLogsReq := c.clientset.CoreV1().
 		Pods(namespace).
 		GetLogs(req.Pod, &v1.PodLogOptions{
-			TypeMeta:                    metav1.TypeMeta{},
-			Container:                   req.Container,
-			Follow:                      false,
-			Previous:                    false,
-			SinceSeconds:                nil,
-			SinceTime:                   nil,
-			Timestamps:                  false,
-			TailLines:                   nil,
-			LimitBytes:                  nil,
+			TypeMeta:                     metav1.TypeMeta{},
+			Container:                    req.Container,
+			Follow:                       false,
+			Previous:                     false,
+			SinceSeconds:                 nil,
+			SinceTime:                    nil,
+			Timestamps:                   false,
+			TailLines:                    nil,
+			LimitBytes:                   nil,
 			InsecureSkipTLSVerifyBackend: false,
-			Stream:                      nil,
+			Stream:                       nil,
 		})
 
 	podLogs, err := getLogsReq.Stream(ctx)
