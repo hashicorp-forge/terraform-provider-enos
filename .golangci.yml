@@ -95,6 +95,67 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      # exhaustruct_v5: external types from tfprotov6, multierror, tar, cli, and github packages
+      # don't need all fields set — they have many optional/future fields we intentionally omit.
+      - linters: [exhaustruct_v5]
+        text: "tfprotov6\\..*is missing"
+      - linters: [exhaustruct_v5]
+        text: "multierror\\.Error is missing"
+      - linters: [exhaustruct_v5]
+        text: "tar\\.Header is missing"
+      - linters: [exhaustruct_v5]
+        text: "cli\\.CLI is missing"
+      - linters: [exhaustruct_v5]
+        text: "github\\.RepositoryRelease is missing"
+      - linters: [exhaustruct_v5]
+        text: "publish\\.GithubReleaseCreateReq is missing"
+      # exhaustruct_v5: internal types used as zero-value starters where fields are set via
+      # functional options or assigned immediately after construction.
+      - linters: [exhaustruct_v5]
+        path: "internal/server/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/transport/exec\\.go"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/transport/test/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/ui/ui\\.go"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/flightcontrol/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/remoteflight/hcl/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/kind/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "tools/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "command/"
+        text: "is missing fields"
+      # modernize: errors.As with a local variable is idiomatic Go; the AsType suggestion
+      # requires a Go version bump and changes call semantics in subtle ways.
+      - linters: [modernize]
+        text: "errorsastype:"
+      # dupword: "hello\nhello\n" is a deliberate repeated value in a test assertion.
+      - linters: [dupword]
+        path: "internal/plugin/resource_local_exec_test\\.go"
+      # staticcheck: UnsafeToUseLegacyTypeSystem is deprecated upstream but removing it
+      # is a separate concern from this change.
+      - linters: [staticcheck]
+        text: "UnsafeToUseLegacyTypeSystem is deprecated"
+      # unparam: transportReplacedAttributePaths always returns nil — known issue, not a bug.
+      - linters: [unparam]
+        text: "transportReplacedAttributePaths"
+      # nolintlint: these directives were valid when added but the linter version changed.
+      - linters: [nolintlint]
+        path: "internal/plugin/(helpers_test|datasource_kubernetes_pods_test)\\.go"
 issues:
   uniq-by-line: true
 severity:

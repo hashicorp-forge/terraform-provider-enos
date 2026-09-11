@@ -201,7 +201,6 @@ func testProvider(queryResults []kubernetes.PodInfo) map[string]func() (tfprotov
 	)
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
-		//nolint:unparam// we always return nil here but we have to adhere to an interface that can return an error
 		"enos": func() (tfprotov6.ProviderServer, error) {
 			return s, nil
 		},
