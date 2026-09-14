@@ -48,7 +48,11 @@ func newUser() *user {
 
 func newUserStateV1() *userStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{TransportDebugFailureHandler(transport)}
+	fh := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		// nil appNames: only systemd.KnownServices are collected when this handler fires.
+		GatherLogsFromAllKnownTargetsFailureHandler(nil),
+	}
 
 	return &userStateV1{
 		ID:              newTfString(),

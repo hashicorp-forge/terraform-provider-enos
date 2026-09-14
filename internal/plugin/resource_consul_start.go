@@ -72,7 +72,9 @@ func newConsulStartStateV1() *consulStartStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		GetApplicationLogsFailureHandler(transport, []string{"consul"}),
+		// GatherLogsFromAllKnownTargetsFailureHandler collects consul logs from every registered
+		// target (including this one), so GetApplicationLogsFailureHandler is redundant here.
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"consul"}),
 	}
 
 	return &consulStartStateV1{

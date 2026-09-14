@@ -106,6 +106,12 @@ func (r Router) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyRes
 		return nil, newErrSetProviderConfig(err)
 	}
 
+	// Inject the provider-level transport target registry into the context so that
+	// transport_resource_util and failure handlers can access it without per-resource boilerplate.
+	if r.injectRegistry != nil {
+		ctx = r.injectRegistry(ctx)
+	}
+
 	res := &ApplyResourceChangeResponse{
 		Diagnostics: []*tfprotov6.Diagnostic{},
 	}

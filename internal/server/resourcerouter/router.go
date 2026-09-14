@@ -75,13 +75,26 @@ func RegisterResource(resource Resource) func(Router) Router {
 
 func newRouter() Router {
 	return Router{
-		resources: map[string]Resource{},
+		resources:      map[string]Resource{},
+		injectRegistry: nil,
 	}
 }
 
 // Router routes the requests the resource servers.
 type Router struct {
-	resources map[string]Resource
+	resources      map[string]Resource
+	injectRegistry func(context.Context) context.Context
+}
+
+// WithRegistryInjector is a functional option that stores a context-injection function on the
+// Router. The function is called before every ApplyResourceChange to make the provider-level
+// transport target registry available via context. Using a function avoids an import cycle
+// between the server/resourcerouter and plugin packages.
+func WithRegistryInjector(inject func(context.Context) context.Context) RouterOpt {
+	return func(router Router) Router {
+		router.injectRegistry = inject
+		return router
+	}
 }
 
 // ValidateResourceConfig validates the resource's config.
