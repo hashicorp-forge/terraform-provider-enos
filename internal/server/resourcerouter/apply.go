@@ -76,9 +76,8 @@ type ApplyResourceChangeResponse struct {
 // ToTFProto6Response Converts the response to a tfproto6 response type.
 func (a ApplyResourceChangeResponse) ToTFProto6Response(isDelete bool) *tfprotov6.ApplyResourceChangeResponse {
 	resp := &tfprotov6.ApplyResourceChangeResponse{
-		Private:                     a.Private,
-		Diagnostics:                 a.Diagnostics,
-		UnsafeToUseLegacyTypeSystem: a.UnsafeToUseLegacyTypeSystem,
+		Private:     a.Private,
+		Diagnostics: a.Diagnostics,
 	}
 
 	if !diags.HasErrors(a.Diagnostics) {
