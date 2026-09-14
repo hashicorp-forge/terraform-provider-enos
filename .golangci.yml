@@ -145,62 +145,62 @@ linters:
       # options or immediately after construction — all missing fields are intentional.
       - linters: [exhaustruct_v5]
         path: "internal/remoteflight/"
-        text: "is missing fields"
+        text: "is missing field"
       # exhaustruct_v5: transport layer types (ssh, k8s, nomad, file) use zero-value starters
       # or have unexported fields that cannot be set in struct literals.
       - linters: [exhaustruct_v5]
         path: "internal/transport/"
-        text: "is missing fields"
+        text: "is missing field"
       # exhaustruct_v5: retry.Retrier and artifactory.Client are zero-value starters with fields
       # set via functional options.
       - linters: [exhaustruct_v5]
         path: "internal/retry/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/artifactory/"
-        text: "is missing fields"
+        text: "is missing field"
       # exhaustruct_v5: kubernetes client types have many optional/future fields.
       - linters: [exhaustruct_v5]
         path: "internal/kubernetes/"
-        text: "is missing fields"
+        text: "is missing field"
       # exhaustruct_v5: embedded_transport and ip_resolver use external tftypes/dns types
       # inline; covered by the text-based rules above but also exempted by path for any
       # internal anonymous types in those files.
       - linters: [exhaustruct_v5]
         path: "internal/plugin/embedded_transport"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/plugin/ip_resolver"
-        text: "is missing fields"
+        text: "is missing field"
       # exhaustruct_v5: internal types used as zero-value starters where fields are set via
       # functional options or assigned immediately after construction.
       - linters: [exhaustruct_v5]
         path: "internal/server/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/transport/exec\\.go"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/transport/test/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/ui/ui\\.go"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/flightcontrol/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/remoteflight/hcl/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "internal/kind/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "tools/"
-        text: "is missing fields"
+        text: "is missing field"
       - linters: [exhaustruct_v5]
         path: "command/"
-        text: "is missing fields"
+        text: "is missing field"
       # modernize: errors.As with a local variable is idiomatic Go; the AsType suggestion
       # requires a Go version bump and changes call semantics in subtle ways.
       - linters: [modernize]
