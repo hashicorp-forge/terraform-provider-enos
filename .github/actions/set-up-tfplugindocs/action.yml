@@ -1,0 +1,66 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+---
+name: Set up tfplugindocs from Github releases
+description: Set up tfplugindocs from Github releases
+
+inputs:
+  destination:
+    description: "Where to install the tfplugindocs binary (default: $HOME/bin/tfplugindocs)"
+    default: "$HOME/bin/tfplugindocs"
+  version:
+    description: "The version to install (default: latest)"
+    default: Latest
+
+outputs:
+  destination:
+    description: Where the installed tfplugindocs binary is
+    value: ${{ steps.install.outputs.destination }}
+  destination-dir:
+    description: The directory where the installed tfplugindocs binary is
+    value: ${{ steps.install.outputs.destination-dir }}
+  version:
+    description: The installed version of tfplugindocs
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VERSION=$(gh release list -R hashicorp/terraform-plugin-docs --exclude-drafts --exclude-pre-releases | grep ${{ inputs.version }} | cut -f1)
+
+        mkdir -p $(dirname ${{ inputs.destination }})
+        DESTINATION="$(readlink -f "${{ inputs.destination }}")"
+        DESTINATION_DIR="$(dirname "$DESTINATION")"
+        echo "$DESTINATION_DIR" >> "$GITHUB_PATH"
+
+        {
+          echo "destination=$DESTINATION"
+          echo "destination-dir=$DESTINATION_DIR"
+          echo "version=$VERSION"
+        } | tee -a "$GITHUB_OUTPUT"
+
+        ARCH="$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
+        OS="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+        if [ "$ARCH" = "x64" ]; then
+          export ARCH="amd64"
+        fi
+        if [ "$OS" = "macos" ]; then
+          export OS="darwin"
+        fi
+
+        V2=${VERSION#v}
+
+        mkdir -p tmp/tfplugindocs
+        pushd tmp/tfplugindocs
+        gh release download "$VERSION" -p "tfplugindocs_${V2}_${OS}_${ARCH}.zip" -O tfplugindocs.zip -R hashicorp/terraform-plugin-docs
+        unzip tfplugindocs.zip tfplugindocs
+        chmod +x tfplugindocs
+        mv tfplugindocs "$DESTINATION"
+        popd
+        rm -rf tmp/tfplugindocs
