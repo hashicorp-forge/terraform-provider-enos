@@ -29,11 +29,7 @@ type Opt func(*Client) *Client
 
 func NewClient(opts ...Opt) *Client {
 	c := &Client{
-		http:     http.Client{},
-		Host:     "",
-		Username: "",
-		Token:    "",
-		mu:       sync.Mutex{},
+		mu: sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -68,7 +64,7 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	res := &SearchAQLResponse{Results: nil}
+	res := &SearchAQLResponse{}
 
 	search, err := url.Parse(c.Host + "/api/search/aql")
 	if err != nil {

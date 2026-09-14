@@ -48,11 +48,7 @@ func newUser() *user {
 
 func newUserStateV1() *userStateV1 {
 	transport := newEmbeddedTransport()
-	fh := failureHandlers{
-		TransportDebugFailureHandler(transport),
-		// nil appNames: only systemd.KnownServices are collected when this handler fires.
-		GatherLogsFromAllKnownTargetsFailureHandler(nil),
-	}
+	fh := failureHandlers{TransportDebugFailureHandler(transport)}
 
 	return &userStateV1{
 		ID:              newTfString(),
@@ -310,13 +306,7 @@ func (u *userStateV1) User() *remoteflight.User {
 		return nil
 	}
 
-	user := &remoteflight.User{
-		Name:    nil,
-		HomeDir: nil,
-		Shell:   nil,
-		GID:     nil,
-		UID:     nil,
-	}
+	user := &remoteflight.User{}
 	if u.Name != nil {
 		if n, ok := u.Name.Get(); ok {
 			user.Name = &n

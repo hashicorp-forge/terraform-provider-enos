@@ -103,31 +103,10 @@ func TestResourceKindClusterInvalidAttributes(t *testing.T) {
 		ProtoV6ProviderFactories: testProviders(t),
 		Steps: []resource.TestStep{
 			{
-				ResourceName:              "",
-				PreConfig:                 nil,
-				Taint:                     nil,
-				Config:                    `resource "enos_local_kind_cluster" "this" {}`,
-				Check:                     nil,
-				Destroy:                   false,
-				ExpectNonEmptyPlan:        false,
-				ExpectError:               regexp.MustCompile(`Missing required argument`),
-				PlanOnly:                  true,
-				PreventDiskCleanup:        false,
-				PreventPostDestroyRefresh: false,
-				SkipFunc:                  nil,
-				ImportState:               false,
-				ImportStateId:             "",
-				ImportStateIdPrefix:       "",
-				ImportStateIdFunc:         nil,
-				ImportStateCheck:          nil,
-				ImportStateVerify:         false,
-				ImportStateVerifyIgnore:   nil,
-				ImportStatePersist:        false,
-				RefreshState:              false,
-				ProviderFactories:         nil,
-				ProtoV5ProviderFactories:  nil,
-				ProtoV6ProviderFactories:  nil,
-				ExternalProviders:         nil,
+				Config:             `resource "enos_local_kind_cluster" "this" {}`,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+				ExpectError:        regexp.MustCompile(`Missing required argument`),
 			},
 		},
 	})
@@ -155,11 +134,7 @@ func TestClusterBuild(t *testing.T) {
 	dir := t.TempDir()
 	kubeConfigPath := filepath.Join(dir, "kubeconfig")
 
-	info, err := client.CreateCluster(kind.CreateKindClusterRequest{
-		Name:           name,
-		KubeConfigPath: kubeConfigPath,
-		WaitTimeout:    "",
-	})
+	info, err := client.CreateCluster(kind.CreateKindClusterRequest{Name: name, KubeConfigPath: kubeConfigPath})
 	require.NoError(t, err)
 	assert.NotNil(t, info)
 	assert.NotEmpty(t, info.KubeConfigBase64)

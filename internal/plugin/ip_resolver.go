@@ -106,28 +106,12 @@ func withDNSResolver(
 		}
 
 		msg := &dns.Msg{
-			MsgHdr: dns.MsgHdr{
-				Id:                 0,
-				Response:           false,
-				Opcode:             dns.OpcodeQuery,
-				Authoritative:      false,
-				Truncated:          false,
-				RecursionDesired:   false,
-				RecursionAvailable: false,
-				Zero:               false,
-				AuthenticatedData:  false,
-				CheckingDisabled:   false,
-				Rcode:              0,
-			},
-			Compress: false,
+			MsgHdr: dns.MsgHdr{Opcode: dns.OpcodeQuery},
 			Question: []dns.Question{{
 				Name:   host,
 				Qtype:  uint16(qType),
 				Qclass: uint16(qClass),
 			}},
-			Answer: nil,
-			Ns:     nil,
-			Extra:  nil,
 		}
 
 		baseErr := fmt.Sprintf(
@@ -135,18 +119,7 @@ func withDNSResolver(
 			host, nameserver, qType.String(), qClass.String(),
 		)
 
-		client := dns.Client{
-			Net:          "",
-			UDPSize:      0,
-			TLSConfig:    nil,
-			Dialer:       nil,
-			Timeout:      0,
-			DialTimeout:  0,
-			ReadTimeout:  0,
-			WriteTimeout: 0,
-			TsigSecret:   nil,
-			TsigProvider: nil,
-		}
+		client := dns.Client{}
 		res, _, err := client.ExchangeContext(ctx, msg, nameserver)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", baseErr, err)
@@ -268,7 +241,7 @@ func (r *publicIPResolver) resolve(ctx context.Context, resolvers ...ipResolver)
 	}
 
 	wg := sync.WaitGroup{}
-	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
+	ipCtx, ipCancel := context.WithDeadline(ctx, time.Now().Add(time.Second*1))
 
 	defer ipCancel()
 	errC := make(chan error)

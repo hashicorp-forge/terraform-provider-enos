@@ -134,31 +134,7 @@ EOF
 			}
 
 			steps = append(steps, resource.TestStep{
-				ResourceName:              "",
-				PreConfig:                 nil,
-				Taint:                     nil,
-				Config:                    buf.String(),
-				Check:                     nil,
-				Destroy:                   false,
-				ExpectNonEmptyPlan:        false,
-				ExpectError:               nil,
-				PlanOnly:                  false,
-				PreventDiskCleanup:        false,
-				PreventPostDestroyRefresh: false,
-				SkipFunc:                  nil,
-				ImportState:               false,
-				ImportStateId:             "",
-				ImportStateIdPrefix:       "",
-				ImportStateIdFunc:         nil,
-				ImportStateCheck:          nil,
-				ImportStateVerify:         false,
-				ImportStateVerifyIgnore:   nil,
-				ImportStatePersist:        false,
-				RefreshState:              false,
-				ProviderFactories:         nil,
-				ProtoV5ProviderFactories:  nil,
-				ProtoV6ProviderFactories:  nil,
-				ExternalProviders:         nil,
+				Config: buf.String(),
 			})
 		}
 
@@ -199,31 +175,8 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 	}
 
 	apply1 := resource.TestStep{
-		ResourceName:              "",
-		PreConfig:                 nil,
-		Taint:                     nil,
-		Config:                    s1.String(),
-		Check:                     nil,
-		Destroy:                   false,
-		ExpectNonEmptyPlan:        false,
-		ExpectError:               nil,
-		PlanOnly:                  false,
-		PreventDiskCleanup:        false,
-		PreventPostDestroyRefresh: false,
-		SkipFunc:                  nil,
-		ImportState:               false,
-		ImportStateId:             "",
-		ImportStateIdPrefix:       "",
-		ImportStateIdFunc:         nil,
-		ImportStateCheck:          nil,
-		ImportStateVerify:         false,
-		ImportStateVerifyIgnore:   nil,
-		ImportStatePersist:        false,
-		RefreshState:              false,
-		ProviderFactories:         nil,
-		ProtoV5ProviderFactories:  nil,
-		ProtoV6ProviderFactories:  nil,
-		ExternalProviders:         nil,
+		Config:   s1.String(),
+		PlanOnly: false,
 	}
 
 	data2 := map[string]any{
@@ -241,31 +194,8 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 	}
 
 	apply2 := resource.TestStep{
-		ResourceName:              "",
-		PreConfig:                 nil,
-		Taint:                     nil,
-		Config:                    s2.String(),
-		Check:                     nil,
-		Destroy:                   false,
-		ExpectNonEmptyPlan:        false,
-		ExpectError:               nil,
-		PlanOnly:                  false,
-		PreventDiskCleanup:        false,
-		PreventPostDestroyRefresh: false,
-		SkipFunc:                  nil,
-		ImportState:               false,
-		ImportStateId:             "",
-		ImportStateIdPrefix:       "",
-		ImportStateIdFunc:         nil,
-		ImportStateCheck:          nil,
-		ImportStateVerify:         false,
-		ImportStateVerifyIgnore:   nil,
-		ImportStatePersist:        false,
-		RefreshState:              false,
-		ProviderFactories:         nil,
-		ProtoV5ProviderFactories:  nil,
-		ProtoV6ProviderFactories:  nil,
-		ExternalProviders:         nil,
+		Config:   s2.String(),
+		PlanOnly: false,
 	}
 
 	resource.ParallelTest(t, resource.TestCase{

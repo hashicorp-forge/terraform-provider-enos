@@ -37,10 +37,9 @@ func TestConfigStateSanitizedDeserialize(t *testing.T) {
 		},
 	}
 	expected.Data.Storage = &ConfigStorage{
-		ClusterAddr:       "http://10.13.10.150:8201",
-		DisableClustering: false,
-		RedirectAddr:      "http://10.13.10.150:8200",
-		Type:              "raft",
+		ClusterAddr:  "http://10.13.10.150:8201",
+		RedirectAddr: "http://10.13.10.150:8200",
+		Type:         "raft",
 	}
 
 	got := NewConfigStateSanitizedResponse()

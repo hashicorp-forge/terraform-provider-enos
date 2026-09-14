@@ -75,12 +75,8 @@ type SearchAQLRequest struct {
 
 func NewSearchAQLRequest(opts ...SearchAQLOpt) *SearchAQLRequest {
 	req := &SearchAQLRequest{
-		Repo:          "",
-		Path:          "",
-		Name:          "",
-		Limit:         "",
-		Properties:    map[string]string{},
 		QueryTemplate: AQLQueryTemplate,
+		Properties:    map[string]string{},
 	}
 
 	for _, opt := range opts {

@@ -21,13 +21,7 @@ import (
 type k8sTransportBuilder func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error)
 
 var defaultK8STransportBuilder = func(state *embeddedTransportK8Sv1, ctx context.Context) (transport.Transport, error) {
-	opts := k8s.TransportOpts{
-		KubeConfigBase64: "",
-		ContextName:      "",
-		Namespace:        "",
-		Pod:              "",
-		Container:        "",
-	}
+	opts := k8s.TransportOpts{}
 
 	if err := state.Validate(ctx); err != nil {
 		return nil, err
@@ -101,16 +95,13 @@ func (em *embeddedTransportK8Sv1) Terraform5Type() tftypes.Type {
 func (em *embeddedTransportK8Sv1) Terraform5Value() tftypes.Value {
 	// If the values are empty it means that the transport configuration is unknown
 	if len(em.Values) == 0 {
-		return tftypes.NewValue(tftypes.Object{
-			AttributeTypes: map[string]tftypes.Type{
-				"kubeconfig_base64": tftypes.String,
-				"context_name":      tftypes.String,
-				"namespace":         tftypes.String,
-				"pod":               tftypes.String,
-				"container":         tftypes.String,
-			},
-			OptionalAttributes: nil,
-		}, tftypes.UnknownValue)
+		return tftypes.NewValue(tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+			"kubeconfig_base64": tftypes.String,
+			"context_name":      tftypes.String,
+			"namespace":         tftypes.String,
+			"pod":               tftypes.String,
+			"container":         tftypes.String,
+		}}, tftypes.UnknownValue)
 	}
 
 	return terraform5Value(em.Values)
@@ -230,10 +221,7 @@ func (em *embeddedTransportK8Sv1) debug() string {
 }
 
 func (em *embeddedTransportK8Sv1) k8sClient() (kubernetes.Client, error) {
-	cfg := kubernetes.ClientCfg{
-		KubeConfigBase64: "",
-		ContextName:      "",
-	}
+	cfg := kubernetes.ClientCfg{}
 
 	kubeconfig, ok := em.KubeConfigBase64.Get()
 	if !ok {

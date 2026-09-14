@@ -329,6 +329,7 @@ func testProviders(t *testing.T, overrides ...providerOverrides) map[string]func
 	}
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
+		//nolint:unparam// we always return nil here but we have to adhere to an interface that can return an error
 		"enos": func() (tfprotov6.ProviderServer, error) {
 			return server.New(
 				server.RegisterProvider(provider),

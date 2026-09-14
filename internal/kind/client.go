@@ -246,7 +246,7 @@ func (c *localClient) LoadImage(req LoadImageRequest) (LoadedImageResult, error)
 
 // loadImageArchive loads the provided image archive onto all nodes of the provided cluster.
 func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImageResult, error) {
-	result := LoadedImageResult{Nodes: []string{}, Images: nil}
+	result := LoadedImageResult{Nodes: []string{}}
 
 	infos, err := docker.GetImageInfos(archive)
 	if err != nil {

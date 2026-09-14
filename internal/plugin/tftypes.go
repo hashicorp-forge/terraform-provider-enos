@@ -159,7 +159,7 @@ func encodeTfObjectDynamicPseudoType(
 }
 
 func newTfBool() *tfBool {
-	return &tfBool{Unknown: false, Null: true, Val: false}
+	return &tfBool{Null: true}
 }
 
 type tfBool struct {
@@ -242,7 +242,7 @@ func (b *tfBool) String() string {
 }
 
 func newTfNum() *tfNum {
-	return &tfNum{Unknown: false, Null: true, Val: 0}
+	return &tfNum{Null: true}
 }
 
 type tfNum struct {
@@ -326,7 +326,7 @@ func (b *tfNum) String() string {
 }
 
 func newTfString() *tfString {
-	return &tfString{Unknown: false, Null: true, Val: ""}
+	return &tfString{Null: true}
 }
 
 type tfString struct {
@@ -410,9 +410,8 @@ func (b *tfString) String() string {
 
 func newTfStringSlice() *tfStringSlice {
 	return &tfStringSlice{
-		Unknown: false,
-		Null:    true,
-		Val:     []*tfString{},
+		Null: true,
+		Val:  []*tfString{},
 	}
 }
 
@@ -570,9 +569,8 @@ func (b *tfStringSlice) String() string {
 
 func newTfStringMap() *tfStringMap {
 	return &tfStringMap{
-		Unknown: false,
-		Null:    true,
-		Val:     map[string]*tfString{},
+		Null: true,
+		Val:  map[string]*tfString{},
 	}
 }
 
@@ -730,7 +728,6 @@ func (b *tfStringMap) String() string {
 
 func newTfObject() *tfObject {
 	return &tfObject{
-		Unknown:   false,
 		Null:      true,
 		AttrTypes: map[string]tftypes.Type{},
 		Val:       map[string]any{},
@@ -833,7 +830,7 @@ func (b *tfObject) TFValue() tftypes.Value {
 
 func (b *tfObject) FromTFValue(val tftypes.Value) error {
 	switch {
-	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Object{AttributeTypes: nil, OptionalAttributes: nil}, tftypes.UnknownValue)), !val.IsKnown():
+	case val.Equal(unknownDSTVal), val.Equal(tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue)), !val.IsKnown():
 		b.Unknown = true
 	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.DynamicPseudoType, nil)):
 		b.Null = true
@@ -1021,7 +1018,6 @@ func (b *tfObject) String() string {
 
 func newTfObjectSlice() *tfObjectSlice {
 	return &tfObjectSlice{
-		Unknown:   false,
 		Null:      true,
 		Val:       []*tfObject{},
 		AttrTypes: map[string]tftypes.Type{},
@@ -1192,7 +1188,7 @@ type dynamicPseudoTypeBlock struct {
 }
 
 func newDynamicPseudoTypeBlock() *dynamicPseudoTypeBlock {
-	return &dynamicPseudoTypeBlock{Object: newTfObject(), OriginalValue: tftypes.Value{}}
+	return &dynamicPseudoTypeBlock{Object: newTfObject()}
 }
 
 // FromTFValue nmarshals a tftypes.Value into itself and the embedded object.
@@ -1237,12 +1233,12 @@ func (d *dynamicPseudoTypeBlock) TFValue() (tftypes.Value, error) {
 	values := map[string]tftypes.Value{}
 	err := d.Object.TFValue().As(&values)
 	if err != nil {
-		return tftypes.NewValue(tftypes.Object{AttributeTypes: nil, OptionalAttributes: nil}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
+		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
 	}
 
 	val, err := encodeTfObjectDynamicPseudoType(d.OriginalValue, values)
 	if err != nil {
-		return tftypes.NewValue(tftypes.Object{AttributeTypes: nil, OptionalAttributes: nil}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
+		return tftypes.NewValue(tftypes.Object{}, tftypes.UnknownValue), fmt.Errorf("marshaling dynamic block to terraform value: %w", err)
 	}
 
 	return val, nil

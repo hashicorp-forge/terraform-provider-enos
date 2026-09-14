@@ -54,9 +54,7 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 	transport := newEmbeddedTransport()
 	fh := failureHandlers{
 		TransportDebugFailureHandler(transport),
-		// GatherLogsFromAllKnownTargetsFailureHandler collects vault logs from every registered
-		// target (including this one), so GetApplicationLogsFailureHandler is redundant here.
-		GatherLogsFromAllKnownTargetsFailureHandler([]string{"vault"}),
+		GetApplicationLogsFailureHandler(transport, []string{"vault"}),
 	}
 
 	return &vaultUnsealStateV1{
@@ -66,7 +64,6 @@ func newVaultUnsealStateV1() *vaultUnsealStateV1 {
 		SystemdUnitName: newTfString(),
 		SealType:        newTfString(),
 		UnsealKeys:      newTfStringSlice(),
-		Status:          newTfNum(),
 		Transport:       transport,
 		failureHandlers: fh,
 	}

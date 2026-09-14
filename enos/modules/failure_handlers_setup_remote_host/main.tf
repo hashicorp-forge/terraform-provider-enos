@@ -53,12 +53,14 @@ resource "aws_instance" "this" {
   vpc_security_group_ids = [aws_security_group.this.id]
 
   root_block_device {
-    encrypted = true
+    encrypted             = true
+    delete_on_termination = true
   }
 
   metadata_options {
-    http_tokens   = "required"
-    http_endpoint = "enabled"
+    http_tokens                 = "required"
+    http_endpoint               = "enabled"
+    http_put_response_hop_limit = 1
   }
 
   tags = var.tags
