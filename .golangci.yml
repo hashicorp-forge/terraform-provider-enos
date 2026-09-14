@@ -110,6 +110,20 @@ linters:
         text: "github\\.RepositoryRelease is missing"
       - linters: [exhaustruct_v5]
         text: "publish\\.GithubReleaseCreateReq is missing"
+      # exhaustruct_v5: resource.TestStep is an external type with many optional fields;
+      # only the fields relevant to each test case are set.
+      - linters: [exhaustruct_v5]
+        text: "resource\\.TestStep is missing"
+      # exhaustruct_v5: releases.Release is constructed via functional options; callers only
+      # set the fields they need and the zero values for the rest are intentional.
+      - linters: [exhaustruct_v5]
+        path: "internal/releases/"
+        text: "releases\\.Release is missing"
+      # exhaustruct_v5: remoteflight types are zero-value starters populated via functional
+      # options or immediately after construction — all missing fields are intentional.
+      - linters: [exhaustruct_v5]
+        path: "internal/remoteflight/"
+        text: "is missing fields"
       # exhaustruct_v5: internal types used as zero-value starters where fields are set via
       # functional options or assigned immediately after construction.
       - linters: [exhaustruct_v5]

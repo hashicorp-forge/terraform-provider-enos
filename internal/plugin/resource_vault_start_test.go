@@ -486,6 +486,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"gcpckms": {
+			shouldFail: false,
 			in: map[string]any{
 				"credentials": "/usr/vault/vault-project-user-creds.json",
 				"project":     "vault-project",
@@ -505,6 +506,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"pkcs11": {
+			shouldFail: false,
 			in: map[string]any{
 				"default_key_label":      "ignored",
 				"default_hmac_key_label": "ignored_hmac",
@@ -549,6 +551,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"ocikms": {
+			shouldFail: false,
 			in: map[string]any{
 				"key_id":              "ocid1.key.oc1.iad.afnxza26aag4s.abzwkljsbapzb2nrha5nt3s7s7p42ctcrcj72vn3kq5qx",
 				"crypto_endpoint":     "https://afnxza26aag4s-crypto.kms.us-ashburn-1.oraclecloud.com",
