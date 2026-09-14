@@ -119,6 +119,7 @@ func NewRaftConfigurationResponse() *RaftConfigurationResponse {
 	return &RaftConfigurationResponse{
 		Data: &RaftConfigurationData{
 			Config: &RaftConfigurationDataConfig{
+				Index:   "",
 				Servers: []*RaftConfigurationServer{},
 			},
 		},

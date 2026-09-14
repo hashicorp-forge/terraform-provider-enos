@@ -79,6 +79,7 @@ func TestRaftAutopilotStateDeserialize(t *testing.T) {
 			Healthy:     true,
 			StableSince: "2023-05-10T21:34:05.142269016Z",
 			Status:      "leader",
+			Meta:        nil,
 		},
 		"node_1": {
 			ID:          "node_1",
@@ -90,6 +91,7 @@ func TestRaftAutopilotStateDeserialize(t *testing.T) {
 			Healthy:     true,
 			StableSince: "2023-05-10T21:34:07.143318399Z",
 			Status:      "voter",
+			Meta:        nil,
 		},
 		"node_2": {
 			ID:          "node_2",
@@ -101,6 +103,7 @@ func TestRaftAutopilotStateDeserialize(t *testing.T) {
 			Healthy:     true,
 			StableSince: "2023-05-10T21:34:07.143318399Z",
 			Status:      "voter",
+			Meta:        nil,
 		},
 	}
 	expected.Data.UpgradeInfo.Status = "idle"

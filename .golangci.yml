@@ -110,10 +110,32 @@ linters:
         text: "github\\.RepositoryRelease is missing"
       - linters: [exhaustruct_v5]
         text: "publish\\.GithubReleaseCreateReq is missing"
-      # exhaustruct_v5: resource.TestStep is an external type with many optional fields;
-      # only the fields relevant to each test case are set.
+      # exhaustruct_v5: resource.TestStep and resource.TestCase are external types with many
+      # optional fields; only the fields relevant to each test case are set.
       - linters: [exhaustruct_v5]
         text: "resource\\.TestStep is missing"
+      - linters: [exhaustruct_v5]
+        text: "resource\\.TestCase is missing"
+      # exhaustruct_v5: external stdlib/third-party types with many optional fields that we
+      # intentionally leave at their zero values.
+      - linters: [exhaustruct_v5]
+        text: "http\\.Client is missing"
+      - linters: [exhaustruct_v5]
+        text: "metav1\\.TypeMeta is missing"
+      - linters: [exhaustruct_v5]
+        text: "v1\\.TypeMeta is missing"
+      - linters: [exhaustruct_v5]
+        text: "v1\\.ResourceRequirements is missing"
+      - linters: [exhaustruct_v5]
+        text: "tftypes\\.Object is missing"
+      - linters: [exhaustruct_v5]
+        text: "dns\\.Client is missing"
+      - linters: [exhaustruct_v5]
+        text: "ssh\\.ClientConfig is missing"
+      - linters: [exhaustruct_v5]
+        text: "ssh\\.Config is missing"
+      - linters: [exhaustruct_v5]
+        text: "net\\.Dialer is missing"
       # exhaustruct_v5: releases.Release is constructed via functional options; callers only
       # set the fields they need and the zero values for the rest are intentional.
       - linters: [exhaustruct_v5]
@@ -123,6 +145,32 @@ linters:
       # options or immediately after construction — all missing fields are intentional.
       - linters: [exhaustruct_v5]
         path: "internal/remoteflight/"
+        text: "is missing fields"
+      # exhaustruct_v5: transport layer types (ssh, k8s, nomad, file) use zero-value starters
+      # or have unexported fields that cannot be set in struct literals.
+      - linters: [exhaustruct_v5]
+        path: "internal/transport/"
+        text: "is missing fields"
+      # exhaustruct_v5: retry.Retrier and artifactory.Client are zero-value starters with fields
+      # set via functional options.
+      - linters: [exhaustruct_v5]
+        path: "internal/retry/"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/artifactory/"
+        text: "is missing fields"
+      # exhaustruct_v5: kubernetes client types have many optional/future fields.
+      - linters: [exhaustruct_v5]
+        path: "internal/kubernetes/"
+        text: "is missing fields"
+      # exhaustruct_v5: embedded_transport and ip_resolver use external tftypes/dns types
+      # inline; covered by the text-based rules above but also exempted by path for any
+      # internal anonymous types in those files.
+      - linters: [exhaustruct_v5]
+        path: "internal/plugin/embedded_transport"
+        text: "is missing fields"
+      - linters: [exhaustruct_v5]
+        path: "internal/plugin/ip_resolver"
         text: "is missing fields"
       # exhaustruct_v5: internal types used as zero-value starters where fields are set via
       # functional options or assigned immediately after construction.

@@ -570,6 +570,7 @@ func Test_sealAttrsToEnvVars(t *testing.T) {
 			},
 		},
 		"transit": {
+			shouldFail: false,
 			in: map[string]any{
 				"address":         "https://vault:8200",
 				"token":           "s.Qf1s5zigZ4OX6akYjQXJC1jY",

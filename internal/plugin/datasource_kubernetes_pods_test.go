@@ -106,11 +106,13 @@ output "transports_1_container" {
 			Name:       "pod1",
 			Namespace:  "yoyo",
 			Containers: []string{"foo"},
+			Pod:        nil,
 		},
 		{
 			Name:       "pod2",
 			Namespace:  "yoyo",
 			Containers: []string{"bar"},
+			Pod:        nil,
 		},
 	}
 
