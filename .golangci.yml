@@ -18,11 +18,13 @@ linters:
     - depguard
     - dogsled
     - dupl
+    - dupword
     - embeddedstructfieldcheck
     - err113
     - errname
     - errorlint
     - exhaustruct
+    - exhaustruct_v5
     - fatcontext
     - forbidigo
     - forcetypeassert
@@ -35,8 +37,8 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - godox
     - godoclint
+    - godox
     - goheader
     - gomoddirectives
     - importas
@@ -45,10 +47,12 @@ linters:
     - loggercheck
     - maintidx
     - mnd
+    - modernize
     - musttag
     - nakedret
     - nestif
     - noinlineerr
+    - nolintlint
     - nonamedreturns
     - nosprintfhostport
     - prealloc
@@ -59,7 +63,10 @@ linters:
     - tagliatelle
     - testableexamples
     - testpackage
+    - thelper
     - tparallel
+    - unparam
+    - usetesting
     - varnamelen
     - wrapcheck
     - wsl

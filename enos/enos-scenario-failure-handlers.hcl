@@ -11,6 +11,10 @@ scenario "failure_handlers" {
       Name        = "enos-provider"
       Environment = var.environment
     }
+
+    # Local directory where the ubuntu_with_debug provider writes failure-handler log files.
+    # This must match the debug_data_root_dir configured on provider.enos.ubuntu_with_debug.
+    debug_data_root_dir = abspath(joinpath(path.root, "../.enos-debug-logs"))
   }
 
   terraform_cli = matrix.use == "dev" ? terraform_cli.dev : terraform_cli.default
@@ -18,6 +22,7 @@ scenario "failure_handlers" {
   providers = [
     provider.aws.default,
     provider.enos.ubuntu,
+    provider.enos.ubuntu_with_debug,
   ]
 
   step "find_azs" {
@@ -91,6 +96,42 @@ scenario "failure_handlers" {
 
     variables {
       host_public_ip = step.setup_remote_host.public_ip
+    }
+  }
+
+  # test_gather_logs_all_targets verifies VAULT-42080 (first half).
+  # Installs Vault + Consul, registers their SSH transports, then intentionally fails a
+  # separate resource to fire GatherLogsFromAllKnownTargetsFailureHandler. Because
+  # provider.enos.ubuntu_with_debug has debug_data_root_dir set, the handler writes vault
+  # and consul log files to disk — even though those resources succeeded.
+  #
+  # This step is expected to fail (the trigger resource always errors). Enos handles the
+  # expected failure and continues to the verify step below.
+  step "test_gather_logs_all_targets" {
+    skip_step  = !var.run_failure_handler_tests
+    module     = module.test_gather_logs_all_targets
+    depends_on = [step.setup_remote_host]
+
+    providers = {
+      enos = provider.enos.ubuntu_with_debug
+    }
+
+    variables {
+      host_public_ip  = step.setup_remote_host.public_ip
+      host_private_ip = step.setup_remote_host.private_ip
+    }
+  }
+
+  # test_gather_logs_all_targets_verify verifies VAULT-42080 (second half).
+  # Runs after the expected failure above. Checks that the vault and consul log files
+  # were written to debug_data_root_dir by GatherLogsFromAllKnownTargetsFailureHandler.
+  step "test_gather_logs_all_targets_verify" {
+    skip_step  = !var.run_failure_handler_tests
+    module     = module.test_gather_logs_all_targets_verify
+    depends_on = [step.test_gather_logs_all_targets]
+
+    variables {
+      debug_data_root_dir = local.debug_data_root_dir
     }
   }
 

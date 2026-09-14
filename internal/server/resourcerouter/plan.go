@@ -62,10 +62,9 @@ type PlanResourceChangeResponse struct {
 // the diagnostic if the plan request failed.
 func (p PlanResourceChangeResponse) ToTFProto6Response() *tfprotov6.PlanResourceChangeResponse {
 	resp := &tfprotov6.PlanResourceChangeResponse{
-		RequiresReplace:             p.RequiresReplace,
-		PlannedPrivate:              p.PlannedPrivate,
-		Diagnostics:                 p.Diagnostics,
-		UnsafeToUseLegacyTypeSystem: p.UnsafeToUseLegacyTypeSystem,
+		RequiresReplace: p.RequiresReplace,
+		PlannedPrivate:  p.PlannedPrivate,
+		Diagnostics:     p.Diagnostics,
 	}
 
 	if !diags.HasErrors(p.Diagnostics) {

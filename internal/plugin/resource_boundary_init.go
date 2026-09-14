@@ -78,7 +78,10 @@ func newBoundaryInit() *boundaryInit {
 
 func newBoundaryInitStateV1() *boundaryInitStateV1 {
 	transport := newEmbeddedTransport()
-	handlers := failureHandlers{TransportDebugFailureHandler(transport)}
+	handlers := failureHandlers{
+		TransportDebugFailureHandler(transport),
+		GatherLogsFromAllKnownTargetsFailureHandler([]string{"boundary"}),
+	}
 
 	return &boundaryInitStateV1{
 		ID:         newTfString(),

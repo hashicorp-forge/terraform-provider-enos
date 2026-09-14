@@ -29,15 +29,17 @@ var (
 // newProvider returns a new instance of the plugin provider server.
 func newProvider() *Provider {
 	return &Provider{
-		mu:     sync.Mutex{},
-		config: newProviderConfig(),
+		mu:       sync.Mutex{},
+		config:   newProviderConfig(),
+		registry: newTransportTargetRegistry(),
 	}
 }
 
 // Provider implements the internal server.Provider interface.
 type Provider struct {
-	mu     sync.Mutex
-	config *config
+	mu       sync.Mutex
+	config   *config
+	registry *transportTargetRegistry
 }
 
 type config struct {

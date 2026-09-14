@@ -164,6 +164,7 @@ jobs:
             ${{ secrets.ELEVATED_GITHUB_TOKEN }}
       - uses: ./.github/actions/set-up-gofumpt
       - uses: ./.github/actions/set-up-golangci-lint
+      - uses: ./.github/actions/set-up-tfplugindocs
       - name: Run make fmt-check
         run: make fmt-check
       - name: Run make lint
