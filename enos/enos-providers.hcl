@@ -26,43 +26,43 @@ provider "enos" "rhel" {
 }
 
 provider "helm" "default" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig"))
   }
 }
 
 provider "helm" "kind_dev" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_kind_dev"))
   }
 }
 
 provider "helm" "kind_prod" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_kind_prod"))
   }
 }
 
 provider "helm" "ce_dev" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_ce_dev"))
   }
 }
 
 provider "helm" "ce_prod" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_ce_prod"))
   }
 }
 
 provider "helm" "ent_dev" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_ent_dev"))
   }
 }
 
 provider "helm" "ent_prod" {
-  kubernetes {
+  kubernetes = {
     config_path = abspath(joinpath(path.root, "kubeconfig_ent_prod"))
   }
 }

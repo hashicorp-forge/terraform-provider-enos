@@ -416,7 +416,7 @@ wrapping_token_creation_path:    sys/replication/performance/primary/secondary-t
 	transportSSH.Host.Set(host)
 	transportSSH.PrivateKeyPath.Set(privateKeyPath)
 	require.NoError(t, transport.SetTransportState(transportSSH))
-	data := map[string]interface{}{
+	data := map[string]any{
 		"TokensFile": tokensFile,
 		"Transport":  transport,
 	}

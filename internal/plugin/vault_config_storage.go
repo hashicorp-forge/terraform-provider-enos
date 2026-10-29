@@ -12,8 +12,12 @@ import (
 type vaultStorageConfig struct {
 	Type *tfString
 
-	Attrs     *dynamicPseudoTypeBlock
-	RetryJoin *dynamicPseudoTypeBlock
+	Attrs *dynamicPseudoTypeBlock
+
+	// We use a different backing type depending on whether or not retry_join
+	// has been configured with a single or multiple retry_join blocks.
+	RetryJoin  *dynamicPseudoTypeBlock
+	RetryJoins *tfObjectSlice
 
 	// keep these around for marshaling the dynamic value
 	RawValues map[string]tftypes.Value
@@ -31,11 +35,12 @@ type vaultStorageConfigSet struct {
 
 func newVaultStorageConfig() *vaultStorageConfig {
 	return &vaultStorageConfig{
-		Type:      newTfString(),
-		Attrs:     newDynamicPseudoTypeBlock(),
-		RetryJoin: newDynamicPseudoTypeBlock(),
-		Unknown:   false,
-		Null:      true,
+		Type:       newTfString(),
+		Attrs:      newDynamicPseudoTypeBlock(),
+		RetryJoin:  newDynamicPseudoTypeBlock(),
+		RetryJoins: newTfObjectSlice(),
+		Unknown:    false,
+		Null:       true,
 	}
 }
 
@@ -61,7 +66,8 @@ func (s *vaultStorageConfig) Set(set *vaultStorageConfigSet) {
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vault storage config", val.String()),
+		return AttributePathError(
+			fmt.Errorf("cannot unmarshal %s into nil vault storage config", val.String()),
 			"config", "storage",
 		)
 	}
@@ -103,12 +109,29 @@ func (s *vaultStorageConfig) FromTerraform5Value(val tftypes.Value) error {
 				return err
 			}
 		case "retry_join":
+			// Terraform can send lists as either tftypes.List or tftypes.Tuple
+			// depending on the number of elements. Preserve the raw collection
+			// shape so we can round-trip heterogeneous retry_join objects during
+			// plan/apply without forcing a single object schema.
+			_, isList := v.Type().(tftypes.List)
+			_, isTuple := v.Type().(tftypes.Tuple)
+			if isList || isTuple {
+				err = s.RetryJoins.FromTFValue(v)
+				if err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			// Assume it's a singular retry_join block
 			err = s.RetryJoin.FromTFValue(v)
 			if err != nil {
 				return err
 			}
 		default:
-			return AttributePathError(fmt.Errorf("unknown configuration '%s', known values are 'type', 'attributes', or 'retry_join'", k),
+			return AttributePathError(
+				fmt.Errorf("unknown configuration '%s', known values are 'type', 'attributes', or 'retry_join'", k),
 				"config", "storage",
 			)
 		}
@@ -146,6 +169,15 @@ func (s *vaultStorageConfig) Terraform5Value() tftypes.Value {
 				panic(err)
 			}
 		case "retry_join":
+			if rawVal, ok := s.RawValues[name]; ok {
+				_, isList := rawVal.Type().(tftypes.List)
+				_, isTuple := rawVal.Type().(tftypes.Tuple)
+				if isList || isTuple {
+					val = rawVal
+					break
+				}
+			}
+
 			val, err = s.RetryJoin.TFValue()
 			if err != nil {
 				panic(err)

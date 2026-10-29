@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/remoteflight"
@@ -219,7 +220,8 @@ func GetHealth(ctx context.Context, tr it.Transport, req *HealthRequest) (*Healt
 
 // String returns the health status request as an enos-flight-control command string.
 func (r *HealthRequest) String() string {
-	return fmt.Sprintf("%s download --exit-with-status-code --stdout --url '%s/v1/sys/health?standbyok=%t&perfstandbyok=%t&activecode=%d&standbycode=%d&drsecondarycode=%d&performancestandbycode=%d&sealedcode=%d&uninitcode=%d'",
+	return fmt.Sprintf(
+		"%s download --exit-with-status-code --stdout --url '%s/v1/sys/health?standbyok=%t&perfstandbyok=%t&activecode=%d&standbycode=%d&drsecondarycode=%d&performancestandbycode=%d&sealedcode=%d&uninitcode=%d'",
 		r.FlightControlPath,
 		r.VaultAddr,
 		r.StandbyOk,
@@ -248,13 +250,8 @@ func (r *HealthResponse) StatusIsOneOf(statuses ...HealthStatus) bool {
 	}
 
 	s := r.Status()
-	for _, status := range statuses {
-		if status == s {
-			return true
-		}
-	}
 
-	return false
+	return slices.Contains(statuses, s)
 }
 
 // IsSealed returns whether or not the node is sealed.
@@ -310,7 +307,8 @@ func (l *HealthResponseDataLicense) String() string {
 		return ""
 	}
 
-	return fmt.Sprintf("State: %s\nExpiry Time: %s\nTerminated: %t\n",
+	return fmt.Sprintf(
+		"State: %s\nExpiry Time: %s\nTerminated: %t\n",
 		l.State, l.ExpiryTime, l.Terminated,
 	)
 }

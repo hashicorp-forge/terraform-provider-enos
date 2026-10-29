@@ -19,9 +19,10 @@ import (
 func TestAccResourceBundleInstall(t *testing.T) {
 	t.Parallel()
 
-	cfg := template.Must(template.New("enos_bundle_install").
-		Funcs(transportRenderFunc).
-		Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
+	cfg := template.Must(
+		template.New("enos_bundle_install").
+			Funcs(transportRenderFunc).
+			Parse(`resource "enos_bundle_install" "{{.ID.Value}}" {
 		  destination = "{{ .Destination.Value }}"
 
 		  {{ if .Path.Value -}}
@@ -170,7 +171,8 @@ func TestAccResourceBundleInstall(t *testing.T) {
 			artToken, oktoken = os.LookupEnv("ARTIFACTORY_TOKEN")
 		}
 		if (okuser && !oktoken) || (!okuser && !okbearertoken) {
-			t.Logf(`skipping data bundle install from artifactory test because ARTIFACTORY_BEARER_TOKEN(%t) or ARTIFACTORY_TOKEN(%t) isn't set`,
+			t.Logf(
+				`skipping data bundle install from artifactory test because ARTIFACTORY_BEARER_TOKEN(%t) or ARTIFACTORY_TOKEN(%t) isn't set`,
 				okbearertoken, oktoken,
 			)
 			t.Skip()
@@ -183,8 +185,8 @@ func TestAccResourceBundleInstall(t *testing.T) {
 				bundleInstallArtifactoryInstall.Artifactory.Username.Set(artUser)
 			}
 			bundleInstallArtifactoryInstall.Artifactory.Token.Set(artToken)
-			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-packagespec-buildcache-local/cache-v1/vault-enterprise/7fb88d4d3d0a36ffc78a522d870492e5791bae1b0640232ce4c6d69cc22cf520/store/f45845666b4e552bfc8ca775834a3ef6fc097fe0-1a2809da73e5896b6f766b395ff6e1804f876c45.zip")
-			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("d01a82111133908167a5a140604ab3ec8fd18601758376a5f8e9dd54c7703373")
+			bundleInstallArtifactoryInstall.Artifactory.URL.Set("https://artifactory.hashicorp.engineering/artifactory/hashicorp-crt-prod-local/vault-enterprise/1.20.2%2Bent/8e95c64a526fa9f8aa0b822fcf5080eb0f6226be/vault_1.20.2%2Bent_linux_amd64.zip")
+			bundleInstallArtifactoryInstall.Artifactory.SHA256.Set("081e592c87d9209e0e77b8e7092ba71d9be64ba6eee0fafc935d9044d9c2afb3")
 			ssh := newEmbeddedTransportSSH()
 			ssh.Host.Set(enosVars["host"])
 			require.NoError(t, bundleInstallArtifactoryInstall.Transport.SetTransportState(ssh))

@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"regexp"
+	"slices"
 )
 
 // Binaries are the embedded enos-flight-control binaries
@@ -63,10 +64,8 @@ func SupportedTarget(platform, arch string) (bool, error) {
 		return false, nil
 	}
 
-	for _, a := range archs {
-		if arch == a {
-			return true, nil
-		}
+	if slices.Contains(archs, arch) {
+		return true, nil
 	}
 
 	return false, nil

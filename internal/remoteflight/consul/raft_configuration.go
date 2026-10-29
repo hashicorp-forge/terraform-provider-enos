@@ -122,7 +122,8 @@ func GetRaftConfiguration(ctx context.Context, tr it.Transport, req *RaftConfigu
 
 // String returns the request as a string.
 func (r *RaftConfigurationRequest) String() string {
-	return fmt.Sprintf("%s download --url '%s/v1/operator/raft/configuration' --stdout",
+	return fmt.Sprintf(
+		"%s download --url '%s/v1/operator/raft/configuration' --stdout",
 		r.FlightControlPath,
 		r.ConsulAddr,
 	)

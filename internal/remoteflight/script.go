@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/random"
@@ -60,9 +61,7 @@ func NewRunScriptRequest(opts ...RunScriptRequestOpt) *RunScriptRequest {
 // WithRunScriptEnv sets the environment variables.
 func WithRunScriptEnv(env map[string]string) RunScriptRequestOpt {
 	return func(cf *RunScriptRequest) *RunScriptRequest {
-		for k, v := range env {
-			cf.Env[k] = v
-		}
+		maps.Copy(cf.Env, env)
 
 		return cf
 	}

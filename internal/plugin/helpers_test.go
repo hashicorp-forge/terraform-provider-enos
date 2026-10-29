@@ -217,7 +217,8 @@ func ensureEnosTransportEnvVars(t *testing.T) (map[string]string, bool) {
 	vars["path"], okpath = os.LookupEnv("ENOS_TRANSPORT_PRIVATE_KEY_PATH")
 
 	if !okacc || !okuser || !okhost || !okpath {
-		t.Logf(`skipping because TF_ACC(%t), ENOS_TRANSPORT_USER(%t), ENOS_TRANSPORT_HOST(%t), and ENOS_TRANSPORT_PRIVATE_KEY_PATH(%t) environment variables need to be set`,
+		t.Logf(
+			`skipping because TF_ACC(%t), ENOS_TRANSPORT_USER(%t), ENOS_TRANSPORT_HOST(%t), and ENOS_TRANSPORT_PRIVATE_KEY_PATH(%t) environment variables need to be set`,
 			okacc, okuser, okhost, okpath,
 		)
 		t.Skip()

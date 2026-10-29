@@ -283,7 +283,7 @@ func (s *vaultUnsealStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *vaultUnsealStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"id":          s.ID,
 		"bin_path":    s.BinPath,
 		"seal_type":   s.SealType,

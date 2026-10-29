@@ -96,7 +96,7 @@ func (e execConfig) computeSHA256(ctx context.Context) (string, error) {
 		sort.Strings(keys)
 
 		for _, key := range keys {
-			b := []byte(fmt.Sprintf("%s:%s", key, env[key]))
+			b := fmt.Appendf(nil, "%s:%s", key, env[key])
 			sha := fmt.Sprintf("%x", sha256.Sum256(b))
 			ag.WriteString(sha)
 		}

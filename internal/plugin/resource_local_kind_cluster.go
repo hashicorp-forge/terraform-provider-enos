@@ -141,7 +141,7 @@ func (r *localKindCluster) ReadResource(ctx context.Context, req tfprotov6.ReadR
 		return
 	}
 
-	tflog.Info(ctx, "Reading Local Kind Cluster", map[string]interface{}{
+	tflog.Info(ctx, "Reading Local Kind Cluster", map[string]any{
 		"name":              newState.Name,
 		"kubeconfig_base64": newState.KubeConfigBase64,
 	})
@@ -236,7 +236,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req resource
 
 	switch {
 	case req.IsDelete():
-		logger.Debug("Destroying a local kind cluster", map[string]interface{}{
+		logger.Debug("Destroying a local kind cluster", map[string]any{
 			"name":            priorState.Name.Val,
 			"kubeconfig_path": priorState.KubeConfigPath.Val,
 		})
@@ -259,7 +259,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req resource
 			return
 		}
 	case req.IsCreate():
-		logger.Debug("Create a local kind cluster", map[string]interface{}{
+		logger.Debug("Create a local kind cluster", map[string]any{
 			"name":            plannedState.Name.Val,
 			"kubeconfig_path": plannedState.KubeConfigPath.Val,
 		})
@@ -287,7 +287,7 @@ func (r *localKindCluster) ApplyResourceChange(ctx context.Context, req resource
 		plannedState.ClusterCACertificate.Set(info.ClusterCACertificate)
 		plannedState.Endpoint.Set(info.Endpoint)
 	case req.IsUpdate():
-		tflog.Warn(ctx, "Unexpected resource update for local kind cluster", map[string]interface{}{
+		tflog.Warn(ctx, "Unexpected resource update for local kind cluster", map[string]any{
 			"name":            plannedState.Name.Val,
 			"kubeconfig_path": plannedState.KubeConfigPath.Val,
 		})
@@ -388,7 +388,7 @@ The ^enos_local_kind_cluster^ can be used to create a [kind cluster](https://kin
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (s *localKindClusterStateV1) FromTerraform5Value(val tftypes.Value) error {
-	if _, err := mapAttributesTo(val, map[string]interface{}{
+	if _, err := mapAttributesTo(val, map[string]any{
 		"id":                     s.ID,
 		"name":                   s.Name,
 		"kubeconfig_path":        s.KubeConfigPath,

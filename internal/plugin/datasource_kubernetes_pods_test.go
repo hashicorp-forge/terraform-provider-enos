@@ -197,7 +197,8 @@ func testProvider(queryResults []kubernetes.PodInfo) map[string]func() (tfprotov
 		server.RegisterProvider(newProvider()),
 		server.RegisterDataRouter(dr.New(
 			dr.RegisterDataSource(ds),
-		)))
+		)),
+	)
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		//nolint:unparam// we always return nil here but we have to adhere to an interface that can return an error

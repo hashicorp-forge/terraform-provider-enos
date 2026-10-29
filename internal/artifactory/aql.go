@@ -5,6 +5,7 @@ package artifactory
 
 import (
 	"encoding/json"
+	"maps"
 	"text/template"
 )
 
@@ -129,9 +130,7 @@ func WithProperty(key, value string) SearchAQLOpt {
 
 func WithProperties(props map[string]string) SearchAQLOpt {
 	return func(req *SearchAQLRequest) *SearchAQLRequest {
-		for k, v := range props {
-			req.Properties[k] = v
-		}
+		maps.Copy(req.Properties, props)
 
 		return req
 	}

@@ -382,7 +382,7 @@ func (s *consulStartStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Consul with As().
 func (s *consulStartStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"bin_path":   s.BinPath,
 		"config_dir": s.ConfigDir,
 		"data_dir":   s.DataDir,
@@ -489,7 +489,7 @@ func (c *consulConfig) Terraform5Value() tftypes.Value {
 
 // FromTerraform5Value unmarshals the value to the struct.
 func (c *consulConfig) FromTerraform5Value(val tftypes.Value) error {
-	_, err := mapAttributesTo(val, map[string]interface{}{
+	_, err := mapAttributesTo(val, map[string]any{
 		"bind_addr":        c.BindAddr,
 		"data_dir":         c.DataDir,
 		"datacenter":       c.Datacenter,
@@ -710,7 +710,8 @@ func (s *consulStartStateV1) startConsul(ctx context.Context, transport it.Trans
 	}
 
 	if minNodes, ok := s.Config.BootstrapExpect.Get(); ok {
-		checks = append(checks,
+		checks = append(
+			checks,
 			consul.CheckStateClusterHasMinNVoters(uint(minNodes)),
 			consul.CheckStateClusterHasMinNHealthyNodes(uint(minNodes)),
 		)

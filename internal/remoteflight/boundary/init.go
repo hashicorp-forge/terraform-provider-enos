@@ -167,7 +167,8 @@ func Init(ctx context.Context, tr it.Transport, req *InitRequest) (*InitResponse
 
 	stdout, stderr, err := tr.Run(ctx, command.New(
 		req.String(),
-		command.WithEnvVars(envVars)))
+		command.WithEnvVars(envVars),
+	))
 	if err != nil {
 		return res, fmt.Errorf("failed to init: %s stderr: %s", err, stderr)
 	}

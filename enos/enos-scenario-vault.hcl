@@ -11,18 +11,13 @@ scenario "vault" {
     configure_retry_join = ["true", "false"]
     use                  = ["dev", "prod"]
     unseal_method        = ["shamir", "awskms"]
-    version              = ["1.8.12", "1.9.10", "1.10.11", "1.11.12", "1.12.11", "1.13.13", "1.14.10", "1.15.5"]
+    # Use versions that are available for ce and ent
+    version = ["1.16.3", "1.17.6", "1.18.5", "1.19.5", "1.20.4", "1.21.4", "2.0.3"]
 
     exclude {
       backend = ["consul"]
       # Don't test super old versions with consul because it can be flaky
-      version = ["1.8.12", "1.9.10", "1.10.11"]
-    }
-
-    exclude {
-      unseal_method = ["shamir"]
-      # Don't test super old versions with shamir because it can be flaky
-      version = ["1.8.12", "1.9.10", "1.10.11"]
+      version = ["1.21.5", "1.22.7", "2.0.1"]
     }
   }
 

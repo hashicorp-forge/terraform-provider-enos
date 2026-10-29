@@ -140,7 +140,8 @@ func GetSealStatus(ctx context.Context, tr it.Transport, req *SealStatusRequest)
 // series the API changed to conform to what `vault read` expects, but we have
 // get the raw body to support prior and post response body types.
 func (r *SealStatusRequest) String() string {
-	return fmt.Sprintf("%s download --stdout --url '%s/v1/sys/seal-status'",
+	return fmt.Sprintf(
+		"%s download --stdout --url '%s/v1/sys/seal-status'",
 		r.FlightControlPath,
 		r.VaultAddr,
 	)

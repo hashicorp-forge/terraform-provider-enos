@@ -37,7 +37,8 @@ func newVaultSealsConfig() *vaultSealsConfig {
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
 	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vaultSealsConfig", val.String()),
+		return AttributePathError(
+			fmt.Errorf("cannot unmarshal %s into nil vaultSealsConfig", val.String()),
 			"config", "seals",
 		)
 	}
@@ -74,7 +75,8 @@ func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
 		switch key {
 		case "primary", "secondary", "tertiary":
 		default:
-			return AttributePathError(fmt.Errorf("unknown configuration '%s', expected 'primary', 'secondary', or 'tertiary'", key),
+			return AttributePathError(
+				fmt.Errorf("unknown configuration '%s', expected 'primary', 'secondary', or 'tertiary'", key),
 				"config", "seals", "primary",
 			)
 		}
@@ -93,8 +95,10 @@ func (s *vaultSealsConfig) FromTerraform5Value(val tftypes.Value) error {
 			}
 
 			if !val.Type().Equal(lastType) {
-				return AttributePathError(fmt.Errorf(
-					"unable to configure more than one seal type as a map value. Try unquoting '%s', and all other seals, to set them as an object attributes", key),
+				return AttributePathError(
+					fmt.Errorf(
+						"unable to configure more than one seal type as a map value. Try unquoting '%s', and all other seals, to set them as an object attributes", key,
+					),
 					"config", "seals", key,
 				)
 			}
@@ -137,6 +141,10 @@ func (s *vaultSealsConfig) Terraform5Type() tftypes.Type {
 // Terraform5Value is the tftypes.Value.
 func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
 	if s.Null {
+		if s.RawValue.Type() != nil {
+			return tftypes.NewValue(s.RawValue.Type(), map[string]tftypes.Value{})
+		}
+
 		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
 	}
 
@@ -162,6 +170,10 @@ func (s *vaultSealsConfig) Terraform5Value() tftypes.Value {
 	}
 
 	if len(vals) == 0 {
+		if s.RawValue.Type() != nil {
+			return tftypes.NewValue(s.RawValue.Type(), map[string]tftypes.Value{})
+		}
+
 		return tftypes.NewValue(tftypes.DynamicPseudoType, nil)
 	}
 

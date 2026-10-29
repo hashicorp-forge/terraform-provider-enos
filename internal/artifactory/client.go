@@ -79,7 +79,7 @@ func (c *Client) SearchAQL(ctx context.Context, req *SearchAQLRequest) (*SearchA
 
 	query := buf.String()
 
-	tflog.Info(ctx, "searching for artifactory item", map[string]interface{}{
+	tflog.Info(ctx, "searching for artifactory item", map[string]any{
 		"url":   search.String,
 		"query": query,
 	})

@@ -140,7 +140,7 @@ func (em *embeddedTransportSSHv1) IsConfigured() bool {
 }
 
 func (em *embeddedTransportSSHv1) FromTerraform5Value(val tftypes.Value) (err error) {
-	em.Values, err = mapAttributesTo(val, map[string]interface{}{
+	em.Values, err = mapAttributesTo(val, map[string]any{
 		"user":             em.User,
 		"host":             em.Host,
 		"private_key":      em.PrivateKey,

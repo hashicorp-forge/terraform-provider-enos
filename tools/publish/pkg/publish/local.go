@@ -198,7 +198,8 @@ func (l *Local) AddGoBinariesFrom(binPath string) error {
 	defer l.mu.Unlock()
 
 	var err error
-	l.log.Infow("scanning for binaries",
+	l.log.Infow(
+		"scanning for binaries",
 		"path", binPath,
 		"provider-binary-name", l.binaryName,
 		"provider-binary-rename", l.binaryRename,
@@ -249,7 +250,8 @@ func (l *Local) AddGoBinariesFrom(binPath string) error {
 		arch := parts[3]
 		releasePath := path
 
-		l.log.Debugw("found provider binary",
+		l.log.Debugw(
+			"found provider binary",
 			"binary_name", binaryName,
 			"version", version,
 			"platform", platform,
@@ -263,7 +265,8 @@ func (l *Local) AddGoBinariesFrom(binPath string) error {
 				l.binaryRename, version, platform, arch,
 			}, "_"))
 
-			l.log.Infow("renaming provider binary",
+			l.log.Infow(
+				"renaming provider binary",
 				"original_name", binaryName,
 				"new_name", l.binaryRename,
 				"original_path", releasePath,
@@ -284,6 +287,7 @@ func (l *Local) AddGoBinariesFrom(binPath string) error {
 				return err
 			}
 
+			//nolint:gosec
 			sourceFile, err := os.Open(releasePath)
 			if err != nil {
 				return err

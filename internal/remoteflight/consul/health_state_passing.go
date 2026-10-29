@@ -111,7 +111,8 @@ func GetHealthStatePassing(ctx context.Context, tr it.Transport, req *HealthStat
 
 // String returns the request as a string.
 func (r *HealthStatePassingRequest) String() string {
-	return fmt.Sprintf("%s download --url '%s/v1/health/state/passing' --stdout",
+	return fmt.Sprintf(
+		"%s download --url '%s/v1/health/state/passing' --stdout",
 		r.FlightControlPath,
 		r.ConsulAddr,
 	)

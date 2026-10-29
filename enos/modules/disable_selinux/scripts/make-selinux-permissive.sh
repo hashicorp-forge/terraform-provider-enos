@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Copyright IBM Corp. 2016, 2025
+# SPDX-License-Identifier: MPL-2.0
+
+set -e
+
+fail() {
+  echo "$1" 1>&2
+  exit 1
+}
+
+if ! sudo bash -c 'type getenforce'; then
+  exit 0
+fi
+
+if sudo getenforce | grep Enforcing; then
+  sudo setenforce 0
+fi

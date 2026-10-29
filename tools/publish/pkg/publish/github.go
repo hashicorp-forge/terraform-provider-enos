@@ -66,7 +66,8 @@ func (g *githubClient) createRelease(
 ) (*github.RepositoryRelease, *github.Response, error) {
 	owner, repo := req.OwnerRepo()
 
-	g.Log.Infow("creating github release",
+	g.Log.Infow(
+		"creating github release",
 		"owner", owner,
 		"repo", repo,
 		"req", fmt.Sprintf("%+v", req.GithubRelease),
@@ -94,7 +95,8 @@ func (g *githubClient) uploadAsset(
 		MediaType: mediaType,
 	}
 
-	g.Log.Infow("uploading github release asset",
+	g.Log.Infow(
+		"uploading github release asset",
 		"owner", owner,
 		"repo", repo,
 		"id", rel.GetID(),

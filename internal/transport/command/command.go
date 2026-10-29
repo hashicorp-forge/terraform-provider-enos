@@ -5,6 +5,7 @@ package command
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	it "github.com/hashicorp-forge/terraform-provider-enos/internal/transport"
@@ -37,9 +38,7 @@ func New(command string, opts ...Opt) it.Command {
 // WithEnvVars sets the environment variables.
 func WithEnvVars(vars map[string]string) func(*cmd) {
 	return func(c *cmd) {
-		for key, val := range vars {
-			c.env[key] = val
-		}
+		maps.Copy(c.env, vars)
 	}
 }
 
@@ -54,7 +53,7 @@ func (c *cmd) Cmd() string {
 	cmd := strings.Builder{}
 
 	for key, val := range c.env {
-		cmd.WriteString(fmt.Sprintf("%s='%s' ", key, val))
+		fmt.Fprintf(&cmd, "%s='%s' ", key, val)
 	}
 
 	cmd.WriteString(c.cmd)

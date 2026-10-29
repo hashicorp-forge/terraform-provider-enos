@@ -109,7 +109,7 @@ func (em *embeddedTransportNomadv1) IsConfigured() bool {
 }
 
 func (em *embeddedTransportNomadv1) FromTerraform5Value(val tftypes.Value) (err error) {
-	em.Values, err = mapAttributesTo(val, map[string]interface{}{
+	em.Values, err = mapAttributesTo(val, map[string]any{
 		"host":          em.Host,
 		"secret_id":     em.SecretID,
 		"allocation_id": em.AllocationID,

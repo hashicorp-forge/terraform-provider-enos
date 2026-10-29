@@ -62,7 +62,7 @@ func upgradeState(currentState state.Serializable, newValues tftypes.Value) (*tf
 // marshaled tftypes.Value. The props is a property map that dictates which val
 // field to map to the which go value. The value of the prop map should be a
 // pointer to valid value.
-func mapAttributesTo(val tftypes.Value, props map[string]interface{}) (map[string]tftypes.Value, error) {
+func mapAttributesTo(val tftypes.Value, props map[string]any) (map[string]tftypes.Value, error) {
 	vals := map[string]tftypes.Value{}
 	err := val.As(&vals)
 	if err != nil {
@@ -730,7 +730,7 @@ func newTfObject() *tfObject {
 	return &tfObject{
 		Null:      true,
 		AttrTypes: map[string]tftypes.Type{},
-		Val:       map[string]interface{}{},
+		Val:       map[string]any{},
 		Optional:  map[string]struct{}{},
 	}
 }
@@ -739,7 +739,7 @@ type tfObject struct {
 	Unknown   bool
 	Null      bool
 	AttrTypes map[string]tftypes.Type
-	Val       map[string]interface{}
+	Val       map[string]any
 	Optional  map[string]struct{}
 }
 
@@ -835,7 +835,7 @@ func (b *tfObject) FromTFValue(val tftypes.Value) error {
 	case val.Equal(nullDSTVal), val.Equal(tftypes.NewValue(tftypes.DynamicPseudoType, nil)):
 		b.Null = true
 	default:
-		res := map[string]interface{}{}
+		res := map[string]any{}
 		vals := map[string]tftypes.Value{}
 		err := val.As(&vals)
 		if err != nil {
@@ -918,7 +918,7 @@ func (b *tfObject) FromTFValue(val tftypes.Value) error {
 }
 
 // Get will return the object as map of tf* types.
-func (b *tfObject) Get() (map[string]interface{}, bool) {
+func (b *tfObject) Get() (map[string]any, bool) {
 	if b.Unknown || b.Null {
 		return b.Val, false
 	}
@@ -927,8 +927,8 @@ func (b *tfObject) Get() (map[string]interface{}, bool) {
 }
 
 // GetObject will return the object as a map of native go types.
-func (b *tfObject) GetObject() (map[string]interface{}, bool) {
-	objs := map[string]interface{}{}
+func (b *tfObject) GetObject() (map[string]any, bool) {
+	objs := map[string]any{}
 
 	tfAttrs, ok := b.Get()
 	if !ok {
@@ -941,43 +941,43 @@ func (b *tfObject) GetObject() (map[string]interface{}, bool) {
 			if str, ok := t.Get(); ok {
 				objs[key] = str
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfNum:
 			if num, ok := t.Get(); ok {
 				objs[key] = num
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfBool:
 			if b, ok := t.Get(); ok {
 				objs[key] = b
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfStringSlice:
 			if strs, ok := t.GetStrings(); ok {
 				objs[key] = strs
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfStringMap:
 			if strs, ok := t.GetStrings(); ok {
 				objs[key] = strs
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfObject:
 			if obj, ok := t.GetObject(); ok {
 				objs[key] = obj
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		case *tfObjectSlice:
 			if obj, ok := t.GetObjects(); ok {
 				objs[key] = obj
 			} else {
-				return map[string]interface{}{}, false
+				return map[string]any{}, false
 			}
 		default:
 			objs[key] = obj
@@ -987,11 +987,11 @@ func (b *tfObject) GetObject() (map[string]interface{}, bool) {
 	return objs, true
 }
 
-func (b *tfObject) Value() map[string]interface{} {
+func (b *tfObject) Value() map[string]any {
 	return b.Val
 }
 
-func (b *tfObject) Set(obj map[string]interface{}) {
+func (b *tfObject) Set(obj map[string]any) {
 	b.Unknown = false
 	b.Null = false
 	b.Val = obj
@@ -1099,8 +1099,8 @@ func (b *tfObjectSlice) Get() ([]*tfObject, bool) {
 	return b.Val, true
 }
 
-func (b *tfObjectSlice) GetObjects() ([]map[string]interface{}, bool) {
-	res := []map[string]interface{}{}
+func (b *tfObjectSlice) GetObjects() ([]map[string]any, bool) {
+	res := []map[string]any{}
 	objs, ok := b.Get()
 	if !ok {
 		return res, ok
@@ -1122,7 +1122,7 @@ func (b *tfObjectSlice) Value() []*tfObject {
 	return b.Val
 }
 
-func (b *tfObjectSlice) ObjectsValue() []map[string]interface{} {
+func (b *tfObjectSlice) ObjectsValue() []map[string]any {
 	obs, _ := b.GetObjects()
 	return obs
 }
@@ -1133,7 +1133,7 @@ func (b *tfObjectSlice) Set(objs []*tfObject) {
 	b.Val = objs
 }
 
-func (b *tfObjectSlice) SetObjects(objs []map[string]interface{}) {
+func (b *tfObjectSlice) SetObjects(objs []map[string]any) {
 	b.Unknown = false
 	b.Null = false
 	tfObjs := []*tfObject{}

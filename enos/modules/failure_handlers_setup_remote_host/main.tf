@@ -17,10 +17,9 @@ terraform {
 data "aws_ami" "ubuntu" {
   most_recent = true
 
-  # Currently latest LTS-1
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-*-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
   }
 
   filter {
@@ -52,6 +51,15 @@ resource "aws_instance" "this" {
   subnet_id = tolist(data.aws_subnets.infra.ids)[0]
 
   vpc_security_group_ids = [aws_security_group.this.id]
+
+  root_block_device {
+    encrypted = true
+  }
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
 
   tags = var.tags
 }

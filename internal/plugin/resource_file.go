@@ -345,7 +345,7 @@ func (fs *fileStateV1) Validate(ctx context.Context) error {
 
 // FromTerraform5Value is a callback to unmarshal from the tftypes.Vault with As().
 func (fs *fileStateV1) FromTerraform5Value(val tftypes.Value) error {
-	vals, err := mapAttributesTo(val, map[string]interface{}{
+	vals, err := mapAttributesTo(val, map[string]any{
 		"id":          fs.ID,
 		"source":      fs.Src,
 		"destination": fs.Dst,

@@ -8,72 +8,27 @@ locals {
   ids = {
     "arm64" = {
       "rhel" = {
-        "8.8" = data.aws_ami.rhel_88["arm64"].id
-        "9.1" = data.aws_ami.rhel_91["arm64"].id
+        "9.8"  = data.aws_ami.rhel_98["arm64"].id
+        "10.2" = data.aws_ami.rhel_102["arm64"].id
       }
       "ubuntu" = {
-        "18.04" = data.aws_ami.ubuntu_1804["arm64"].id
-        "20.04" = data.aws_ami.ubuntu_2004["arm64"].id
         "22.04" = data.aws_ami.ubuntu_2204["arm64"].id
+        "24.04" = data.aws_ami.ubuntu_2404["arm64"].id
+        "26.04" = data.aws_ami.ubuntu_2604["arm64"].id
       }
     }
     "amd64" = {
       "rhel" = {
-        "7.9" = data.aws_ami.rhel_79.id
-        "8.8" = data.aws_ami.rhel_88["x86_64"].id
-        "9.1" = data.aws_ami.rhel_91["x86_64"].id
+        "9.8"  = data.aws_ami.rhel_98["x86_64"].id
+        "10.2" = data.aws_ami.rhel_102["x86_64"].id
       }
       "ubuntu" = {
-        "18.04" = data.aws_ami.ubuntu_1804["x86_64"].id
-        "20.04" = data.aws_ami.ubuntu_2004["x86_64"].id
         "22.04" = data.aws_ami.ubuntu_2204["x86_64"].id
+        "24.04" = data.aws_ami.ubuntu_2404["x86_64"].id
+        "26.04" = data.aws_ami.ubuntu_2604["x86_64"].id
       }
     }
   }
-}
-
-data "aws_ami" "ubuntu_1804" {
-  most_recent = true
-  for_each    = local.architectures
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-*-18.04-*-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = [each.value]
-  }
-
-  owners = [local.canonical_owner_id]
-}
-
-data "aws_ami" "ubuntu_2004" {
-  most_recent = true
-  for_each    = local.architectures
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-*-20.04-*-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = [each.value]
-  }
-
-  owners = [local.canonical_owner_id]
 }
 
 data "aws_ami" "ubuntu_2204" {
@@ -98,13 +53,13 @@ data "aws_ami" "ubuntu_2204" {
   owners = [local.canonical_owner_id]
 }
 
-data "aws_ami" "rhel_79" {
+data "aws_ami" "ubuntu_2404" {
   most_recent = true
+  for_each    = local.architectures
 
-  # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-7.9*HVM-20*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-*-server-*"]
   }
 
   filter {
@@ -114,20 +69,42 @@ data "aws_ami" "rhel_79" {
 
   filter {
     name   = "architecture"
-    values = ["x86_64"]
+    values = [each.value]
   }
 
-  owners = [local.rhel_owner_id]
+  owners = [local.canonical_owner_id]
 }
 
-data "aws_ami" "rhel_88" {
+data "aws_ami" "ubuntu_2604" {
+  most_recent = true
+  for_each    = local.architectures
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-*-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = [each.value]
+  }
+
+  owners = [local.canonical_owner_id]
+}
+
+data "aws_ami" "rhel_98" {
   most_recent = true
   for_each    = local.architectures
 
   # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-8.8*HVM-20*"]
+    values = ["RHEL-9.8*HVM_GA-20*"]
   }
 
   filter {
@@ -143,14 +120,13 @@ data "aws_ami" "rhel_88" {
   owners = [local.rhel_owner_id]
 }
 
-data "aws_ami" "rhel_91" {
+data "aws_ami" "rhel_102" {
   most_recent = true
   for_each    = local.architectures
 
-  # Currently latest latest point release-1
   filter {
     name   = "name"
-    values = ["RHEL-9.1*HVM-20*"]
+    values = ["RHEL-10.2*HVM_GA-20*"]
   }
 
   filter {

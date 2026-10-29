@@ -135,7 +135,8 @@ func GetHealthNode(ctx context.Context, tr it.Transport, req *HealthNodeRequest)
 
 // String returns the request as a string.
 func (r *HealthNodeRequest) String() string {
-	return fmt.Sprintf("%s download --url '%s/v1/health/node/%s' --stdout",
+	return fmt.Sprintf(
+		"%s download --url '%s/v1/health/node/%s' --stdout",
 		r.FlightControlPath,
 		r.ConsulAddr,
 		r.NodeName,

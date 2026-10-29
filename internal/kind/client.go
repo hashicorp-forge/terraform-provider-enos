@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -124,7 +125,7 @@ func (c *localClient) CreateCluster(request CreateKindClusterRequest) (ClusterIn
 		return EmptyClusterInfo, errors.New("cannot create a cluster with an empty cluster 'name'")
 	}
 
-	logFields := map[string]interface{}{"name": request.Name}
+	logFields := map[string]any{"name": request.Name}
 
 	var copts []cluster.CreateOption
 
@@ -194,7 +195,7 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
 	}
 
-	c.logger.Info("Destroying Local Kind Cluster", map[string]interface{}{
+	c.logger.Info("Destroying Local Kind Cluster", map[string]any{
 		"name":            request.Name,
 		"kubeconfig_path": kubeConfigPath,
 	})
@@ -205,7 +206,7 @@ func (c *localClient) DeleteCluster(request DeleteKindClusterRequest) error {
 		return fmt.Errorf("failed to destroy cluster, due to: %w", err)
 	}
 
-	c.logger.Info("Local Kind Cluster Destroyed", map[string]interface{}{
+	c.logger.Info("Local Kind Cluster Destroyed", map[string]any{
 		"name":            request.Name,
 		"kubeconfig_path": kubeConfigPath,
 	})
@@ -262,17 +263,25 @@ func (c *localClient) loadImageArchive(archive, clusterName string) (LoadedImage
 	if len(nodes) == 0 {
 		return result, fmt.Errorf("no nodes found for cluster: [%s]", clusterName)
 	}
-
 	tarFile, err := os.Open(archive)
 	if err != nil {
 		return result, fmt.Errorf("failed to open image archive: [%s], due to: %w", archive, err)
 	}
 	defer tarFile.Close()
 
-	for _, node := range nodes {
-		if err := nodeutils.LoadImageArchive(node, tarFile); err != nil {
+	for i, node := range nodes {
+		if i != 0 {
+			_, err := tarFile.Seek(0, io.SeekStart)
+			if err != nil {
+				return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
+			}
+		}
+
+		err = nodeutils.LoadImageArchive(node, tarFile)
+		if err != nil {
 			return result, fmt.Errorf("failed to load image archive: [%s] to cluster: [%s], due to: %w", archive, clusterName, err)
 		}
+
 		result.Nodes = append(result.Nodes, node.String())
 	}
 

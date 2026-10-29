@@ -6,6 +6,8 @@
 *.dylib
 *.pem
 
+.bob/*
+
 # Test binary, built with `go test -c`
 *.test
 bin/*

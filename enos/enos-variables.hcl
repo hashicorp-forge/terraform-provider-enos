@@ -8,7 +8,7 @@ variable "consul_release" {
   })
   description = "Consul release version and edition to install from releases.hashicorp.com"
   default = {
-    version = "1.18.0"
+    version = "2.0.1"
     edition = "ce"
   }
 }

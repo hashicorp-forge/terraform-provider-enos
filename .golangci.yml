@@ -36,6 +36,7 @@ linters:
     - gocritic
     - gocyclo
     - godox
+    - godoclint
     - goheader
     - gomoddirectives
     - importas
@@ -50,6 +51,7 @@ linters:
     - noinlineerr
     - nonamedreturns
     - nosprintfhostport
+    - prealloc
     - predeclared
     - promlinter
     - rowserrcheck

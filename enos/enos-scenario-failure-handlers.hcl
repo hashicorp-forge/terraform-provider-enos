@@ -32,7 +32,6 @@ scenario "failure_handlers" {
     module = module.aws_infra
 
     variables {
-      ami_architectures  = ["amd64"]
       availability_zones = step.find_azs.availability_zones
     }
   }

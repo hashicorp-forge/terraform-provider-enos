@@ -49,6 +49,7 @@ func newVaultListenerConfig() *vaultListenerConfig {
 	}
 }
 
+//nolint:unparam // typ is only "tcp" right now but could be more
 func newVaultListenerConfigSet(typ string, attrs map[string]map[string]any) *vaultListenerConfigSet {
 	return &vaultListenerConfigSet{typ: typ, attrs: attrs}
 }
@@ -80,7 +81,8 @@ func (s *vaultListenerConfig) Set(set *vaultListenerConfigSet) {
 // FromTerraform5Value unmarshals the value to the struct.
 func (s *vaultListenerConfig) FromTerraform5Value(val tftypes.Value) error {
 	if s == nil {
-		return AttributePathError(fmt.Errorf("cannot unmarshal %s into nil vault listener config", val.String()),
+		return AttributePathError(
+			fmt.Errorf("cannot unmarshal %s into nil vault listener config", val.String()),
 			"config", "listener",
 		)
 	}

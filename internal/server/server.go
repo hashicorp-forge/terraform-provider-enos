@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp-forge/terraform-provider-enos/internal/server/resourcerouter"
 )
 
+var _ tfprotov6.ProviderServer = (*Server)(nil)
+
 // Server is our gRPC ProviderServer.
 type Server struct {
 	provider       Provider
