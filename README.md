@@ -10,6 +10,8 @@ Terraform-based quality requirement scenarios using a composable, modular, and d
 It is intended to be use in conjunction with the [Enos CLI](https://github.com/hashicorp/enos) and
 provide the resources necessary to use Terraform as Enos's execution engine.
 
+[Enos Docs](https://hashicorp.atlassian.net/wiki/x/GQCKOwE)
+
 - [Installing the provider](#installing-the-provider)
   - [Requirements](#requirements)
   - [From the Terraform registry](#from-the-terraform-registry)
