@@ -257,13 +257,53 @@ func TestTFStringMapGetAndValue(t *testing.T) {
 			map[string]string{},
 			false,
 		},
+		{
+			"known with null child",
+			&tfStringMap{Val: map[string]*tfString{"A": {Val: "foo"}, "B": {Null: true}, "C": {Val: "bar"}}},
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{
+				"A": tftypes.NewValue(tftypes.String, "foo"),
+				"B": tftypes.NewValue(tftypes.String, nil),
+				"C": tftypes.NewValue(tftypes.String, "bar"),
+			}),
+			map[string]string{"A": "foo", "C": "bar"},
+			true,
+		},
+		{
+			"only null children",
+			&tfStringMap{Val: map[string]*tfString{"B": {Null: true}}},
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{
+				"B": tftypes.NewValue(tftypes.String, nil),
+			}),
+			map[string]string{},
+			true,
+		},
+		{
+			"null and unknown children",
+			&tfStringMap{Val: map[string]*tfString{"A": {Val: "foo"}, "B": {Null: true}, "C": {Unknown: true}}},
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{
+				"A": tftypes.NewValue(tftypes.String, "foo"),
+				"B": tftypes.NewValue(tftypes.String, nil),
+				"C": tftypes.NewValue(tftypes.String, tftypes.UnknownValue),
+			}),
+			map[string]string{},
+			false,
+		},
+		{
+			"empty",
+			&tfStringMap{Val: map[string]*tfString{}},
+			tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil),
+			map[string]string{},
+			true,
+		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 			require.True(t, test.in.TFValue().Equal(test.value))
-			val, ok := test.in.GetStrings()
-			require.Equal(t, test.val, val)
-			require.Equal(t, test.ok, ok)
+			for range 50 {
+				val, ok := test.in.GetStrings()
+				require.Equal(t, test.val, val)
+				require.Equal(t, test.ok, ok)
+			}
 		})
 	}
 }

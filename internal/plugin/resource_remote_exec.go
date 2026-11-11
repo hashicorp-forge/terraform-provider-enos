@@ -420,7 +420,10 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transpo
 	// TODO: Eventually we'll probably have to support /tmp being mounted
 	// with no exec. In those cases we'll have to make this configurable
 	// or find another strategy for executing scripts.
-	env, _ := state.Env.GetStrings()
+	env, ok := state.Env.GetStrings()
+	if !ok && !state.Env.Null && !state.Env.Unknown {
+		return fmt.Errorf("unable to resolve environment variables: all values must be known")
+	}
 	res, err := remoteflight.RunScript(ctx, client, remoteflight.NewRunScriptRequest(
 		remoteflight.WithRunScriptContent(src),
 		remoteflight.WithRunScriptDestination(fmt.Sprintf("/tmp/%s-%s.sh", state.ID.Value(), sha)),
