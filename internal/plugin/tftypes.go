@@ -653,9 +653,15 @@ func (b *tfStringMap) GetStrings() (map[string]string, bool) {
 	}
 
 	for key, str := range strs {
+		// Null values are treated as unset and omitted. Unknown values cannot
+		// be resolved yet, so never return a partial map for them.
+		if str == nil || str.Null {
+			continue
+		}
+
 		v, ok := str.Get()
 		if !ok {
-			return res, ok
+			return map[string]string{}, false
 		}
 
 		res[key] = v
@@ -706,8 +712,7 @@ func (b *tfStringMap) FullyKnown() bool {
 	}
 
 	for _, v := range val {
-		_, ok := v.Get()
-		if !ok {
+		if v != nil && v.Unknown {
 			return false
 		}
 	}
