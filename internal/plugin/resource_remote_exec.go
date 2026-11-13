@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -422,7 +423,7 @@ func (r *remoteExec) copyAndRun(ctx context.Context, ui ui.UI, client it.Transpo
 	// or find another strategy for executing scripts.
 	env, ok := state.Env.GetStrings()
 	if !ok && !state.Env.Null && !state.Env.Unknown {
-		return fmt.Errorf("unable to resolve environment variables: all values must be known")
+		return errors.New("unable to resolve environment variables: all values must be known")
 	}
 	res, err := remoteflight.RunScript(ctx, client, remoteflight.NewRunScriptRequest(
 		remoteflight.WithRunScriptContent(src),
