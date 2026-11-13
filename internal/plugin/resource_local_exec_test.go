@@ -243,5 +243,5 @@ func TestResourceReAppliedWhenEnvChanges(t *testing.T) {
 
 	actual, err := io.ReadAll(f)
 	require.NoError(t, err)
-	require.Equal(t, "hello\nhello\n", string(actual))
+	require.Equal(t, "hello\nhello\n", string(actual)) //nolint:dupword // two lines of output are expected
 }
