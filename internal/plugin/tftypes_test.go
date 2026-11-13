@@ -737,3 +737,11 @@ func TestDebugTfObjectSlice(t *testing.T) {
 		assert.Equal(t, test.expectedDebug, test.val.String())
 	}
 }
+
+// TestTFStringMapFullyKnownWithNullChild tests that null children don't count as unknown.
+func TestTFStringMapFullyKnownWithNullChild(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, (&tfStringMap{Val: map[string]*tfString{"A": {Val: "a"}, "B": {Null: true}}}).FullyKnown())
+	require.False(t, (&tfStringMap{Val: map[string]*tfString{"A": {Val: "a"}, "B": {Unknown: true}}}).FullyKnown())
+}

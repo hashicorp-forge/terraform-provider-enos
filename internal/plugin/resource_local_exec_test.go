@@ -5,6 +5,7 @@ package plugin
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 // TestAccResourceLocalExec tests the local_exec resource.
@@ -142,6 +144,39 @@ EOF
 			ProtoV6ProviderFactories: testProviders(t),
 			Steps:                    steps,
 		})
+	})
+}
+
+//nolint:paralleltest// because our resource handles it
+func TestAccResourceLocalExecNullEnvValue(t *testing.T) {
+	outFile := t.TempDir() + "/env.out"
+
+	resource.ParallelTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProviders(t),
+		Steps: []resource.TestStep{{
+			Config: `resource "enos_local_exec" "null_env" {
+  environment = {
+    A = "foo"
+    B = null
+    C = "bar"
+  }
+  inline = ["env > ` + outFile + `"]
+}`,
+			Check: func(_ *terraform.State) error {
+				out, err := os.ReadFile(outFile)
+				if err != nil {
+					return err
+				}
+				if !regexp.MustCompile(`(?m)^A=foo$`).Match(out) || !regexp.MustCompile(`(?m)^C=bar$`).Match(out) {
+					return fmt.Errorf("expected A and C in env, got: %s", out)
+				}
+				if regexp.MustCompile(`(?m)^B=`).Match(out) {
+					return fmt.Errorf("expected B to be unset, got: %s", out)
+				}
+
+				return nil
+			},
+		}},
 	})
 }
 

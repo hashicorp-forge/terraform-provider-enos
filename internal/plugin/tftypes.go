@@ -712,8 +712,7 @@ func (b *tfStringMap) FullyKnown() bool {
 	}
 
 	for _, v := range val {
-		_, ok := v.Get()
-		if !ok {
+		if v != nil && v.Unknown {
 			return false
 		}
 	}
